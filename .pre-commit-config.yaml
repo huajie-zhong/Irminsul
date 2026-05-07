@@ -1,0 +1,35 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.7
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - pydantic>=2.7
+          - types-requests
+        files: ^src/
+
+  # Dogfood: run irminsul against its own docs once they exist.
+  # Enabled in Week 4 after seed docs are written.
+  # - repo: local
+  #   hooks:
+  #     - id: irminsul-check
+  #       name: irminsul check
+  #       entry: irminsul check --scope=hard
+  #       language: system
+  #       pass_filenames: false
