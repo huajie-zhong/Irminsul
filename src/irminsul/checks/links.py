@@ -1,14 +1,15 @@
 """LinksCheck — internal markdown link integrity.
 
 Walks each doc body via markdown-it and verifies every relative link target
-resolves to an existing file inside the repo. External URLs (`http`/`https`/
-`mailto`/`tel`) and same-doc anchor links (`#heading`) are skipped — same-doc
-anchor validation and external link checking land in Sprint 2.
+resolves to an existing file inside the repo. Also validates anchor fragments:
+same-doc (`#heading`) anchors must match a heading in this doc, cross-doc
+anchors (`path.md#heading`) must match a heading in the target doc. External
+URLs (`http`/`https`/`mailto`/`tel`) are skipped; that's `ExternalLinksCheck`.
 """
 
 from __future__ import annotations
 
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import ClassVar
 from urllib.parse import urlparse
 
@@ -20,16 +21,15 @@ from irminsul.docgraph import DocGraph, DocNode
 _SKIP_SCHEMES = {"http", "https", "mailto", "tel", "ftp", "ftps", "data"}
 
 
-def _is_external_or_anchor(href: str) -> bool:
+def is_external(href: str) -> bool:
+    """Return True for absolute URLs we don't validate (http, mailto, etc.)."""
     if not href:
-        return True
-    if href.startswith("#"):
         return True
     parsed = urlparse(href)
     return parsed.scheme.lower() in _SKIP_SCHEMES
 
 
-def _extract_link_hrefs(body: str, md: MarkdownIt) -> list[str]:
+def extract_link_hrefs(body: str, md: MarkdownIt) -> list[str]:
     """Return every href attribute on a link_open token in the doc body."""
     hrefs: list[str] = []
     tokens = md.parse(body)
@@ -43,17 +43,22 @@ def _extract_link_hrefs(body: str, md: MarkdownIt) -> list[str]:
     return hrefs
 
 
-def _resolve_target(doc: DocNode, href: str, repo_root: PurePosixPath) -> PurePosixPath:
-    """Resolve a relative link's target to a repo-relative POSIX path.
+# Backwards-compatible alias; the underscore-prefixed name is the original.
+_extract_link_hrefs = extract_link_hrefs
 
-    Strips the trailing `#anchor`, treats the href as relative to the doc's
-    parent directory, and joins onto `repo_root` to canonicalize.
-    """
-    target = href.split("#", 1)[0]
+
+def _split_href(href: str) -> tuple[str, str | None]:
+    """Return (path_part, anchor) where anchor is None if no '#' present."""
+    if "#" not in href:
+        return href, None
+    path_part, anchor = href.split("#", 1)
+    return path_part, anchor or None
+
+
+def _resolve_target_path(doc: DocNode, target: str) -> Path:
+    """Resolve a relative target string to a repo-relative POSIX path."""
     doc_parent = PurePosixPath(doc.path.as_posix()).parent
-    # Posix-normalize by going through parts; PurePosixPath handles "../".
     raw = doc_parent / target
-    # PurePosixPath has no resolve(); collapse .. manually.
     parts: list[str] = []
     for part in raw.parts:
         if part == "..":
@@ -61,7 +66,7 @@ def _resolve_target(doc: DocNode, href: str, repo_root: PurePosixPath) -> PurePo
                 parts.pop()
         elif part != ".":
             parts.append(part)
-    return PurePosixPath(*parts)
+    return Path(*parts)
 
 
 class LinksCheck:
@@ -75,15 +80,36 @@ class LinksCheck:
         if graph.repo_root is None:
             return []
 
-        repo_root_posix = PurePosixPath(*graph.repo_root.resolve().parts)
         out: list[Finding] = []
 
         for node in graph.nodes.values():
-            for href in _extract_link_hrefs(node.body, self._md):
-                if _is_external_or_anchor(href):
+            for href in extract_link_hrefs(node.body, self._md):
+                if is_external(href):
                     continue
 
-                target_rel = _resolve_target(node, href, repo_root_posix)
+                path_part, anchor = _split_href(href)
+
+                # Same-doc anchor: validate against this doc's headings.
+                if not path_part:
+                    if anchor is None:
+                        continue
+                    headings = graph.headings.get(node.id, [])
+                    if not any(h.slug == anchor for h in headings):
+                        out.append(
+                            Finding(
+                                check=self.name,
+                                severity=Severity.error,
+                                message=(
+                                    f"unknown anchor: '#{anchor}' has no matching "
+                                    "heading in this doc"
+                                ),
+                                path=node.path,
+                                doc_id=node.id,
+                            )
+                        )
+                    continue
+
+                target_rel = _resolve_target_path(node, path_part)
                 target_abs = graph.repo_root / target_rel
 
                 if not target_abs.exists():
@@ -92,6 +118,31 @@ class LinksCheck:
                             check=self.name,
                             severity=Severity.error,
                             message=f"broken link: '{href}' (resolved to '{target_rel}')",
+                            path=node.path,
+                            doc_id=node.id,
+                        )
+                    )
+                    continue
+
+                # Cross-doc anchor: validate against the target doc's headings,
+                # if the target is a known doc node and an anchor was given.
+                if anchor is None:
+                    continue
+                target_node = graph.by_path.get(target_rel)
+                if target_node is None:
+                    # Target file exists but isn't a doc node (e.g. README, source
+                    # file). Anchor validation is undefined; skip silently.
+                    continue
+                target_headings = graph.headings.get(target_node.id, [])
+                if not any(h.slug == anchor for h in target_headings):
+                    out.append(
+                        Finding(
+                            check=self.name,
+                            severity=Severity.error,
+                            message=(
+                                f"unknown anchor in '{target_rel}': "
+                                f"'#{anchor}' has no matching heading"
+                            ),
                             path=node.path,
                             doc_id=node.id,
                         )

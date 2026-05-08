@@ -8,13 +8,17 @@ and we resolve them here.
 from __future__ import annotations
 
 from irminsul.checks.base import Check, Finding, Severity, sort_findings, summarize
+from irminsul.checks.external_links import ExternalLinksCheck
 from irminsul.checks.frontmatter import FrontmatterCheck
 from irminsul.checks.globs import GlobsCheck
+from irminsul.checks.glossary import GlossaryCheck
 from irminsul.checks.links import LinksCheck
 from irminsul.checks.mtime_drift import MtimeDriftCheck
 from irminsul.checks.orphans import OrphansCheck
+from irminsul.checks.parent_child import ParentChildCheck
 from irminsul.checks.schema_leak import SchemaLeakCheck
 from irminsul.checks.stale_reaper import StaleReaperCheck
+from irminsul.checks.supersession import SupersessionCheck
 from irminsul.checks.uniqueness import UniquenessCheck
 
 HARD_REGISTRY: dict[str, type[Check]] = {
@@ -29,6 +33,10 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     MtimeDriftCheck.name: MtimeDriftCheck,
     OrphansCheck.name: OrphansCheck,
     StaleReaperCheck.name: StaleReaperCheck,
+    SupersessionCheck.name: SupersessionCheck,
+    ParentChildCheck.name: ParentChildCheck,
+    GlossaryCheck.name: GlossaryCheck,
+    ExternalLinksCheck.name: ExternalLinksCheck,
 }
 
 __all__ = [

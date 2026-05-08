@@ -1,9 +1,11 @@
 """SchemaLeakCheck — type/schema definitions don't belong in narrative docs.
 
-Scans every doc inside the protected glob (`docs/20-components/**/*.md` for
-v0.1.0; configurable later) line-by-line against the active language profiles'
-patterns. Tracks fenced-code-block state so a snippet labelled ```toml or
-```text doesn't trigger findings just because it contains the word "class".
+Scans every doc inside the configured protected globs
+(`config.checks.schema_leak.protected_paths`, defaulting to
+`docs/20-components/**/*.md`) line-by-line against the active language
+profiles' patterns. Tracks fenced-code-block state so a snippet labelled
+```toml or ```text doesn't trigger findings just because it contains the word
+"class".
 """
 
 from __future__ import annotations
@@ -18,13 +20,23 @@ from irminsul.checks.base import Finding, Severity
 from irminsul.docgraph import DocGraph
 from irminsul.languages import LANGUAGE_REGISTRY, LanguageProfile
 
-# Hardcoded for v0.1.0; expose via config in Sprint 2.
-_PROTECTED_GLOB = GitIgnoreSpec.from_lines(["docs/20-components/**/*.md"])
-
 # Languages whose code-blocks should be scanned for schema leaks. A markdown
 # fence labelled with one of these names is treated as scannable; anything else
 # (toml, json, text, yaml, …) is exempt.
-_SCANNABLE_FENCE_LANGS = {"", "python", "py", "sql", "ts", "typescript", "tsx", "javascript", "js"}
+_SCANNABLE_FENCE_LANGS = {
+    "",
+    "python",
+    "py",
+    "sql",
+    "ts",
+    "typescript",
+    "tsx",
+    "javascript",
+    "js",
+    "go",
+    "rust",
+    "rs",
+}
 
 _FENCE_RE = re.compile(r"^\s*```(\S*)\s*$")
 
@@ -50,10 +62,12 @@ class SchemaLeakCheck:
         if not profiles:
             return []
 
+        protected_glob = GitIgnoreSpec.from_lines(graph.config.checks.schema_leak.protected_paths)
+
         out: list[Finding] = []
 
         for node in graph.nodes.values():
-            if not _PROTECTED_GLOB.match_file(node.path.as_posix()):
+            if not protected_glob.match_file(node.path.as_posix()):
                 continue
 
             in_fence = False

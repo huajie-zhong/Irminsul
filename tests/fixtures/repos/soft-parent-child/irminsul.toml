@@ -1,0 +1,11 @@
+project_name = "soft-parent-child-fixture"
+
+[paths]
+docs_root = "docs"
+source_roots = ["app"]
+
+[checks]
+soft_deterministic = ["parent-child"]
+
+[checks.parent_child]
+length_warning_lines = 300

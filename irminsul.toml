@@ -5,7 +5,15 @@ docs_root = "docs"
 source_roots = ["src"]
 
 [checks]
-soft_deterministic = ["mtime-drift", "orphans", "stale-reaper"]
+soft_deterministic = [
+    "mtime-drift",
+    "orphans",
+    "stale-reaper",
+    "supersession",
+    "parent-child",
+    "glossary",
+]
+# external-links left out by default; enable in nightly workflow with network access.
 
 [languages]
 enabled = ["python"]

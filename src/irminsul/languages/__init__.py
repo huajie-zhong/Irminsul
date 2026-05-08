@@ -7,17 +7,23 @@ Looking up by name keeps the toml side honest: `[languages] enabled = ["python",
 from __future__ import annotations
 
 from irminsul.languages.base import LanguageProfile
+from irminsul.languages.go import GO_PROFILE
 from irminsul.languages.python import PYTHON_PROFILE
+from irminsul.languages.rust import RUST_PROFILE
 from irminsul.languages.typescript import TYPESCRIPT_PROFILE
 
 LANGUAGE_REGISTRY: dict[str, LanguageProfile] = {
     PYTHON_PROFILE.name: PYTHON_PROFILE,
     TYPESCRIPT_PROFILE.name: TYPESCRIPT_PROFILE,
+    GO_PROFILE.name: GO_PROFILE,
+    RUST_PROFILE.name: RUST_PROFILE,
 }
 
 __all__ = [
+    "GO_PROFILE",
     "LANGUAGE_REGISTRY",
     "PYTHON_PROFILE",
+    "RUST_PROFILE",
     "TYPESCRIPT_PROFILE",
     "LanguageProfile",
 ]
