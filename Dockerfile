@@ -1,16 +1,9 @@
 # syntax=docker/dockerfile:1.7
-
-FROM python:3.12-slim AS builder
-
-WORKDIR /build
-
-RUN pip install --no-cache-dir --upgrade pip build
-
-COPY pyproject.toml README.md LICENSE ./
-COPY src ./src
-
-RUN python -m build --wheel --outdir /wheels
-
+#
+# Builds a slim runtime image around a pre-built wheel. The wheel is produced
+# on the GitHub Actions runner (where the .git history is intact and hatch-vcs
+# can derive the version from the tag) and copied into `dist/` before
+# `docker build` runs.
 
 FROM python:3.12-slim AS runtime
 
@@ -20,11 +13,10 @@ LABEL org.opencontainers.image.licenses="AGPL-3.0-or-later"
 LABEL org.opencontainers.image.source="https://github.com/huajie-zhong/irminsul"
 
 RUN useradd --create-home --shell /bin/bash irminsul
-WORKDIR /home/irminsul
 
-COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir --no-index --find-links=/wheels irminsul \
- && rm -rf /wheels
+COPY dist/*.whl /tmp/wheels/
+RUN pip install --no-cache-dir /tmp/wheels/*.whl \
+ && rm -rf /tmp/wheels
 
 USER irminsul
 WORKDIR /workspace
