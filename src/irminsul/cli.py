@@ -14,6 +14,7 @@ import typer
 from irminsul import __version__
 from irminsul.checks import (
     HARD_REGISTRY,
+    LLM_REGISTRY,
     SOFT_REGISTRY,
     Finding,
     Severity,
@@ -22,7 +23,11 @@ from irminsul.checks import (
 )
 from irminsul.config import find_config, load
 from irminsul.docgraph import build_graph
-from irminsul.init.command import run_init
+from irminsul.init.command import (
+    detect_code_signals,
+    run_init,
+    run_init_docs_only,
+)
 from irminsul.render.mkdocs import MkDocsRenderer, MkDocsRenderError
 
 app = typer.Typer(
@@ -84,10 +89,89 @@ def init(
         ),
     ] = Path("."),
 ) -> None:
-    """Scaffold the docs skeleton, irminsul.toml, and CI workflows."""
+    """Scaffold the docs skeleton, irminsul.toml, and CI workflows (single-repo)."""
     target = path.resolve()
     target.mkdir(parents=True, exist_ok=True)
-    run_init(target, interactive=not no_interactive, force=force)
+    interactive = not no_interactive
+
+    if interactive and not detect_code_signals(target):
+        answer = typer.confirm(
+            "No code detected here. Is this a docs-only repo with code in a separate repo?",
+            default=False,
+        )
+        if answer:
+            code_repo = typer.prompt(
+                "Code repo (GitHub owner/repo or local path, e.g. acme/my-public-code)"
+            )
+            run_init_docs_only(target, interactive=interactive, code_repo=code_repo, force=force)
+            return
+    elif not interactive and not detect_code_signals(target):
+        typer.echo(
+            typer.style(
+                "No code detected in the target directory. "
+                "If this is a docs-only repo, use `irminsul init-docs-only --code-repo <spec-or-path>` instead.",
+                fg="red",
+            )
+        )
+        raise typer.Exit(code=2)
+
+    run_init(target, interactive=interactive, force=force)
+
+
+@app.command("init-docs-only")
+def init_docs_only(
+    code_repo: Annotated[
+        str | None,
+        typer.Option(
+            "--code-repo",
+            help=(
+                "Code repository spec: GitHub 'owner/repo' or a local path. "
+                "The code is cloned/placed as a gitignored subfolder inside this docs repo."
+            ),
+        ),
+    ] = None,
+    no_interactive: Annotated[
+        bool,
+        typer.Option("--no-interactive", help="Use defaults instead of prompting."),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Overwrite scaffold files that already exist."),
+    ] = False,
+    path: Annotated[
+        Path,
+        typer.Option("--path", help="Root of the docs-only repo. Defaults to current directory."),
+    ] = Path("."),
+) -> None:
+    """Scaffold a docs-only repo where code lives in a separate repository (Topology A).
+
+    The code repo is cloned as a gitignored subfolder inside this docs repo so
+    that all source-coverage checks work without cross-repo filesystem access.
+    Topology B (code at a sibling filesystem path) is not yet supported.
+    """
+    target = path.resolve()
+    target.mkdir(parents=True, exist_ok=True)
+    interactive = not no_interactive
+
+    if interactive and detect_code_signals(target):
+        answer = typer.confirm(
+            "This directory looks like a code repo. Are you sure you want two-repo (docs-only) mode?",
+            default=False,
+        )
+        if not answer:
+            typer.echo("Hint: use `irminsul init` for a single-repo setup.")
+            raise typer.Exit(code=0)
+    elif not interactive and detect_code_signals(target):
+        typer.echo(
+            typer.style(
+                "This directory contains code signals. "
+                "For a single-repo setup use `irminsul init` instead.",
+                fg="red",
+            )
+        )
+        raise typer.Exit(code=2)
+
+    run_init_docs_only(target, interactive=interactive, code_repo=code_repo, force=force)
 
 
 _SEVERITY_STYLE = {
@@ -133,8 +217,12 @@ def check(
     ] = Scope.hard,
     llm: Annotated[
         bool,
-        typer.Option("--llm", help="Include LLM advisory checks (Phase 2; no-op for now)."),
+        typer.Option("--llm", help="Include LLM advisory checks."),
     ] = False,
+    llm_budget: Annotated[
+        float | None,
+        typer.Option("--llm-budget", help="Override the LLM cost ceiling (USD) for this run."),
+    ] = None,
     strict: Annotated[
         bool,
         typer.Option(
@@ -185,12 +273,66 @@ def check(
             findings.extend(cls().run(graph))
 
     if llm:
-        typer.echo(
-            typer.style(
-                "note: --llm is a Phase 2 feature; no LLM checks ran.",
-                fg="yellow",
-            )
+        from irminsul.llm.client import LlmClient
+
+        budget = llm_budget if llm_budget is not None else config.llm.max_cost_usd
+        llm_client = LlmClient(
+            provider=config.llm.provider,
+            model=config.llm.model,
+            max_cost_usd=budget,
+            cache_path=repo_root / config.llm.cache_path,
+            required_in_ci=config.llm.required_in_ci,
         )
+
+        if not llm_client.is_available():
+            if config.llm.required_in_ci:
+                findings.append(
+                    Finding(
+                        check="llm",
+                        severity=Severity.error,
+                        message=(
+                            f"LLM checks required (required_in_ci=true) "
+                            f"but no API key found for provider '{config.llm.provider}'"
+                        ),
+                    )
+                )
+            else:
+                for check_name in config.checks.soft_llm:
+                    if check_name in LLM_REGISTRY:
+                        findings.append(
+                            Finding(
+                                check=check_name,
+                                severity=Severity.info,
+                                message=(
+                                    f"LLM check skipped: no API key configured "
+                                    f"for provider '{config.llm.provider}'"
+                                ),
+                            )
+                        )
+        else:
+            calls_before = sum(1 for e in llm_client._cache.values())
+            for check_name in config.checks.soft_llm:
+                cls_llm = LLM_REGISTRY.get(check_name)
+                if cls_llm is None:
+                    typer.echo(
+                        typer.style(
+                            f"note: LLM check '{check_name}' not yet implemented; skipping.",
+                            fg="yellow",
+                        )
+                    )
+                    continue
+                findings.extend(cls_llm(llm_client=llm_client).run(graph))
+
+            spent = budget - llm_client.remaining_budget()
+            cache_size = sum(1 for e in llm_client._cache.values())
+            hits = max(0, cache_size - calls_before)
+            typer.echo(
+                typer.style(
+                    f"LLM: ${spent:.4f} / ${budget:.2f} budget used"
+                    + (f"; {hits} cache hit(s)" if hits else ""),
+                    dim=True,
+                )
+            )
 
     findings = sort_findings(findings)
     for finding in findings:
@@ -249,6 +391,146 @@ def render(
         raise typer.Exit(code=1) from e
 
     typer.echo(typer.style(f"site built at {target_out}", fg="green"))
+
+
+_new_app = typer.Typer(name="new", help="Scaffold a new doc atom.", no_args_is_help=True)
+app.add_typer(_new_app)
+
+
+@_new_app.command("adr")
+def new_adr(
+    title: Annotated[str, typer.Argument(help="Title of the ADR.")],
+    owner: Annotated[
+        str,
+        typer.Option("--owner", help="Doc owner (GitHub handle). Defaults to @TODO."),
+    ] = "@TODO",
+    force: Annotated[bool, typer.Option("--force")] = False,
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Scaffold a new Architecture Decision Record."""
+    from irminsul.new.command import NewSpec, write_new
+
+    repo_root = path.resolve()
+    config = load(find_config(repo_root))
+    spec = NewSpec(kind="adr", title=title, owner=owner, extra={})
+    try:
+        dest = write_new(repo_root, spec, config, force=force)
+    except FileExistsError as e:
+        typer.echo(typer.style(f"already exists: {e}", fg="yellow"))
+        raise typer.Exit(1) from e
+    rel = dest.relative_to(repo_root).as_posix()
+    typer.echo(typer.style(f"created: {rel}", fg="green"))
+
+
+@_new_app.command("component")
+def new_component(
+    title: Annotated[str, typer.Argument(help="Name of the component.")],
+    owner: Annotated[str, typer.Option("--owner")] = "@TODO",
+    force: Annotated[bool, typer.Option("--force")] = False,
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Scaffold a new component doc."""
+    from irminsul.new.command import NewSpec, write_new
+
+    repo_root = path.resolve()
+    config = load(find_config(repo_root))
+    spec = NewSpec(kind="component", title=title, owner=owner, extra={})
+    try:
+        dest = write_new(repo_root, spec, config, force=force)
+    except FileExistsError as e:
+        typer.echo(typer.style(f"already exists: {e}", fg="yellow"))
+        raise typer.Exit(1) from e
+    rel = dest.relative_to(repo_root).as_posix()
+    typer.echo(typer.style(f"created: {rel}", fg="green"))
+
+
+@_new_app.command("rfc")
+def new_rfc(
+    title: Annotated[str, typer.Argument(help="Title of the RFC.")],
+    owner: Annotated[str, typer.Option("--owner")] = "@TODO",
+    force: Annotated[bool, typer.Option("--force")] = False,
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Scaffold a new RFC."""
+    from irminsul.new.command import NewSpec, write_new
+
+    repo_root = path.resolve()
+    config = load(find_config(repo_root))
+    spec = NewSpec(kind="rfc", title=title, owner=owner, extra={})
+    try:
+        dest = write_new(repo_root, spec, config, force=force)
+    except FileExistsError as e:
+        typer.echo(typer.style(f"already exists: {e}", fg="yellow"))
+        raise typer.Exit(1) from e
+    rel = dest.relative_to(repo_root).as_posix()
+    typer.echo(typer.style(f"created: {rel}", fg="green"))
+
+
+_list_app = typer.Typer(name="list", help="List docs by condition.", no_args_is_help=True)
+app.add_typer(_list_app)
+
+
+@_list_app.command("orphans")
+def list_orphans(
+    fmt: Annotated[str, typer.Option("--format", help="Output format: plain or json.")] = "plain",
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """List docs with no inbound references."""
+    from irminsul.listing.command import list_orphans as _list_orphans
+
+    _list_orphans(path.resolve(), fmt=fmt)
+
+
+@_list_app.command("stale")
+def list_stale(
+    fmt: Annotated[str, typer.Option("--format")] = "plain",
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """List deprecated docs that are past the stale threshold."""
+    from irminsul.listing.command import list_stale as _list_stale
+
+    _list_stale(path.resolve(), fmt=fmt)
+
+
+@_list_app.command("undocumented")
+def list_undocumented(
+    fmt: Annotated[str, typer.Option("--format")] = "plain",
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """List source files in covered directories that no doc claims."""
+    from irminsul.listing.command import list_undocumented as _list_undocumented
+
+    _list_undocumented(path.resolve(), fmt=fmt)
+
+
+@app.command()
+def regen(
+    language: Annotated[
+        str,
+        typer.Option("--language", help="Language to regenerate reference docs for."),
+    ] = "python",
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Regenerate reference docs from source (currently Python only)."""
+    if language != "python":
+        typer.echo(
+            typer.style(
+                f"TypeScript reference regeneration deferred to Sprint 3 "
+                f"(got --language={language})",
+                fg="yellow",
+            )
+        )
+        raise typer.Exit(code=0)
+
+    from irminsul.regen.python import regen_python
+
+    repo_root = path.resolve()
+    config = load(find_config(repo_root))
+    written = regen_python(repo_root, config)
+    for p in written:
+        rel = p.relative_to(repo_root).as_posix()
+        typer.echo(f"  {rel}")
+    typer.echo(typer.style(f"regenerated {len(written)} reference stub(s)", fg="green"))
 
 
 if __name__ == "__main__":  # pragma: no cover

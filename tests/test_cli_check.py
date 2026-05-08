@@ -41,8 +41,9 @@ def test_check_bad_globs_exits_one_and_names_pattern(
     assert "app/missing/*.py" in result.stdout
 
 
-def test_check_llm_flag_is_no_op(fixture_repo: Callable[[str], Path]) -> None:
+def test_check_llm_flag_runs_without_error(fixture_repo: Callable[[str], Path]) -> None:
     repo = fixture_repo("good")
     result = runner.invoke(app, ["check", "--scope", "hard", "--llm", "--path", str(repo)])
+    # --llm is now real; with no soft_llm configured and no API key it emits skip-info
+    # or nothing — either way exit code should be 0 (info findings never block)
     assert result.exit_code == 0
-    assert "Phase 2" in result.stdout

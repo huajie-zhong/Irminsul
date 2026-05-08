@@ -17,6 +17,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+{% if code_repo_spec %}
+      - uses: actions/checkout@v4
+        with:
+          repository: {{ code_repo_spec }}
+          path: {{ code_subfolder }}
+          fetch-depth: 1
+{% endif %}
       - uses: {{ github_user }}/irminsul@v0.1.0
         with:
           scope: soft

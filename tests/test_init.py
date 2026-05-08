@@ -13,6 +13,8 @@ runner = CliRunner()
 
 def test_init_no_interactive_creates_expected_tree(tmp_path: Path) -> None:
     target = tmp_path / "demo"
+    target.mkdir()
+    (target / "src").mkdir()  # code signal required by --no-interactive guard
     result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
     assert result.exit_code == 0, result.stdout
 
@@ -59,6 +61,7 @@ def test_init_then_check_passes_on_freshly_scaffolded_repo(tmp_path: Path) -> No
 def test_init_does_not_overwrite_without_force(tmp_path: Path) -> None:
     target = tmp_path / "demo"
     target.mkdir()
+    (target / "src").mkdir()  # code signal
 
     # Pre-create a scaffold file with custom content.
     docs_dir = target / "docs" / "00-foundation"
@@ -75,6 +78,7 @@ def test_init_does_not_overwrite_without_force(tmp_path: Path) -> None:
 def test_init_force_overwrites_existing_files(tmp_path: Path) -> None:
     target = tmp_path / "demo"
     target.mkdir()
+    (target / "src").mkdir()  # code signal
     docs_dir = target / "docs" / "00-foundation"
     docs_dir.mkdir(parents=True)
     custom = docs_dir / "principles.md"

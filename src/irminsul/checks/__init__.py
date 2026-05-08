@@ -15,8 +15,11 @@ from irminsul.checks.glossary import GlossaryCheck
 from irminsul.checks.links import LinksCheck
 from irminsul.checks.mtime_drift import MtimeDriftCheck
 from irminsul.checks.orphans import OrphansCheck
+from irminsul.checks.overlap import OverlapCheck
 from irminsul.checks.parent_child import ParentChildCheck
 from irminsul.checks.schema_leak import SchemaLeakCheck
+from irminsul.checks.scope_appropriateness import ScopeAppropriatenessCheck
+from irminsul.checks.semantic_drift import SemanticDriftCheck
 from irminsul.checks.stale_reaper import StaleReaperCheck
 from irminsul.checks.supersession import SupersessionCheck
 from irminsul.checks.uniqueness import UniquenessCheck
@@ -39,11 +42,21 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     ExternalLinksCheck.name: ExternalLinksCheck,
 }
 
+LLM_REGISTRY: dict[str, type] = {
+    OverlapCheck.name: OverlapCheck,
+    SemanticDriftCheck.name: SemanticDriftCheck,
+    ScopeAppropriatenessCheck.name: ScopeAppropriatenessCheck,
+}
+
 __all__ = [
     "HARD_REGISTRY",
+    "LLM_REGISTRY",
     "SOFT_REGISTRY",
     "Check",
     "Finding",
+    "OverlapCheck",
+    "ScopeAppropriatenessCheck",
+    "SemanticDriftCheck",
     "Severity",
     "sort_findings",
     "summarize",

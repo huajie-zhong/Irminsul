@@ -1,0 +1,12 @@
+You are reviewing whether a documentation article stays within its intended scope.
+
+Doc id: {{ doc_id }}
+Audience type: {{ audience }}
+Tier: {{ tier }}
+
+Content:
+{{ body }}
+
+Does this document cross tier boundaries? For example, does a tutorial contain type definitions or architectural decisions? Does an explanation doc embed step-by-step how-to instructions? Does a component doc define data schemas that belong in a reference doc?
+
+Respond with a JSON object: {"inappropriate": true|false, "rationale": "one sentence explaining your decision"}

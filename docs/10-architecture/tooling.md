@@ -70,6 +70,40 @@ Decision Table:
 | Public | Private | Two repos, all-private docs | Public code where API stability > community participation |
 | Public | Public | Single repo | Pure community OSS |
 
+### Topology of the Two-Repo Setup
+
+The "code public + docs private" row in the decision table above requires clarification because "code is in a separate repo" is ambiguous:
+
+| Sense of "elsewhere" | Supported in v0.2.0 |
+|---|---|
+| **Elsewhere in git ownership** — code lives in a different GitHub/GitLab repo (public, private, or a different org) | ✅ Yes — `irminsul init-docs-only` |
+| **Elsewhere on the filesystem** — code lives at a sibling path like `../my-public-code/` without being inside the docs repo | ❌ No — deferred to Sprint 3 (Topology B) |
+
+#### Topology A (v0.2.0) — code nested inside docs repo
+
+The code repo is cloned as a **gitignored subfolder** inside the docs repo. CI checks it out as a secondary `actions/checkout@v4` step.
+
+```
+docs-private-repo/              ← this repo (private)
+├── docs/
+├── irminsul.toml               ← source_roots = ["my-public-code/src"]
+├── .gitignore                  ← /my-public-code/  ← added by init-docs-only
+└── my-public-code/             ← gitignored clone of the public repo
+    └── src/
+        └── ...
+```
+
+Use `irminsul init-docs-only --code-repo acme/my-public-code` to scaffold this topology. The command:
+1. Writes the docs skeleton and `irminsul.toml` with `source_roots = ["my-public-code/src"]`.
+2. Appends `/my-public-code/` to `.gitignore`.
+3. Renders CI workflows with a dual `actions/checkout@v4` step (docs at `.`, code at `my-public-code/`).
+
+#### Topology B (deferred to Sprint 3) — code at a sibling path
+
+The code would live at `../my-public-code/` — outside the docs repo entirely. This is **not supported** in v0.2.0.
+
+**Why:** `walk_source_files` (`src/irminsul/checks/globs.py`) and `_to_repo_relative` (`src/irminsul/docgraph.py`) both call `path.relative_to(repo_root)`, which raises `ValueError` when the path is outside `repo_root`. Lifting that assumption requires a refactor of the path layer and is planned for Sprint 3 as a `--source-root-prefix` option.
+
 ### Adopting on a New Codebase
 
 Once the tooling repo exists, adopting it on a new codebase is roughly:
@@ -78,3 +112,11 @@ Once the tooling repo exists, adopting it on a new codebase is roughly:
 2. Run `irminsul init` — generates `/docs` skeleton, `irminsul.toml`, GitHub Actions workflow, and pre-commit hooks.
 3. Write `00-foundation/principles.md` and `10-architecture/overview.md`.
 4. Commit. CI now enforces the system from PR #1.
+
+For the public-code + private-docs case:
+
+1. Create an empty docs-only private repo.
+2. Run `irminsul init-docs-only --code-repo owner/public-repo` inside it.
+3. Clone the public repo locally: `git clone https://github.com/owner/public-repo`.
+4. Write the foundation and architecture docs.
+5. Commit. CI checks out both repos on every PR.
