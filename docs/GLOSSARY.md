@@ -1,6 +1,16 @@
 # Glossary
 
-Vocabulary used across Irminsul's codebase and docs.
+Vocabulary used across Irminsul's codebase and docs. A single `GLOSSARY.md` is the authoritative dictionary for all domain terms.
+
+Each entry should have:
+- **Term** (singular, capitalized).
+- **Definition** in one or two sentences.
+- **Aliases** — informal synonyms used in the codebase.
+- **Negative space** — what the term is NOT, when ambiguity exists.
+- **Bounded context** — if the same word means different things in different parts of the system, scope it.
+- **Since** — the version or PR where the term was introduced (optional).
+
+CI enforces: any capitalized noun phrase used three or more times across the docs must have a glossary entry, OR be on the **anti-glossary** — a list of explicitly banned synonyms.
 
 | Term | Definition | Aliases | Not to be confused with |
 |------|------------|---------|-------------------------|

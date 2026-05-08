@@ -12,7 +12,7 @@ describes:
 
 # Frontmatter
 
-Every doc atom carries a YAML frontmatter block matching Appendix B of the [reference](../90-meta/doc-system.md). The schema validates required fields (`id`, `title`, `audience`, `tier`, `status`, `owner`, `last_reviewed`) and parses optional ones (`describes`, `depends_on`, `supersedes`, `superseded_by`, `tags`, `related_adrs`, `children`).
+Every doc atom carries a YAML frontmatter block matching Appendix B of the [Doc Atom reference](doc-atom.md). The schema validates required fields (`id`, `title`, `audience`, `tier`, `status`, `owner`, `last_reviewed`) and parses optional ones (`describes`, `depends_on`, `supersedes`, `superseded_by`, `tags`, `related_adrs`, `children`).
 
 `extra="allow"` is intentional — projects extend the schema with their own fields. Strictness comes from validating canonical fields, not from forbidding unknown ones.
 

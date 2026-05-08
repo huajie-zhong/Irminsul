@@ -11,4 +11,27 @@ describes: []
 
 # Architecture decisions (ADRs)
 
-Each ADR documents one decision. Append-only — never edit a past decision; supersede it with a new one.
+ADRs are the canonical home for *why*. Use the standard template (Michael Nygard's original works fine):
+
+```
+# ADR 0042: Adopt event sourcing for the order service
+
+## Status
+Accepted, 2026-04-01. Supersedes ADR-0019.
+
+## Context
+What forces are at play? What are we currently doing?
+
+## Decision
+What we will do.
+
+## Alternatives Considered
+What we explicitly rejected, and why.
+
+## Consequences
+What becomes easier. What becomes harder. What new risks appear.
+```
+
+Two non-obvious rules:
+- **ADRs are append-only.** Never edit a past ADR's decision. If it changes, write a new one and mark the old as `Superseded by ADR-XXXX`.
+- **The "Alternatives Considered" section is mandatory.** Without it, future contributors will keep proposing the same rejected ideas.

@@ -11,7 +11,24 @@ describes: []
 
 # Principles
 
-Irminsul exists because most documentation rots, and the reason it rots is structural — the system makes the right action harder than the wrong one. The full reasoning lives in [the reference](../90-meta/doc-system.md). This file names the principles that drive the tool's design.
+Irminsul exists because most documentation rots, and the reason it rots is structural — the system makes the right action harder than the wrong one. 
+
+## The Five Core Principles
+
+### 1. Single Source of Truth (SSOT)
+Every fact has exactly one canonical home. All other appearances are references to that home, not copies of it. If you find yourself typing the same definition twice, you've created a future contradiction.
+
+### 2. Provenance
+Every non-trivial claim in the docs must trace back to one of three sources: **the source code**, **an Architecture Decision Record (ADR)**, or **an external citation**. Floating assertions ("we use eventual consistency because it's simpler") are forbidden — either point to the ADR that decided it, or write that ADR.
+
+### 3. Audience Separation
+Every document is written for one reader in one mental state. The Diataxis framework names four such moments: *learning* (tutorial), *doing* (how-to), *understanding* (explanation), *referring* (reference). A doc that tries to serve two of these serves neither.
+
+### 4. Code as Ultimate Truth
+When code and docs disagree, code wins by default. This means anything that *can* be generated from code *should* be — schemas, type signatures, API surfaces, config references, error catalogs. Hand-written docs cover only what code cannot express: intent, trade-offs, and process.
+
+### 5. The Doc Graph is Bidirectional
+If `composer.md` references `data-model.md`, then `data-model.md` should automatically show "referenced by composer.md" at the bottom. Backlinks are generated, not maintained. This makes "what breaks if I change this?" a one-glance question.
 
 ## Goals
 

@@ -25,6 +25,11 @@ flowchart LR
     cli -->|exit 0/1| user
     cli -->|render| mkdocs[MkDocs Material site]
 ```
+## Structure
+
+The Irminsul documentation system dictates strict structural rules for a codebase's documentation:
+- **[The Tier System](tiers.md)** defines maintenance and enforcement rules based on the doc's tier (T1-T4).
+- **[The Layered Directory Structure](layers.md)** enforces exactly where docs should be placed based on their specificity.
 
 ## Components
 

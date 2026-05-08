@@ -13,6 +13,6 @@ This tree follows the doc system Irminsul itself enforces. We dogfood — every 
 | `60-operations/` | (Empty for a CLI tool.) |
 | `70-knowledge/` | (Empty until we have user-facing tutorials.) |
 | `80-evolution/` | Roadmap and risks. |
-| [`90-meta/doc-system.md`](90-meta/doc-system.md) | The full architectural reference for the doc system. |
+| `90-meta/` | Docs about docs, style guides, and health dashboard. |
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`GLOSSARY.md`](GLOSSARY.md).
