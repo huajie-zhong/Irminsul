@@ -1,0 +1,2 @@
+def route() -> str:
+    return "/"

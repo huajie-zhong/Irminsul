@@ -1,0 +1,146 @@
+"""UniquenessCheck — every source file is claimed by exactly one most-specific doc.
+
+Implements Part VI ("Hierarchical Describes") of `Irminsul-reference.md`. Two
+docs claiming the same files at the same specificity is an error (silent
+duplication). A source file in a covered directory that no doc claims is a
+warning (silent omission). A child doc claiming a narrower glob wins over a
+parent's broader claim — that's the most-specific-match rule, and it's what
+lets `planner/INDEX.md` say `describes: [app/planner/**]` while
+`planner/routing.md` adds `describes: [app/planner/routing/*.py]` without
+either docking the other.
+"""
+
+from __future__ import annotations
+
+from collections import defaultdict
+from collections.abc import Iterable
+from pathlib import Path
+from typing import ClassVar
+
+from pathspec import GitIgnoreSpec
+
+from irminsul.checks.base import Finding, Severity
+from irminsul.checks.globs import walk_source_files
+from irminsul.docgraph import DocGraph, DocNode
+
+# Files that are usually noise from a doc-coverage standpoint. Keeping the
+# omission warning quiet here trades a tiny risk of missing a legit doc gap
+# against the much larger annoyance of warning on every `__init__.py`.
+_OMISSION_SKIP = GitIgnoreSpec.from_lines(
+    [
+        "__init__.py",
+        "__main__.py",
+        "conftest.py",
+        "*.pyi",
+        "test_*.py",
+        "*_test.py",
+        "*.test.ts",
+        "*.spec.ts",
+        "*.test.tsx",
+        "*.spec.tsx",
+        "*.d.ts",
+    ]
+)
+
+
+def specificity(pattern: str) -> tuple[int, int, int]:
+    """Higher tuple = more specific. Compared lexicographically.
+
+    Components:
+    - count of literal (no-wildcard) path segments — exact paths beat globs
+    - total path depth — deeper claims beat shallower
+    - negated wildcard-character count — fewer wildcards beats more
+    """
+    parts = pattern.split("/")
+    literal_segments = sum(1 for p in parts if "*" not in p and "?" not in p)
+    depth = len(parts)
+    wildcard_chars = sum(p.count("*") + p.count("?") for p in parts)
+    return (literal_segments, depth, -wildcard_chars)
+
+
+class UniquenessCheck:
+    name: ClassVar[str] = "uniqueness"
+    default_severity: ClassVar[Severity] = Severity.error
+
+    def run(self, graph: DocGraph) -> list[Finding]:
+        if graph.config is None or graph.repo_root is None:
+            return []
+
+        source_files, _missing = walk_source_files(graph.repo_root, graph.config.paths.source_roots)
+
+        # claims_by_file: source file -> list of (DocNode, pattern, score).
+        claims_by_file: dict[str, list[tuple[DocNode, str, tuple[int, int, int]]]] = defaultdict(
+            list
+        )
+
+        for node in graph.nodes.values():
+            for pattern in node.frontmatter.describes:
+                spec = GitIgnoreSpec.from_lines([pattern])
+                score = specificity(pattern)
+                for source_file in source_files:
+                    if spec.match_file(source_file):
+                        claims_by_file[source_file].append((node, pattern, score))
+
+        out: list[Finding] = []
+
+        # Tie at most-specific level → silent duplication, error.
+        for source_file, claims in claims_by_file.items():
+            top_score = max(c[2] for c in claims)
+            top_claims = [c for c in claims if c[2] == top_score]
+            if len(top_claims) > 1:
+                claim_descs = ", ".join(
+                    f"{node.path.as_posix()} (`{pattern}`)" for node, pattern, _ in top_claims
+                )
+                out.append(
+                    Finding(
+                        check=self.name,
+                        severity=Severity.error,
+                        message=(
+                            f"source file '{source_file}' is claimed at the same "
+                            f"specificity by: {claim_descs}"
+                        ),
+                    )
+                )
+
+        # Covered directories: parents of every claimed file.
+        covered_dirs = _covered_dirs(claims_by_file.keys())
+
+        # Omission: a file under a covered directory that no doc claims.
+        for source_file in source_files:
+            if source_file in claims_by_file:
+                continue
+            if not _is_in_covered_dir(source_file, covered_dirs):
+                continue
+            if _OMISSION_SKIP.match_file(source_file):
+                continue
+            out.append(
+                Finding(
+                    check=self.name,
+                    severity=Severity.warning,
+                    message=(
+                        f"source file '{source_file}' lives in a doc-covered "
+                        "directory but no doc claims it"
+                    ),
+                )
+            )
+
+        return out
+
+
+def _covered_dirs(claimed_files: Iterable[str]) -> set[str]:
+    """Every directory that has at least one claimed file under it (at any
+    depth)."""
+    dirs: set[str] = set()
+    for f in claimed_files:
+        parent = str(Path(f).parent.as_posix())
+        while parent and parent != ".":
+            dirs.add(parent)
+            parent = str(Path(parent).parent.as_posix())
+            if parent == ".":
+                break
+    return dirs
+
+
+def _is_in_covered_dir(source_file: str, covered: set[str]) -> bool:
+    parent = str(Path(source_file).parent.as_posix())
+    return parent in covered

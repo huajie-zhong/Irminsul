@@ -9,11 +9,16 @@ from __future__ import annotations
 from irminsul.checks.base import Check, Finding, Severity, sort_findings, summarize
 from irminsul.checks.frontmatter import FrontmatterCheck
 from irminsul.checks.globs import GlobsCheck
+from irminsul.checks.links import LinksCheck
+from irminsul.checks.schema_leak import SchemaLeakCheck
+from irminsul.checks.uniqueness import UniquenessCheck
 
 HARD_REGISTRY: dict[str, type[Check]] = {
     FrontmatterCheck.name: FrontmatterCheck,
     GlobsCheck.name: GlobsCheck,
-    # uniqueness, links, schema-leak land in Sprint 1 Week 3
+    UniquenessCheck.name: UniquenessCheck,
+    LinksCheck.name: LinksCheck,
+    SchemaLeakCheck.name: SchemaLeakCheck,
 }
 
 __all__ = [

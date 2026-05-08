@@ -11,7 +11,7 @@ from irminsul.checks.base import Finding, Severity
 from irminsul.docgraph import DocGraph
 
 
-def _walk_source_files(repo_root: Path, source_roots: list[str]) -> tuple[list[str], list[str]]:
+def walk_source_files(repo_root: Path, source_roots: list[str]) -> tuple[list[str], list[str]]:
     """Return (relative_posix_paths, missing_roots).
 
     Walks every file under each existing source root. Skips dot-directories
@@ -44,7 +44,7 @@ class GlobsCheck:
         if graph.config is None or graph.repo_root is None:
             return []
 
-        source_files, missing_roots = _walk_source_files(
+        source_files, missing_roots = walk_source_files(
             graph.repo_root, graph.config.paths.source_roots
         )
 
