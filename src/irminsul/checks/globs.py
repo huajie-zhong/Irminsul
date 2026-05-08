@@ -11,15 +11,20 @@ from irminsul.checks.base import Finding, Severity
 from irminsul.docgraph import DocGraph
 
 
-def walk_source_files(repo_root: Path, source_roots: list[str]) -> tuple[list[str], list[str]]:
-    """Return (relative_posix_paths, missing_roots).
+def walk_source_files(
+    repo_root: Path, source_roots: list[str]
+) -> tuple[list[tuple[Path, str]], list[str]]:
+    """Return ([(abs_path, display_posix)], missing_roots).
 
     Walks every file under each existing source root. Skips dot-directories
-    (`.git`, `.venv`, `.mypy_cache`, ...) so we don't drag environment cruft
-    into the source set. A missing root isn't fatal here — surfaced separately
-    so the caller can warn rather than error.
+    (`.git`, `.venv`, `.mypy_cache`, ...). A missing root isn't fatal here —
+    surfaced separately so the caller can warn rather than error.
+
+    display_posix is repo-relative for same-repo files and source-root-relative
+    for cross-repo files (source_root outside repo_root). Callers use display_posix
+    for glob matching and abs_path for git/file I/O.
     """
-    files: list[str] = []
+    files: list[tuple[Path, str]] = []
     missing: list[str] = []
     for root in source_roots:
         abs_root = (repo_root / root).resolve()
@@ -29,10 +34,13 @@ def walk_source_files(repo_root: Path, source_roots: list[str]) -> tuple[list[st
         for path in abs_root.rglob("*"):
             if not path.is_file():
                 continue
-            if any(part.startswith(".") for part in path.relative_to(repo_root).parts):
+            if any(part.startswith(".") for part in path.relative_to(abs_root).parts):
                 continue
-            rel = PurePosixPath(*path.relative_to(repo_root).parts)
-            files.append(str(rel))
+            try:
+                display = str(PurePosixPath(*path.relative_to(repo_root).parts))
+            except ValueError:
+                display = str(PurePosixPath(*path.relative_to(abs_root).parts))
+            files.append((path, display))
     return files, missing
 
 
@@ -62,7 +70,7 @@ class GlobsCheck:
         for node in graph.nodes.values():
             for pattern in node.frontmatter.describes:
                 spec = GitIgnoreSpec.from_lines([pattern])
-                if not any(spec.match_file(f) for f in source_files):
+                if not any(spec.match_file(display) for _, display in source_files):
                     out.append(
                         Finding(
                             check=self.name,

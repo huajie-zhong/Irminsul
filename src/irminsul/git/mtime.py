@@ -84,6 +84,32 @@ def last_commit_time(repo_root: Path, path: Path) -> GitTime:
     return _commit_to_gittime(commits[0])
 
 
+def git_root_for(path: Path) -> Path | None:
+    """Walk up from path to find a directory containing a .git entry."""
+    cur = path if path.is_dir() else path.parent
+    for candidate in (cur, *cur.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return None
+
+
+def last_commit_time_any_repo(path: Path, docs_root: Path) -> GitTime | None:
+    """Like last_commit_time but handles cross-repo absolute paths.
+
+    Returns None when path is outside docs_root and no .git is found — caller
+    should emit an error Finding. Returns _NO_TIME when git exists but path has
+    no commits (same as same-repo behaviour).
+    """
+    try:
+        path.relative_to(docs_root)
+        return last_commit_time(docs_root, path)
+    except ValueError:
+        root = git_root_for(path)
+        if root is None:
+            return None
+        return last_commit_time(root, path)
+
+
 def last_commit_time_for_paths(repo_root: Path, paths: Iterable[Path]) -> GitTime:
     """Maximum (latest) GitTime across `paths`. None when none of the paths
     have any committed history."""

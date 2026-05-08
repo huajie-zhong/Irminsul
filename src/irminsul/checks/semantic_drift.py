@@ -52,15 +52,18 @@ class SemanticDriftCheck:
                 continue
 
             spec = GitIgnoreSpec.from_lines(node.frontmatter.describes)
-            matched = [f for f in source_files if spec.match_file(f)]
+            matched = [
+                (abs_path, display)
+                for abs_path, display in source_files
+                if spec.match_file(display)
+            ]
             if not matched:
                 continue
 
             source_parts: list[str] = []
             total_bytes = 0
             over_budget = False
-            for rel in matched:
-                abs_path = graph.repo_root / rel
+            for abs_path, display in matched:
                 try:
                     content = abs_path.read_text(encoding="utf-8", errors="replace")
                 except OSError:
@@ -78,7 +81,7 @@ class SemanticDriftCheck:
                     )
                     over_budget = True
                     break
-                source_parts.append(f"# {rel}\n{content}")
+                source_parts.append(f"# {display}\n{content}")
 
             if over_budget or not source_parts:
                 continue

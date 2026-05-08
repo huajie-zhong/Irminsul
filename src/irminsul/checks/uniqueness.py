@@ -78,9 +78,9 @@ class UniquenessCheck:
             for pattern in node.frontmatter.describes:
                 spec = GitIgnoreSpec.from_lines([pattern])
                 score = specificity(pattern)
-                for source_file in source_files:
-                    if spec.match_file(source_file):
-                        claims_by_file[source_file].append((node, pattern, score))
+                for _, display in source_files:
+                    if spec.match_file(display):
+                        claims_by_file[display].append((node, pattern, score))
 
         out: list[Finding] = []
 
@@ -107,7 +107,8 @@ class UniquenessCheck:
         covered_dirs = _covered_dirs(claims_by_file.keys())
 
         # Omission: a file under a covered directory that no doc claims.
-        for source_file in source_files:
+        for _, display in source_files:
+            source_file = display
             if source_file in claims_by_file:
                 continue
             if not _is_in_covered_dir(source_file, covered_dirs):

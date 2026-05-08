@@ -199,6 +199,35 @@ def _print_finding(finding: Finding) -> None:
         typer.echo(typer.style(f"      → {finding.suggestion}", dim=True))
 
 
+def _findings_to_json(findings: list[Finding], counts: dict[Severity, int]) -> str:
+    import json
+
+    return json.dumps(
+        {
+            "version": 1,
+            "findings": [
+                {
+                    "check": f.check,
+                    "severity": f.severity.value,
+                    "message": f.message,
+                    "path": f.path.as_posix() if f.path else None,
+                    "doc_id": f.doc_id,
+                    "line": f.line,
+                    "suggestion": f.suggestion,
+                    "category": f.category,
+                }
+                for f in findings
+            ],
+            "summary": {
+                "errors": counts[Severity.error],
+                "warnings": counts[Severity.warning],
+                "info": counts[Severity.info],
+            },
+        },
+        indent=2,
+    )
+
+
 def _print_summary(counts: dict[Severity, int]) -> None:
     parts: list[str] = [
         f"{counts[Severity.error]} error{'s' if counts[Severity.error] != 1 else ''}",
@@ -230,6 +259,10 @@ def check(
             help="Promote warnings to errors for the exit code. Hard checks always block.",
         ),
     ] = False,
+    fmt: Annotated[
+        str,
+        typer.Option("--format", help="Output format: plain or json."),
+    ] = "plain",
     path: Annotated[
         Path,
         typer.Option(
@@ -239,6 +272,10 @@ def check(
     ] = Path("."),
 ) -> None:
     """Run the configured checks. Errors exit non-zero."""
+    if fmt not in ("plain", "json"):
+        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+        raise typer.Exit(code=2)
+
     repo_root = path.resolve()
     config_path = find_config(repo_root)
     config = load(config_path)
@@ -326,22 +363,26 @@ def check(
             spent = budget - llm_client.remaining_budget()
             cache_size = sum(1 for e in llm_client._cache.values())
             hits = max(0, cache_size - calls_before)
-            typer.echo(
-                typer.style(
-                    f"LLM: ${spent:.4f} / ${budget:.2f} budget used"
-                    + (f"; {hits} cache hit(s)" if hits else ""),
-                    dim=True,
+            if fmt == "plain":
+                typer.echo(
+                    typer.style(
+                        f"LLM: ${spent:.4f} / ${budget:.2f} budget used"
+                        + (f"; {hits} cache hit(s)" if hits else ""),
+                        dim=True,
+                    )
                 )
-            )
 
     findings = sort_findings(findings)
-    for finding in findings:
-        _print_finding(finding)
-
     counts = summarize(findings)
-    _print_summary(counts)
-
     fail = counts[Severity.error] > 0 or (strict and counts[Severity.warning] > 0)
+
+    if fmt == "json":
+        typer.echo(_findings_to_json(findings, counts))
+    else:
+        for finding in findings:
+            _print_finding(finding)
+        _print_summary(counts)
+
     raise typer.Exit(code=1 if fail else 0)
 
 
