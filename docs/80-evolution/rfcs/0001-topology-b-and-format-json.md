@@ -3,7 +3,7 @@ id: 0001-topology-b-and-format-json
 title: "RFC-0001: Topology B (sibling code repos) and structured check output"
 audience: explanation
 tier: 2
-status: draft
+status: stable
 owner: "@hz642"
 last_reviewed: 2026-05-08
 ---
@@ -12,7 +12,7 @@ last_reviewed: 2026-05-08
 
 ## Status
 
-Draft. Target decision date: 2026-06-30.
+Accepted and implemented (2026-05-08).
 
 ## Summary
 
@@ -104,8 +104,8 @@ Add `--format=plain|json` (default `plain`) to `irminsul check`. When `json`:
 - **GitHub Annotations output** (`--format=github`). Could emit `::error file=...,line=...,col=...::message` directly. Useful for PR annotations. Can be a follow-on; JSON is the more general primitive.
 - **SARIF output.** Standard for static-analysis tools; heavy schema. Probably Sprint 4+.
 
-## Unresolved Questions
+## Resolved Questions
 
-- Should `source_roots` with `..`-relative paths be forbidden in single-repo `init` to avoid confusion? Or rely on the user knowing what they're doing?
-- Does `git/mtime.py` work cross-repo (the source files may be in a different `.git` tree)? `gitpython` can open any repo root — `last_commit_time` already takes `repo_root` as a parameter, but Topology B source files live in a different git repo. Need to resolve which repo root to pass for mtime checks.
-- JSON schema version strategy: embed `"version": 1` in the output from day one so consumers can detect breaking changes.
+- `source_roots` with `..`-relative paths are permitted; single-repo `init` does not restrict them. Teams are expected to know their layout.
+- Cross-repo mtime: `git/mtime.py` gained `git_root_for` (walks up to find `.git`) and `last_commit_time_any_repo` (uses the code repo's own `.git`). If no `.git` is found, `MtimeDriftCheck` emits an `error` Finding rather than silently skipping.
+- JSON output embeds `"version": 1` from day one.
