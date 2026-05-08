@@ -7,6 +7,18 @@ status: stable
 owner: "@hz642"
 last_reviewed: 2026-05-08
 describes: []
+children:
+  - cli
+  - config
+  - frontmatter
+  - docgraph
+  - doc-atom
+  - checks
+  - languages
+  - render
+  - init
+  - llm
+  - new-list-regen
 ---
 
 # Components
@@ -21,3 +33,5 @@ Each architectural piece of Irminsul has a dedicated doc here. Frontmatter `desc
 - [`languages`](languages.md) — language-profile registry
 - [`render`](render.md) — MkDocs renderer
 - [`init`](init.md) — scaffolding command and templates
+- [`llm`](llm.md) — LLM client (budget tracking, disk cache, LiteLLM wrapper)
+- [`new-list-regen`](new-list-regen.md) — `new`, `list`, and `regen reference` commands

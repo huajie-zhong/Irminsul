@@ -7,6 +7,8 @@ status: draft
 owner: "@hz642"
 last_reviewed: 2026-05-08
 describes: []
+children:
+  - patterns
 ---
 
 # Evolution
@@ -16,6 +18,12 @@ Where the system is going. Roadmap, RFCs in flight, risks, debt, deprecations.
 - [`patterns`](patterns.md) — failure patterns and the system rules that prevent them
 
 ## Requests for Comments (RFCs)
+
+In-flight proposals:
+
+- [`0001-topology-b-and-format-json`](rfcs/0001-topology-b-and-format-json.md) — Topology B (sibling code repos) and `--format=json` for check output
+- [`0002-fix-and-regen-typescript`](rfcs/0002-fix-and-regen-typescript.md) — `irminsul fix` auto-remediation and TypeScript reference regen
+- [`0003-vscode-extension`](rfcs/0003-vscode-extension.md) — VS Code extension (Phase 3)
 
 RFCs are *proposals before decisions*. They live in `rfcs/` while in flight. The lifecycle:
 
