@@ -54,3 +54,21 @@ jobs:
           pip install -e ".[dev]"
       - name: Pytest
         run: pytest -q --cov=irminsul --cov-report=term-missing
+
+  dogfood:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[mkdocs]"
+      - name: irminsul check (self)
+        run: irminsul check --scope=hard
+      - name: irminsul render (self)
+        run: irminsul render

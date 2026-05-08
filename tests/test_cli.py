@@ -23,11 +23,6 @@ def test_help_lists_commands() -> None:
         assert cmd in result.stdout
 
 
-def test_init_stub_exits_non_zero() -> None:
-    result = runner.invoke(app, ["init", "--no-interactive"])
-    assert result.exit_code == 2
-
-
 def test_check_rejects_unknown_scope() -> None:
     result = runner.invoke(app, ["check", "--scope", "wat"])
     assert result.exit_code != 0

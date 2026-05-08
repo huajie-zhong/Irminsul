@@ -1,0 +1,20 @@
+name: docs-pr
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "irminsul.toml"
+      - "{{ source_roots[0] }}/**"
+      - ".github/workflows/docs-pr.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # mtime drift (Sprint 2) needs full history
+      - uses: {{ github_user }}/irminsul@v0.1.0
+        with:
+          scope: hard

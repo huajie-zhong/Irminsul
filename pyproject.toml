@@ -58,9 +58,9 @@ irminsul = "irminsul.cli:app"
 irm = "irminsul.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/anson/irminsul"
-Repository = "https://github.com/anson/irminsul"
-Issues = "https://github.com/anson/irminsul/issues"
+Homepage = "https://github.com/huajie-zhong/irminsul"
+Repository = "https://github.com/huajie-zhong/irminsul"
+Issues = "https://github.com/huajie-zhong/irminsul/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/irminsul"]

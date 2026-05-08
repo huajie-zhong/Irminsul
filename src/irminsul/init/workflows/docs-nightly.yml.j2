@@ -1,0 +1,23 @@
+name: docs-nightly
+
+# Soft-deterministic checks (mtime drift, orphans, supersession, parent-child
+# consistency, glossary linter) and LLM advisory checks land in irminsul Sprint 2.
+# This workflow is wired up so it starts producing useful output the moment you
+# upgrade.
+
+on:
+  schedule:
+    - cron: "23 6 * * *"   # daily at 06:23 UTC
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: {{ github_user }}/irminsul@v0.1.0
+        with:
+          scope: soft
+          llm: "true"

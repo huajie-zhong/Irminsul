@@ -1,0 +1,12 @@
+project_name = "{{ project_name }}"
+
+[paths]
+docs_root = "docs"
+source_roots = {{ source_roots | tojson }}
+
+[languages]
+enabled = {{ languages | tojson }}
+
+[render]
+target = "{{ render_target }}"
+site_dir = "site"

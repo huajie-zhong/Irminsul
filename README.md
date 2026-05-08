@@ -24,8 +24,6 @@ Hard, blocking checks (deterministic, no LLM):
 - **Internal link integrity** — no broken `[link](other.md)` references
 - **Schema-leak detection** — no class/type definitions in component docs (those belong in the generated reference layer)
 
-Coming in Sprint 2: mtime drift, orphan detection, supersession auto-update, parent-child consistency, glossary linter, and LLM-advisory checks for behavioral overlap and semantic drift.
-
 ## CI integration
 
 ```yaml
@@ -36,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - uses: anson/irminsul@v0.1.0
+      - uses: <github-user>/irminsul@v0.1.0
         with:
           scope: hard
 ```
@@ -49,4 +47,4 @@ AGPL-3.0-or-later. See [`LICENSE`](LICENSE).
 
 ## Reference
 
-The full architectural reference for the doc system Irminsul enforces lives in [`Irminsul-reference.md`](Irminsul-reference.md).
+The full architectural reference for the doc system Irminsul enforces lives in [`docs/90-meta/doc-system.md`](docs/90-meta/doc-system.md).

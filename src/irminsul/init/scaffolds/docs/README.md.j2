@@ -1,0 +1,18 @@
+# {{ project_name }} — documentation
+
+This tree follows the [Irminsul](https://github.com/{{ github_user }}/irminsul) layout.
+
+| Layer | What lives here |
+|-------|-----------------|
+| `00-foundation/` | Principles, constraints, stakeholders. Rarely change. |
+| `10-architecture/` | System overview, containers, boundaries, deployment. |
+| `20-components/` | One doc per component. Most edits live here. |
+| `30-workflows/` | Cross-component how-it-works narratives. |
+| `40-reference/` | Generated. Schemas, API surface, error catalog. Don't hand-edit. |
+| `50-decisions/` | ADRs. Append-only. |
+| `60-operations/` | Runbooks, playbooks, SLOs, on-call. |
+| `70-knowledge/` | Tutorials, how-tos, explanations. |
+| `80-evolution/` | Roadmap, RFCs, risks, deprecations. |
+| `90-meta/` | Docs about the doc system itself. |
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to write docs in this system, and [`GLOSSARY.md`](GLOSSARY.md) for canonical vocabulary.

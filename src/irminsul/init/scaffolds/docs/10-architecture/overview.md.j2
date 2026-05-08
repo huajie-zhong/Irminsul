@@ -1,0 +1,26 @@
+---
+id: overview
+title: Architecture overview
+audience: explanation
+tier: 2
+status: draft
+owner: "{{ owner }}"
+last_reviewed: {{ today }}
+describes: []
+---
+
+# Architecture overview
+
+C4 Level 1 — {{ project_name }} as a single box, plus the users and external systems it talks to.
+
+```mermaid
+C4Context
+    title System Context for {{ project_name }}
+    Person(user, "User")
+    System({{ project_name | replace("-", "_") }}, "{{ project_name }}", "What this system does, in one sentence.")
+    System_Ext(external, "External system", "Why we depend on it.")
+    Rel(user, {{ project_name | replace("-", "_") }}, "uses")
+    Rel({{ project_name | replace("-", "_") }}, external, "calls")
+```
+
+> _Replace the diagram and prose to match your system. Container-level (C4 L2) detail belongs in `containers.md`._

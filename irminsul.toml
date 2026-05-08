@@ -1,0 +1,12 @@
+project_name = "Irminsul"
+
+[paths]
+docs_root = "docs"
+source_roots = ["src"]
+
+[languages]
+enabled = ["python"]
+
+[render]
+target = "mkdocs"
+site_dir = "site"

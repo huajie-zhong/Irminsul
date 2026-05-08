@@ -1,0 +1,40 @@
+name: irminsul
+description: Run irminsul checks against your /docs tree.
+branding:
+  icon: book-open
+  color: green
+
+inputs:
+  scope:
+    description: 'Check tier to run: hard | soft | all.'
+    default: hard
+  llm:
+    description: "Set to 'true' to include LLM advisory checks (Phase 2)."
+    default: 'false'
+  version:
+    description: Pin a specific irminsul release to install (default unpinned).
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Install irminsul
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.version }}" ]; then
+          pip install "irminsul==${{ inputs.version }}"
+        else
+          pip install irminsul
+        fi
+    - name: Run irminsul check
+      shell: bash
+      run: |
+        if [ "${{ inputs.llm }}" = "true" ]; then
+          irminsul check --scope=${{ inputs.scope }} --llm
+        else
+          irminsul check --scope=${{ inputs.scope }}
+        fi

@@ -1,3 +1,14 @@
+---
+id: doc-system
+title: A Documentation System for Complex Codebases
+audience: reference
+tier: 2
+status: stable
+owner: "@hz642"
+last_reviewed: 2026-05-08
+describes: []
+---
+
 # A Documentation System for Complex Codebases
 
 > A reference architecture for project documentation that generalizes across domains. Designed to resist rot, scale with complexity, and survive philosophy shifts.

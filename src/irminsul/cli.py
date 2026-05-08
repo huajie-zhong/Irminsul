@@ -15,6 +15,8 @@ from irminsul import __version__
 from irminsul.checks import HARD_REGISTRY, Finding, Severity, sort_findings, summarize
 from irminsul.config import find_config, load
 from irminsul.docgraph import build_graph
+from irminsul.init.command import run_init
+from irminsul.render.mkdocs import MkDocsRenderer, MkDocsRenderError
 
 app = typer.Typer(
     name="irminsul",
@@ -60,6 +62,13 @@ def init(
             help="Use defaults instead of prompting. CI-friendly.",
         ),
     ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Overwrite scaffold files that already exist.",
+        ),
+    ] = False,
     path: Annotated[
         Path,
         typer.Option(
@@ -69,9 +78,9 @@ def init(
     ] = Path("."),
 ) -> None:
     """Scaffold the docs skeleton, irminsul.toml, and CI workflows."""
-    typer.echo(f"[init] path={path.resolve()} interactive={not no_interactive}")
-    typer.echo("init: not yet implemented (Sprint 1, Week 4)")
-    raise typer.Exit(code=2)
+    target = path.resolve()
+    target.mkdir(parents=True, exist_ok=True)
+    run_init(target, interactive=not no_interactive, force=force)
 
 
 _SEVERITY_STYLE = {
@@ -178,11 +187,43 @@ def render(
             help="Root of the codebase to render. Defaults to current directory.",
         ),
     ] = Path("."),
+    out_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--out-dir",
+            help="Override the site output directory (default from irminsul.toml).",
+        ),
+    ] = None,
 ) -> None:
     """Build the rendered docs site."""
-    typer.echo(f"[render] path={path.resolve()}")
-    typer.echo("render: not yet implemented (Sprint 1, Week 4)")
-    raise typer.Exit(code=2)
+    repo_root = path.resolve()
+    config_path = find_config(repo_root)
+    config = load(config_path)
+    graph = build_graph(repo_root, config)
+
+    target_out = (out_dir or repo_root / config.render.site_dir).resolve()
+
+    if config.render.target == "none":
+        typer.echo("render.target = 'none' in irminsul.toml; nothing to render.")
+        raise typer.Exit(code=0)
+
+    if config.render.target != "mkdocs":
+        typer.echo(
+            typer.style(
+                f"unknown render target '{config.render.target}'; only 'mkdocs' is implemented.",
+                fg="red",
+            )
+        )
+        raise typer.Exit(code=2)
+
+    renderer = MkDocsRenderer()
+    try:
+        renderer.build(graph, target_out)
+    except MkDocsRenderError as e:
+        typer.echo(typer.style(str(e), fg="red"))
+        raise typer.Exit(code=1) from e
+
+    typer.echo(typer.style(f"site built at {target_out}", fg="green"))
 
 
 if __name__ == "__main__":  # pragma: no cover
