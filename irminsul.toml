@@ -4,6 +4,9 @@ project_name = "Irminsul"
 docs_root = "docs"
 source_roots = ["src"]
 
+[checks]
+soft_deterministic = ["mtime-drift", "orphans", "stale-reaper"]
+
 [languages]
 enabled = ["python"]
 

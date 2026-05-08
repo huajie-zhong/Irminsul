@@ -12,7 +12,14 @@ from typing import Annotated
 import typer
 
 from irminsul import __version__
-from irminsul.checks import HARD_REGISTRY, Finding, Severity, sort_findings, summarize
+from irminsul.checks import (
+    HARD_REGISTRY,
+    SOFT_REGISTRY,
+    Finding,
+    Severity,
+    sort_findings,
+    summarize,
+)
 from irminsul.config import find_config, load
 from irminsul.docgraph import build_graph
 from irminsul.init.command import run_init
@@ -104,6 +111,8 @@ def _print_finding(finding: Finding) -> None:
     severity_str = typer.style(finding.severity.value.ljust(7), fg=color, bold=bold)
     location = _format_location(finding)
     typer.echo(f"{location}  {severity_str}  [{finding.check}]  {finding.message}")
+    if finding.suggestion:
+        typer.echo(typer.style(f"      → {finding.suggestion}", dim=True))
 
 
 def _print_summary(counts: dict[Severity, int]) -> None:
@@ -126,6 +135,13 @@ def check(
         bool,
         typer.Option("--llm", help="Include LLM advisory checks (Phase 2; no-op for now)."),
     ] = False,
+    strict: Annotated[
+        bool,
+        typer.Option(
+            "--strict",
+            help="Promote warnings to errors for the exit code. Hard checks always block.",
+        ),
+    ] = False,
     path: Annotated[
         Path,
         typer.Option(
@@ -146,7 +162,6 @@ def check(
         for check_name in config.checks.hard:
             cls = HARD_REGISTRY.get(check_name)
             if cls is None:
-                # Configured check not implemented yet — note it but don't fail.
                 typer.echo(
                     typer.style(
                         f"note: hard check '{check_name}' not yet implemented; skipping.",
@@ -157,8 +172,17 @@ def check(
             findings.extend(cls().run(graph))
 
     if scope in (Scope.soft, Scope.all):
-        # Sprint 1 ships no soft-deterministic checks; Sprint 2 will populate this.
-        pass
+        for check_name in config.checks.soft_deterministic:
+            cls = SOFT_REGISTRY.get(check_name)
+            if cls is None:
+                typer.echo(
+                    typer.style(
+                        f"note: soft check '{check_name}' not yet implemented; skipping.",
+                        fg="yellow",
+                    )
+                )
+                continue
+            findings.extend(cls().run(graph))
 
     if llm:
         typer.echo(
@@ -175,7 +199,8 @@ def check(
     counts = summarize(findings)
     _print_summary(counts)
 
-    raise typer.Exit(code=1 if counts[Severity.error] else 0)
+    fail = counts[Severity.error] > 0 or (strict and counts[Severity.warning] > 0)
+    raise typer.Exit(code=1 if fail else 0)
 
 
 @app.command()

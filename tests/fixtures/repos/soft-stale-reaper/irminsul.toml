@@ -1,0 +1,11 @@
+project_name = "soft-stale-reaper-fixture"
+
+[paths]
+docs_root = "docs"
+source_roots = ["app"]
+
+[checks]
+soft_deterministic = ["stale-reaper"]
+
+[checks.stale_reaper]
+deprecated_threshold_days = 90

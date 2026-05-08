@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
+from typing import TYPE_CHECKING
 
 from irminsul.config import IrminsulConfig
 from irminsul.frontmatter import (
@@ -17,6 +18,10 @@ from irminsul.frontmatter import (
     ParseFailure,
     parse_doc,
 )
+
+if TYPE_CHECKING:
+    from irminsul.docgraph_index import Heading
+    from irminsul.git.mtime import GitTime
 
 # Top-level docs that aren't doc atoms — `README.md`, the glossary, contributor
 # guidance — and don't carry frontmatter. They're navigation, not content.
@@ -44,6 +49,10 @@ class DocGraph:
     """(id, first_path, conflicting_path) tuples discovered during build."""
     config: IrminsulConfig | None = None
     repo_root: Path | None = None
+    inbound_strong: dict[str, set[str]] = field(default_factory=dict)
+    inbound_weak: dict[str, set[str]] = field(default_factory=dict)
+    headings: dict[str, list[Heading]] = field(default_factory=dict)
+    git_times: dict[Path, GitTime] = field(default_factory=dict)
 
 
 def _to_repo_relative(absolute: Path, repo_root: Path) -> Path:
@@ -88,5 +97,19 @@ def build_graph(repo_root: Path, config: IrminsulConfig) -> DocGraph:
             graph.nodes[node.id] = node
 
         graph.by_path[node.path] = node
+
+    # Lazy indexes consumed by Sprint 2 checks.
+    from markdown_it import MarkdownIt
+
+    from irminsul.docgraph_index import (
+        build_headings,
+        build_inbound_strong,
+        build_inbound_weak,
+    )
+
+    parser = MarkdownIt("commonmark")
+    graph.inbound_strong = build_inbound_strong(graph.nodes)
+    graph.inbound_weak = build_inbound_weak(graph.nodes, graph.by_path, parser)
+    graph.headings = build_headings(graph.nodes, parser)
 
     return graph

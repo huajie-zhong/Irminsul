@@ -23,6 +23,7 @@ SOFT_DETERMINISTIC_CHECKS = (
     "supersession",
     "parent-child",
     "glossary",
+    "external-links",
 )
 SOFT_LLM_CHECKS = ("overlap", "semantic-drift", "scope-appropriateness")
 
@@ -47,12 +48,52 @@ class Tiers(BaseModel):
     )
 
 
+class SchemaLeakSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    protected_paths: list[str] = Field(default_factory=lambda: ["docs/20-components/**/*.md"])
+
+
+class ExternalLinksSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    timeout_seconds: float = 5.0
+    cache_path: str = ".irminsul-cache/external-links.json"
+    ttl_hours: int = 168
+
+
+class StaleReaperSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    deprecated_threshold_days: int = 180
+
+
+class GlossarySettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    glossary_path: str = "docs/GLOSSARY.md"
+    enforce_undefined_terms: bool = False
+
+
+class ParentChildSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    length_warning_lines: int = 300
+
+
 class Checks(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     hard: list[str] = Field(default_factory=lambda: list(HARD_CHECKS))
     soft_deterministic: list[str] = Field(default_factory=list)
     soft_llm: list[str] = Field(default_factory=list)
+
+    schema_leak: SchemaLeakSettings = Field(default_factory=SchemaLeakSettings)
+    external_links: ExternalLinksSettings = Field(default_factory=ExternalLinksSettings)
+    stale_reaper: StaleReaperSettings = Field(default_factory=StaleReaperSettings)
+    glossary: GlossarySettings = Field(default_factory=GlossarySettings)
+    parent_child: ParentChildSettings = Field(default_factory=ParentChildSettings)
 
     @field_validator("hard", "soft_deterministic", "soft_llm")
     @classmethod
@@ -68,6 +109,7 @@ class Overrides(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     ignore_uniqueness: list[str] = Field(default_factory=list)
+    llm_ignore: list[str] = Field(default_factory=list)
     mtime_drift_days: int = 30
 
 
@@ -76,12 +118,15 @@ class Llm(BaseModel):
 
     provider: str = "anthropic"
     model: str = "claude-haiku-4-5"
+    max_cost_usd: float = 1.00
+    required_in_ci: bool = False
+    cache_path: str = ".irminsul-cache/llm.json"
 
 
 class Languages(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    enabled: list[Literal["python", "typescript"]] = Field(default=["python"])
+    enabled: list[Literal["python", "typescript", "go", "rust"]] = Field(default=["python"])
 
 
 class Render(BaseModel):

@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import ClassVar, Protocol, runtime_checkable
+from typing import ClassVar, Literal, Protocol, runtime_checkable
 
 from irminsul.docgraph import DocGraph
 
@@ -31,6 +31,8 @@ class Finding:
     path: Path | None = None
     doc_id: str | None = None
     line: int | None = None
+    suggestion: str | None = None
+    category: Literal["hard", "soft", "llm"] | None = None
 
 
 @runtime_checkable

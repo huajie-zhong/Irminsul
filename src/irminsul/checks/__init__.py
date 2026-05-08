@@ -1,7 +1,8 @@
 """Check registry.
 
 Looking-up by name keeps the CLI/config side honest: `irminsul.toml`'s
-`checks.hard` field is just a list of strings, and we resolve them here.
+`checks.hard` (and `soft_deterministic`, `soft_llm`) are just lists of strings,
+and we resolve them here.
 """
 
 from __future__ import annotations
@@ -10,7 +11,10 @@ from irminsul.checks.base import Check, Finding, Severity, sort_findings, summar
 from irminsul.checks.frontmatter import FrontmatterCheck
 from irminsul.checks.globs import GlobsCheck
 from irminsul.checks.links import LinksCheck
+from irminsul.checks.mtime_drift import MtimeDriftCheck
+from irminsul.checks.orphans import OrphansCheck
 from irminsul.checks.schema_leak import SchemaLeakCheck
+from irminsul.checks.stale_reaper import StaleReaperCheck
 from irminsul.checks.uniqueness import UniquenessCheck
 
 HARD_REGISTRY: dict[str, type[Check]] = {
@@ -21,8 +25,15 @@ HARD_REGISTRY: dict[str, type[Check]] = {
     SchemaLeakCheck.name: SchemaLeakCheck,
 }
 
+SOFT_REGISTRY: dict[str, type[Check]] = {
+    MtimeDriftCheck.name: MtimeDriftCheck,
+    OrphansCheck.name: OrphansCheck,
+    StaleReaperCheck.name: StaleReaperCheck,
+}
+
 __all__ = [
     "HARD_REGISTRY",
+    "SOFT_REGISTRY",
     "Check",
     "Finding",
     "Severity",

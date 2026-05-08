@@ -13,6 +13,8 @@ describes: []
 
 Where the system is going. Roadmap, RFCs in flight, risks, debt, deprecations.
 
+- [`patterns`](patterns.md) — failure patterns and the system rules that prevent them
+
 ## Requests for Comments (RFCs)
 
 RFCs are *proposals before decisions*. They live in `rfcs/` while in flight. The lifecycle:
