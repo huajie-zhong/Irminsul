@@ -6,7 +6,6 @@ tier: 3
 status: stable
 owner: "@anson"
 last_reviewed: 2026-05-07
-children: [widget-internals]
 ---
 
 # Widget

@@ -1,15 +1,14 @@
-"""ParentChildCheck — INDEX.md children registry consistency.
+"""ParentChildCheck — INDEX.md structural invariants.
 
-Three concerns rolled into one check (per Part VI §4.4 of the reference):
+An INDEX.md auto-owns every sibling `.md` file in its folder. No explicit
+`children:` declaration is required or supported.
 
-1. **Asymmetry** — every id listed under an INDEX.md's `children:` must exist
-   on disk in the parent folder. Conversely, once a parent INDEX has *any*
-   declared children, on-disk siblings that aren't listed are flagged as a
-   warning so the registry stays a true index.
-2. **Broad-globs ban** — once a parent INDEX has on-disk children, its
+Two concerns:
+
+1. **Broad-globs ban** — once a parent INDEX has on-disk siblings, its
    `describes:` field must not contain wildcards. Children narrow coverage;
    wildcards on the parent risk silent overlap.
-3. **Length cap** — INDEX bodies over `length_warning_lines` (default 300) get
+2. **Length cap** — INDEX bodies over `length_warning_lines` (default 300) get
    a warning. INDEX is meant to be navigation, not exposition.
 """
 
@@ -44,49 +43,13 @@ class ParentChildCheck:
                 continue
 
             folder = index_node.path.parent
-            declared = set(index_node.frontmatter.children)
 
             on_disk_ids: set[str] = set()
             for path, child in graph.by_path.items():
                 if path.parent == folder and path.name != "INDEX.md":
                     on_disk_ids.add(child.id)
 
-            extra_in_frontmatter = declared - on_disk_ids
-            extra_on_disk = on_disk_ids - declared
-
-            if extra_in_frontmatter:
-                listed = ", ".join(sorted(extra_in_frontmatter))
-                out.append(
-                    Finding(
-                        check=self.name,
-                        severity=Severity.error,
-                        message=(f"'{index_node.id}.children' lists ids not on disk: {listed}"),
-                        path=index_node.path,
-                        doc_id=index_node.id,
-                        suggestion="remove the entries or create the missing docs",
-                    )
-                )
-
-            # Only flag asymmetry once the user has opted in to children
-            # (declared non-empty). Many components are single-file; spamming
-            # those is noise.
-            if declared and extra_on_disk:
-                listed = ", ".join(sorted(extra_on_disk))
-                out.append(
-                    Finding(
-                        check=self.name,
-                        severity=Severity.warning,
-                        message=(
-                            f"on-disk siblings of {index_node.path.as_posix()} not "
-                            f"listed in 'children': {listed}"
-                        ),
-                        path=index_node.path,
-                        doc_id=index_node.id,
-                        suggestion=f"add to {index_node.path.as_posix()}'s 'children': {listed}",
-                    )
-                )
-
-            # Broad-globs ban: parents with children must claim narrowly.
+            # Broad-globs ban: parents with siblings must claim narrowly.
             if on_disk_ids:
                 for pattern in index_node.frontmatter.describes:
                     if _has_wildcard(pattern):

@@ -62,7 +62,7 @@ def test_doc_with_inbound_link_not_orphan(fixture_repo: Callable[[str], Path]) -
     assert "hub" not in flagged_ids
 
 
-def test_child_listed_in_index_not_orphan(fixture_repo: Callable[[str], Path]) -> None:
+def test_sibling_of_index_not_orphan(fixture_repo: Callable[[str], Path]) -> None:
     repo = fixture_repo("soft-orphans")
     config = load(find_config(repo))
     graph = build_graph(repo, config)

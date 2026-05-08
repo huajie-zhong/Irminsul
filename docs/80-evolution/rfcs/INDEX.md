@@ -7,11 +7,6 @@ status: draft
 owner: "@hz642"
 last_reviewed: 2026-05-08
 describes: []
-children:
-  - 0001-topology-b-and-format-json
-  - 0002-fix-and-regen-typescript
-  - 0003-vscode-extension
-  - 0004-remove-children-field
 ---
 
 # RFCs

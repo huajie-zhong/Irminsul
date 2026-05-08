@@ -7,18 +7,6 @@ status: stable
 owner: "@hz642"
 last_reviewed: 2026-05-08
 describes: []
-children:
-  - cli
-  - config
-  - frontmatter
-  - docgraph
-  - doc-atom
-  - checks
-  - languages
-  - render
-  - init
-  - llm
-  - new-list-regen
 ---
 
 # Components

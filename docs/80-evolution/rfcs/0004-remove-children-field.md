@@ -3,7 +3,7 @@ id: 0004-remove-children-field
 title: "RFC-0004: Remove children: field — INDEX auto-owns all folder siblings"
 audience: explanation
 tier: 2
-status: draft
+status: stable
 owner: "@hz642"
 last_reviewed: 2026-05-08
 ---

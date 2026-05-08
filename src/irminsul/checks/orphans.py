@@ -1,14 +1,15 @@
-"""OrphansCheck — docs that nothing links to or claims as a child.
+"""OrphansCheck — docs that nothing links to or claims as a sibling.
 
-Strong (`depends_on`), weak (markdown body links), and structural (parent
-INDEX's `children`) inbound references all count. INDEX.md docs are exempt
-because they're navigation; ADRs are exempt because they're append-only and
-routinely orphaned (linked from PRs and future ADRs, not always from existing
-docs).
+Strong (`depends_on`), weak (markdown body links), and structural (folder
+co-location with an INDEX.md) inbound references all count. INDEX.md docs are
+exempt because they're navigation; ADRs are exempt because they're append-only
+and routinely orphaned (linked from PRs and future ADRs, not always from
+existing docs).
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import ClassVar
 
 from irminsul.checks.base import Finding, Severity
@@ -21,11 +22,11 @@ class OrphansCheck:
     default_severity: ClassVar[Severity] = Severity.warning
 
     def run(self, graph: DocGraph) -> list[Finding]:
-        # Collect ids referenced by any INDEX.md's `children`.
-        children_set: set[str] = set()
+        # Folders that have an INDEX.md auto-own their direct siblings.
+        indexed_folders: set[Path] = set()
         for node in graph.nodes.values():
             if node.path.name == "INDEX.md":
-                children_set.update(node.frontmatter.children)
+                indexed_folders.add(node.path.parent)
 
         out: list[Finding] = []
         for node in graph.nodes.values():
@@ -37,7 +38,7 @@ class OrphansCheck:
             inbound: set[str] = set()
             inbound |= graph.inbound_strong.get(node.id, set())
             inbound |= graph.inbound_weak.get(node.id, set())
-            if node.id in children_set:
+            if node.path.parent in indexed_folders:
                 continue
             if inbound:
                 continue
@@ -50,8 +51,8 @@ class OrphansCheck:
                     path=node.path,
                     doc_id=node.id,
                     suggestion=(
-                        "add a link from a parent doc, list this id under an "
-                        "INDEX.md's 'children', or remove the doc"
+                        "add a link from a parent doc, put this file in a folder "
+                        "that has an INDEX.md, or remove the doc"
                     ),
                 )
             )
