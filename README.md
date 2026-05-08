@@ -34,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - uses: <github-user>/irminsul@v0.1.0
+      - uses: huajie-zhong/irminsul@v0.1.0
         with:
           scope: hard
 ```

@@ -18,7 +18,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from irminsul.init.detector import detect_languages, detect_source_roots
 
-_GITHUB_USER_PLACEHOLDER = "<github-user>"
+_GITHUB_USER_PLACEHOLDER = "huajie-zhong"
 
 _SCAFFOLDS_DIR = Path(__file__).parent / "scaffolds"
 _WORKFLOWS_DIR = Path(__file__).parent / "workflows"
@@ -135,12 +135,8 @@ def print_next_steps(answers: InitAnswers, written: list[Path]) -> None:
     typer.echo("  1. Edit docs/00-foundation/principles.md")
     typer.echo("  2. Edit docs/10-architecture/overview.md")
     typer.echo("  3. Add CODEOWNERS coverage for /docs (project-specific; not auto-generated).")
-    typer.echo(
-        f"  4. Replace {_GITHUB_USER_PLACEHOLDER} in .github/workflows/docs-*.yml "
-        "with your GitHub user/org."
-    )
-    typer.echo("  5. git add . && git commit -m 'Adopt Irminsul'")
-    typer.echo("  6. Push — CI enforces from PR #1.")
+    typer.echo("  4. git add . && git commit -m 'Adopt Irminsul'")
+    typer.echo("  5. Push — CI enforces from PR #1.")
 
 
 def run_init(target_root: Path, *, interactive: bool, force: bool = False) -> None:

@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "irminsul"
-version = "0.1.0.dev0"
+dynamic = ["version"]
 description = "A documentation system for complex codebases. Enforces structural invariants in CI."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -62,12 +62,14 @@ Homepage = "https://github.com/huajie-zhong/irminsul"
 Repository = "https://github.com/huajie-zhong/irminsul"
 Issues = "https://github.com/huajie-zhong/irminsul/issues"
 
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/irminsul/_version.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/irminsul"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"src/irminsul/init/scaffolds" = "irminsul/init/scaffolds"
-"src/irminsul/init/workflows" = "irminsul/init/workflows"
 
 [tool.ruff]
 line-length = 100

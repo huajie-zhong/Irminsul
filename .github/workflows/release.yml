@@ -39,6 +39,8 @@ jobs:
         run: python -m build
       - name: Publish via OIDC
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
 
   docker:
     name: Push image to ghcr.io
