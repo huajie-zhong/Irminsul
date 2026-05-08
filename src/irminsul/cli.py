@@ -12,6 +12,9 @@ from typing import Annotated
 import typer
 
 from irminsul import __version__
+from irminsul.checks import HARD_REGISTRY, Finding, Severity, sort_findings, summarize
+from irminsul.config import find_config, load
+from irminsul.docgraph import build_graph
 
 app = typer.Typer(
     name="irminsul",
@@ -71,6 +74,39 @@ def init(
     raise typer.Exit(code=2)
 
 
+_SEVERITY_STYLE = {
+    Severity.error: ("red", True),
+    Severity.warning: ("yellow", True),
+    Severity.info: ("cyan", False),
+}
+
+
+def _format_location(finding: Finding) -> str:
+    if finding.path is None:
+        return "<repo>"
+    posix = finding.path.as_posix()
+    if finding.line is None:
+        return posix
+    return f"{posix}:{finding.line}"
+
+
+def _print_finding(finding: Finding) -> None:
+    color, bold = _SEVERITY_STYLE[finding.severity]
+    severity_str = typer.style(finding.severity.value.ljust(7), fg=color, bold=bold)
+    location = _format_location(finding)
+    typer.echo(f"{location}  {severity_str}  [{finding.check}]  {finding.message}")
+
+
+def _print_summary(counts: dict[Severity, int]) -> None:
+    parts: list[str] = [
+        f"{counts[Severity.error]} error{'s' if counts[Severity.error] != 1 else ''}",
+        f"{counts[Severity.warning]} warning{'s' if counts[Severity.warning] != 1 else ''}",
+    ]
+    if counts[Severity.info]:
+        parts.append(f"{counts[Severity.info]} info")
+    typer.echo(", ".join(parts))
+
+
 @app.command()
 def check(
     scope: Annotated[
@@ -79,7 +115,7 @@ def check(
     ] = Scope.hard,
     llm: Annotated[
         bool,
-        typer.Option("--llm", help="Include LLM advisory checks (Phase 2)."),
+        typer.Option("--llm", help="Include LLM advisory checks (Phase 2; no-op for now)."),
     ] = False,
     path: Annotated[
         Path,
@@ -89,10 +125,48 @@ def check(
         ),
     ] = Path("."),
 ) -> None:
-    """Run the configured checks. Hard findings exit non-zero."""
-    typer.echo(f"[check] scope={scope.value} llm={llm} path={path.resolve()}")
-    typer.echo("check: not yet implemented (Sprint 1, Weeks 2-3)")
-    raise typer.Exit(code=2)
+    """Run the configured checks. Errors exit non-zero."""
+    repo_root = path.resolve()
+    config_path = find_config(repo_root)
+    config = load(config_path)
+    graph = build_graph(repo_root, config)
+
+    findings: list[Finding] = []
+
+    if scope in (Scope.hard, Scope.all):
+        for check_name in config.checks.hard:
+            cls = HARD_REGISTRY.get(check_name)
+            if cls is None:
+                # Configured check not implemented yet — note it but don't fail.
+                typer.echo(
+                    typer.style(
+                        f"note: hard check '{check_name}' not yet implemented; skipping.",
+                        fg="yellow",
+                    )
+                )
+                continue
+            findings.extend(cls().run(graph))
+
+    if scope in (Scope.soft, Scope.all):
+        # Sprint 1 ships no soft-deterministic checks; Sprint 2 will populate this.
+        pass
+
+    if llm:
+        typer.echo(
+            typer.style(
+                "note: --llm is a Phase 2 feature; no LLM checks ran.",
+                fg="yellow",
+            )
+        )
+
+    findings = sort_findings(findings)
+    for finding in findings:
+        _print_finding(finding)
+
+    counts = summarize(findings)
+    _print_summary(counts)
+
+    raise typer.Exit(code=1 if counts[Severity.error] else 0)
 
 
 @app.command()

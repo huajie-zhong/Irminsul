@@ -28,11 +28,6 @@ def test_init_stub_exits_non_zero() -> None:
     assert result.exit_code == 2
 
 
-def test_check_stub_exits_non_zero() -> None:
-    result = runner.invoke(app, ["check", "--scope", "hard"])
-    assert result.exit_code == 2
-
-
 def test_check_rejects_unknown_scope() -> None:
     result = runner.invoke(app, ["check", "--scope", "wat"])
     assert result.exit_code != 0
