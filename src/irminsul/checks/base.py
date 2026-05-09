@@ -6,6 +6,7 @@ prints them and uses their severity to decide the exit code.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -33,6 +34,13 @@ class Finding:
     line: int | None = None
     suggestion: str | None = None
     category: Literal["hard", "soft", "llm"] | None = None
+
+
+@dataclass(frozen=True)
+class Fix:
+    path: Path
+    description: str
+    apply: Callable[[str], str]
 
 
 @runtime_checkable

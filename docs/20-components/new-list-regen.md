@@ -1,6 +1,6 @@
 ---
 id: new-list-regen
-title: New / List / Regen commands
+title: New / List / Regen / Fix commands
 audience: explanation
 tier: 3
 status: stable
@@ -8,15 +8,17 @@ describes:
   - src/irminsul/new/**
   - src/irminsul/listing/**
   - src/irminsul/regen/**
+  - src/irminsul/fix.py
 tests:
   - tests/test_cli_new.py
   - tests/test_cli_regen.py
   - tests/test_cli_list.py
+  - tests/test_cli_fix.py
 ---
 
-# New / List / Regen commands
+# New / List / Regen / Fix commands
 
-Three doc-author UX commands added in v0.2.0.
+Doc-author UX commands for creating, finding, regenerating, and remediating documentation atoms.
 
 ## `irminsul new {adr,component,rfc}`
 
@@ -26,6 +28,12 @@ Scaffolds a new doc atom from a Jinja template under `src/irminsul/new/templates
 
 Thin wrappers over existing soft checks: `orphans` delegates to `OrphansCheck`, `stale` to `StaleReaperCheck`, `undocumented` to `UniquenessCheck` (filtering to omission warnings). Output is plain text by default; `--format json` emits a JSON array.
 
-## `irminsul regen --language=python`
+## `irminsul fix`
 
-Walks `source_roots`, finds all non-private `.py` files, and writes a mkdocstrings stub (`:::<dotted.module>`) under `docs/40-reference/python/`. The `id` in each stub matches the filename stem per the frontmatter rule. TypeScript support is deferred to Sprint 3.
+Applies deterministic remediations for fixable soft-check findings. The first implementation target is `SupersessionCheck`: when a new doc lists an old doc in `supersedes:`, `fix` can set the old doc's `status: deprecated` and `superseded_by: <new-id>` frontmatter. `--dry-run` prints planned edits without writing files; normal runs group fixes by path and write updated files atomically.
+
+## `irminsul regen --language=python|typescript`
+
+For Python, walks `source_roots`, finds all non-private `.py` files, and writes a mkdocstrings stub (`:::<dotted.module>`) under `docs/40-reference/python/`. The `id` in each stub matches the filename stem per the frontmatter rule.
+
+For TypeScript, `irminsul regen --language=typescript` requires local TypeDoc (`node_modules/.bin/typedoc` or `npx --no-install typedoc`) and writes minimal reference stubs under `docs/40-reference/typescript/`, mirroring the source directory layout. Stub IDs are derived from the full relative module path with `-` separators so nested files keep unique IDs.

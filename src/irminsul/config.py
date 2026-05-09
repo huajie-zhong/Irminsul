@@ -134,6 +134,20 @@ class Languages(BaseModel):
     enabled: list[Literal["python", "typescript", "go", "rust"]] = Field(default=["python"])
 
 
+class RegenTypescript(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    tsconfig: str = "tsconfig.json"
+    out_dir: str = "docs/40-reference/typescript"
+
+
+class Regen(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    typescript: RegenTypescript = Field(default_factory=RegenTypescript)
+
+
 class Render(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -151,6 +165,7 @@ class IrminsulConfig(BaseModel):
     overrides: Overrides = Field(default_factory=Overrides)
     llm: Llm = Field(default_factory=Llm)
     languages: Languages = Field(default_factory=Languages)
+    regen: Regen = Field(default_factory=Regen)
     render: Render = Field(default_factory=Render)
 
 

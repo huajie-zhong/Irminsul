@@ -7,7 +7,7 @@ and we resolve them here.
 
 from __future__ import annotations
 
-from irminsul.checks.base import Check, Finding, Severity, sort_findings, summarize
+from irminsul.checks.base import Check, Finding, Fix, Severity, sort_findings, summarize
 from irminsul.checks.boundary import BoundaryCheck
 from irminsul.checks.coverage import CoverageCheck
 from irminsul.checks.dependency_check import DependencyCheck
@@ -72,6 +72,7 @@ __all__ = [
     "DependencyCheck",
     "EnvCheck",
     "Finding",
+    "Fix",
     "LiarCheck",
     "OverlapCheck",
     "PhantomLayerCheck",
