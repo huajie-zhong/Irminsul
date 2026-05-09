@@ -39,8 +39,17 @@ Transform `depends_on` from a conceptual list to a verified architectural graph.
 - **Rule:** Any directory mapped in `docs/README.md` or templates must contain at least one valid `INDEX.md` and non-empty content.
 - **Enforcement:** `irminsul check` will flag "Phantom Layers" to prevent navigation rot.
 
+## Frontmatter Cleanup
+
+### Remove `owner`
+No check reads it, nothing enforces its correctness, and it goes stale the moment a team changes. Pure social metadata — delete the field.
+
+### Remove `last_reviewed`
+A manually maintained date that can lie: anyone can bump it without reviewing. The `mtime-drift` check already provides a mechanical staleness signal from git commit times, which is strictly more reliable. Redundant and weaker — delete the field.
+
 ## Implementation Plan
 1. Update `DocFrontmatter` schema to include `requires_env`.
 2. Implement `EnvCheck` using static analysis (regex/ast) on `describes` targets.
 3. Implement `DependencyCheck` by cross-referencing file imports with the `DocGraph`.
 4. Update `init` templates to remove empty "Phantom" directories (`30-workflows`, `60-operations`) until they have content.
+5. Drop `owner` and `last_reviewed` from `DocFrontmatter` schema, update all existing docs, and update `init` scaffolds.
