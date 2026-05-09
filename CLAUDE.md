@@ -16,6 +16,15 @@ Editable install with dev tooling (Python 3.12+ required):
 pip install -e ".[dev]"      # ruff, mypy, pytest, pre-commit, mkdocs
 ```
 
+```powershell
+.venv\Scripts\pytest -q          # run tests
+.venv\Scripts\ruff check .       # lint
+.venv\Scripts\mypy               # type-check
+.venv\Scripts\irminsul check --scope=hard   # dogfood
+```
+
+Alternatively, `py -3.12 -m pytest` works if the uv venv is not activated, but `py -3.12 -m pip install -e ".[dev]"` must be run first. The system `python` on this machine is 3.10 and will not satisfy the `>=3.12` requirement.
+
 Day-to-day:
 
 ```bash
