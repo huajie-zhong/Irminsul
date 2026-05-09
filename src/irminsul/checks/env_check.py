@@ -19,9 +19,9 @@ from irminsul.checks.globs import walk_source_files
 from irminsul.docgraph import DocGraph, DocNode
 
 _ENV_PATTERN = re.compile(
-    r'os\.environ\[["\']([\w]+)["\']\]'
-    r'|os\.environ\.get\(["\']([\w]+)["\']'
-    r'|os\.getenv\(["\']([\w]+)["\']',
+    r'os\.environ\s*\[\s*["\'](\w+)["\']\s*\]'
+    r'|os\.environ\.get\s*\(\s*["\'](\w+)["\']'
+    r'|os\.getenv\s*\(\s*["\'](\w+)["\']',
     re.MULTILINE,
 )
 
@@ -67,18 +67,17 @@ class EnvCheck:
             declared = _collect_transitive_declared(node, graph)
 
             found: set[str] = set()
-            for pattern in node.frontmatter.describes:
-                spec = GitIgnoreSpec.from_lines([pattern])
-                for abs_path, display in source_files:
-                    if not spec.match_file(display):
-                        continue
-                    if PurePosixPath(display).suffix != ".py":
-                        continue
-                    try:
-                        text = abs_path.read_text(encoding="utf-8")
-                    except OSError:
-                        continue
-                    found.update(_scan_env_vars(text))
+            spec = GitIgnoreSpec.from_lines(node.frontmatter.describes)
+            for abs_path, display in source_files:
+                if not spec.match_file(display):
+                    continue
+                if PurePosixPath(display).suffix != ".py":
+                    continue
+                try:
+                    text = abs_path.read_text(encoding="utf-8")
+                except OSError:
+                    continue
+                found.update(_scan_env_vars(text))
 
             for key in sorted(found - declared):
                 out.append(

@@ -9,6 +9,7 @@ resolves module paths to file paths via source_roots. Flags:
 from __future__ import annotations
 
 import ast
+from collections import defaultdict
 from pathlib import Path, PurePosixPath
 from typing import ClassVar
 
@@ -16,6 +17,7 @@ from pathspec import GitIgnoreSpec
 
 from irminsul.checks.base import Finding, Severity
 from irminsul.checks.globs import walk_source_files
+from irminsul.checks.uniqueness import specificity
 from irminsul.docgraph import DocGraph
 
 
@@ -58,39 +60,65 @@ class DependencyCheck:
         source_roots = graph.config.paths.source_roots
         source_files, _ = walk_source_files(graph.repo_root, source_roots)
 
-        file_to_doc: dict[Path, str] = {}
+        # Pass 1: build file→doc ownership (specificity-aware) and cache each
+        # doc's Python files to avoid re-matching in pass 2.
+        #
+        # claims maps abs_path → list of (node_id, best_pattern_specificity).
+        # When multiple docs claim the same file, the most-specific pattern wins
+        # (same rule as UniquenessCheck). Ties are broken by node_id for
+        # determinism; UniquenessCheck already errors on true ties.
+        claims: dict[Path, list[tuple[str, tuple[int, int, int]]]] = defaultdict(list)
+        doc_py_files: dict[str, list[Path]] = {}
+
         for node in graph.nodes.values():
             if not node.frontmatter.describes:
                 continue
-            for pattern in node.frontmatter.describes:
-                spec = GitIgnoreSpec.from_lines([pattern])
-                for abs_path, display in source_files:
-                    if spec.match_file(display):
-                        file_to_doc[abs_path.resolve()] = node.id
+            pattern_specs = sorted(
+                [
+                    (p, specificity(p), GitIgnoreSpec.from_lines([p]))
+                    for p in node.frontmatter.describes
+                ],
+                key=lambda x: x[1],
+                reverse=True,
+            )
+            node_py: list[Path] = []
+            for abs_path, display in source_files:
+                best_score: tuple[int, int, int] | None = None
+                for _pat, score, pspec in pattern_specs:
+                    if pspec.match_file(display):
+                        best_score = score
+                        break  # sorted descending; first match is highest score
+                if best_score is None:
+                    continue
+                claims[abs_path.resolve()].append((node.id, best_score))
+                if PurePosixPath(display).suffix == ".py":
+                    node_py.append(abs_path)
+            doc_py_files[node.id] = node_py
+
+        file_to_doc: dict[Path, str] = {}
+        for file_path, file_claims in claims.items():
+            top_score = max(c[1] for c in file_claims)
+            winners = sorted(c[0] for c in file_claims if c[1] == top_score)
+            file_to_doc[file_path] = winners[0]
 
         out: list[Finding] = []
 
+        # Pass 2: reuse pre-computed doc_py_files — no re-matching needed.
         for node in graph.nodes.values():
-            if not node.frontmatter.describes or not node.frontmatter.depends_on:
+            if not node.frontmatter.describes:
                 continue
 
             actual_deps: set[str] = set()
-            for pattern in node.frontmatter.describes:
-                spec = GitIgnoreSpec.from_lines([pattern])
-                for abs_path, display in source_files:
-                    if not spec.match_file(display):
-                        continue
-                    if PurePosixPath(display).suffix != ".py":
-                        continue
-                    try:
-                        text = abs_path.read_text(encoding="utf-8")
-                    except OSError:
-                        continue
-                    for module in _extract_imports(text):
-                        for candidate in _dotted_to_paths(module, source_roots, graph.repo_root):
-                            doc_id = file_to_doc.get(candidate.resolve())
-                            if doc_id and doc_id != node.id:
-                                actual_deps.add(doc_id)
+            for abs_path in doc_py_files.get(node.id, []):
+                try:
+                    text = abs_path.read_text(encoding="utf-8")
+                except OSError:
+                    continue
+                for module in _extract_imports(text):
+                    for candidate in _dotted_to_paths(module, source_roots, graph.repo_root):
+                        dep_id = file_to_doc.get(candidate.resolve())
+                        if dep_id and dep_id != node.id:
+                            actual_deps.add(dep_id)
 
             declared_deps = set(node.frontmatter.depends_on)
 
