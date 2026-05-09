@@ -1,8 +1,8 @@
 """SupersessionCheck — `supersedes`/`superseded_by` reciprocity.
 
-Check-only: emits findings when reciprocity is broken. Auto-fix (rewriting the
-old doc's frontmatter to add `superseded_by:` and flip status) is deferred to
-Sprint 3.
+Emits findings when reciprocity is broken. For the deterministic forward case
+(`new.supersedes = [old]`), it can also rewrite the old doc's frontmatter to
+add `superseded_by:` and flip status.
 
 Severity policy:
 - Unknown id referenced from `supersedes` / `superseded_by` → **error** (the
@@ -13,9 +13,12 @@ Severity policy:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import ClassVar
 
-from irminsul.checks.base import Finding, Severity
+from ruamel.yaml import YAML
+
+from irminsul.checks.base import Finding, Fix, Severity
 from irminsul.docgraph import DocGraph
 from irminsul.frontmatter import StatusEnum
 
@@ -106,3 +109,98 @@ class SupersessionCheck:
                 )
 
         return out
+
+    def fixes(self, findings: list[Finding], graph: DocGraph) -> list[Fix]:
+        fixable = {
+            (finding.path, finding.doc_id)
+            for finding in findings
+            if finding.check == self.name and finding.severity == Severity.warning
+        }
+        out: list[Fix] = []
+
+        for new_doc in graph.nodes.values():
+            for old_id in new_doc.frontmatter.supersedes:
+                old = graph.nodes.get(old_id)
+                if old is None or (old.path, old.id) not in fixable:
+                    continue
+
+                if old.frontmatter.status != StatusEnum.deprecated:
+                    out.append(
+                        Fix(
+                            path=old.path,
+                            description=(f"set status: deprecated in {old.path.as_posix()}"),
+                            apply=_frontmatter_setter("status", StatusEnum.deprecated.value),
+                        )
+                    )
+
+                if old.frontmatter.superseded_by != new_doc.id:
+                    replacement = new_doc.id
+                    out.append(
+                        Fix(
+                            path=old.path,
+                            description=(
+                                f"set superseded_by: {replacement} in {old.path.as_posix()}"
+                            ),
+                            apply=_frontmatter_setter("superseded_by", replacement),
+                        )
+                    )
+
+        return out
+
+
+def _frontmatter_setter(key: str, value: str) -> Callable[[str], str]:
+    def apply(text: str) -> str:
+        return _set_frontmatter_value(text, key, value)
+
+    return apply
+
+
+def _set_frontmatter_value(text: str, key: str, value: str) -> str:
+    if not text.startswith("---\n"):
+        raise ValueError("missing YAML frontmatter block")
+
+    try:
+        _, raw_yaml, body = text.split("---\n", 2)
+    except ValueError as exc:
+        raise ValueError("missing closing YAML frontmatter delimiter") from exc
+
+    yaml = YAML()
+    yaml.preserve_quotes = True
+    data = yaml.load(raw_yaml) or {}
+    data[key] = value
+    ordered = _canonicalize_frontmatter(data)
+
+    from io import StringIO
+
+    buf = StringIO()
+    yaml.dump(ordered, buf)
+    return f"---\n{buf.getvalue()}---\n{body}"
+
+
+def _canonicalize_frontmatter(data: object) -> object:
+    if not isinstance(data, dict):
+        return data
+
+    ordered: dict[object, object] = {}
+    canonical = (
+        "id",
+        "title",
+        "audience",
+        "tier",
+        "status",
+        "describes",
+        "depends_on",
+        "supersedes",
+        "superseded_by",
+        "tags",
+        "related_adrs",
+        "tests",
+        "requires_env",
+    )
+    for key in canonical:
+        if key in data:
+            ordered[key] = data[key]
+    for key, value in data.items():
+        if key not in ordered:
+            ordered[key] = value
+    return ordered

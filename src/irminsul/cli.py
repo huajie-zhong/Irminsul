@@ -387,6 +387,69 @@ def check(
 
 
 @app.command()
+def fix(
+    scope: Annotated[
+        Scope,
+        typer.Option("--scope", help="Which check tier to fix."),
+    ] = Scope.soft,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Print planned fixes without writing files."),
+    ] = False,
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path",
+            help="Root of the codebase to fix. Defaults to current directory.",
+        ),
+    ] = Path("."),
+) -> None:
+    """Apply deterministic remediations for fixable findings."""
+    if scope == Scope.hard:
+        typer.echo(typer.style("hard checks do not expose automatic fixes", fg="yellow"))
+        raise typer.Exit(code=0)
+
+    from irminsul.fix import apply_fixes
+
+    repo_root = path.resolve()
+    config_path = find_config(repo_root)
+    config = load(config_path)
+    graph = build_graph(repo_root, config)
+
+    fixes = []
+
+    for check_name in config.checks.soft_deterministic:
+        cls = SOFT_REGISTRY.get(check_name)
+        if cls is None:
+            continue
+        check = cls()
+        check_findings = check.run(graph)
+        maybe_fixes = getattr(check, "fixes", None)
+        if maybe_fixes is not None:
+            fixes.extend(maybe_fixes(check_findings, graph))
+
+    if not fixes:
+        typer.echo("no automatic fixes available")
+        raise typer.Exit(code=0)
+
+    result = apply_fixes(repo_root, fixes, dry_run=dry_run)
+    for planned in result.planned:
+        typer.echo(f"  {planned.path.as_posix()}: {planned.description}")
+
+    if result.errors:
+        for error in result.errors:
+            typer.echo(typer.style(error, fg="red"))
+        raise typer.Exit(code=1)
+
+    if dry_run:
+        typer.echo(typer.style(f"planned {len(result.planned)} fix(es)", fg="green"))
+    else:
+        typer.echo(typer.style(f"updated {len(result.written)} file(s)", fg="green"))
+
+    raise typer.Exit(code=0)
+
+
+@app.command()
 def render(
     path: Annotated[
         Path,
@@ -546,22 +609,35 @@ def regen(
     ] = "python",
     path: Annotated[Path, typer.Option("--path")] = Path("."),
 ) -> None:
-    """Regenerate reference docs from source (currently Python only)."""
-    if language != "python":
-        typer.echo(
-            typer.style(
-                f"TypeScript reference regeneration deferred to Sprint 3 "
-                f"(got --language={language})",
-                fg="yellow",
-            )
-        )
-        raise typer.Exit(code=0)
-
-    from irminsul.regen.python import regen_python
-
+    """Regenerate reference docs from source."""
     repo_root = path.resolve()
     config = load(find_config(repo_root))
-    written = regen_python(repo_root, config)
+
+    written: list[Path] = []
+    if language in ("python", "all"):
+        from irminsul.regen.python import regen_python
+
+        written.extend(regen_python(repo_root, config))
+    elif language not in ("typescript",):
+        typer.echo(
+            typer.style(
+                f"unknown --language '{language}'; expected python, typescript, or all",
+                fg="red",
+            )
+        )
+        raise typer.Exit(code=2)
+
+    if language in ("typescript", "all") and (
+        language == "typescript" or "typescript" in config.languages.enabled
+    ):
+        from irminsul.regen.typescript import TypeScriptRegenError, regen_typescript
+
+        try:
+            written.extend(regen_typescript(repo_root, config))
+        except TypeScriptRegenError as exc:
+            typer.echo(typer.style(str(exc), fg="red"))
+            raise typer.Exit(code=1) from exc
+
     for p in written:
         rel = p.relative_to(repo_root).as_posix()
         typer.echo(f"  {rel}")

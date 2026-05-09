@@ -73,7 +73,7 @@ All checks subclass `Check` and return `list[Finding]` with `(check, severity, p
 
 **Init scaffolder** (`src/irminsul/init/`) walks Jinja2 templates under `init/scaffolds/` and `init/workflows/` to bootstrap a new repo. Two modes: `init` (single-repo, the common case) and `init-docs-only` (Topology A: docs repo + sibling code repo cloned as gitignored subfolder). `detect_code_signals()` decides which to suggest.
 
-**`new`, `regen`, and `list`**. `irminsul new {adr,component,rfc}` writes templated atoms from `src/irminsul/new/templates/`. `irminsul regen --language=python` regenerates `40-reference/` stubs from source via `src/irminsul/regen/python.py`. Other languages are deferred and currently no-op with a yellow notice. `irminsul list {orphans,stale,undocumented}` (`src/irminsul/listing/command.py`) wraps three checks with custom filtering; each subcommand supports `--format plain|json`.
+**`new`, `regen`, and `list`**. `irminsul new {adr,component,rfc}` writes templated atoms from `src/irminsul/new/templates/`. `irminsul regen --language=python` regenerates Python `40-reference/` stubs from source via `src/irminsul/regen/python.py`; `--language=typescript` writes TypeScript stubs via `src/irminsul/regen/typescript.py` after confirming local TypeDoc is available. `irminsul list {orphans,stale,undocumented}` (`src/irminsul/listing/command.py`) wraps three checks with custom filtering; each subcommand supports `--format plain|json`.
 
 **The composite Action** (`action.yml`) is a thin shell wrapper: `pip install irminsul[==version]` → `irminsul check --scope=… [--llm]`. Don't add logic here; add it to the CLI and let the Action call it.
 
