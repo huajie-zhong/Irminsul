@@ -43,12 +43,14 @@ def regen_typescript(
 
     out_dir = repo_root / settings.out_dir
     written: list[Path] = []
+    seen_destinations: dict[Path, Path] = {}
+    seen_doc_ids: dict[str, Path] = {}
 
     for root_str in config.paths.source_roots:
         src_root = repo_root / root_str
         if not src_root.is_dir():
             continue
-        candidates = sorted(src_root.rglob("*.ts")) + sorted(src_root.rglob("*.tsx"))
+        candidates = sorted([*src_root.rglob("*.ts"), *src_root.rglob("*.tsx")])
         for ts_file in candidates:
             if _should_skip(ts_file):
                 continue
@@ -56,6 +58,13 @@ def regen_typescript(
             dest = out_dir / rel.with_suffix(".md")
             module_path = "/".join(rel.with_suffix("").parts)
             doc_id = "-".join(rel.with_suffix("").parts)
+            _check_collision(
+                source=ts_file,
+                destination=dest,
+                doc_id=doc_id,
+                seen_destinations=seen_destinations,
+                seen_doc_ids=seen_doc_ids,
+            )
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(
                 _STUB_TEMPLATE.format(doc_id=doc_id, title=module_path),
@@ -64,6 +73,34 @@ def regen_typescript(
             written.append(dest)
 
     return written
+
+
+def _check_collision(
+    *,
+    source: Path,
+    destination: Path,
+    doc_id: str,
+    seen_destinations: dict[Path, Path],
+    seen_doc_ids: dict[str, Path],
+) -> None:
+    prior_destination_source = seen_destinations.get(destination)
+    if prior_destination_source is not None:
+        raise TypeScriptRegenError(
+            "TypeScript reference regen collision: "
+            f"{source.as_posix()} and {prior_destination_source.as_posix()} "
+            f"both map to {destination.as_posix()}"
+        )
+
+    prior_doc_id_source = seen_doc_ids.get(doc_id)
+    if prior_doc_id_source is not None:
+        raise TypeScriptRegenError(
+            "TypeScript reference regen collision: "
+            f"{source.as_posix()} and {prior_doc_id_source.as_posix()} "
+            f"both use doc id '{doc_id}'"
+        )
+
+    seen_destinations[destination] = source
+    seen_doc_ids[doc_id] = source
 
 
 def _ensure_typedoc(repo_root: Path) -> None:

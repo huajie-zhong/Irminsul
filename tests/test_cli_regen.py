@@ -97,6 +97,19 @@ def test_regen_typescript_creates_stubs(tmp_path: Path, monkeypatch) -> None:
     assert not (repo / "docs" / "40-reference" / "typescript" / "ui" / "button.test.md").exists()
 
 
+def test_regen_typescript_rejects_stub_collisions(tmp_path: Path, monkeypatch) -> None:
+    repo = _make_typescript_repo(tmp_path)
+    (repo / "src" / "ui" / "button.tsx").write_text("export function ButtonView() {}\n")
+
+    import irminsul.regen.typescript as regen_typescript
+
+    monkeypatch.setattr(regen_typescript, "_ensure_typedoc", lambda repo_root: None)
+    result = runner.invoke(app, ["regen", "--language", "typescript", "--path", str(repo)])
+
+    assert result.exit_code == 1
+    assert "collision" in result.output
+
+
 def test_regen_idempotent(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
     runner.invoke(app, ["regen", "--language", "python", "--path", str(repo)])

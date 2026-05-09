@@ -20,7 +20,7 @@ from ruamel.yaml import YAML
 
 from irminsul.checks.base import Finding, Fix, Severity
 from irminsul.docgraph import DocGraph
-from irminsul.frontmatter import StatusEnum
+from irminsul.frontmatter import DocFrontmatter, StatusEnum
 
 
 class SupersessionCheck:
@@ -156,13 +156,7 @@ def _frontmatter_setter(key: str, value: str) -> Callable[[str], str]:
 
 
 def _set_frontmatter_value(text: str, key: str, value: str) -> str:
-    if not text.startswith("---\n"):
-        raise ValueError("missing YAML frontmatter block")
-
-    try:
-        _, raw_yaml, body = text.split("---\n", 2)
-    except ValueError as exc:
-        raise ValueError("missing closing YAML frontmatter delimiter") from exc
+    raw_yaml, body = _split_frontmatter(text)
 
     yaml = YAML()
     yaml.preserve_quotes = True
@@ -182,21 +176,7 @@ def _canonicalize_frontmatter(data: object) -> object:
         return data
 
     ordered: dict[object, object] = {}
-    canonical = (
-        "id",
-        "title",
-        "audience",
-        "tier",
-        "status",
-        "describes",
-        "depends_on",
-        "supersedes",
-        "superseded_by",
-        "tags",
-        "related_adrs",
-        "tests",
-        "requires_env",
-    )
+    canonical = tuple(DocFrontmatter.model_fields)
     for key in canonical:
         if key in data:
             ordered[key] = data[key]
@@ -204,3 +184,15 @@ def _canonicalize_frontmatter(data: object) -> object:
         if key not in ordered:
             ordered[key] = value
     return ordered
+
+
+def _split_frontmatter(text: str) -> tuple[str, str]:
+    lines = text.splitlines(keepends=True)
+    if not lines or lines[0].strip() != "---":
+        raise ValueError("missing YAML frontmatter block")
+
+    for index, line in enumerate(lines[1:], start=1):
+        if line.strip() == "---":
+            return "".join(lines[1:index]), "".join(lines[index + 1 :])
+
+    raise ValueError("missing closing YAML frontmatter delimiter")

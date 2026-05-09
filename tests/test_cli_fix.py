@@ -34,3 +34,27 @@ def test_fix_supersession_writes_frontmatter(fixture_repo: Callable[[str], Path]
     text = old_doc.read_text(encoding="utf-8")
     assert "status: deprecated" in text
     assert "superseded_by: new-system" in text
+
+
+def test_fix_supersession_handles_crlf_and_closing_delimiter_at_eof(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("soft-supersession")
+    old_doc = repo / "docs" / "20-components" / "old-system.md"
+    old_doc.write_text(
+        "---\r\n"
+        "id: old-system\r\n"
+        "title: Old System\r\n"
+        "audience: explanation\r\n"
+        "tier: 3\r\n"
+        "status: stable\r\n"
+        "---",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["fix", "--path", str(repo)])
+
+    assert result.exit_code == 0, result.output
+    text = old_doc.read_text(encoding="utf-8")
+    assert "status: deprecated" in text
+    assert "superseded_by: new-system" in text
