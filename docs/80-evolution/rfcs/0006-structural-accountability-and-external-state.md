@@ -3,7 +3,7 @@ id: 0006-structural-accountability-and-external-state
 title: Structural Accountability & External State Verification
 audience: reference
 tier: 4
-status: draft
+status: stable
 describes: []
 ---
 

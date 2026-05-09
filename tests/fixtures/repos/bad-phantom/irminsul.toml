@@ -1,0 +1,8 @@
+project_name = "bad-phantom"
+
+[paths]
+docs_root = "docs"
+source_roots = []
+
+[checks]
+soft_deterministic = ["phantom-layer"]
