@@ -17,3 +17,4 @@ In-flight proposals. See [`80-evolution`](../INDEX.md) for the RFC lifecycle.
 - [`0002-fix-and-regen-typescript`](0002-fix-and-regen-typescript.md) — `irminsul fix` auto-remediation and TypeScript reference regen
 - [`0003-vscode-extension`](0003-vscode-extension.md) — VS Code extension (Phase 3)
 - [`0004-remove-children-field`](0004-remove-children-field.md) — Remove `children:` field; INDEX auto-owns all folder siblings
+- [`0005-systemic-doc-enforcement`](0005-systemic-doc-enforcement.md) — New Reality, Coverage, Boundary, and Liar checks
