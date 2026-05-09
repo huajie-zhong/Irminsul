@@ -29,10 +29,11 @@ The documentation is organized by Layer (specificity) and Tier (maintenance poli
 
 To prevent "truth rot," all contributors (human and AI) must follow these rules:
 
-1. **Reality Only:** Documentation in Layers 00-30 must reflect the current state of the main branch. Never document "planned" or "deferred" features as reality; use RFCs (Layer 80) for future casting.
-2. **Implementation First:** Never update a `new` template or a `README` with fields/checks that the current version of the CLI does not yet enforce.
-3. **No Signature Mirroring:** Do not manually list function signatures or config fields in prose if they are auto-generated in Layer 40. Reference the generated doc instead.
-4. **Atomic PRs:** A feature and its corresponding documentation changes must land in the same PR.
-5. **Silence is Intentional:** If a limitation is not documented, it is a bug in the doc. Explicitly document what a component *cannot* do.
+1. **Strict SSOT:** Every fact has exactly one canonical home. **Never re-explain or paraphrase** a concept defined in another doc; use a direct link instead. Duplication-by-paraphrase is a "hallucination trap" and will be rejected.
+2. **Reality Only:** Documentation in Layers 00-30 must reflect the current state of the main branch. Never document "planned" or "deferred" features as reality; use RFCs (Layer 80) for future casting.
+3. **Implementation First:** Never update a `new` template or a `README` with fields/checks that the current version of the CLI does not yet enforce.
+4. **No Signature Mirroring:** Do not manually list function signatures or config fields in prose if they are auto-generated in Layer 40. Reference the generated doc instead.
+5. **Atomic PRs:** A feature and its corresponding documentation changes must land in the same PR.
+6. **Silence is Intentional:** If a limitation is not documented, it is a bug in the doc. Explicitly document what a component *cannot* do.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [GLOSSARY.md](GLOSSARY.md).

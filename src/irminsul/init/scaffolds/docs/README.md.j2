@@ -1,4 +1,4 @@
-﻿# {{ project_name }} — documentation
+# {{ project_name }} — documentation
 
 This tree follows the [Irminsul](https://github.com/hz642/Irminsul) layout.
 
@@ -24,5 +24,14 @@ The documentation is organized by Layer (specificity) and Tier (maintenance poli
 - **Code Mapping:** Every component doc in `20-components/` contains a `describes:` frontmatter field mapping it to source files.
 - **Stability:** Refer to the `status:` field (draft | stable | deprecated) to understand the reliability of a document.
 - **Discovery:** Use `grep -r "describes:" docs/20-components/` to find the documentation governing specific source paths.
+
+## Editing Rules (Anti-Rot Protocol)
+
+To prevent "truth rot," all contributors (human and AI) must follow these rules:
+
+1. **Strict SSOT:** Every fact has exactly one canonical home. **Never re-explain or paraphrase** a concept defined in another doc; use a direct link instead. Duplication-by-paraphrase is a "hallucination trap" and will be rejected.
+2. **Reality Only:** Documentation in Layers 00-30 must reflect the current state of the main branch. Never document "planned" or "deferred" features as reality.
+3. **Atomic PRs:** A feature and its corresponding documentation changes must land in the same PR.
+4. **Silence is Intentional:** If a limitation is not documented, it is a bug in the doc. Explicitly document what a component *cannot* do.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [GLOSSARY.md](GLOSSARY.md).
