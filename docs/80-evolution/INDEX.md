@@ -17,11 +17,7 @@ Where the system is going. Roadmap, RFCs in flight, risks, debt, deprecations.
 
 ## Requests for Comments (RFCs)
 
-In-flight proposals:
-
-- [`0001-topology-b-and-format-json`](rfcs/0001-topology-b-and-format-json.md) — Topology B (sibling code repos) and `--format=json` for check output
-- [`0002-fix-and-regen-typescript`](rfcs/0002-fix-and-regen-typescript.md) — `irminsul fix` auto-remediation and TypeScript reference regen
-- [`0003-vscode-extension`](rfcs/0003-vscode-extension.md) — VS Code extension (Phase 3)
+See [`rfcs`](rfcs/INDEX.md) for the current RFC list.
 
 RFCs are *proposals before decisions*. They live in `rfcs/` while in flight. The lifecycle:
 
