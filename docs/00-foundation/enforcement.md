@@ -11,7 +11,7 @@ describes: []
 
 # Mechanical Enforcement
 
-The point of the whole system is that you don't have to remember the rules. CI does.
+The point of the whole system is that you don't have to remember the rules. CI does. This technical layer provides the mechanical realization of [**The Harness Principle**](principles.md#strategic-assumptions).
 
 ## Two Tiers of Enforcement
 

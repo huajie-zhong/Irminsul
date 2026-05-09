@@ -11,7 +11,16 @@ describes: []
 
 # Principles
 
-Irminsul exists because most documentation rots, and the reason it rots is structural — the system makes the right action harder than the wrong one. 
+Irminsul exists because most documentation rots, and the reason it rots is structural — the system makes the right action harder than the wrong one.
+
+## Strategic Assumptions
+
+Irminsul is built on a specific view of the modern development environment:
+
+1. **LLMs are the primary consumers.** LLM agents are now the most frequent "readers" of documentation. They are exceptionally good at processing volume but exceptionally bad at resolving contradiction.
+2. **Rot is the primary failure mode.** The issue isn't that documentation is hard to write; it's that it is impossible to keep accurate as code evolves. "Silent rot"—where docs and code diverge—is the deadliest threat to LLM-driven workflows because it triggers invisible hallucinations.
+3. **The Harness Principle.** LLMs follow rules most of the time, but they fail silently and confidently. To make LLM-driven development safe, the system must provide **Hard Checks** (deterministic enforcements). When a check fails, it provides a clear signal that allows the LLM to self-correct without human intervention.
+4. **Mechanical Necessity.** We assume that humans will only maintain documentation if the system makes it a mechanical necessity. If the doc doesn't *have* to be updated to merge the code, it eventually won't be.
 
 ## The Five Core Principles
 
