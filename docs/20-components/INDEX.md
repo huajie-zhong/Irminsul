@@ -4,8 +4,6 @@ title: Components
 audience: reference
 tier: 3
 status: stable
-owner: "@hz642"
-last_reviewed: 2026-05-08
 describes: []
 tests:
   - tests/

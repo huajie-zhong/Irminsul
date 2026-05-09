@@ -4,8 +4,6 @@ title: DocGraph
 audience: explanation
 tier: 3
 status: stable
-owner: "@hz642"
-last_reviewed: 2026-05-08
 describes:
   - src/irminsul/docgraph.py
   - src/irminsul/docgraph_index.py

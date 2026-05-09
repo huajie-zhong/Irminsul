@@ -4,8 +4,6 @@ title: Recent Deprecation
 audience: explanation
 tier: 3
 status: deprecated
-owner: "@anson"
-last_reviewed: 2026-05-07
 ---
 
 # Recent Deprecation

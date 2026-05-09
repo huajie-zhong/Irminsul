@@ -53,7 +53,6 @@ def test_headings_extracted(fixture_repo: Callable[[str], Path]) -> None:
 
 def test_build_inbound_strong_isolated() -> None:
     # Build a tiny graph by hand to exercise the pure builder.
-    from datetime import date
 
     from irminsul.docgraph import DocNode
     from irminsul.frontmatter import AudienceEnum, DocFrontmatter, StatusEnum
@@ -65,8 +64,6 @@ def test_build_inbound_strong_isolated() -> None:
             audience=AudienceEnum.explanation,
             tier=3,
             status=StatusEnum.stable,
-            owner="@a",
-            last_reviewed=date.today(),
             depends_on=depends_on,
         )
         return DocNode(id=node_id, path=Path(f"{node_id}.md"), frontmatter=fm, body="")
@@ -83,8 +80,6 @@ def test_build_inbound_strong_isolated() -> None:
 
 
 def test_build_inbound_weak_skips_externals() -> None:
-    from datetime import date
-
     from irminsul.docgraph import DocNode
     from irminsul.frontmatter import AudienceEnum, DocFrontmatter, StatusEnum
 
@@ -92,8 +87,6 @@ def test_build_inbound_weak_skips_externals() -> None:
         "audience": AudienceEnum.explanation,
         "tier": 3,
         "status": StatusEnum.stable,
-        "owner": "@a",
-        "last_reviewed": date.today(),
     }
     a = DocNode(
         id="a",
@@ -117,8 +110,6 @@ def test_build_inbound_weak_skips_externals() -> None:
 
 
 def test_build_headings_records_levels_and_lines() -> None:
-    from datetime import date
-
     from irminsul.docgraph import DocNode
     from irminsul.frontmatter import AudienceEnum, DocFrontmatter, StatusEnum
 
@@ -128,8 +119,6 @@ def test_build_headings_records_levels_and_lines() -> None:
         audience=AudienceEnum.explanation,
         tier=3,
         status=StatusEnum.stable,
-        owner="@a",
-        last_reviewed=date.today(),
     )
     body = "# Top\n\nintro\n\n## Sub\n\ncontent\n"
     node = DocNode(id="x", path=Path("x.md"), frontmatter=fm, body=body)

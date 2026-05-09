@@ -4,8 +4,6 @@ title: Widget Extra
 audience: reference
 tier: 3
 status: stable
-owner: "@anson"
-last_reviewed: 2026-05-08
 ---
 
 # Widget Extra

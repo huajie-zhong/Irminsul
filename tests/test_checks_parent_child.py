@@ -39,13 +39,13 @@ def test_index_auto_owns_siblings_no_warnings(tmp_path: Path) -> None:
     docs.mkdir(parents=True)
     (docs / "INDEX.md").write_text(
         "---\nid: thing\ntitle: Thing\naudience: reference\ntier: 3\n"
-        'status: stable\nowner: "@a"\nlast_reviewed: 2026-05-08\n'
+        "status: stable\n"
         "describes: []\n---\n\n# Thing\n",
         encoding="utf-8",
     )
     (docs / "sibling.md").write_text(
         "---\nid: sibling\ntitle: Sibling\naudience: reference\ntier: 3\n"
-        'status: stable\nowner: "@a"\nlast_reviewed: 2026-05-08\n'
+        "status: stable\n"
         "---\n\n# Sibling\n",
         encoding="utf-8",
     )

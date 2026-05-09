@@ -4,8 +4,6 @@ title: "ADR-0001: Adopt the Irminsul doc system on Irminsul itself"
 audience: adr
 tier: 2
 status: stable
-owner: "@hz642"
-last_reviewed: 2026-05-08
 describes: []
 ---
 

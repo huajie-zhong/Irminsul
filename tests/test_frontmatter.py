@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime as _dt
 from pathlib import Path
 
 import pytest
@@ -24,8 +23,6 @@ def _good_payload() -> dict[str, object]:
         "audience": "explanation",
         "tier": 3,
         "status": "stable",
-        "owner": "@anson",
-        "last_reviewed": _dt.date(2026, 5, 7),
     }
 
 
@@ -76,16 +73,7 @@ def test_parse_doc_valid_returns_parsed(tmp_path: Path) -> None:
     md = tmp_path / "docs" / "x.md"
     md.parent.mkdir(parents=True)
     md.write_text(
-        "---\n"
-        "id: x\n"
-        "title: X\n"
-        "audience: explanation\n"
-        "tier: 3\n"
-        "status: stable\n"
-        "owner: '@anson'\n"
-        "last_reviewed: 2026-05-07\n"
-        "---\n\n"
-        "Body.\n",
+        "---\nid: x\ntitle: X\naudience: explanation\ntier: 3\nstatus: stable\n---\n\nBody.\n",
         encoding="utf-8",
     )
     result = parse_doc(md, tmp_path)

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime as _dt
 from pathlib import Path
 
 from irminsul.config import IrminsulConfig
@@ -14,8 +13,6 @@ title: "{title}"
 audience: reference
 tier: 1
 status: stable
-owner: "@TODO"
-last_reviewed: {today}
 ---
 
 ::: {dotted}
@@ -27,7 +24,6 @@ def regen_python(repo_root: Path, config: IrminsulConfig) -> list[Path]:
 
     Returns the list of files written (absolute paths).
     """
-    today = _dt.date.today().isoformat()
     out_dir = repo_root / config.paths.docs_root / "40-reference" / "python"
     written: list[Path] = []
 
@@ -46,7 +42,7 @@ def regen_python(repo_root: Path, config: IrminsulConfig) -> list[Path]:
             title = dotted
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(
-                _STUB_TEMPLATE.format(doc_id=doc_id, title=title, today=today, dotted=dotted),
+                _STUB_TEMPLATE.format(doc_id=doc_id, title=title, dotted=dotted),
                 encoding="utf-8",
             )
             written.append(dest)

@@ -441,10 +441,6 @@ app.add_typer(_new_app)
 @_new_app.command("adr")
 def new_adr(
     title: Annotated[str, typer.Argument(help="Title of the ADR.")],
-    owner: Annotated[
-        str,
-        typer.Option("--owner", help="Doc owner (GitHub handle). Defaults to @TODO."),
-    ] = "@TODO",
     force: Annotated[bool, typer.Option("--force")] = False,
     path: Annotated[Path, typer.Option("--path")] = Path("."),
 ) -> None:
@@ -453,7 +449,7 @@ def new_adr(
 
     repo_root = path.resolve()
     config = load(find_config(repo_root))
-    spec = NewSpec(kind="adr", title=title, owner=owner, extra={})
+    spec = NewSpec(kind="adr", title=title, extra={})
     try:
         dest = write_new(repo_root, spec, config, force=force)
     except FileExistsError as e:
@@ -466,7 +462,6 @@ def new_adr(
 @_new_app.command("component")
 def new_component(
     title: Annotated[str, typer.Argument(help="Name of the component.")],
-    owner: Annotated[str, typer.Option("--owner")] = "@TODO",
     force: Annotated[bool, typer.Option("--force")] = False,
     path: Annotated[Path, typer.Option("--path")] = Path("."),
 ) -> None:
@@ -475,7 +470,7 @@ def new_component(
 
     repo_root = path.resolve()
     config = load(find_config(repo_root))
-    spec = NewSpec(kind="component", title=title, owner=owner, extra={})
+    spec = NewSpec(kind="component", title=title, extra={})
     try:
         dest = write_new(repo_root, spec, config, force=force)
     except FileExistsError as e:
@@ -488,7 +483,6 @@ def new_component(
 @_new_app.command("rfc")
 def new_rfc(
     title: Annotated[str, typer.Argument(help="Title of the RFC.")],
-    owner: Annotated[str, typer.Option("--owner")] = "@TODO",
     force: Annotated[bool, typer.Option("--force")] = False,
     path: Annotated[Path, typer.Option("--path")] = Path("."),
 ) -> None:
@@ -497,7 +491,7 @@ def new_rfc(
 
     repo_root = path.resolve()
     config = load(find_config(repo_root))
-    spec = NewSpec(kind="rfc", title=title, owner=owner, extra={})
+    spec = NewSpec(kind="rfc", title=title, extra={})
     try:
         dest = write_new(repo_root, spec, config, force=force)
     except FileExistsError as e:

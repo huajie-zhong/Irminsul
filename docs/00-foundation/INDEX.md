@@ -4,8 +4,6 @@ title: Foundation
 audience: reference
 tier: 1
 status: stable
-owner: "@hz642"
-last_reviewed: 2026-05-08
 describes: []
 ---
 

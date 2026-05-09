@@ -8,7 +8,6 @@ from rejecting unknown ones.
 
 from __future__ import annotations
 
-import datetime as _dt
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -46,8 +45,6 @@ class DocFrontmatter(BaseModel):
     audience: AudienceEnum
     tier: int = Field(ge=1, le=4)
     status: StatusEnum
-    owner: str = Field(min_length=1)
-    last_reviewed: _dt.date
 
     # Optional but recommended
     describes: list[str] = Field(default_factory=list)
@@ -57,6 +54,7 @@ class DocFrontmatter(BaseModel):
     tags: list[str] = Field(default_factory=list)
     related_adrs: list[str] = Field(default_factory=list)
     tests: list[str] = Field(default_factory=list)
+    requires_env: list[str] = Field(default_factory=list)
 
 
 @dataclass(frozen=True)

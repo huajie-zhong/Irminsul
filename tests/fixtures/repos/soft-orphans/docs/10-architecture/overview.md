@@ -4,8 +4,6 @@ title: Architecture Overview
 audience: explanation
 tier: 2
 status: stable
-owner: "@anson"
-last_reviewed: 2026-05-07
 ---
 
 # Overview

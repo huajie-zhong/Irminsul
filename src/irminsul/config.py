@@ -26,6 +26,9 @@ SOFT_DETERMINISTIC_CHECKS = (
     "external-links",
     "reality",
     "boundary",
+    "phantom-layer",
+    "requires-env",
+    "import-deps",
 )
 SOFT_LLM_CHECKS = ("overlap", "semantic-drift", "scope-appropriateness")
 

@@ -4,8 +4,6 @@ title: Thing schema
 audience: reference
 tier: 1
 status: stable
-owner: "@anson"
-last_reviewed: 2026-05-07
 describes: []
 ---
 

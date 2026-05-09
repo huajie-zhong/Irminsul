@@ -12,6 +12,9 @@ soft_deterministic = [
     "supersession",
     "parent-child",
     "glossary",
+    "phantom-layer",
+    "requires-env",
+    "import-deps",
 ]
 # external-links left out by default; enable in nightly workflow with network access.
 

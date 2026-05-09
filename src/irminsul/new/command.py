@@ -21,7 +21,6 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 class NewSpec:
     kind: Kind
     title: str
-    owner: str
     extra: dict[str, Any]
 
 
@@ -85,7 +84,6 @@ def write_new(
     content = tmpl.render(
         id=doc_id,
         title=spec.title,
-        owner=spec.owner,
         today=today,
         **spec.extra,
     )

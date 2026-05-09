@@ -10,6 +10,8 @@ from __future__ import annotations
 from irminsul.checks.base import Check, Finding, Severity, sort_findings, summarize
 from irminsul.checks.boundary import BoundaryCheck
 from irminsul.checks.coverage import CoverageCheck
+from irminsul.checks.dependency_check import DependencyCheck
+from irminsul.checks.env_check import EnvCheck
 from irminsul.checks.external_links import ExternalLinksCheck
 from irminsul.checks.frontmatter import FrontmatterCheck
 from irminsul.checks.globs import GlobsCheck
@@ -20,6 +22,7 @@ from irminsul.checks.mtime_drift import MtimeDriftCheck
 from irminsul.checks.orphans import OrphansCheck
 from irminsul.checks.overlap import OverlapCheck
 from irminsul.checks.parent_child import ParentChildCheck
+from irminsul.checks.phantom_layer import PhantomLayerCheck
 from irminsul.checks.reality import RealityCheck
 from irminsul.checks.schema_leak import SchemaLeakCheck
 from irminsul.checks.scope_appropriateness import ScopeAppropriatenessCheck
@@ -48,6 +51,9 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     ExternalLinksCheck.name: ExternalLinksCheck,
     RealityCheck.name: RealityCheck,
     BoundaryCheck.name: BoundaryCheck,
+    PhantomLayerCheck.name: PhantomLayerCheck,
+    EnvCheck.name: EnvCheck,
+    DependencyCheck.name: DependencyCheck,
 }
 
 LLM_REGISTRY: dict[str, type] = {
@@ -63,9 +69,12 @@ __all__ = [
     "BoundaryCheck",
     "Check",
     "CoverageCheck",
+    "DependencyCheck",
+    "EnvCheck",
     "Finding",
     "LiarCheck",
     "OverlapCheck",
+    "PhantomLayerCheck",
     "RealityCheck",
     "ScopeAppropriatenessCheck",
     "SemanticDriftCheck",

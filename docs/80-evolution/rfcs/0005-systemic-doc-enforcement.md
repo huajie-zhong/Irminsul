@@ -3,9 +3,7 @@ id: 0005-systemic-doc-enforcement
 title: Systemic Doc Enforcement (Reality, Coverage, Boundary, Liar)
 audience: reference
 tier: 4
-status: draft
-owner: "@gemini"
-last_reviewed: 2026-05-09
+status: stable
 describes: []
 ---
 

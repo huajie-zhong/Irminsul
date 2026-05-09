@@ -4,8 +4,6 @@ title: "ADR-0001: Pick Something"
 audience: adr
 tier: 2
 status: stable
-owner: "@anson"
-last_reviewed: 2026-05-07
 ---
 
 # ADR-0001: Pick Something

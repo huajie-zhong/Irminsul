@@ -45,15 +45,7 @@ def test_missing_source_root_emits_warning(tmp_path: Path) -> None:
     )
     (tmp_path / "docs" / "20-components").mkdir(parents=True)
     (tmp_path / "docs" / "20-components" / "x.md").write_text(
-        "---\n"
-        "id: x\n"
-        "title: X\n"
-        "audience: explanation\n"
-        "tier: 3\n"
-        "status: stable\n"
-        "owner: '@anson'\n"
-        "last_reviewed: 2026-05-07\n"
-        "---\nbody\n",
+        "---\nid: x\ntitle: X\naudience: explanation\ntier: 3\nstatus: stable\n---\nbody\n",
         encoding="utf-8",
     )
     cfg = load(tmp_path / "irminsul.toml")
