@@ -4,8 +4,6 @@ title: Tooling Stack and Deployment
 audience: explanation
 tier: 2
 status: stable
-owner: "@hz642"
-last_reviewed: 2026-05-08
 describes: []
 ---
 

@@ -4,8 +4,6 @@ title: Renderer
 audience: explanation
 tier: 3
 status: stable
-owner: "@hz642"
-last_reviewed: 2026-05-08
 describes:
   - src/irminsul/render/**
 tests:

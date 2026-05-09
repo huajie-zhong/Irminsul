@@ -4,8 +4,6 @@ title: "RFC-0003: VS Code extension (Phase 3)"
 audience: explanation
 tier: 2
 status: draft
-owner: "@hz642"
-last_reviewed: 2026-05-08
 ---
 
 # RFC-0003: VS Code extension (Phase 3)

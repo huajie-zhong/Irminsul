@@ -4,8 +4,6 @@ title: Evolution
 audience: reference
 tier: 4
 status: draft
-owner: "@hz642"
-last_reviewed: 2026-05-08
 describes: []
 children:
   - patterns

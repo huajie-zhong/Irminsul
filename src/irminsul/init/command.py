@@ -37,7 +37,6 @@ _CODE_SIGNAL_DIRS = ("src", "app", "lib")
 @dataclass(frozen=True)
 class InitAnswers:
     project_name: str
-    owner: str
     render_target: str
     languages: list[str]
     source_roots: list[str]
@@ -93,7 +92,6 @@ def gather_answers(
 
     if interactive:
         project_name = typer.prompt("Project name", default=default_project_name)
-        owner = typer.prompt("Default doc owner (GitHub handle, e.g. @anson)", default="@TODO")
         render_target = typer.prompt("Render target [mkdocs|none]", default="mkdocs")
         if render_target not in ("mkdocs", "none"):
             typer.echo(
@@ -102,12 +100,10 @@ def gather_answers(
             render_target = "mkdocs"
     else:
         project_name = default_project_name
-        owner = "@TODO"
         render_target = "mkdocs"
 
     return InitAnswers(
         project_name=project_name,
-        owner=owner,
         render_target=render_target,
         languages=languages,
         source_roots=source_roots,
@@ -132,7 +128,6 @@ def gather_answers_docs_only(
                 "Code repo (GitHub owner/repo or local path, e.g. acme/my-public-code)"
             )
         project_name = typer.prompt("Project name", default=default_project_name)
-        owner = typer.prompt("Default doc owner (GitHub handle, e.g. @anson)", default="@TODO")
         render_target = typer.prompt("Render target [mkdocs|none]", default="mkdocs")
         if render_target not in ("mkdocs", "none"):
             render_target = "mkdocs"
@@ -142,7 +137,6 @@ def gather_answers_docs_only(
                 "--code-repo is required in non-interactive mode", param_hint="--code-repo"
             )
         project_name = default_project_name
-        owner = "@TODO"
         render_target = "mkdocs"
 
     github_spec, subfolder = parse_code_repo(code_repo)
@@ -158,7 +152,6 @@ def gather_answers_docs_only(
 
     return InitAnswers(
         project_name=project_name,
-        owner=owner,
         render_target=render_target,
         languages=languages,
         source_roots=source_roots,
@@ -202,7 +195,6 @@ def write_scaffold(target_root: Path, answers: InitAnswers, *, force: bool = Fal
     files written (repo-relative)."""
     context = {
         "project_name": answers.project_name,
-        "owner": answers.owner,
         "render_target": answers.render_target,
         "languages": answers.languages,
         "source_roots": answers.source_roots,

@@ -30,7 +30,7 @@ def _seed_repo(tmp_path: Path, *, enabled: bool, body_link: str) -> Path:
     docs.mkdir(parents=True)
     (docs / "linker.md").write_text(
         "---\nid: linker\ntitle: Linker\naudience: explanation\ntier: 3\n"
-        'status: stable\nowner: "@a"\nlast_reviewed: 2026-05-08\n---\n\n'
+        "status: stable\n---\n\n"
         f"See [out]({body_link}).\n",
         encoding="utf-8",
     )

@@ -4,8 +4,6 @@ title: "RFC-0002: irminsul fix (auto-remediation) and TypeScript reference regen
 audience: explanation
 tier: 2
 status: draft
-owner: "@hz642"
-last_reviewed: 2026-05-08
 ---
 
 # RFC-0002: `irminsul fix` (auto-remediation) and TypeScript reference regen
@@ -110,8 +108,6 @@ title: "<package>.<Module>"
 audience: reference
 tier: 1
 status: draft
-owner: "@TODO"
-last_reviewed: <today>
 ---
 
 # <package>.<Module>

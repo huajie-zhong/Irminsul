@@ -32,7 +32,6 @@ def test_missing_superseded_by_warned(fixture_repo: Callable[[str], Path]) -> No
 
 def test_unknown_supersedes_id_errors() -> None:
     """Direct unit: build a tiny graph with a dangling supersedes pointer."""
-    from datetime import date
 
     from irminsul.checks.base import Severity
     from irminsul.docgraph import DocGraph, DocNode
@@ -44,8 +43,6 @@ def test_unknown_supersedes_id_errors() -> None:
         audience=AudienceEnum.explanation,
         tier=3,
         status=StatusEnum.stable,
-        owner="@a",
-        last_reviewed=date.today(),
         supersedes=["does-not-exist"],
     )
     node = DocNode(id="x", path=Path("x.md"), frontmatter=fm, body="")
@@ -57,8 +54,6 @@ def test_unknown_supersedes_id_errors() -> None:
 
 
 def test_orphaned_superseded_by_errors() -> None:
-    from datetime import date
-
     from irminsul.checks.base import Severity
     from irminsul.docgraph import DocGraph, DocNode
     from irminsul.frontmatter import AudienceEnum, DocFrontmatter, StatusEnum
@@ -69,8 +64,6 @@ def test_orphaned_superseded_by_errors() -> None:
         audience=AudienceEnum.explanation,
         tier=3,
         status=StatusEnum.deprecated,
-        owner="@a",
-        last_reviewed=date.today(),
         superseded_by="ghost",
     )
     node = DocNode(id="lonely", path=Path("l.md"), frontmatter=fm, body="")

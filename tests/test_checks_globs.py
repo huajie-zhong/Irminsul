@@ -51,8 +51,6 @@ def test_missing_source_root_emits_warning(tmp_path: Path) -> None:
         "audience: explanation\n"
         "tier: 3\n"
         "status: stable\n"
-        "owner: '@anson'\n"
-        "last_reviewed: 2026-05-07\n"
         "---\nbody\n",
         encoding="utf-8",
     )

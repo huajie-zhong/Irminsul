@@ -58,7 +58,6 @@ def _seed_two_doc_repo(tmp_path: Path, *, audience: str = "explanation") -> Path
         (layer / f"{doc_id}.md").write_text(
             f"---\nid: {doc_id}\ntitle: {doc_id.capitalize()}\n"
             f"audience: {audience}\ntier: 2\nstatus: stable\n"
-            f'owner: "@a"\nlast_reviewed: 2026-05-08\n'
             f"describes:\n  - {src_file}\n---\n\nContent about {doc_id}.\n",
             encoding="utf-8",
         )
@@ -180,7 +179,7 @@ def test_semantic_drift_no_describes_skipped(tmp_path: Path) -> None:
     (repo / "docs" / "20-components").mkdir(parents=True)
     (repo / "docs" / "20-components" / "nodesc.md").write_text(
         "---\nid: nodesc\ntitle: No Desc\naudience: explanation\ntier: 2\n"
-        'status: stable\nowner: "@a"\nlast_reviewed: 2026-05-08\n---\n\nBody.\n',
+        "status: stable\n---\n\nBody.\n",
         encoding="utf-8",
     )
     config = load(find_config(repo))

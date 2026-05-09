@@ -1,14 +1,12 @@
-"""MtimeDriftCheck — flag docs whose `last_reviewed` lags behind their sources.
+"""MtimeDriftCheck — flag docs whose git mtime lags behind their sources.
 
-The drift signal is `max(last_commit_time(source))` vs the doc's own
-`last_reviewed` claim. Using `last_reviewed` (rather than the doc's git mtime)
-decouples the check from cosmetic edits — bumping the field is the explicit
-"yes, I've re-read this" gesture.
+The drift signal is `max(last_commit_time(source))` vs the doc file's own
+last commit time. This is fully mechanical — no manually maintained field
+can lie or go stale.
 """
 
 from __future__ import annotations
 
-import datetime as _dt
 from typing import ClassVar
 
 from pathspec import GitIgnoreSpec
@@ -31,7 +29,6 @@ class MtimeDriftCheck:
         source_files, _missing = walk_source_files(graph.repo_root, graph.config.paths.source_roots)
 
         out: list[Finding] = []
-        today = _dt.date.today().isoformat()
 
         for node in graph.nodes.values():
             patterns = node.frontmatter.describes
@@ -68,8 +65,12 @@ class MtimeDriftCheck:
             if latest.when is None:
                 continue
 
-            doc_reviewed = node.frontmatter.last_reviewed
-            drift = latest.when.date() - doc_reviewed
+            doc_abs = graph.repo_root / node.path
+            doc_gt = last_commit_time_any_repo(doc_abs, graph.repo_root)
+            if doc_gt is None or doc_gt.when is None:
+                continue
+
+            drift = latest.when.date() - doc_gt.when.date()
             if drift.days > threshold:
                 out.append(
                     Finding(
@@ -77,12 +78,12 @@ class MtimeDriftCheck:
                         severity=Severity.warning,
                         message=(
                             f"source last touched {latest.when.date().isoformat()}; "
-                            f"doc last_reviewed {doc_reviewed.isoformat()} "
+                            f"doc last committed {doc_gt.when.date().isoformat()} "
                             f"({drift.days} days drift, threshold {threshold})"
                         ),
                         path=node.path,
                         doc_id=node.id,
-                        suggestion=f"bump last_reviewed to {today} or update the doc body",
+                        suggestion="update the doc body to re-align with source changes",
                     )
                 )
 

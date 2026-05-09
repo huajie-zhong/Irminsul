@@ -59,8 +59,6 @@ def test_last_commit_time_any_repo_cross_repo_with_git(tmp_path: Path) -> None:
 
 def test_mtime_drift_cross_repo_no_git_emits_error(tmp_path: Path) -> None:
     """MtimeDriftCheck emits an error finding for cross-repo source with no .git."""
-    import datetime
-
     from irminsul.checks.base import Severity
     from irminsul.checks.mtime_drift import MtimeDriftCheck
     from irminsul.docgraph import build_graph
@@ -75,19 +73,16 @@ def test_mtime_drift_cross_repo_no_git_emits_error(tmp_path: Path) -> None:
     (code_dir / "app.py").write_text("# code")
 
     # Write a valid doc that describes the cross-repo source
-    today = datetime.date.today().isoformat()
     (docs_root / "docs" / "20-components" / "app.md").write_text(
-        f"---\n"
-        f"id: app\n"
-        f"title: App\n"
-        f"audience: explanation\n"
-        f"tier: 3\n"
-        f"status: stable\n"
-        f'owner: "@test"\n'
-        f"last_reviewed: {today}\n"
-        f"describes:\n"
-        f"  - app.py\n"
-        f"---\n\n# App\n"
+        "---\n"
+        "id: app\n"
+        "title: App\n"
+        "audience: explanation\n"
+        "tier: 3\n"
+        "status: stable\n"
+        "describes:\n"
+        "  - app.py\n"
+        "---\n\n# App\n"
     )
 
     # Write irminsul.toml pointing at the sibling code dir
