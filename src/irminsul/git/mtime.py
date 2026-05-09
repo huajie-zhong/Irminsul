@@ -10,7 +10,8 @@ instead of erroring on tarball checkouts or shallow clones.
 from __future__ import annotations
 
 import datetime as _dt
-from collections.abc import Iterable
+from collections.abc import Generator, Iterable
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,26 +27,35 @@ class GitTime:
 _NO_TIME = GitTime(sha=None, when=None)
 
 
-def _open_repo(repo_root: Path) -> Repo | None:
+@contextmanager
+def _open_repo(repo_root: Path) -> Generator[Repo | None, None, None]:
+    repo: Repo | None = None
     try:
         repo = Repo(repo_root, search_parent_directories=False)
     except (InvalidGitRepositoryError, NoSuchPathError):
-        return None
+        yield None
+        return
     if repo.bare or not repo.head.is_valid():
-        return None
-    return repo
+        repo.close()
+        yield None
+        return
+    try:
+        yield repo
+    finally:
+        repo.close()
 
 
 def has_history(repo_root: Path) -> bool:
-    return _open_repo(repo_root) is not None
+    with _open_repo(repo_root) as repo:
+        return repo is not None
 
 
 def is_shallow(repo_root: Path) -> bool:
     """True when this is a shallow clone (e.g. CI fetch-depth=1)."""
-    repo = _open_repo(repo_root)
-    if repo is None:
-        return False
-    return (Path(repo.git_dir) / "shallow").exists()
+    with _open_repo(repo_root) as repo:
+        if repo is None:
+            return False
+        return (Path(repo.git_dir) / "shallow").exists()
 
 
 def _commit_to_gittime(commit: object) -> GitTime:
@@ -64,24 +74,24 @@ def last_commit_time(repo_root: Path, path: Path) -> GitTime:
     When no git history exists, when `path` has never been committed, or when
     the repo is bare, returns `GitTime(None, None)`.
     """
-    repo = _open_repo(repo_root)
-    if repo is None:
-        return _NO_TIME
+    with _open_repo(repo_root) as repo:
+        if repo is None:
+            return _NO_TIME
 
-    rel = path
-    try:
-        if path.is_absolute():
-            rel = path.relative_to(repo_root)
-    except ValueError:
-        return _NO_TIME
+        rel = path
+        try:
+            if path.is_absolute():
+                rel = path.relative_to(repo_root)
+        except ValueError:
+            return _NO_TIME
 
-    try:
-        commits = list(repo.iter_commits(paths=str(rel.as_posix()), max_count=1))
-    except Exception:
-        return _NO_TIME
-    if not commits:
-        return _NO_TIME
-    return _commit_to_gittime(commits[0])
+        try:
+            commits = list(repo.iter_commits(paths=str(rel.as_posix()), max_count=1))
+        except Exception:
+            return _NO_TIME
+        if not commits:
+            return _NO_TIME
+        return _commit_to_gittime(commits[0])
 
 
 def git_root_for(path: Path) -> Path | None:
