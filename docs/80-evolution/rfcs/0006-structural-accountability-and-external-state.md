@@ -1,5 +1,5 @@
 ---
-id: rfc-0006
+id: 0006-structural-accountability-and-external-state
 title: Structural Accountability & External State Verification
 audience: reference
 tier: 4

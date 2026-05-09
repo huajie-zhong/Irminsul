@@ -1,5 +1,5 @@
 ---
-id: rfc-0005
+id: 0005-systemic-doc-enforcement
 title: Systemic Doc Enforcement (Reality, Coverage, Boundary, Liar)
 audience: reference
 tier: 4
