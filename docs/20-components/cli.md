@@ -9,6 +9,9 @@ last_reviewed: 2026-05-08
 describes:
   - src/irminsul/cli.py
   - src/irminsul/__init__.py
+tests:
+  - tests/test_cli.py
+  - tests/test_cli_check.py
 ---
 
 # CLI

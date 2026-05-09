@@ -8,6 +8,8 @@ owner: "@hz642"
 last_reviewed: 2026-05-08
 describes:
   - src/irminsul/render/**
+tests:
+  - tests/test_render_mkdocs.py
 ---
 
 # Renderer

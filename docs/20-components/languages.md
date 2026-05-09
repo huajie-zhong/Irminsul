@@ -8,6 +8,9 @@ owner: "@hz642"
 last_reviewed: 2026-05-08
 describes:
   - src/irminsul/languages/**
+tests:
+  - tests/test_languages.py
+  - tests/test_languages_go_rust.py
 ---
 
 # Language profiles

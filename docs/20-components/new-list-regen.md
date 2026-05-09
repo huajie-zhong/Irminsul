@@ -10,6 +10,10 @@ describes:
   - src/irminsul/new/**
   - src/irminsul/listing/**
   - src/irminsul/regen/**
+tests:
+  - tests/test_cli_new.py
+  - tests/test_cli_regen.py
+  - tests/test_cli_list.py
 ---
 
 # New / List / Regen commands

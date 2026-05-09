@@ -8,6 +8,9 @@ owner: "@hz642"
 last_reviewed: 2026-05-08
 describes:
   - src/irminsul/llm/**
+tests:
+  - tests/test_llm_client.py
+  - tests/test_checks_llm.py
 ---
 
 # LLM Client

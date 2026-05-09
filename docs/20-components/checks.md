@@ -8,6 +8,16 @@ owner: "@hz642"
 last_reviewed: 2026-05-08
 describes:
   - src/irminsul/checks/**
+tests:
+  - tests/test_checks_frontmatter.py
+  - tests/test_checks_globs.py
+  - tests/test_checks_links.py
+  - tests/test_checks_schema_leak.py
+  - tests/test_checks_uniqueness.py
+  - tests/test_checks_coverage.py
+  - tests/test_checks_liar.py
+  - tests/test_checks_reality.py
+  - tests/test_checks_boundary.py
 ---
 
 # Checks

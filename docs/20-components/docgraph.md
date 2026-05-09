@@ -9,6 +9,9 @@ last_reviewed: 2026-05-08
 describes:
   - src/irminsul/docgraph.py
   - src/irminsul/docgraph_index.py
+tests:
+  - tests/test_docgraph.py
+  - tests/test_docgraph_index.py
 ---
 
 # DocGraph

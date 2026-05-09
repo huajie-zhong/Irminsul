@@ -8,15 +8,19 @@ and we resolve them here.
 from __future__ import annotations
 
 from irminsul.checks.base import Check, Finding, Severity, sort_findings, summarize
+from irminsul.checks.boundary import BoundaryCheck
+from irminsul.checks.coverage import CoverageCheck
 from irminsul.checks.external_links import ExternalLinksCheck
 from irminsul.checks.frontmatter import FrontmatterCheck
 from irminsul.checks.globs import GlobsCheck
 from irminsul.checks.glossary import GlossaryCheck
+from irminsul.checks.liar import LiarCheck
 from irminsul.checks.links import LinksCheck
 from irminsul.checks.mtime_drift import MtimeDriftCheck
 from irminsul.checks.orphans import OrphansCheck
 from irminsul.checks.overlap import OverlapCheck
 from irminsul.checks.parent_child import ParentChildCheck
+from irminsul.checks.reality import RealityCheck
 from irminsul.checks.schema_leak import SchemaLeakCheck
 from irminsul.checks.scope_appropriateness import ScopeAppropriatenessCheck
 from irminsul.checks.semantic_drift import SemanticDriftCheck
@@ -30,6 +34,8 @@ HARD_REGISTRY: dict[str, type[Check]] = {
     UniquenessCheck.name: UniquenessCheck,
     LinksCheck.name: LinksCheck,
     SchemaLeakCheck.name: SchemaLeakCheck,
+    CoverageCheck.name: CoverageCheck,
+    LiarCheck.name: LiarCheck,
 }
 
 SOFT_REGISTRY: dict[str, type[Check]] = {
@@ -40,6 +46,8 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     ParentChildCheck.name: ParentChildCheck,
     GlossaryCheck.name: GlossaryCheck,
     ExternalLinksCheck.name: ExternalLinksCheck,
+    RealityCheck.name: RealityCheck,
+    BoundaryCheck.name: BoundaryCheck,
 }
 
 LLM_REGISTRY: dict[str, type] = {
@@ -52,9 +60,13 @@ __all__ = [
     "HARD_REGISTRY",
     "LLM_REGISTRY",
     "SOFT_REGISTRY",
+    "BoundaryCheck",
     "Check",
+    "CoverageCheck",
     "Finding",
+    "LiarCheck",
     "OverlapCheck",
+    "RealityCheck",
     "ScopeAppropriatenessCheck",
     "SemanticDriftCheck",
     "Severity",

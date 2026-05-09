@@ -22,7 +22,7 @@ Not every doc deserves the same treatment. We classify each doc by how it's main
 | T3 | Living | Humans, often | Quarterly | Component docs, workflows, runbooks |
 | T4 | Ephemeral | Anyone | Discarded after use | Sprint plans, RFCs in flight |
 
-Tier dictates enforcement: 
+Tier dictates enforcement:
 - **T1 docs** are in `.gitignore` and rebuilt every PR.
 - **T3 docs** trigger drift warnings if their `describes` files change without them.
 - **T4 docs** auto-archive after a deadline.

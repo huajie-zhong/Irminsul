@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 CONFIG_FILENAME = "irminsul.toml"
 
-HARD_CHECKS = ("frontmatter", "globs", "uniqueness", "links", "schema-leak")
+HARD_CHECKS = ("frontmatter", "globs", "uniqueness", "links", "schema-leak", "coverage", "liar")
 SOFT_DETERMINISTIC_CHECKS = (
     "mtime-drift",
     "stale-reaper",
@@ -24,6 +24,8 @@ SOFT_DETERMINISTIC_CHECKS = (
     "parent-child",
     "glossary",
     "external-links",
+    "reality",
+    "boundary",
 )
 SOFT_LLM_CHECKS = ("overlap", "semantic-drift", "scope-appropriateness")
 

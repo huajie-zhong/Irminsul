@@ -57,8 +57,7 @@ def _parse_glossary_terms(glossary_text: str) -> tuple[set[str], set[str]]:
 
 def _doc_redefines_term(body: str, term: str) -> bool:
     pattern = re.compile(
-        rf"(?m)^#{{1,6}}\s+{re.escape(term)}\s*$"
-        rf"|^\*\*{re.escape(term)}\*\*:?\s*$"
+        rf"(?m)^#{{1,6}}\s+{re.escape(term)}\s*$" rf"|^\*\*{re.escape(term)}\*\*:?\s*$"
     )
     return pattern.search(body) is not None
 

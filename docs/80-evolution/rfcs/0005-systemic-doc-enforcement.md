@@ -23,7 +23,7 @@ Current documentation in Irminsul (and projects using it) suffers from four dist
 We propose four new checks to be added to the Irminsul core:
 
 ### 1. `RealityCheck` (Soft/Advisory)
-Scans Tier 3 (Living) documents for speculative keywords ("planned", "deferred", "sprint", "roadmap", "v0.X"). 
+Scans Tier 3 (Living) documents for speculative keywords ("planned", "deferred", "sprint", "roadmap", "v0.X").
 *   **Rule:** Living component docs must reflect the state of the current branch. Future plans belong in RFCs or the Roadmap.
 
 ### 2. `CoverageCheck` (Hard)

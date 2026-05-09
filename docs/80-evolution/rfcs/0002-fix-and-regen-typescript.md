@@ -96,7 +96,7 @@ Then re-run: irminsul regen reference --language=typescript
 
 **Output format.** Two options exist:
 
-Option A — TypeDoc JSON → custom Markdown writer (no new mkdocs plugin required).  
+Option A — TypeDoc JSON → custom Markdown writer (no new mkdocs plugin required).
 Option B — TypeDoc's `--plugin typedoc-plugin-markdown` (third-party) → write stubs that include the rendered output.
 
 Recommended: **Option A**. We control the output format, keep the stub structure consistent with the Python stubs (frontmatter + a brief docstring excerpt + `::: module.path` style directive — adapted for whichever mkdocs plugin handles TS).

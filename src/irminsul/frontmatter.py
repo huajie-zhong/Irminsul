@@ -56,6 +56,7 @@ class DocFrontmatter(BaseModel):
     superseded_by: str | None = None
     tags: list[str] = Field(default_factory=list)
     related_adrs: list[str] = Field(default_factory=list)
+    tests: list[str] = Field(default_factory=list)
 
 
 @dataclass(frozen=True)

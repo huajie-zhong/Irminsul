@@ -8,6 +8,8 @@ owner: "@hz642"
 last_reviewed: 2026-05-08
 describes:
   - src/irminsul/frontmatter.py
+tests:
+  - tests/test_frontmatter.py
 ---
 
 # Frontmatter

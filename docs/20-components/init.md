@@ -8,6 +8,10 @@ owner: "@hz642"
 last_reviewed: 2026-05-08
 describes:
   - src/irminsul/init/**
+tests:
+  - tests/test_init.py
+  - tests/test_init_detector.py
+  - tests/test_init_docs_only.py
 ---
 
 # Init scaffolder
