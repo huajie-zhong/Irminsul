@@ -1,18 +1,28 @@
-# {{ project_name }} — documentation
+﻿# {{ project_name }} — documentation
 
-This tree follows the [Irminsul](https://github.com/{{ github_user }}/irminsul) layout.
+This tree follows the [Irminsul](https://github.com/hz642/Irminsul) layout.
 
-| Layer | What lives here |
-|-------|-----------------|
-| `00-foundation/` | Principles, constraints, stakeholders. Rarely change. |
-| `10-architecture/` | System overview, containers, boundaries, deployment. |
-| `20-components/` | One doc per component. Most edits live here. |
-| `30-workflows/` | Cross-component how-it-works narratives. |
-| `40-reference/` | Generated. Schemas, API surface, error catalog. Don't hand-edit. |
-| `50-decisions/` | ADRs. Append-only. |
-| `60-operations/` | Runbooks, playbooks, SLOs, on-call. |
-| `70-knowledge/` | Tutorials, how-tos, explanations. |
-| `80-evolution/` | Roadmap, RFCs, risks, deprecations. |
-| `90-meta/` | Docs about the doc system itself. |
+## Navigation Protocol
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to write docs in this system, and [`GLOSSARY.md`](GLOSSARY.md) for canonical vocabulary.
+The documentation is organized by Layer (specificity) and Tier (maintenance policy).
+
+| Layer | Purpose | Audience |
+|-------|---------|----------|
+| [00-foundation/](00-foundation/principles.md) | Why the system exists; core principles and laws. | Foundation |
+| [10-architecture/](10-architecture/overview.md) | High-level system overview and component hierarchy. | Architecture |
+| [20-components/](20-components/INDEX.md) | One doc per architectural piece; maps code to concepts. | Components |
+| 30-workflows/ | Cross-component narratives and flows. | Workflows |
+| 40-reference/ | Generated technical references (API, Config, CLI). | Reference |
+| [50-decisions/](50-decisions/INDEX.md) | ADRs; append-only record of trade-offs. | Decisions |
+| 60-operations/ | Runbooks and operational procedures. | Operations |
+| 70-knowledge/ | Tutorials, how-tos, and deep-dive explanations. | Knowledge |
+| 80-evolution/ | Roadmap, RFCs, and tech debt registry. | Evolution |
+| 90-meta/ | Style guides and documentation system health. | Meta |
+
+## For AI Agents and Contributors
+
+- **Code Mapping:** Every component doc in `20-components/` contains a `describes:` frontmatter field mapping it to source files.
+- **Stability:** Refer to the `status:` field (draft | stable | deprecated) to understand the reliability of a document.
+- **Discovery:** Use `grep -r "describes:" docs/20-components/` to find the documentation governing specific source paths.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [GLOSSARY.md](GLOSSARY.md).

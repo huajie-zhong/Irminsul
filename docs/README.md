@@ -2,17 +2,37 @@
 
 This tree follows the doc system Irminsul itself enforces. We dogfood — every PR runs `irminsul check --scope=hard` against this directory.
 
-| Layer | What lives here |
-|-------|-----------------|
-| [`00-foundation/`](00-foundation/principles.md) | Why Irminsul exists; what it isn't. |
-| [`10-architecture/`](10-architecture/overview.md) | System overview. |
-| [`20-components/`](20-components/INDEX.md) | One doc per architectural piece. |
-| `30-workflows/` | Cross-component narratives (none yet). |
-| `40-reference/` | Generated. CLI surface, config schema. |
-| [`50-decisions/`](50-decisions/INDEX.md) | ADRs. Append-only. |
-| `60-operations/` | (Empty for a CLI tool.) |
-| `70-knowledge/` | (Empty until we have user-facing tutorials.) |
-| `80-evolution/` | Roadmap and risks. |
-| `90-meta/` | Docs about docs, style guides, and health dashboard. |
+## Navigation Protocol
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`GLOSSARY.md`](GLOSSARY.md).
+The documentation is organized by Layer (specificity) and Tier (maintenance policy).
+
+| Layer | Purpose | Audience |
+|-------|---------|----------|
+| [00-foundation/](00-foundation/principles.md) | Why Irminsul exists; core principles and laws. | Foundation |
+| [10-architecture/](10-architecture/overview.md) | High-level system overview and component hierarchy. | Architecture |
+| [20-components/](20-components/INDEX.md) | One doc per architectural piece; maps code to concepts. | Components |
+| 30-workflows/ | Cross-component narratives and flows. | Workflows |
+| 40-reference/ | Generated technical references (API, Config, CLI). | Reference |
+| [50-decisions/](50-decisions/INDEX.md) | ADRs; append-only record of trade-offs. | Decisions |
+| 60-operations/ | Runbooks and operational procedures. | Operations |
+| 70-knowledge/ | Tutorials, how-tos, and deep-dive explanations. | Knowledge |
+| 80-evolution/ | Roadmap, RFCs, and tech debt registry. | Evolution |
+| 90-meta/ | Style guides and documentation system health. | Meta |
+
+## For AI Agents and Contributors
+
+- **Code Mapping:** Every component doc in `20-components/` contains a `describes:` frontmatter field mapping it to source files.
+- **Stability:** Refer to the `status:` field (draft | stable | deprecated) to understand the reliability of a document.
+- **Discovery:** Use `grep -r "describes:" docs/20-components/` to find the documentation governing specific source paths.
+
+## Editing Rules (Anti-Rot Protocol)
+
+To prevent "truth rot," all contributors (human and AI) must follow these rules:
+
+1. **Reality Only:** Documentation in Layers 00-30 must reflect the current state of the main branch. Never document "planned" or "deferred" features as reality; use RFCs (Layer 80) for future casting.
+2. **Implementation First:** Never update a `new` template or a `README` with fields/checks that the current version of the CLI does not yet enforce.
+3. **No Signature Mirroring:** Do not manually list function signatures or config fields in prose if they are auto-generated in Layer 40. Reference the generated doc instead.
+4. **Atomic PRs:** A feature and its corresponding documentation changes must land in the same PR.
+5. **Silence is Intentional:** If a limitation is not documented, it is a bug in the doc. Explicitly document what a component *cannot* do.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [GLOSSARY.md](GLOSSARY.md).
