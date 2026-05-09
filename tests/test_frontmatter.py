@@ -73,14 +73,7 @@ def test_parse_doc_valid_returns_parsed(tmp_path: Path) -> None:
     md = tmp_path / "docs" / "x.md"
     md.parent.mkdir(parents=True)
     md.write_text(
-        "---\n"
-        "id: x\n"
-        "title: X\n"
-        "audience: explanation\n"
-        "tier: 3\n"
-        "status: stable\n"
-        "---\n\n"
-        "Body.\n",
+        "---\nid: x\ntitle: X\naudience: explanation\ntier: 3\nstatus: stable\n---\n\nBody.\n",
         encoding="utf-8",
     )
     result = parse_doc(md, tmp_path)
