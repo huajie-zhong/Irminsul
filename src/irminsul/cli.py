@@ -92,7 +92,7 @@ def init(
         str | None,
         typer.Option(
             "--code-repo",
-            help=("Future or existing code repository for " "`--fresh --topology docs-only`."),
+            help=("Future or existing code repository for `--fresh --topology docs-only`."),
         ),
     ] = None,
     allow_existing_code: Annotated[
@@ -141,7 +141,7 @@ def init(
         )
         raise typer.Exit(code=2)
 
-    if not fresh and code_repo is not None:
+    if code_repo is not None and topology != FreshTopology.docs_only:
         typer.echo(
             typer.style(
                 "`--code-repo` is only valid with `--fresh --topology docs-only`. "
@@ -187,10 +187,7 @@ def init(
             )
             return
         if answer == "3":
-            code_repo = typer.prompt(
-                "Code repo (GitHub owner/repo or local path, e.g. acme/my-public-code)"
-            )
-            run_init_docs_only(target, interactive=interactive, code_repo=code_repo, force=force)
+            run_init_docs_only(target, interactive=interactive, code_repo=None, force=force)
             return
         typer.echo("Canceled.")
         raise typer.Exit(code=0)

@@ -79,6 +79,13 @@ def update_gitignore(target_root: Path, subfolder: str) -> None:
         gitignore.write_text(marker + "\n" + entry + "\n", encoding="utf-8")
 
 
+def _normalize_render_target(render_target: str) -> str:
+    if render_target in ("mkdocs", "none"):
+        return render_target
+    typer.echo(typer.style(f"unknown render target '{render_target}', using 'mkdocs'", fg="yellow"))
+    return "mkdocs"
+
+
 def gather_answers(
     *,
     repo_root: Path,
@@ -93,11 +100,7 @@ def gather_answers(
     if interactive:
         project_name = typer.prompt("Project name", default=default_project_name)
         render_target = typer.prompt("Render target [mkdocs|none]", default="mkdocs")
-        if render_target not in ("mkdocs", "none"):
-            typer.echo(
-                typer.style(f"unknown render target '{render_target}', using 'mkdocs'", fg="yellow")
-            )
-            render_target = "mkdocs"
+        render_target = _normalize_render_target(render_target)
     else:
         project_name = default_project_name
         render_target = "mkdocs"
@@ -124,11 +127,7 @@ def gather_answers_fresh(
     if interactive:
         project_name = typer.prompt("Project name", default=default_project_name)
         render_target = typer.prompt("Render target [mkdocs|none]", default="mkdocs")
-        if render_target not in ("mkdocs", "none"):
-            typer.echo(
-                typer.style(f"unknown render target '{render_target}', using 'mkdocs'", fg="yellow")
-            )
-            render_target = "mkdocs"
+        render_target = _normalize_render_target(render_target)
     else:
         project_name = default_project_name
         render_target = "mkdocs"
@@ -160,8 +159,7 @@ def gather_answers_docs_only(
             )
         project_name = typer.prompt("Project name", default=default_project_name)
         render_target = typer.prompt("Render target [mkdocs|none]", default="mkdocs")
-        if render_target not in ("mkdocs", "none"):
-            render_target = "mkdocs"
+        render_target = _normalize_render_target(render_target)
     else:
         if code_repo is None:
             raise typer.BadParameter(
@@ -210,8 +208,7 @@ def gather_answers_fresh_docs_only(
             )
         project_name = typer.prompt("Project name", default=default_project_name)
         render_target = typer.prompt("Render target [mkdocs|none]", default="mkdocs")
-        if render_target not in ("mkdocs", "none"):
-            render_target = "mkdocs"
+        render_target = _normalize_render_target(render_target)
     else:
         if code_repo is None:
             raise typer.BadParameter(

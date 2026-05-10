@@ -104,6 +104,48 @@ def test_init_fresh_docs_only_future_repo(tmp_path: Path) -> None:
     assert check_result.exit_code == 0, check_result.stdout
 
 
+def test_init_fresh_code_repo_requires_docs_only_topology(tmp_path: Path) -> None:
+    target = tmp_path / "demo"
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "--fresh",
+            "--code-repo",
+            "acme/ignored",
+            "--no-interactive",
+            "--path",
+            str(target),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "--topology docs-only" in result.stdout
+    assert not (target / "irminsul.toml").exists()
+
+
+def test_init_fresh_docs_only_warns_on_unknown_render_target(tmp_path: Path) -> None:
+    target = tmp_path / "docs-repo"
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "--fresh",
+            "--topology",
+            "docs-only",
+            "--code-repo",
+            "acme/future-public-repo",
+            "--path",
+            str(target),
+        ],
+        input="\nwat\n",
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "unknown render target 'wat', using 'mkdocs'" in result.stdout
+    assert 'target = "mkdocs"' in (target / "irminsul.toml").read_text(encoding="utf-8")
+
+
 def test_init_fresh_docs_only_detects_existing_subfolder(tmp_path: Path) -> None:
     target = tmp_path / "docs-repo"
     code = target / "public-code"
