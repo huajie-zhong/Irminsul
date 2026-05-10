@@ -8,12 +8,14 @@ from pathlib import Path
 from typing import ClassVar
 
 from irminsul.checks.base import Finding, Severity
+from irminsul.config import TerminologyRule
 from irminsul.docgraph import DocGraph, DocNode
 from irminsul.frontmatter import StatusEnum
 from irminsul.regen.doc_surfaces import surface_by_filename
 
 _LOCAL_MD_RE = re.compile(r"(?<![\w.-])((?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.md)(?![\w.-])")
-_MARKDOWN_LINK_RE = re.compile(r"\[[^\]]*\]\([^)]*\)")
+_MARKDOWN_LINK_RE = re.compile(r"!?\[[^\]\n]*\](?:\([^\)\n]*\)|\[[^\]\n]*\])")
+_LINK_DEFINITION_RE = re.compile(r"^\s{0,3}\[[^\]\n]+\]:\s+\S+")
 _FENCE_RE = re.compile(r"^\s*(```|~~~)")
 _IGNORE_RE = re.compile(r"irminsul:ignore\s+prose-file-reference")
 _IGNORE_START_RE = re.compile(r"irminsul:ignore-start\s+prose-file-reference")
@@ -40,6 +42,8 @@ def _is_rfc_doc(node: DocNode) -> bool:
 
 
 def _line_link_spans(line: str) -> list[range]:
+    if _LINK_DEFINITION_RE.match(line):
+        return [range(0, len(line))]
     return [range(match.start(), match.end()) for match in _MARKDOWN_LINK_RE.finditer(line)]
 
 
@@ -205,7 +209,11 @@ class TerminologyOverloadCheck:
     default_severity: ClassVar[Severity] = Severity.warning
 
     def run(self, graph: DocGraph) -> list[Finding]:
+        if graph.config is None:
+            return []
+
         out: list[Finding] = []
+        rules = graph.config.checks.terminology_overload.rules
         for node in _stable_audit_nodes(graph):
             if _is_rfc_doc(node):
                 continue
@@ -216,38 +224,29 @@ class TerminologyOverloadCheck:
                     continue
                 if in_fence:
                     continue
-                if not re.search(r"\bcoverage\b", line, re.IGNORECASE):
-                    continue
-                if _coverage_is_explicit(line):
-                    continue
-                out.append(
-                    Finding(
-                        check=self.name,
-                        severity=self.default_severity,
-                        message="'coverage' is ambiguous here",
-                        path=node.path,
-                        doc_id=node.id,
-                        line=lineno,
-                        suggestion=(
-                            "Clarify whether this means source ownership coverage "
-                            "or the `CoverageCheck` tests: rule"
-                        ),
+                for rule in rules:
+                    if not _line_has_term(line, rule.term):
+                        continue
+                    if _term_is_explicit(line, rule):
+                        continue
+                    out.append(
+                        Finding(
+                            check=self.name,
+                            severity=self.default_severity,
+                            message=f"'{rule.term}' is ambiguous here",
+                            path=node.path,
+                            doc_id=node.id,
+                            line=lineno,
+                            suggestion=rule.suggestion,
+                        )
                     )
-                )
         return out
 
 
-def _coverage_is_explicit(line: str) -> bool:
+def _line_has_term(line: str, term: str) -> bool:
+    return re.search(rf"\b{re.escape(term)}\b", line, re.IGNORECASE) is not None
+
+
+def _term_is_explicit(line: str, rule: TerminologyRule) -> bool:
     lowered = line.lower()
-    explicit_phrases = (
-        "source ownership coverage",
-        "source-file coverage",
-        "source file",
-        "source files",
-        "source paths",
-        "coveragecheck",
-        "`coverage`",
-        "tests:",
-        "`tests:`",
-    )
-    return any(phrase in lowered for phrase in explicit_phrases)
+    return any(phrase.lower() in lowered for phrase in rule.explicit_phrases)

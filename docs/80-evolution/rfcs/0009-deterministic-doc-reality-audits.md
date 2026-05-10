@@ -79,8 +79,8 @@ when the configured hard check set has changed.
 
 ### `terminology-overload`
 
-Warn when a key system term is used for multiple concepts without an explicit
-disambiguation link. The initial target is "coverage":
+Warn when a configured key system term is used for multiple concepts without an
+explicit disambiguation link. The default target is "coverage":
 
 - source ownership coverage: whether source files are claimed by docs
 - `CoverageCheck`: whether tier-3 docs declare valid `tests:` entries
@@ -98,6 +98,10 @@ disambiguation link. The initial target is "coverage":
 5. Add fixtures for the dogfood failures listed above.
 6. Run configured warnings in dogfood/nightly. Use strict warning policy only
    after the repo has a clean advisory baseline.
+
+The soft deterministic RFC 0009 checks are globally enabled by default as part
+of `checks.soft_deterministic`. Projects can still override that list when they
+need a narrower configured profile.
 
 ## Drawbacks
 

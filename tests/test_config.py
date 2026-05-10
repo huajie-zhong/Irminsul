@@ -9,6 +9,7 @@ import pytest
 from irminsul.config import (
     CONFIG_FILENAME,
     HARD_CHECKS,
+    SOFT_DETERMINISTIC_CHECKS,
     IrminsulConfig,
     find_config,
     load,
@@ -20,6 +21,8 @@ def test_defaults_are_valid() -> None:
     assert cfg.paths.docs_root == "docs"
     assert "src" in cfg.paths.source_roots
     assert set(cfg.checks.hard) == set(HARD_CHECKS)
+    assert set(cfg.checks.soft_deterministic) == set(SOFT_DETERMINISTIC_CHECKS)
+    assert cfg.checks.terminology_overload.rules[0].term == "coverage"
     assert cfg.llm.provider == "anthropic"
     assert cfg.render.target == "mkdocs"
 

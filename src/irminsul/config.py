@@ -100,6 +100,41 @@ class ParentChildSettings(BaseModel):
     length_warning_lines: int = 300
 
 
+class TerminologyRule(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    term: str
+    explicit_phrases: list[str]
+    suggestion: str
+
+
+class TerminologyOverloadSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rules: list[TerminologyRule] = Field(
+        default_factory=lambda: [
+            TerminologyRule(
+                term="coverage",
+                explicit_phrases=[
+                    "source ownership coverage",
+                    "source-file coverage",
+                    "source file",
+                    "source files",
+                    "source paths",
+                    "coveragecheck",
+                    "`coverage`",
+                    "tests:",
+                    "`tests:`",
+                ],
+                suggestion=(
+                    "Clarify whether this means source ownership coverage "
+                    "or the `CoverageCheck` tests: rule"
+                ),
+            )
+        ]
+    )
+
+
 class Checks(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -112,6 +147,9 @@ class Checks(BaseModel):
     stale_reaper: StaleReaperSettings = Field(default_factory=StaleReaperSettings)
     glossary: GlossarySettings = Field(default_factory=GlossarySettings)
     parent_child: ParentChildSettings = Field(default_factory=ParentChildSettings)
+    terminology_overload: TerminologyOverloadSettings = Field(
+        default_factory=TerminologyOverloadSettings
+    )
 
     @field_validator("hard", "soft_deterministic", "soft_llm")
     @classmethod

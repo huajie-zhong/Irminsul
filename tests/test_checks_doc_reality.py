@@ -83,6 +83,20 @@ def test_prose_file_reference_allows_links_and_ignores(tmp_path: Path) -> None:
     assert ProseFileReferenceCheck().run(_graph(tmp_path)) == []
 
 
+def test_prose_file_reference_allows_reference_links_definitions_and_images(
+    tmp_path: Path,
+) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/20-components/widget.md",
+        doc_id="widget",
+        body=("See [neighbor][neighbor-doc].\n![diagram](diagram.md)\n[neighbor-doc]: neighbor.md"),
+    )
+
+    assert ProseFileReferenceCheck().run(_graph(tmp_path)) == []
+
+
 def test_prose_file_reference_allows_block_ignore(tmp_path: Path) -> None:
     _write_config(tmp_path)
     _write_doc(
@@ -205,3 +219,34 @@ def test_terminology_overload_allows_explicit_coverage(tmp_path: Path) -> None:
     )
 
     assert TerminologyOverloadCheck().run(_graph(tmp_path)) == []
+
+
+def test_terminology_overload_uses_configured_rules(tmp_path: Path) -> None:
+    (tmp_path / "irminsul.toml").write_text(
+        "\n".join(
+            [
+                'project_name = "doc-reality"',
+                "[paths]",
+                'docs_root = "docs"',
+                'source_roots = ["src"]',
+                "[[checks.terminology_overload.rules]]",
+                'term = "latency"',
+                'explicit_phrases = ["p95 latency"]',
+                'suggestion = "Clarify which latency metric this means."',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/20-components/widget.md",
+        doc_id="widget",
+        body="Latency must stay low.\nP95 latency is tracked separately.",
+    )
+
+    findings = TerminologyOverloadCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert findings[0].message == "'latency' is ambiguous here"
+    assert findings[0].suggestion == "Clarify which latency metric this means."
