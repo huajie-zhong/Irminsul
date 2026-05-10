@@ -55,7 +55,3 @@ jobs:
 ## License
 
 AGPL-3.0-or-later. See [`LICENSE`](LICENSE).
-
-## Reference
-
-The full architectural reference for the doc system Irminsul enforces lives in [`docs/90-meta/doc-system.md`](docs/90-meta/doc-system.md).
