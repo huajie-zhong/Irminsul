@@ -104,17 +104,26 @@ The code would live at `../my-public-code/` — outside the docs repo entirely. 
 
 ### Adopting on a New Codebase
 
-Once the tooling repo exists, adopting it on a new codebase is roughly:
+For an existing same-repo codebase, adoption is roughly:
 
 1. Add the tool as a dev dependency.
 2. Run `irminsul init` — generates `/docs` skeleton, `irminsul.toml`, GitHub Actions workflow, and pre-commit hooks.
 3. Write `00-foundation/principles.md` and `10-architecture/overview.md`.
 4. Commit. CI now enforces the system from PR #1.
 
-For the public-code + private-docs case:
+For a fresh same-repo project with no code yet:
+
+1. Run `irminsul init --fresh --path my-new-project`.
+2. Add application code under `src/` when the project generator or first implementation is ready.
+3. Write the foundation and architecture docs.
+4. Commit. CI now enforces the system from PR #1.
+
+For an existing public-code + private-docs case:
 
 1. Create an empty docs-only private repo.
 2. Run `irminsul init-docs-only --code-repo owner/public-repo` inside it.
 3. Clone the public repo locally: `git clone https://github.com/owner/public-repo`.
 4. Write the foundation and architecture docs.
 5. Commit. CI checks out both repos on every PR.
+
+For fresh public-code + private-docs setup, use `irminsul init --fresh --topology docs-only --code-repo owner/future-public-repo`. The code repo checkout folder is gitignored and may be absent until the public repo exists.

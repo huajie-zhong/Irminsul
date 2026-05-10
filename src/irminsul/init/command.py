@@ -112,6 +112,37 @@ def gather_answers(
     )
 
 
+def gather_answers_fresh(
+    *,
+    repo_root: Path,
+    interactive: bool,
+) -> InitAnswers:
+    """Gather answers for a language-neutral same-repo fresh start."""
+    today = _dt.date.today().isoformat()
+    default_project_name = repo_root.resolve().name or "untitled"
+
+    if interactive:
+        project_name = typer.prompt("Project name", default=default_project_name)
+        render_target = typer.prompt("Render target [mkdocs|none]", default="mkdocs")
+        if render_target not in ("mkdocs", "none"):
+            typer.echo(
+                typer.style(f"unknown render target '{render_target}', using 'mkdocs'", fg="yellow")
+            )
+            render_target = "mkdocs"
+    else:
+        project_name = default_project_name
+        render_target = "mkdocs"
+
+    return InitAnswers(
+        project_name=project_name,
+        render_target=render_target,
+        languages=[],
+        source_roots=["src"],
+        github_user=_GITHUB_USER_PLACEHOLDER,
+        today=today,
+    )
+
+
 def gather_answers_docs_only(
     *,
     repo_root: Path,
@@ -148,6 +179,55 @@ def gather_answers_docs_only(
         source_roots = [f"{subfolder}/{r}" for r in detect_source_roots(subfolder_path, languages)]
     else:
         languages = ["python"]
+        source_roots = [f"{subfolder}/src"]
+
+    return InitAnswers(
+        project_name=project_name,
+        render_target=render_target,
+        languages=languages,
+        source_roots=source_roots,
+        github_user=_GITHUB_USER_PLACEHOLDER,
+        today=today,
+        code_repo_spec=github_spec,
+        code_subfolder=subfolder,
+    )
+
+
+def gather_answers_fresh_docs_only(
+    *,
+    repo_root: Path,
+    interactive: bool,
+    code_repo: str | None,
+) -> InitAnswers:
+    """Gather answers for a future-code private-docs/public-code fresh start."""
+    today = _dt.date.today().isoformat()
+    default_project_name = repo_root.resolve().name or "untitled"
+
+    if interactive:
+        if code_repo is None:
+            code_repo = typer.prompt(
+                "Code repo (GitHub owner/repo or local path, e.g. acme/my-public-code)"
+            )
+        project_name = typer.prompt("Project name", default=default_project_name)
+        render_target = typer.prompt("Render target [mkdocs|none]", default="mkdocs")
+        if render_target not in ("mkdocs", "none"):
+            render_target = "mkdocs"
+    else:
+        if code_repo is None:
+            raise typer.BadParameter(
+                "--code-repo is required for fresh docs-only topology", param_hint="--code-repo"
+            )
+        project_name = default_project_name
+        render_target = "mkdocs"
+
+    github_spec, subfolder = parse_code_repo(code_repo)
+
+    subfolder_path = repo_root / subfolder
+    if subfolder_path.is_dir():
+        languages = detect_languages(subfolder_path)
+        source_roots = [f"{subfolder}/{r}" for r in detect_source_roots(subfolder_path, languages)]
+    else:
+        languages = []
         source_roots = [f"{subfolder}/src"]
 
     return InitAnswers(
@@ -237,6 +317,14 @@ def run_init(target_root: Path, *, interactive: bool, force: bool = False) -> No
     print_next_steps(answers, written)
 
 
+def run_init_fresh(target_root: Path, *, interactive: bool, force: bool = False) -> None:
+    answers = gather_answers_fresh(repo_root=target_root, interactive=interactive)
+    written = write_scaffold(target_root, answers, force=force)
+    for root in answers.source_roots:
+        (target_root / root).mkdir(parents=True, exist_ok=True)
+    print_next_steps(answers, written)
+
+
 def run_init_docs_only(
     target_root: Path,
     *,
@@ -245,6 +333,22 @@ def run_init_docs_only(
     force: bool = False,
 ) -> None:
     answers = gather_answers_docs_only(
+        repo_root=target_root, interactive=interactive, code_repo=code_repo
+    )
+    written = write_scaffold(target_root, answers, force=force)
+    if answers.code_subfolder:
+        update_gitignore(target_root, answers.code_subfolder)
+    _print_docs_only_next_steps(answers, written)
+
+
+def run_init_fresh_docs_only(
+    target_root: Path,
+    *,
+    interactive: bool,
+    code_repo: str | None,
+    force: bool = False,
+) -> None:
+    answers = gather_answers_fresh_docs_only(
         repo_root=target_root, interactive=interactive, code_repo=code_repo
     )
     written = write_scaffold(target_root, answers, force=force)

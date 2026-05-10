@@ -6,13 +6,24 @@ Irminsul is a Python CLI + composite GitHub Action that enforces structural inva
 
 ## Quickstart
 
+For an existing codebase:
+
 ```bash
 pipx install irminsul
 cd my-codebase
 irminsul init
 ```
 
+For a new project with no code yet:
+
+```bash
+pipx install irminsul
+irminsul init --fresh --path my-new-project
+```
+
 That scaffolds a 9-layer `/docs` skeleton, an `irminsul.toml` config, GitHub Actions workflows, and pre-commit hooks. Three commands, ten seconds, fully wired.
+
+For private docs with separate public code, use `irminsul init-docs-only --code-repo owner/repo` when the code repo already exists, or `irminsul init --fresh --topology docs-only --code-repo owner/future-repo` when both repos are starting from zero.
 
 ## What it checks
 

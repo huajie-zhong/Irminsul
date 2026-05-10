@@ -187,6 +187,8 @@ def test_init_errors_when_no_code_signals_noninteractive(tmp_path: Path) -> None
     repo = _make_empty_dir(tmp_path)
     result = runner.invoke(app, ["init", "--no-interactive", "--path", str(repo)])
     assert result.exit_code == 2
+    assert "irminsul init --fresh" in result.stdout
+    assert "irminsul init-docs-only --code-repo <spec-or-path>" in result.stdout
 
 
 def test_init_docs_only_warns_when_code_signals_present_noninteractive(tmp_path: Path) -> None:
