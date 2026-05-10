@@ -58,7 +58,7 @@ def test_init_fresh_generated_repo_passes_hard_check(tmp_path: Path) -> None:
     result = runner.invoke(app, ["init", "--fresh", "--no-interactive", "--path", str(target)])
     assert result.exit_code == 0, result.stdout
 
-    check_result = runner.invoke(app, ["check", "--scope", "hard", "--path", str(target)])
+    check_result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(target)])
     assert check_result.exit_code == 0, check_result.stdout
 
 
@@ -100,7 +100,7 @@ def test_init_fresh_docs_only_future_repo(tmp_path: Path) -> None:
     gitignore = (target / ".gitignore").read_text(encoding="utf-8")
     assert "/future-public-repo/" in gitignore
 
-    check_result = runner.invoke(app, ["check", "--scope", "hard", "--path", str(target)])
+    check_result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(target)])
     assert check_result.exit_code == 0, check_result.stdout
 
 
@@ -245,7 +245,7 @@ def test_init_then_check_passes_on_freshly_scaffolded_repo(tmp_path: Path) -> No
     result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
     assert result.exit_code == 0
 
-    check_result = runner.invoke(app, ["check", "--scope", "hard", "--path", str(target)])
+    check_result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(target)])
     # The freshly-scaffolded repo has no `describes` claims yet so nothing
     # should be flagged. (Source coverage is advisory, not hard.)
     assert check_result.exit_code == 0, check_result.stdout

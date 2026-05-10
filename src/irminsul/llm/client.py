@@ -1,7 +1,8 @@
 """Budget-aware LiteLLM client with disk cache.
 
-Used only when `--llm` is passed to `irminsul check`. The main path (hard/soft
-checks) never imports this module, so LiteLLM is a soft dependency.
+Used only when `irminsul check --profile advisory` selects configured LLM
+checks. The main deterministic paths never import this module, so LiteLLM is a
+soft dependency.
 """
 
 from __future__ import annotations

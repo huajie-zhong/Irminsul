@@ -30,7 +30,7 @@ Thin wrappers over existing soft checks: `orphans` delegates to `OrphansCheck`, 
 
 ## `irminsul fix`
 
-Applies deterministic remediations for fixable soft-check findings. The first implementation target is `SupersessionCheck`: when a new doc lists an old doc in `supersedes:`, `fix` can set the old doc's `status: deprecated` and `superseded_by: <new-id>` frontmatter. `--dry-run` prints planned edits without writing files; normal runs group fixes by path and write updated files atomically.
+Applies deterministic remediations for fixable findings selected by `--profile`. The default profile is `configured`; `hard`, `configured`, `advisory`, and `all-available` use the same selection policy as `irminsul check`, but LLM advisory checks are never used for file mutation. The first implementation target is `SupersessionCheck`: when a new doc lists an old doc in `supersedes:`, `fix` can set the old doc's `status: deprecated` and `superseded_by: <new-id>` frontmatter. `--dry-run` prints planned edits without writing files; normal runs group fixes by path and write updated files atomically.
 
 ## `irminsul regen --language=python|typescript`
 

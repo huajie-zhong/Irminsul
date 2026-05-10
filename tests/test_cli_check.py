@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
+import irminsul.cli as cli
 from irminsul.cli import app
 
 runner = CliRunner()
@@ -16,7 +18,7 @@ def test_check_good_fixture_exits_zero(
     fixture_repo: Callable[[str], Path],
 ) -> None:
     repo = fixture_repo("good")
-    result = runner.invoke(app, ["check", "--scope", "hard", "--path", str(repo)])
+    result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(repo)])
     assert result.exit_code == 0, result.stdout
     assert "0 errors" in result.stdout
 
@@ -25,7 +27,7 @@ def test_check_bad_frontmatter_exits_one_with_findings(
     fixture_repo: Callable[[str], Path],
 ) -> None:
     repo = fixture_repo("bad-frontmatter")
-    result = runner.invoke(app, ["check", "--scope", "hard", "--path", str(repo)])
+    result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(repo)])
     assert result.exit_code == 1
     assert "[frontmatter]" in result.stdout
     assert "missing frontmatter" in result.stdout
@@ -35,18 +37,65 @@ def test_check_bad_globs_exits_one_and_names_pattern(
     fixture_repo: Callable[[str], Path],
 ) -> None:
     repo = fixture_repo("bad-globs")
-    result = runner.invoke(app, ["check", "--scope", "hard", "--path", str(repo)])
+    result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(repo)])
     assert result.exit_code == 1
     assert "[globs]" in result.stdout
     assert "app/missing/*.py" in result.stdout
 
 
-def test_check_llm_flag_runs_without_error(fixture_repo: Callable[[str], Path]) -> None:
+def test_check_advisory_runs_configured_llm_checks(fixture_repo: Callable[[str], Path]) -> None:
     repo = fixture_repo("good")
-    result = runner.invoke(app, ["check", "--scope", "hard", "--llm", "--path", str(repo)])
-    # --llm is now real; with no soft_llm configured and no API key it emits skip-info
-    # or nothing — either way exit code should be 0 (info findings never block)
-    assert result.exit_code == 0
+    (repo / "irminsul.toml").write_text(
+        (repo / "irminsul.toml").read_text(encoding="utf-8")
+        + '\n[checks]\nsoft_llm = ["overlap"]\n'
+        + '\n[llm]\nprovider = "definitely-missing-provider"\n',
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["check", "--profile", "advisory", "--path", str(repo)])
+
+    assert result.exit_code == 0, result.stdout
+    assert "[overlap]" in result.stdout
+    assert "LLM check skipped" in result.stdout
+
+
+def test_check_llm_footer_reports_api_calls_not_cache_hits(
+    fixture_repo: Callable[[str], Path],
+    monkeypatch,
+) -> None:
+    repo = fixture_repo("good")
+    (repo / "irminsul.toml").write_text(
+        (repo / "irminsul.toml").read_text(encoding="utf-8")
+        + '\n[checks]\nsoft_llm = ["overlap"]\n'
+        + '\n[llm]\nprovider = "openai"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+
+    class OneCallLlmCheck:
+        def __init__(self, *, llm_client):
+            self.llm_client = llm_client
+
+        def run(self, graph):
+            from irminsul.llm.client import LlmRequest
+
+            self.llm_client.complete(LlmRequest(system="system", user="user"))
+            return []
+
+    def fake_completion(**_kwargs):
+        msg = SimpleNamespace(content='{"ok": true}')
+        choice = SimpleNamespace(message=msg)
+        return SimpleNamespace(choices=[choice])
+
+    monkeypatch.setitem(cli.LLM_REGISTRY, "overlap", OneCallLlmCheck)
+    monkeypatch.setattr("litellm.completion", fake_completion)
+    monkeypatch.setattr("litellm.completion_cost", lambda _raw: 0.01)
+
+    result = runner.invoke(app, ["check", "--profile", "advisory", "--path", str(repo)])
+
+    assert result.exit_code == 0, result.stdout
+    assert "1 API call(s)" in result.stdout
+    assert "cache hit" not in result.stdout
 
 
 def test_check_format_json_produces_valid_json(
@@ -56,7 +105,7 @@ def test_check_format_json_produces_valid_json(
 
     repo = fixture_repo("good")
     result = runner.invoke(
-        app, ["check", "--scope", "hard", "--format", "json", "--path", str(repo)]
+        app, ["check", "--profile", "hard", "--format", "json", "--path", str(repo)]
     )
     assert result.exit_code == 0, result.stdout
     data = json.loads(result.stdout)
@@ -72,7 +121,7 @@ def test_check_format_json_exit_one_on_errors(
 
     repo = fixture_repo("bad-frontmatter")
     result = runner.invoke(
-        app, ["check", "--scope", "hard", "--format", "json", "--path", str(repo)]
+        app, ["check", "--profile", "hard", "--format", "json", "--path", str(repo)]
     )
     assert result.exit_code == 1
     data = json.loads(result.stdout)
@@ -87,7 +136,7 @@ def test_check_format_json_finding_schema(
 
     repo = fixture_repo("bad-frontmatter")
     result = runner.invoke(
-        app, ["check", "--scope", "hard", "--format", "json", "--path", str(repo)]
+        app, ["check", "--profile", "hard", "--format", "json", "--path", str(repo)]
     )
     data = json.loads(result.stdout)
     for finding in data["findings"]:
@@ -107,3 +156,37 @@ def test_check_format_unknown_exits_two(
     repo = fixture_repo("good")
     result = runner.invoke(app, ["check", "--format", "xml", "--path", str(repo)])
     assert result.exit_code == 2
+
+
+def test_check_configured_runs_configured_soft_checks(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("soft-supersession")
+    result = runner.invoke(app, ["check", "--profile", "configured", "--path", str(repo)])
+    assert result.exit_code == 0, result.stdout
+    assert "[supersession]" in result.stdout
+
+
+def test_check_strict_fails_on_warnings(fixture_repo: Callable[[str], Path]) -> None:
+    repo = fixture_repo("soft-supersession")
+    result = runner.invoke(
+        app, ["check", "--profile", "configured", "--strict", "--path", str(repo)]
+    )
+    assert result.exit_code == 1
+    assert "[supersession]" in result.stdout
+
+
+def test_check_strict_does_not_enable_soft_checks(fixture_repo: Callable[[str], Path]) -> None:
+    repo = fixture_repo("soft-supersession")
+    result = runner.invoke(app, ["check", "--profile", "hard", "--strict", "--path", str(repo)])
+    assert result.exit_code == 0, result.stdout
+    assert "[supersession]" not in result.stdout
+
+
+def test_check_all_available_runs_unconfigured_deterministic_checks(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("soft-boundary")
+    result = runner.invoke(app, ["check", "--profile", "all-available", "--path", str(repo)])
+    assert result.exit_code == 0, result.stdout
+    assert "[boundary]" in result.stdout

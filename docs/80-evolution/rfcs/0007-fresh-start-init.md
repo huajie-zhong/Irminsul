@@ -80,7 +80,7 @@ Default behavior:
   pre-commit wiring.
 - Create an empty source root if none exists.
 - Do not create language-specific starter code in non-interactive mode.
-- Exit 0 if the generated project passes `irminsul check --scope=hard`.
+- Exit 0 if the generated project passes `irminsul check --profile=hard`.
 
 For private-docs/public-code fresh-start, add an explicit topology flag:
 
@@ -195,7 +195,7 @@ code repo has source files. Midway adoption of the same topology remains
 
 The fresh-start output must satisfy these conditions:
 
-- `irminsul check --scope=hard --path <target>` exits 0.
+- `irminsul check --profile=hard --path <target>` exits 0.
 - No generated doc claims source paths that do not exist.
 - No generated component doc claims code without a matching generated test.
 - Non-interactive fresh-start does not assume a programming language.

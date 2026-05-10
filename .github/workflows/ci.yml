@@ -69,6 +69,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[mkdocs]"
       - name: irminsul check (self)
-        run: irminsul check --scope=hard
+        run: irminsul check --profile=hard
       - name: irminsul render (self)
         run: irminsul render

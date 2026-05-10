@@ -10,4 +10,4 @@ A few rules to keep these docs readable as the codebase grows.
 6. **Edit the canonical doc, not its mirror.** If you find yourself editing `20-components/foo.md` to keep it in sync with `10-architecture/overview.md`, one of them is wrong.
 7. **First-is-Interface.** The first file or glob listed in `describes:` is formally recognised as the component's entry point or public interface. When exploring an unfamiliar component, start here. Order subsequent globs from most-public to least-public.
 
-CI runs `irminsul check --scope=hard` on every PR. Locally, `irminsul check` does the same.
+CI runs `irminsul check --profile=hard` on every PR. Locally, `irminsul check` does the same.
