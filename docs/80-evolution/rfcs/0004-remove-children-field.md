@@ -8,10 +8,6 @@ status: stable
 
 # RFC-0004: Remove `children:` field — INDEX auto-owns all folder siblings
 
-## Status
-
-Draft. Target decision date: 2026-06-30.
-
 ## Summary
 
 The `children:` frontmatter field on `INDEX.md` files is redundant. An INDEX that exists in a folder implicitly owns every sibling `.md` file in that folder. Making this the enforced convention removes the field entirely and eliminates the verbosity of declaring what the folder structure already expresses.
