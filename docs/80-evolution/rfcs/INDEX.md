@@ -18,3 +18,7 @@ In-flight proposals. See [`80-evolution`](../INDEX.md) for the RFC lifecycle.
 - [`0005-systemic-doc-enforcement`](0005-systemic-doc-enforcement.md) — New Reality, Coverage, Boundary, and Liar checks
 - [`0006-structural-accountability-and-external-state`](0006-structural-accountability-and-external-state.md) — Structural accountability and external state verification
 - [`0007-fresh-start-init`](0007-fresh-start-init.md) — Fresh-start init for new codebases
+- [`0008-check-profiles-and-warning-policy`](0008-check-profiles-and-warning-policy.md) — Check profiles and warning policy
+- [`0009-deterministic-doc-reality-audits`](0009-deterministic-doc-reality-audits.md) — Deterministic audits for doc/code reality drift
+- [`0010-structured-claim-provenance`](0010-structured-claim-provenance.md) — Structured provenance for enforcement and automation claims
+- [`0011-generated-agent-discovery-index`](0011-generated-agent-discovery-index.md) — Generated first-hop index for agents and contributors
