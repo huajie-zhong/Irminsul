@@ -27,6 +27,8 @@ from irminsul.init.command import (
     detect_code_signals,
     run_init,
     run_init_docs_only,
+    run_init_fresh,
+    run_init_fresh_docs_only,
 )
 from irminsul.render.mkdocs import MkDocsRenderer, MkDocsRenderError
 
@@ -42,6 +44,11 @@ class Scope(StrEnum):
     hard = "hard"
     soft = "soft"
     all = "all"
+
+
+class FreshTopology(StrEnum):
+    same_repo = "same-repo"
+    docs_only = "docs-only"
 
 
 def _version_callback(value: bool) -> None:
@@ -67,6 +74,34 @@ def _root(
 
 @app.command()
 def init(
+    fresh: Annotated[
+        bool,
+        typer.Option(
+            "--fresh",
+            help="Initialize a new project with no existing code.",
+        ),
+    ] = False,
+    topology: Annotated[
+        FreshTopology,
+        typer.Option(
+            "--topology",
+            help="Fresh-start topology: same-repo or docs-only.",
+        ),
+    ] = FreshTopology.same_repo,
+    code_repo: Annotated[
+        str | None,
+        typer.Option(
+            "--code-repo",
+            help=("Future or existing code repository for `--fresh --topology docs-only`."),
+        ),
+    ] = None,
+    allow_existing_code: Annotated[
+        bool,
+        typer.Option(
+            "--allow-existing-code",
+            help="Allow --fresh even when code signals already exist.",
+        ),
+    ] = False,
     no_interactive: Annotated[
         bool,
         typer.Option(
@@ -93,23 +128,76 @@ def init(
     target = path.resolve()
     target.mkdir(parents=True, exist_ok=True)
     interactive = not no_interactive
+    has_code = detect_code_signals(target)
 
-    if interactive and not detect_code_signals(target):
-        answer = typer.confirm(
-            "No code detected here. Is this a docs-only repo with code in a separate repo?",
-            default=False,
-        )
-        if answer:
-            code_repo = typer.prompt(
-                "Code repo (GitHub owner/repo or local path, e.g. acme/my-public-code)"
-            )
-            run_init_docs_only(target, interactive=interactive, code_repo=code_repo, force=force)
-            return
-    elif not interactive and not detect_code_signals(target):
+    if not fresh and topology != FreshTopology.same_repo:
         typer.echo(
             typer.style(
-                "No code detected in the target directory. "
-                "If this is a docs-only repo, use `irminsul init-docs-only --code-repo <spec-or-path>` instead.",
+                "`--topology` is only valid with `--fresh`. "
+                "Use `irminsul init-docs-only --code-repo <spec-or-path>` "
+                "to adopt existing separate code.",
+                fg="red",
+            )
+        )
+        raise typer.Exit(code=2)
+
+    if code_repo is not None and topology != FreshTopology.docs_only:
+        typer.echo(
+            typer.style(
+                "`--code-repo` is only valid with `--fresh --topology docs-only`. "
+                "Use `irminsul init-docs-only --code-repo <spec-or-path>` "
+                "to adopt existing separate code.",
+                fg="red",
+            )
+        )
+        raise typer.Exit(code=2)
+
+    if fresh:
+        if has_code and not allow_existing_code:
+            typer.echo(
+                typer.style(
+                    "Code signals already exist in the target directory. "
+                    "Use `irminsul init` to adopt existing same-repo code, or pass "
+                    "`--allow-existing-code` with `--fresh` if this is intentional.",
+                    fg="red",
+                )
+            )
+            raise typer.Exit(code=2)
+        if topology == FreshTopology.docs_only:
+            run_init_fresh_docs_only(
+                target, interactive=interactive, code_repo=code_repo, force=force
+            )
+        else:
+            run_init_fresh(target, interactive=interactive, force=force)
+        return
+
+    if interactive and not has_code:
+        typer.echo("No code detected here. What are you setting up?")
+        typer.echo("  [1] Fresh-start, same repo")
+        typer.echo("  [2] Fresh-start, private docs / public code")
+        typer.echo("  [3] Docs-only repo for existing separate code")
+        typer.echo("  [4] Cancel")
+        answer = typer.prompt("Choose", default="1")
+        if answer == "1":
+            run_init_fresh(target, interactive=interactive, force=force)
+            return
+        if answer == "2":
+            run_init_fresh_docs_only(
+                target, interactive=interactive, code_repo=code_repo, force=force
+            )
+            return
+        if answer == "3":
+            run_init_docs_only(target, interactive=interactive, code_repo=None, force=force)
+            return
+        typer.echo("Canceled.")
+        raise typer.Exit(code=0)
+    elif not interactive and not has_code:
+        typer.echo(
+            typer.style(
+                "No code detected in the target directory.\n"
+                "Use `irminsul init --fresh` to start a new project, or\n"
+                "`irminsul init-docs-only --code-repo <spec-or-path>` "
+                "for a docs-only repo.",
                 fg="red",
             )
         )
