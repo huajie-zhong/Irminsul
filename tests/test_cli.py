@@ -23,6 +23,16 @@ def test_help_lists_commands() -> None:
         assert cmd in result.stdout
 
 
-def test_check_rejects_unknown_scope() -> None:
-    result = runner.invoke(app, ["check", "--scope", "wat"])
+def test_check_rejects_unknown_profile() -> None:
+    result = runner.invoke(app, ["check", "--profile", "wat"])
+    assert result.exit_code != 0
+
+
+def test_check_rejects_removed_scope() -> None:
+    result = runner.invoke(app, ["check", "--scope", "hard"])
+    assert result.exit_code != 0
+
+
+def test_check_rejects_removed_llm_flag() -> None:
+    result = runner.invoke(app, ["check", "--llm"])
     assert result.exit_code != 0

@@ -13,7 +13,7 @@ tests:
 
 # LLM Client
 
-`LlmClient` wraps LiteLLM with budget tracking and a disk-based JSON cache. All three LLM advisory checks (`overlap`, `semantic-drift`, `scope-appropriateness`) receive a client instance via constructor injection; the main hard/soft check paths never import the module.
+`LlmClient` wraps LiteLLM with budget tracking and a disk-based JSON cache. All three LLM advisory checks (`overlap`, `semantic-drift`, `scope-appropriateness`) receive a client instance via constructor injection; `irminsul check --profile advisory` is the only CLI path that imports the module.
 
 **Budget ceiling** — `max_cost_usd` is read from `[llm] max_cost_usd` (default $1.00). Spending is tracked in-memory per invocation; once the ceiling is hit, `BudgetExhausted` is raised and subsequent checks emit `info` findings instead of calling the API.
 

@@ -35,6 +35,6 @@ repos:
     hooks:
       - id: irminsul-check
         name: irminsul check
-        entry: py -3.12 -m irminsul check --scope=hard
+        entry: py -3.12 -m irminsul check --profile=hard
         language: system
         pass_filenames: false

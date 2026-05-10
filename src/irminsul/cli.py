@@ -16,13 +16,15 @@ from irminsul.checks import (
     HARD_REGISTRY,
     LLM_REGISTRY,
     SOFT_REGISTRY,
+    Check,
     Finding,
+    Fix,
     Severity,
     sort_findings,
     summarize,
 )
-from irminsul.config import find_config, load
-from irminsul.docgraph import build_graph
+from irminsul.config import IrminsulConfig, find_config, load
+from irminsul.docgraph import DocGraph, build_graph
 from irminsul.init.command import (
     detect_code_signals,
     run_init,
@@ -40,10 +42,11 @@ app = typer.Typer(
 )
 
 
-class Scope(StrEnum):
+class Profile(StrEnum):
     hard = "hard"
-    soft = "soft"
-    all = "all"
+    configured = "configured"
+    advisory = "advisory"
+    all_available = "all-available"
 
 
 class FreshTopology(StrEnum):
@@ -326,16 +329,132 @@ def _print_summary(counts: dict[Severity, int]) -> None:
     typer.echo(", ".join(parts))
 
 
+def _hard_check_names(profile: Profile, config: IrminsulConfig) -> list[str]:
+    if profile == Profile.all_available:
+        return list(HARD_REGISTRY)
+    return list(config.checks.hard)
+
+
+def _soft_check_names(profile: Profile, config: IrminsulConfig) -> list[str]:
+    if profile == Profile.hard:
+        return []
+    if profile == Profile.all_available:
+        return list(SOFT_REGISTRY)
+    return list(config.checks.soft_deterministic)
+
+
+def _llm_check_names(profile: Profile, config: IrminsulConfig) -> list[str]:
+    if profile != Profile.advisory:
+        return []
+    return list(config.checks.soft_llm)
+
+
+def _run_registered_checks(
+    check_names: list[str],
+    registry: dict[str, type[Check]],
+    graph: DocGraph,
+    *,
+    tier: str,
+) -> list[Finding]:
+    findings: list[Finding] = []
+    for check_name in check_names:
+        cls = registry.get(check_name)
+        if cls is None:
+            typer.echo(
+                typer.style(
+                    f"note: {tier} check '{check_name}' not yet implemented; skipping.",
+                    fg="yellow",
+                )
+            )
+            continue
+        findings.extend(cls().run(graph))
+    return findings
+
+
+def _run_llm_checks(
+    check_names: list[str],
+    *,
+    repo_root: Path,
+    config: IrminsulConfig,
+    graph: DocGraph,
+    llm_budget: float | None,
+    fmt: str,
+) -> list[Finding]:
+    if not check_names:
+        return []
+
+    from irminsul.llm.client import LlmClient
+
+    findings: list[Finding] = []
+    budget = llm_budget if llm_budget is not None else config.llm.max_cost_usd
+    llm_client = LlmClient(
+        provider=config.llm.provider,
+        model=config.llm.model,
+        max_cost_usd=budget,
+        cache_path=repo_root / config.llm.cache_path,
+        required_in_ci=config.llm.required_in_ci,
+    )
+
+    if not llm_client.is_available():
+        if config.llm.required_in_ci:
+            findings.append(
+                Finding(
+                    check="llm",
+                    severity=Severity.error,
+                    message=(
+                        f"LLM checks required (required_in_ci=true) "
+                        f"but no API key found for provider '{config.llm.provider}'"
+                    ),
+                )
+            )
+        else:
+            for check_name in check_names:
+                if check_name in LLM_REGISTRY:
+                    findings.append(
+                        Finding(
+                            check=check_name,
+                            severity=Severity.info,
+                            message=(
+                                f"LLM check skipped: no API key configured "
+                                f"for provider '{config.llm.provider}'"
+                            ),
+                        )
+                    )
+        return findings
+
+    calls_before = sum(1 for e in llm_client._cache.values())
+    for check_name in check_names:
+        cls_llm = LLM_REGISTRY.get(check_name)
+        if cls_llm is None:
+            typer.echo(
+                typer.style(
+                    f"note: LLM check '{check_name}' not yet implemented; skipping.",
+                    fg="yellow",
+                )
+            )
+            continue
+        findings.extend(cls_llm(llm_client=llm_client).run(graph))
+
+    spent = budget - llm_client.remaining_budget()
+    cache_size = sum(1 for e in llm_client._cache.values())
+    hits = max(0, cache_size - calls_before)
+    if fmt == "plain":
+        typer.echo(
+            typer.style(
+                f"LLM: ${spent:.4f} / ${budget:.2f} budget used"
+                + (f"; {hits} cache hit(s)" if hits else ""),
+                dim=True,
+            )
+        )
+    return findings
+
+
 @app.command()
 def check(
-    scope: Annotated[
-        Scope,
-        typer.Option("--scope", help="Which check tier to run."),
-    ] = Scope.hard,
-    llm: Annotated[
-        bool,
-        typer.Option("--llm", help="Include LLM advisory checks."),
-    ] = False,
+    profile: Annotated[
+        Profile,
+        typer.Option("--profile", help="Check profile to run."),
+    ] = Profile.hard,
     llm_budget: Annotated[
         float | None,
         typer.Option("--llm-budget", help="Override the LLM cost ceiling (USD) for this run."),
@@ -370,95 +489,26 @@ def check(
     graph = build_graph(repo_root, config)
 
     findings: list[Finding] = []
-
-    if scope in (Scope.hard, Scope.all):
-        for check_name in config.checks.hard:
-            cls = HARD_REGISTRY.get(check_name)
-            if cls is None:
-                typer.echo(
-                    typer.style(
-                        f"note: hard check '{check_name}' not yet implemented; skipping.",
-                        fg="yellow",
-                    )
-                )
-                continue
-            findings.extend(cls().run(graph))
-
-    if scope in (Scope.soft, Scope.all):
-        for check_name in config.checks.soft_deterministic:
-            cls = SOFT_REGISTRY.get(check_name)
-            if cls is None:
-                typer.echo(
-                    typer.style(
-                        f"note: soft check '{check_name}' not yet implemented; skipping.",
-                        fg="yellow",
-                    )
-                )
-                continue
-            findings.extend(cls().run(graph))
-
-    if llm:
-        from irminsul.llm.client import LlmClient
-
-        budget = llm_budget if llm_budget is not None else config.llm.max_cost_usd
-        llm_client = LlmClient(
-            provider=config.llm.provider,
-            model=config.llm.model,
-            max_cost_usd=budget,
-            cache_path=repo_root / config.llm.cache_path,
-            required_in_ci=config.llm.required_in_ci,
+    findings.extend(
+        _run_registered_checks(
+            _hard_check_names(profile, config), HARD_REGISTRY, graph, tier="hard"
         )
-
-        if not llm_client.is_available():
-            if config.llm.required_in_ci:
-                findings.append(
-                    Finding(
-                        check="llm",
-                        severity=Severity.error,
-                        message=(
-                            f"LLM checks required (required_in_ci=true) "
-                            f"but no API key found for provider '{config.llm.provider}'"
-                        ),
-                    )
-                )
-            else:
-                for check_name in config.checks.soft_llm:
-                    if check_name in LLM_REGISTRY:
-                        findings.append(
-                            Finding(
-                                check=check_name,
-                                severity=Severity.info,
-                                message=(
-                                    f"LLM check skipped: no API key configured "
-                                    f"for provider '{config.llm.provider}'"
-                                ),
-                            )
-                        )
-        else:
-            calls_before = sum(1 for e in llm_client._cache.values())
-            for check_name in config.checks.soft_llm:
-                cls_llm = LLM_REGISTRY.get(check_name)
-                if cls_llm is None:
-                    typer.echo(
-                        typer.style(
-                            f"note: LLM check '{check_name}' not yet implemented; skipping.",
-                            fg="yellow",
-                        )
-                    )
-                    continue
-                findings.extend(cls_llm(llm_client=llm_client).run(graph))
-
-            spent = budget - llm_client.remaining_budget()
-            cache_size = sum(1 for e in llm_client._cache.values())
-            hits = max(0, cache_size - calls_before)
-            if fmt == "plain":
-                typer.echo(
-                    typer.style(
-                        f"LLM: ${spent:.4f} / ${budget:.2f} budget used"
-                        + (f"; {hits} cache hit(s)" if hits else ""),
-                        dim=True,
-                    )
-                )
+    )
+    findings.extend(
+        _run_registered_checks(
+            _soft_check_names(profile, config), SOFT_REGISTRY, graph, tier="soft"
+        )
+    )
+    findings.extend(
+        _run_llm_checks(
+            _llm_check_names(profile, config),
+            repo_root=repo_root,
+            config=config,
+            graph=graph,
+            llm_budget=llm_budget,
+            fmt=fmt,
+        )
+    )
 
     findings = sort_findings(findings)
     counts = summarize(findings)
@@ -476,10 +526,10 @@ def check(
 
 @app.command()
 def fix(
-    scope: Annotated[
-        Scope,
-        typer.Option("--scope", help="Which check tier to fix."),
-    ] = Scope.soft,
+    profile: Annotated[
+        Profile,
+        typer.Option("--profile", help="Fix profile to run."),
+    ] = Profile.configured,
     dry_run: Annotated[
         bool,
         typer.Option("--dry-run", help="Print planned fixes without writing files."),
@@ -493,10 +543,6 @@ def fix(
     ] = Path("."),
 ) -> None:
     """Apply deterministic remediations for fixable findings."""
-    if scope == Scope.hard:
-        typer.echo(typer.style("hard checks do not expose automatic fixes", fg="yellow"))
-        raise typer.Exit(code=0)
-
     from irminsul.fix import apply_fixes
 
     repo_root = path.resolve()
@@ -504,10 +550,14 @@ def fix(
     config = load(config_path)
     graph = build_graph(repo_root, config)
 
-    fixes = []
+    fixes: list[Fix] = []
 
-    for check_name in config.checks.soft_deterministic:
-        cls = SOFT_REGISTRY.get(check_name)
+    selected: list[tuple[str, dict[str, type[Check]]]] = [
+        *[(name, HARD_REGISTRY) for name in _hard_check_names(profile, config)],
+        *[(name, SOFT_REGISTRY) for name in _soft_check_names(profile, config)],
+    ]
+    for check_name, registry in selected:
+        cls = registry.get(check_name)
         if cls is None:
             continue
         check = cls()

@@ -48,11 +48,11 @@ Teams using TypeScript as their primary language have no reference-regen story u
 **New subcommand:**
 
 ```
-irminsul fix [--scope=soft] [--dry-run] [--path=.]
+irminsul fix [--profile=configured] [--dry-run] [--path=.]
 ```
 
 - `--dry-run` (default false) — print what would change, write nothing.
-- `--scope` mirrors `irminsul check`. Only soft findings carry `suggestion`; hard findings should be fixed by the author (schema violations, broken globs, etc.).
+- `--profile` mirrors `irminsul check` after RFC-0008. Only checks that expose an unambiguous `fixes` method are mutated.
 - Exit 0 if nothing changed; exit 0 with a summary if changes were written; exit 1 if a fix could not be applied cleanly (e.g., frontmatter parse error in the target file).
 
 **Fix protocol.** Each check that produces auto-fixable findings implements an optional `fixes(findings: list[Finding], graph: DocGraph) -> list[Fix]` method (not on the `Check` Protocol — just a duck-typed optional checked via `hasattr`). A `Fix` is:
@@ -154,6 +154,6 @@ Detected at `init`/`init-docs-only` time when a `tsconfig.json` is present.
 
 ## Unresolved Questions
 
-- `fix` conflict resolution: when two `Fix.apply` functions both modify the same YAML key, which wins? First-writer? Abort with a message? Propose: abort and report; let the author run fixes incrementally with `--scope=<single-check>`.
+- `fix` conflict resolution: when two `Fix.apply` functions both modify the same YAML key, which wins? First-writer? Abort with a message? Propose: abort and report; let the author run narrower fix profiles first.
 - For TypeScript regen, should stub filenames use dots (`mylib.core.md`) or slashes (`mylib/core.md`) matching directory layout? Python uses dots; TypeScript packages often use directory hierarchies. Tentative: dots, consistent with Python.
 - `ruamel.yaml` round-trip mode sometimes reorders keys. Should we pin key order to the canonical frontmatter field order from `DocFrontmatter`? Probably yes — document the ordering rule.

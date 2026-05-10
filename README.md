@@ -47,7 +47,7 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: huajie-zhong/irminsul@v0.1.0
         with:
-          scope: hard
+          profile: hard
 ```
 
 `irminsul init` writes this file for you.

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Irminsul is a Python CLI (`irminsul` / `irm`) plus composite GitHub Action (`action.yml`) that enforces structural invariants on a target codebase's `/docs` tree in CI. There is no server, no hosted state, no LLM in the hard-check path. Every invocation: load `irminsul.toml` → walk `docs_root` → build a `DocGraph` → run registered checks → exit 0/1 (and optionally render an MkDocs Material site).
 
-The repo dogfoods itself — `docs/` is the live spec for the doc system the tool enforces, and CI runs `irminsul check --scope=hard` against it.
+The repo dogfoods itself — `docs/` is the live spec for the doc system the tool enforces, and CI runs `irminsul check --profile=hard` against it.
 
 ## Common commands
 
@@ -20,7 +20,7 @@ pip install -e ".[dev]"      # ruff, mypy, pytest, pre-commit, mkdocs
 .venv\Scripts\pytest -q          # run tests
 .venv\Scripts\ruff check .       # lint
 .venv\Scripts\mypy               # type-check
-.venv\Scripts\irminsul check --scope=hard   # dogfood
+.venv\Scripts\irminsul check --profile=hard   # dogfood
 ```
 
 Alternatively, `py -3.12 -m pytest` works if the uv venv is not activated, but `py -3.12 -m pip install -e ".[dev]"` must be run first. The system `python` on this machine is 3.10 and will not satisfy the `>=3.12` requirement.
@@ -39,9 +39,9 @@ mypy                                               # strict, src/irminsul only
 Self-check (dogfood) — must pass before merging:
 
 ```bash
-irminsul check --scope=hard              # the gate CI enforces on this repo
-irminsul check --scope=all               # hard + soft deterministic
-irminsul check --scope=hard --format json  # machine-readable output (CI parsers)
+irminsul check --profile=hard              # the gate CI enforces on this repo
+irminsul check --profile=configured        # hard + configured soft deterministic
+irminsul check --profile=hard --format json  # machine-readable output (CI parsers)
 irminsul list orphans                    # docs with no inbound refs
 irminsul list stale                      # deprecated docs past stale threshold
 irminsul list undocumented               # source files in covered dirs with no doc claim
@@ -57,7 +57,7 @@ irminsul render                          # build MkDocs site to ./site
 **Three check registries** (`src/irminsul/checks/__init__.py`). Names in `irminsul.toml` are resolved against these maps; an unknown name prints a yellow note and is skipped (not an error).
 - `HARD_REGISTRY` — `frontmatter`, `globs`, `uniqueness`, `links`, `schema-leak`. Errors from these always block (exit 1) regardless of `--strict`.
 - `SOFT_REGISTRY` — deterministic warnings: `mtime-drift`, `orphans`, `stale-reaper`, `supersession`, `parent-child`, `glossary`, `external-links`. Promoted to errors only with `--strict`.
-- `LLM_REGISTRY` — advisory only: `overlap`, `semantic-drift`, `scope-appropriateness`. Run only with `--llm`. Cost-budgeted via `LlmClient` (`src/irminsul/llm/client.py`); cache lives at `config.llm.cache_path`.
+- `LLM_REGISTRY` — advisory only: `overlap`, `semantic-drift`, `scope-appropriateness`. Run only with `--profile=advisory`. Cost-budgeted via `LlmClient` (`src/irminsul/llm/client.py`); cache lives at `config.llm.cache_path`.
 
 All checks subclass `Check` and return `list[Finding]` with `(check, severity, path, line, message, suggestion)`. Severity ordering and exit-code logic live in `cli.check`.
 
@@ -75,11 +75,11 @@ All checks subclass `Check` and return `list[Finding]` with `(check, severity, p
 
 **`new`, `regen`, and `list`**. `irminsul new {adr,component,rfc}` writes templated atoms from `src/irminsul/new/templates/`. `irminsul regen --language=python` regenerates Python `40-reference/` stubs from source via `src/irminsul/regen/python.py`; `--language=typescript` writes TypeScript stubs via `src/irminsul/regen/typescript.py` after confirming local TypeDoc is available. `irminsul list {orphans,stale,undocumented}` (`src/irminsul/listing/command.py`) wraps three checks with custom filtering; each subcommand supports `--format plain|json`.
 
-**The composite Action** (`action.yml`) is a thin shell wrapper: `pip install irminsul[==version]` → `irminsul check --scope=… [--llm]`. Don't add logic here; add it to the CLI and let the Action call it.
+**The composite Action** (`action.yml`) is a thin shell wrapper: `pip install irminsul[==version]` → `irminsul check --profile=…`. Don't add logic here; add it to the CLI and let the Action call it.
 
 ## The docs tree must obey the rules it enforces
 
-`docs/` is the project's documentation, and because we ship a tool that enforces a doc system, our own docs must obey it too. CI dogfoods `irminsul check --scope=hard` against this repo, so a doc change that breaks the rules breaks the build. The 9-layer structure (`00-foundation/`, `10-architecture/`, …, `90-meta/`) is enforced; doc IDs use bare slugs because the numeric prefixes namespace them. `docs/CONTRIBUTING.md` is the authoritative authoring guide. Before adding or moving a doc, read `docs/10-architecture/layers.md` and `docs/10-architecture/tiers.md`. If `irminsul check --scope=hard` fails on a doc change, the doc is wrong, not the check — fix the frontmatter, glob, or link rather than relaxing the check.
+`docs/` is the project's documentation, and because we ship a tool that enforces a doc system, our own docs must obey it too. CI dogfoods `irminsul check --profile=hard` against this repo, so a doc change that breaks the rules breaks the build. The 9-layer structure (`00-foundation/`, `10-architecture/`, …, `90-meta/`) is enforced; doc IDs use bare slugs because the numeric prefixes namespace them. `docs/CONTRIBUTING.md` is the authoritative authoring guide. Before adding or moving a doc, read `docs/10-architecture/layers.md` and `docs/10-architecture/tiers.md`. If `irminsul check --profile=hard` fails on a doc change, the doc is wrong, not the check — fix the frontmatter, glob, or link rather than relaxing the check.
 
 ## Tests
 

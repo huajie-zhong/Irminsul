@@ -20,7 +20,7 @@ tests:
 
 # Checks
 
-Five hard, deterministic checks ship in v0.1.0. Each consumes a [DocGraph](docgraph.md) and returns a list of `Finding` records with severity, message, and a path/line where applicable.
+Checks consume a [DocGraph](docgraph.md) and return `Finding` records with severity, message, and a path/line where applicable.
 
 | Check | What it enforces | Severity |
 |-------|------------------|----------|
@@ -30,6 +30,4 @@ Five hard, deterministic checks ship in v0.1.0. Each consumes a [DocGraph](docgr
 | `links` | Internal markdown links resolve; external/anchor-only skipped | error |
 | `schema-leak` | No type/schema definitions inside `docs/20-components/` (those belong in `40-reference/`) | error |
 
-Checks are registered in `HARD_REGISTRY` keyed by name. The CLI resolves `config.checks.hard ∩ HARD_REGISTRY` to pick what runs; unknown names emit a one-time skip note (forward-compatible with Sprint 2's soft checks).
-
-Soft-deterministic and LLM checks are deferred to Sprint 2.
+Checks are registered in `HARD_REGISTRY`, `SOFT_REGISTRY`, and `LLM_REGISTRY` keyed by name. The CLI selects checks with `--profile`: `hard` runs configured hard checks, `configured` adds configured soft deterministic checks, `advisory` adds configured LLM checks, and `all-available` runs every implemented deterministic check regardless of config.

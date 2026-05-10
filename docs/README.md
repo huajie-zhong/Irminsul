@@ -1,6 +1,6 @@
 # Irminsul docs
 
-This tree follows the doc system Irminsul itself enforces. We dogfood — every PR runs `irminsul check --scope=hard` against this directory.
+This tree follows the doc system Irminsul itself enforces. We dogfood — every PR runs `irminsul check --profile=hard` against this directory.
 
 ## Navigation Protocol
 
