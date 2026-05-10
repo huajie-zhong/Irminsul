@@ -14,7 +14,9 @@ tests:
 
 # CLI
 
-The Typer app that backs both the `irminsul` and `irm` console scripts. Three commands ship in v0.1.0:
+The Typer app that backs both the `irminsul` and `irm` console scripts. The exact command surface is generated from the Typer app in the [CLI commands reference](../40-reference/cli-commands.md).
+
+Common command paths:
 
 - `irminsul init` — scaffold a new codebase. Delegates to [`init`](init.md).
 - `irminsul check` — build the [DocGraph](docgraph.md) and run checks selected by `--profile`. Exits 1 on any error finding.

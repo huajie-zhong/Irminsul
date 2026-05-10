@@ -12,10 +12,10 @@ tests:
 
 # Frontmatter
 
-Every doc atom carries a YAML frontmatter block matching Appendix B of the [Doc Atom reference](doc-atom.md). The schema validates required fields (`id`, `title`, `audience`, `tier`, `status`, `owner`, `last_reviewed`) and parses optional ones (`describes`, `depends_on`, `supersedes`, `superseded_by`, `tags`, `related_adrs`, `children`).
+Every doc atom carries a YAML frontmatter block matching Appendix B of the [Doc Atom reference](doc-atom.md). The canonical field surface is generated from `DocFrontmatter` in the [frontmatter fields reference](../40-reference/frontmatter-fields.md).
 
 `extra="allow"` is intentional — projects extend the schema with their own fields. Strictness comes from validating canonical fields, not from forbidding unknown ones.
 
 `parse_doc()` returns either a `ParsedDoc` (success) or a `ParseFailure` (YAML error or schema rejection). Callers decide how to surface failures — the [DocGraph](docgraph.md) collects them and the [frontmatter check](checks.md) translates them to findings.
 
-`expected_id_for(path)` codifies the filename rule: `INDEX.md` files take their parent folder's name; everything else uses the filename stem.
+`expected_id_for(path)` codifies the filename rule: folder index docs take their parent folder's name; everything else uses the filename stem.

@@ -3,7 +3,7 @@ id: 0009-deterministic-doc-reality-audits
 title: Deterministic doc reality audits
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
 ---
 
@@ -14,7 +14,10 @@ describes: []
 Add deterministic audit checks that compare stable docs against machine-readable
 repo facts. These checks target dogfood failures where docs understate or
 overstate the current implementation even though the correct answer is already
-available from source code, config, or the doc graph.
+available from source code, config, generated references, or the doc graph.
+
+This RFC does not solve semantic doc truth. It closes mechanical drift holes and
+routes reviewer attention toward nearby prose when generated facts change.
 
 ## Motivation
 
@@ -41,27 +44,38 @@ text looks like an intended local doc reference, require either:
 - a real markdown link to an existing file, or
 - an explicit marker that the name is an example skeleton entry.
 
-The check should ignore fenced code blocks and RFC examples by default.
+This is a hard check. It should ignore fenced code blocks and RFC examples by
+default. Intentional skeleton examples must carry an explicit ignore marker with
+a reason:
+
+`<!-- irminsul:ignore prose-file-reference reason="example skeleton" -->`
+
+Long example sections can use a validated block ignore:
+
+```text
+<!-- irminsul:ignore-start prose-file-reference reason="example skeleton" -->
+...
+<!-- irminsul:ignore-end prose-file-reference -->
+```
+
+Unmatched block markers are findings.
 
 ### `schema-doc-drift`
 
-Compare documented canonical frontmatter fields against `DocFrontmatter`.
-
-The first implementation can require the frontmatter component doc to contain a
-generated or structured field list. Later implementations can extend this to
-config models and renderer options.
+Compare the generated frontmatter reference against `DocFrontmatter`. Component
+docs should link to the generated reference rather than manually listing fields.
 
 ### `cli-doc-drift`
 
-Compare documented top-level and grouped CLI commands against the Typer app.
-Stable CLI docs should not say only `init`, `check`, and `render` ship when the
-CLI also exposes `init-docs-only`, `new`, `list`, `fix`, and `regen`.
+Compare the generated CLI reference against the Typer app. Stable CLI docs
+should link to the generated reference rather than manually listing the complete
+command surface.
 
 ### `check-surface-drift`
 
-Compare documented check names against the hard, soft deterministic, and LLM
-registries. This prevents stale statements such as "five hard checks ship" when
-the configured hard check set has changed.
+Compare the generated check reference against the hard, soft deterministic, and
+LLM registries. This prevents stale statements such as "five hard checks ship"
+when the configured hard check set has changed.
 
 ### `terminology-overload`
 
@@ -73,26 +87,37 @@ disambiguation link. The initial target is "coverage":
 
 ## Implementation Plan
 
-1. Add deterministic checks as soft warnings.
-2. Keep each check narrowly scoped to stable docs and known high-value surfaces.
-3. Add fixtures for the dogfood failures listed above.
-4. Recommend running these checks in dogfood/nightly with strict warning policy.
-5. Update docs to use structured or generated surfaces where possible.
+1. Add `prose-file-reference` as a hard deterministic check with explicit
+   line-level and block ignore markers.
+2. Add schema, CLI, check-surface, and terminology audits as deterministic
+   warnings.
+3. Generate code-derived reference docs for frontmatter fields, CLI commands,
+   and check registries.
+4. Keep component docs explanatory and link them to generated references for
+   exact code-derived surfaces.
+5. Add fixtures for the dogfood failures listed above.
+6. Run configured warnings in dogfood/nightly. Use strict warning policy only
+   after the repo has a clean advisory baseline.
 
 ## Drawbacks
 
-These checks require docs to expose some facts in parseable form. That is extra
-work, but it is cheaper than asking reviewers or agents to infer whether prose
-matches source.
+These checks require generated reference surfaces for code-derived facts. That
+is extra machinery, but it is cheaper than asking reviewers or agents to infer
+whether prose matches source.
 
 ## Alternatives
 
 - Use only LLM semantic drift checks. This catches broader cases but is
   advisory, cost-bearing, and less deterministic.
+- Use manually maintained structured tables in component docs. This is smaller,
+  but violates the code-as-truth principle for surfaces that can be generated.
 - Do nothing and rely on code review. That preserves the current dogfood gap.
 
-## Unresolved Questions
+## Resolved Questions
 
-- Should `prose-file-reference` become hard once false positives are understood?
-- Should generated reference docs be the only allowed home for schema and CLI
-  surfaces?
+- `prose-file-reference` is hard immediately because local `.md` references are
+  machine-verifiable cross-references. False positives use an explicit ignore
+  marker with a reason; long examples may use a validated ignore block.
+- Generated reference docs are the canonical home for code-derived schema, CLI,
+  and check surfaces. A follow-up RFC defines the broader generated-reference
+  system and future expansion.

@@ -22,3 +22,4 @@ In-flight proposals. See [`80-evolution`](../INDEX.md) for the RFC lifecycle.
 - [`0009-deterministic-doc-reality-audits`](0009-deterministic-doc-reality-audits.md) — Deterministic audits for doc/code reality drift
 - [`0010-structured-claim-provenance`](0010-structured-claim-provenance.md) — Structured provenance for enforcement and automation claims
 - [`0011-generated-agent-discovery-index`](0011-generated-agent-discovery-index.md) — Generated first-hop index for agents and contributors
+- [`0012-generated-code-reference-surfaces`](0012-generated-code-reference-surfaces.md) — Generated references for code-derived doc surfaces

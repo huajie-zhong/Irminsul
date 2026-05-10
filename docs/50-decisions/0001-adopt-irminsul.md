@@ -21,7 +21,7 @@ Irminsul is a documentation-system tool. If the project's own docs don't pass `i
 
 Adopt Irminsul as the canonical doc system for the Irminsul codebase itself. The CI workflow runs `irminsul check --profile=hard` on every PR; failures block merge.
 
-The reference document moves from the repo root (`Irminsul-reference.md`) into `docs/90-meta/doc-system.md` so it's discoverable through the standard layer structure rather than as a special-cased top-level file.
+The reference document moves from the repo root (`Irminsul-reference.md`) into `docs/90-meta/doc-system.md` so it's discoverable through the standard layer structure rather than as a special-cased top-level file. <!-- irminsul:ignore prose-file-reference reason="historical moved path" -->
 
 ## Alternatives considered
 

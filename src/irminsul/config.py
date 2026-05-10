@@ -15,7 +15,16 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 CONFIG_FILENAME = "irminsul.toml"
 
-HARD_CHECKS = ("frontmatter", "globs", "uniqueness", "links", "schema-leak", "coverage", "liar")
+HARD_CHECKS = (
+    "frontmatter",
+    "globs",
+    "uniqueness",
+    "links",
+    "schema-leak",
+    "coverage",
+    "liar",
+    "prose-file-reference",
+)
 SOFT_DETERMINISTIC_CHECKS = (
     "mtime-drift",
     "stale-reaper",
@@ -29,6 +38,10 @@ SOFT_DETERMINISTIC_CHECKS = (
     "phantom-layer",
     "requires-env",
     "import-deps",
+    "schema-doc-drift",
+    "cli-doc-drift",
+    "check-surface-drift",
+    "terminology-overload",
 )
 SOFT_LLM_CHECKS = ("overlap", "semantic-drift", "scope-appropriateness")
 
@@ -91,7 +104,7 @@ class Checks(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     hard: list[str] = Field(default_factory=lambda: list(HARD_CHECKS))
-    soft_deterministic: list[str] = Field(default_factory=list)
+    soft_deterministic: list[str] = Field(default_factory=lambda: list(SOFT_DETERMINISTIC_CHECKS))
     soft_llm: list[str] = Field(default_factory=list)
 
     schema_leak: SchemaLeakSettings = Field(default_factory=SchemaLeakSettings)

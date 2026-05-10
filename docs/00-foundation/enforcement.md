@@ -23,7 +23,7 @@ The boundary between hard and soft is principled: **build correctness never depe
 
 | Tier | Examples |
 |------|----------|
-| Hard | Frontmatter validity, glob resolution, coverage uniqueness, internal link integrity, schema-leak detection, supersession auto-update, forced reckoning on source deletion |
+| Hard | Frontmatter validity, glob resolution, source ownership coverage uniqueness, internal link integrity, schema-leak detection, supersession auto-update, forced reckoning on source deletion |
 | Soft, deterministic | Mtime drift, external link rot, stale-doc reaper, orphan detector, ADR-touching policy reminder, Change Triplet declaration check |
 | Soft, LLM | Behavioral overlap detector, semantic drift judge |
 
@@ -51,9 +51,9 @@ Every PR must touch some combination of three things: **code**, **tests**, **doc
 
 ## Supersession Enforcement (the "Did Anyone Mark This Deprecated?" Problem)
 
-The most insidious failure mode is silent replacement: someone writes `composer-v2.md` covering the same ground as `composer.md`, but forgets to mark the old doc deprecated. Now both exist, both look authoritative, and they slowly contradict each other. No single rule prevents this — the system uses six layered mechanisms that together make silent rot mechanically very hard:
+The most insidious failure mode is silent replacement: someone writes `composer-v2.md` covering the same ground as `composer.md`, but forgets to mark the old doc deprecated. Now both exist, both look authoritative, and they slowly contradict each other. No single rule prevents this — the system uses six layered mechanisms that together make silent rot mechanically very hard: <!-- irminsul:ignore prose-file-reference reason="example skeleton" -->
 
-1. **Coverage uniqueness**. Two docs cannot claim the same source paths in their `describes` fields. If `composer-v2.md` declares `describes: [app/composer/*.py]` and `composer.md` already does, CI fails. The author has three legal options: scope the new doc differently, mark the old doc deprecated (which clears its describes claim), or delete the old doc.
+1. **Coverage uniqueness**. Two docs cannot claim the same source paths in their `describes` fields. If `composer-v2.md` declares `describes: [app/composer/*.py]` and `composer.md` already does, CI fails. The author has three legal options: scope the new doc differently, mark the old doc deprecated (which clears its describes claim), or delete the old doc. <!-- irminsul:ignore prose-file-reference reason="example skeleton" -->
 
 2. **Supersession auto-update.** When a new doc declares `supersedes: [doc-X]` in its frontmatter, CI automatically rewrites doc-X's frontmatter to set `superseded_by: <new-doc>` and `status: deprecated`. The author cannot forget — the act of declaring supersession does the marking.
 
@@ -68,7 +68,7 @@ The most insidious failure mode is silent replacement: someone writes `composer-
 The combination is the point. Deleting a component forces doc resolution (3). Replacing a component forces supersession, which auto-deprecates the old (1, 2). Deprecating a component visibly poisons every dependent doc (4). And the LLM judge catches the conceptual-overlap case the structural checks miss (5). No single check is bulletproof; the layering is what makes silent contradiction nearly impossible.
 
 ## The Health Dashboard
-Auto-generated daily into `90-meta/health-dashboard.md`. Tracks:
+Auto-generated daily into `90-meta/health-dashboard.md`. Tracks: <!-- irminsul:ignore prose-file-reference reason="planned generated output path" -->
 
 - **Coverage:** % of source files that appear in some doc's `describes` field
 - **Ownership:** % of docs with a valid CODEOWNER
