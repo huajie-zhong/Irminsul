@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
+import irminsul.cli as cli
 from irminsul.cli import app
 
 runner = CliRunner()
@@ -55,6 +57,45 @@ def test_check_advisory_runs_configured_llm_checks(fixture_repo: Callable[[str],
     assert result.exit_code == 0, result.stdout
     assert "[overlap]" in result.stdout
     assert "LLM check skipped" in result.stdout
+
+
+def test_check_llm_footer_reports_api_calls_not_cache_hits(
+    fixture_repo: Callable[[str], Path],
+    monkeypatch,
+) -> None:
+    repo = fixture_repo("good")
+    (repo / "irminsul.toml").write_text(
+        (repo / "irminsul.toml").read_text(encoding="utf-8")
+        + '\n[checks]\nsoft_llm = ["overlap"]\n'
+        + '\n[llm]\nprovider = "openai"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+
+    class OneCallLlmCheck:
+        def __init__(self, *, llm_client):
+            self.llm_client = llm_client
+
+        def run(self, graph):
+            from irminsul.llm.client import LlmRequest
+
+            self.llm_client.complete(LlmRequest(system="system", user="user"))
+            return []
+
+    def fake_completion(**_kwargs):
+        msg = SimpleNamespace(content='{"ok": true}')
+        choice = SimpleNamespace(message=msg)
+        return SimpleNamespace(choices=[choice])
+
+    monkeypatch.setitem(cli.LLM_REGISTRY, "overlap", OneCallLlmCheck)
+    monkeypatch.setattr("litellm.completion", fake_completion)
+    monkeypatch.setattr("litellm.completion_cost", lambda _raw: 0.01)
+
+    result = runner.invoke(app, ["check", "--profile", "advisory", "--path", str(repo)])
+
+    assert result.exit_code == 0, result.stdout
+    assert "1 API call(s)" in result.stdout
+    assert "cache hit" not in result.stdout
 
 
 def test_check_format_json_produces_valid_json(

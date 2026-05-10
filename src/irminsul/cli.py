@@ -422,7 +422,7 @@ def _run_llm_checks(
                     )
         return findings
 
-    calls_before = sum(1 for e in llm_client._cache.values())
+    calls_before = len(llm_client._cache)
     for check_name in check_names:
         cls_llm = LLM_REGISTRY.get(check_name)
         if cls_llm is None:
@@ -436,13 +436,13 @@ def _run_llm_checks(
         findings.extend(cls_llm(llm_client=llm_client).run(graph))
 
     spent = budget - llm_client.remaining_budget()
-    cache_size = sum(1 for e in llm_client._cache.values())
-    hits = max(0, cache_size - calls_before)
+    cache_size = len(llm_client._cache)
+    api_calls = max(0, cache_size - calls_before)
     if fmt == "plain":
         typer.echo(
             typer.style(
                 f"LLM: ${spent:.4f} / ${budget:.2f} budget used"
-                + (f"; {hits} cache hit(s)" if hits else ""),
+                + (f"; {api_calls} API call(s)" if api_calls else ""),
                 dim=True,
             )
         )
