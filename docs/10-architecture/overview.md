@@ -27,7 +27,7 @@ flowchart LR
 
 The Irminsul documentation system dictates strict structural rules for a codebase's documentation:
 - **[The Tier System](tiers.md)** defines maintenance and enforcement rules based on the doc's tier (T1-T4).
-- **[The Layered Directory Structure](layers.md)** enforces exactly where docs should be placed based on their specificity.
+- **[The Layered Directory Structure](layers.md)** defines where docs should be placed based on their specificity.
 
 ## Components
 
@@ -46,4 +46,4 @@ Cross-cutting: the [composite GitHub Action](../20-components/init.md) (`action.
 
 - No backend service. No webhooks. No state persisted between invocations.
 - No LLM calls in the v0.1.0 hard-check path. The `litellm` dependency is wired but unused; LLM advisory checks land in Sprint 2.
-- No git history queries in the hard-check path. `mtime` drift, supersession auto-update, and the stale reaper land in Sprint 2.
+- No git history queries in the hard-check path. `mtime` drift, supersession checks, and the stale reaper live outside the hard profile.

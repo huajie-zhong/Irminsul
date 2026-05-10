@@ -26,3 +26,6 @@ describes: []
 | `related_adrs` | no |
 | `tests` | no |
 | `requires_env` | no |
+| `claims` | no |
+| `rfc_state` | no |
+| `resolved_by` | no |

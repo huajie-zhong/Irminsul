@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import frontmatter as _pyfm
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 
 class AudienceEnum(StrEnum):
@@ -32,6 +32,33 @@ class StatusEnum(StrEnum):
     stable = "stable"
     deprecated = "deprecated"
     removed = "removed"
+
+
+class ClaimStateEnum(StrEnum):
+    planned = "planned"
+    implemented = "implemented"
+    available = "available"
+    enabled = "enabled"
+    external = "external"
+
+
+class RfcStateEnum(StrEnum):
+    draft = "draft"
+    open = "open"
+    fcp = "fcp"
+    accepted = "accepted"
+    rejected = "rejected"
+    withdrawn = "withdrawn"
+
+
+class Claim(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    state: ClaimStateEnum
+    kind: str = Field(min_length=1)
+    claim: str = Field(min_length=1)
+    evidence: list[str] = Field(min_length=1)
 
 
 class DocFrontmatter(BaseModel):
@@ -55,6 +82,21 @@ class DocFrontmatter(BaseModel):
     related_adrs: list[str] = Field(default_factory=list)
     tests: list[str] = Field(default_factory=list)
     requires_env: list[str] = Field(default_factory=list)
+    claims: list[Claim] = Field(default_factory=list)
+    rfc_state: RfcStateEnum | None = None
+    resolved_by: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_structured_claims(self) -> DocFrontmatter:
+        claim_ids = [claim.id for claim in self.claims]
+        duplicate_ids = sorted(
+            {claim_id for claim_id in claim_ids if claim_ids.count(claim_id) > 1}
+        )
+        if duplicate_ids:
+            raise ValueError(f"duplicate claim id(s): {duplicate_ids}")
+        if self.rfc_state == RfcStateEnum.accepted and not self.resolved_by:
+            raise ValueError("resolved_by is required when rfc_state is accepted")
+        return self
 
 
 @dataclass(frozen=True)
