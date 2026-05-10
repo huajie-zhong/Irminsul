@@ -11,6 +11,13 @@ from irminsul.checks.base import Check, Finding, Fix, Severity, sort_findings, s
 from irminsul.checks.boundary import BoundaryCheck
 from irminsul.checks.coverage import CoverageCheck
 from irminsul.checks.dependency_check import DependencyCheck
+from irminsul.checks.doc_reality import (
+    CheckSurfaceDriftCheck,
+    CliDocDriftCheck,
+    ProseFileReferenceCheck,
+    SchemaDocDriftCheck,
+    TerminologyOverloadCheck,
+)
 from irminsul.checks.env_check import EnvCheck
 from irminsul.checks.external_links import ExternalLinksCheck
 from irminsul.checks.frontmatter import FrontmatterCheck
@@ -39,6 +46,7 @@ HARD_REGISTRY: dict[str, type[Check]] = {
     SchemaLeakCheck.name: SchemaLeakCheck,
     CoverageCheck.name: CoverageCheck,
     LiarCheck.name: LiarCheck,
+    ProseFileReferenceCheck.name: ProseFileReferenceCheck,
 }
 
 SOFT_REGISTRY: dict[str, type[Check]] = {
@@ -54,6 +62,10 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     PhantomLayerCheck.name: PhantomLayerCheck,
     EnvCheck.name: EnvCheck,
     DependencyCheck.name: DependencyCheck,
+    SchemaDocDriftCheck.name: SchemaDocDriftCheck,
+    CliDocDriftCheck.name: CliDocDriftCheck,
+    CheckSurfaceDriftCheck.name: CheckSurfaceDriftCheck,
+    TerminologyOverloadCheck.name: TerminologyOverloadCheck,
 }
 
 LLM_REGISTRY: dict[str, type] = {
@@ -68,6 +80,8 @@ __all__ = [
     "SOFT_REGISTRY",
     "BoundaryCheck",
     "Check",
+    "CheckSurfaceDriftCheck",
+    "CliDocDriftCheck",
     "CoverageCheck",
     "DependencyCheck",
     "EnvCheck",
@@ -76,10 +90,13 @@ __all__ = [
     "LiarCheck",
     "OverlapCheck",
     "PhantomLayerCheck",
+    "ProseFileReferenceCheck",
     "RealityCheck",
+    "SchemaDocDriftCheck",
     "ScopeAppropriatenessCheck",
     "SemanticDriftCheck",
     "Severity",
+    "TerminologyOverloadCheck",
     "sort_findings",
     "summarize",
 ]

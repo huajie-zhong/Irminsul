@@ -743,7 +743,7 @@ def list_undocumented(
 def regen(
     language: Annotated[
         str,
-        typer.Option("--language", help="Language to regenerate reference docs for."),
+        typer.Option("--language", help="Reference docs to regenerate."),
     ] = "python",
     path: Annotated[Path, typer.Option("--path")] = Path("."),
 ) -> None:
@@ -752,14 +752,20 @@ def regen(
     config = load(find_config(repo_root))
 
     written: list[Path] = []
+    if language in ("docs-surfaces", "all"):
+        from irminsul.regen.doc_surfaces import regen_doc_surfaces
+
+        written.extend(regen_doc_surfaces(repo_root, config))
+
     if language in ("python", "all"):
         from irminsul.regen.python import regen_python
 
         written.extend(regen_python(repo_root, config))
-    elif language not in ("typescript",):
+    elif language not in ("typescript", "docs-surfaces"):
         typer.echo(
             typer.style(
-                f"unknown --language '{language}'; expected python, typescript, or all",
+                f"unknown --language '{language}'; expected python, typescript, "
+                "docs-surfaces, or all",
                 fg="red",
             )
         )

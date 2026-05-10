@@ -31,11 +31,11 @@ The Irminsul documentation system dictates strict structural rules for a codebas
 
 ## Components
 
-- The **CLI** ([`cli.md`](../20-components/cli.md)) is the user-facing entry point. Three commands: `init`, `check`, `render`.
+- The **CLI** ([`cli.md`](../20-components/cli.md)) is the user-facing entry point. The exact command surface is generated in the [CLI commands reference](../40-reference/cli-commands.md).
 - The **config** ([`config.md`](../20-components/config.md)) is a Pydantic schema for `irminsul.toml`.
 - The **frontmatter parser** ([`frontmatter.md`](../20-components/frontmatter.md)) validates per-doc YAML frontmatter against Appendix B of the reference.
 - The **DocGraph** ([`docgraph.md`](../20-components/docgraph.md)) is the canonical in-memory representation of a repo's docs.
-- The **checks** ([`checks.md`](../20-components/checks.md)) consume a DocGraph and emit findings. Five hard checks ship in v0.1.0: frontmatter, globs, uniqueness, links, schema-leak.
+- The **checks** ([`checks.md`](../20-components/checks.md)) consume a DocGraph and emit findings. The exact check surface is generated in the [check registries reference](../40-reference/check-registries.md).
 - The **language profiles** ([`languages.md`](../20-components/languages.md)) are pure-data records (source-root candidates + schema-leak regexes) keyed by language name.
 - The **renderer** ([`render.md`](../20-components/render.md)) is a small Protocol with one MkDocs Material implementation.
 - The **init scaffolder** ([`init.md`](../20-components/init.md)) walks Jinja templates to bootstrap a new codebase's `/docs` tree, `irminsul.toml`, and CI workflows.

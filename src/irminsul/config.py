@@ -15,7 +15,16 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 CONFIG_FILENAME = "irminsul.toml"
 
-HARD_CHECKS = ("frontmatter", "globs", "uniqueness", "links", "schema-leak", "coverage", "liar")
+HARD_CHECKS = (
+    "frontmatter",
+    "globs",
+    "uniqueness",
+    "links",
+    "schema-leak",
+    "coverage",
+    "liar",
+    "prose-file-reference",
+)
 SOFT_DETERMINISTIC_CHECKS = (
     "mtime-drift",
     "stale-reaper",
@@ -29,6 +38,10 @@ SOFT_DETERMINISTIC_CHECKS = (
     "phantom-layer",
     "requires-env",
     "import-deps",
+    "schema-doc-drift",
+    "cli-doc-drift",
+    "check-surface-drift",
+    "terminology-overload",
 )
 SOFT_LLM_CHECKS = ("overlap", "semantic-drift", "scope-appropriateness")
 
@@ -87,11 +100,46 @@ class ParentChildSettings(BaseModel):
     length_warning_lines: int = 300
 
 
+class TerminologyRule(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    term: str
+    explicit_phrases: list[str]
+    suggestion: str
+
+
+class TerminologyOverloadSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rules: list[TerminologyRule] = Field(
+        default_factory=lambda: [
+            TerminologyRule(
+                term="coverage",
+                explicit_phrases=[
+                    "source ownership coverage",
+                    "source-file coverage",
+                    "source file",
+                    "source files",
+                    "source paths",
+                    "coveragecheck",
+                    "`coverage`",
+                    "tests:",
+                    "`tests:`",
+                ],
+                suggestion=(
+                    "Clarify whether this means source ownership coverage "
+                    "or the `CoverageCheck` tests: rule"
+                ),
+            )
+        ]
+    )
+
+
 class Checks(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     hard: list[str] = Field(default_factory=lambda: list(HARD_CHECKS))
-    soft_deterministic: list[str] = Field(default_factory=list)
+    soft_deterministic: list[str] = Field(default_factory=lambda: list(SOFT_DETERMINISTIC_CHECKS))
     soft_llm: list[str] = Field(default_factory=list)
 
     schema_leak: SchemaLeakSettings = Field(default_factory=SchemaLeakSettings)
@@ -99,6 +147,9 @@ class Checks(BaseModel):
     stale_reaper: StaleReaperSettings = Field(default_factory=StaleReaperSettings)
     glossary: GlossarySettings = Field(default_factory=GlossarySettings)
     parent_child: ParentChildSettings = Field(default_factory=ParentChildSettings)
+    terminology_overload: TerminologyOverloadSettings = Field(
+        default_factory=TerminologyOverloadSettings
+    )
 
     @field_validator("hard", "soft_deterministic", "soft_llm")
     @classmethod

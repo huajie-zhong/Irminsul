@@ -8,6 +8,9 @@ inputs:
   profile:
     description: 'Check profile to run: hard | configured | advisory | all-available.'
     default: hard
+  strict:
+    description: 'Promote warning findings to a non-zero exit code.'
+    default: 'false'
   version:
     description: Pin a specific irminsul release to install (default unpinned).
     default: ''
@@ -30,4 +33,8 @@ runs:
     - name: Run irminsul check
       shell: bash
       run: |
-        irminsul check --profile=${{ inputs.profile }}
+        if [ "${{ inputs.strict }}" = "true" ]; then
+          irminsul check --profile=${{ inputs.profile }} --strict
+        else
+          irminsul check --profile=${{ inputs.profile }}
+        fi

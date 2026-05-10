@@ -22,6 +22,6 @@ Three sidebands surface conditions checks need to report cleanly:
 - `missing_frontmatter` — files with no frontmatter at all (and not on the exemption list)
 - `duplicate_ids` — `(id, first_path, conflicting_path)` tuples discovered during build
 
-A small set of top-level filenames are exempt from the frontmatter requirement: `README.md`, `GLOSSARY.md`, `CONTRIBUTING.md`. They're navigation, not doc atoms.
+A small set of top-level filenames are exempt from the frontmatter requirement: [`README.md`](../README.md), [`GLOSSARY.md`](../GLOSSARY.md), [`CONTRIBUTING.md`](../CONTRIBUTING.md). They're navigation, not doc atoms.
 
 Paths stored on `DocNode` are repo-relative and POSIX-normalized so they're stable as dict keys and human-readable on Windows.

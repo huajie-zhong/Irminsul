@@ -35,7 +35,7 @@ Every document is written for one reader in one mental state. The Diataxis frame
 When code and docs disagree, code wins by default. This means anything that *can* be generated from code *should* be — schemas, type signatures, API surfaces, config references, error catalogs. Hand-written docs cover only what code cannot express: intent, trade-offs, and process.
 
 ### 5. The Doc Graph is Bidirectional
-If `composer.md` references `data-model.md`, then `data-model.md` should automatically show "referenced by composer.md" at the bottom. Backlinks are generated, not maintained. This makes "what breaks if I change this?" a one-glance question.
+If `composer.md` references `data-model.md`, then `data-model.md` should automatically show "referenced by composer.md" at the bottom. Backlinks are generated, not maintained. This makes "what breaks if I change this?" a one-glance question. <!-- irminsul:ignore prose-file-reference reason="example skeleton" -->
 
 ## Goals
 
@@ -54,5 +54,5 @@ If `composer.md` references `data-model.md`, then `data-model.md` should automat
 
 - **Pure-data language profiles** rather than per-language plugins with behavior. The schema-leak check shouldn't change when we add Go support; only a `LanguageProfile` constant should.
 - **CLI + composite Action over GitHub App.** An App is slicker but requires hosted infrastructure. The CLI runs anywhere CI runs, and pre-commit picks it up for free.
-- **Most-specific match wins** for the uniqueness check. Without it, hierarchical components (`planner/INDEX.md` claims `app/planner/**`, `planner/routing.md` claims `routing/*.py`) require either no parent claim or per-file delegation lists. CSS specificity is the right precedent.
-- **Physical co-location implies ownership.** If a `.md` file lives in a folder that has an `INDEX.md`, it is owned by that INDEX. There is no valid scenario where a file co-locates with an INDEX but is not part of it.
+- **Most-specific match wins** for the uniqueness check. Without it, hierarchical components (`planner/INDEX.md` claims `app/planner/**`, `planner/routing.md` claims `routing/*.py`) require either no parent claim or per-file delegation lists. CSS specificity is the right precedent. <!-- irminsul:ignore prose-file-reference reason="example skeleton" -->
+- **Physical co-location implies ownership.** If a Markdown file lives in a folder that has an index doc, it is owned by that index. There is no valid scenario where a file co-locates with an index but is not part of it.

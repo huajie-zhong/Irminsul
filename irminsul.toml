@@ -15,6 +15,10 @@ soft_deterministic = [
     "phantom-layer",
     "requires-env",
     "import-deps",
+    "schema-doc-drift",
+    "cli-doc-drift",
+    "check-surface-drift",
+    "terminology-overload",
 ]
 # external-links left out by default; enable in nightly workflow with network access.
 
