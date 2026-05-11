@@ -23,3 +23,7 @@ Hard checks and deterministic soft checks are enabled by default. Projects can o
 Generated configs include the stable/useful deterministic sections: paths, tiers, hard and soft checks, implemented nested check settings, overrides, languages, optional TypeScript reference regeneration, and render output. LLM config is supported by the schema but intentionally omitted from the scaffold until LLM checks are part of the normal rollout.
 
 A loader walks up from the invocation directory looking for `irminsul.toml` so subcommands work regardless of cwd.
+
+## Scope & Limitations
+
+Config declares where files live and which checks are active — it does not validate source file contents. `find_config()` walks upward from the invocation directory but does not scan sibling directories or auto-discover projects. Config does not enforce runtime behavior; it only shapes which checks run.

@@ -14,9 +14,9 @@ tests:
 To adopt this system on a new or existing codebase, in order:
 
 - [ ] Create the `/docs` directory tree (see layers)
-- [ ] Write [`00-foundation/principles.md`](../../00-foundation/principles.md) (even just a paragraph)
-- [ ] Write [`10-architecture/overview.md`](../../10-architecture/overview.md) with a C4 L1 diagram
-- [ ] Set up [`GLOSSARY.md`](../../GLOSSARY.md) with whatever terms come to mind first
+- [ ] Write [`00-foundation/principles.md`](../00-foundation/principles.md) (even just a paragraph)
+- [ ] Write [`10-architecture/overview.md`](../10-architecture/overview.md) with a C4 L1 diagram
+- [ ] Set up [`GLOSSARY.md`](../GLOSSARY.md) with whatever terms come to mind first
 - [ ] Pick a renderer (MkDocs Material is the lowest-friction default)
 - [ ] Add the frontmatter validator as a pre-commit hook
 - [ ] Add the link checker to CI
@@ -27,3 +27,7 @@ To adopt this system on a new or existing codebase, in order:
 - [ ] Generate the first health dashboard
 
 You can stop after the first three steps and still be ahead of 90% of codebases. The rest is incremental hardening.
+
+## Scope & Limitations
+
+This is a checklist, not a step-by-step tutorial with expected output at each stage. It does not cover ongoing maintenance, doc-quality improvement, or rollout to additional source languages after initial adoption.

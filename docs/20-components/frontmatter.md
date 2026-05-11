@@ -19,3 +19,7 @@ Every doc atom carries a YAML frontmatter block matching Appendix B of the [Doc 
 `parse_doc()` returns either a `ParsedDoc` (success) or a `ParseFailure` (YAML error or schema rejection). Callers decide how to surface failures — the [DocGraph](docgraph.md) collects them and the [frontmatter check](checks.md) translates them to findings.
 
 `expected_id_for(path)` codifies the filename rule: folder index docs take their parent folder's name; everything else uses the filename stem.
+
+## Scope & Limitations
+
+Frontmatter parsing enforces structural field correctness only — it does not evaluate prose style or content quality. It does not validate `describes:` glob patterns (that is the `globs` check). Unknown fields are silently accepted (`extra="allow"`), not validated.

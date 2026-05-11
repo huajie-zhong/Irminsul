@@ -73,7 +73,7 @@ The boundary between hard and soft is principled: build correctness must not dep
 | Tier | Examples |
 |------|----------|
 | Hard | Frontmatter validity, glob resolution, source ownership coverage uniqueness, internal link integrity, schema-leak detection |
-| Soft, deterministic | Mtime drift, external link rot, stale-doc reaper, orphan detector, generated-reference drift, claim provenance |
+| Soft, deterministic | Mtime drift, external link rot, stale-doc reaper, orphan detector, generated-reference drift, claim provenance, boundary, import-deps, phantom-layer, reality |
 | Soft, LLM | Behavioral overlap detector, semantic drift judge, scope-appropriateness judge |
 
 ## The Change Triplet

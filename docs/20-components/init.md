@@ -4,6 +4,8 @@ title: Init scaffolder
 audience: explanation
 tier: 3
 status: stable
+depends_on:
+  - languages
 describes:
   - src/irminsul/init/**
 tests:
@@ -19,7 +21,7 @@ tests:
 The no-code path distinguishes setup intent:
 
 - **Fresh-start, same repo:** `irminsul init --fresh` creates docs, config, workflows, and an empty `src/` source root. It writes `languages.enabled = []` and does not generate starter code.
-- **Fresh-start, private docs / public code:** `irminsul init --fresh --topology docs-only --code-repo owner/future-repo` creates the docs repo now, configures the future code checkout as a gitignored subfolder, and allows that code folder to be absent.
+- **Fresh-start, private docs / public code:** `irminsul init --fresh --topology docs-only --code-repo owner/code-repo` creates the docs repo now, configures the code checkout as a gitignored subfolder, and allows that code folder to be absent.
 - **Docs-only repo for existing separate code:** `irminsul init-docs-only --code-repo owner/repo` keeps the existing two-repo adoption path and detects language/source roots when the code subfolder is already present.
 
 Templates live as Jinja files under `src/irminsul/init/scaffolds/` (`docs/` tree + `irminsul.toml`) and `src/irminsul/init/workflows/` (CI workflows). Output paths mirror the template path with `.j2` stripped.
@@ -27,3 +29,7 @@ Templates live as Jinja files under `src/irminsul/init/scaffolds/` (`docs/` tree
 `detector.detect_languages()` checks for marker files (`pyproject.toml`, `package.json`+`tsconfig.json`, etc.) — cheap heuristics, fast and resilient to weird repo shapes. `detect_source_roots()` filters each detected language's `source_root_candidates` to those that exist on disk, falling back to `["src"]` if nothing matches.
 
 By default, init refuses to overwrite existing files; pass `--force` to replace them. `--fresh` normally errors if code signals already exist, and `--allow-existing-code` makes that intent explicit.
+
+## Scope & Limitations
+
+Init scaffolds doc/config/CI structure only — it does not scaffold application code or generate implementation stubs. It does not configure IDEs, editors, or local tooling beyond pre-commit hooks. It does not provision remote services such as GitHub repositories or CI runners.

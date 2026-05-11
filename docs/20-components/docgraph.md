@@ -4,6 +4,9 @@ title: DocGraph
 audience: explanation
 tier: 3
 status: stable
+depends_on:
+  - config
+  - frontmatter
 describes:
   - src/irminsul/docgraph.py
   - src/irminsul/docgraph_index.py
@@ -25,3 +28,7 @@ Three sidebands surface conditions checks need to report cleanly:
 A small set of top-level filenames are exempt from the frontmatter requirement: [`README.md`](../README.md), [`GLOSSARY.md`](../GLOSSARY.md), [`CONTRIBUTING.md`](../CONTRIBUTING.md). They're navigation, not doc atoms.
 
 Paths stored on `DocNode` are repo-relative and POSIX-normalized so they're stable as dict keys and human-readable on Windows.
+
+## Scope & Limitations
+
+DocGraph does not check link targets — that is the `links` check's job. It does not parse source code or infer semantics from code structure. The graph is read-only once built; no check is allowed to mutate it.
