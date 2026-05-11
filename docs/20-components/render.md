@@ -24,4 +24,4 @@ Adding a Docusaurus or Sphinx backend means writing a new class that satisfies t
 
 ## Scope & Limitations
 
-The renderer builds a static site and does not host it — deployment is out of scope. It does not validate docs before rendering; run `irminsul check` first. Adding a new backend requires implementing the `Renderer` Protocol and exposing a config knob; no core changes are needed.
+The renderer builds a static site and does not host it — deployment is out of scope. It does not validate docs before rendering; run `irminsul check` first.
