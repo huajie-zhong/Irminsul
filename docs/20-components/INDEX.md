@@ -23,3 +23,7 @@ Each architectural piece of Irminsul has a dedicated doc here. Frontmatter `desc
 - [`init`](init.md) — scaffolding command and templates
 - [`llm`](llm.md) — LLM client (budget tracking, disk cache, LiteLLM wrapper)
 - [`new-list-regen`](new-list-regen.md) — `new`, `list`, `fix`, and `regen` commands
+
+## Scope & Limitations
+
+This is a navigation index for the 20-components layer. Cross-component interaction and runtime data flows are in [`30-workflows`](../30-workflows/INDEX.md), not here.

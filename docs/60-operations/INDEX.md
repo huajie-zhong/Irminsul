@@ -30,3 +30,7 @@ Two staleness defenses specific to runbooks:
 
 - **Last Validated.** Frontmatter field updated whenever on-call confirms the runbook actually worked. CI flags runbooks not validated in 6 months.
 - **Game Days.** Scheduled exercises where the team manually triggers a scenario in non-prod and runs the runbook end-to-end. Catches drift no static check can.
+
+## Scope & Limitations
+
+For Irminsul itself, only the release pipeline is documented here. Irminsul is a developer CLI tool, not a hosted service — service-level concerns (SLOs, on-call rotation, incident runbooks) are out of scope.

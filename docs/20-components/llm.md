@@ -22,3 +22,7 @@ tests:
 **API key detection** — `is_available()` checks for the provider-specific env var (e.g. `ANTHROPIC_API_KEY`). Missing key + `required_in_ci=false` → skip-info findings; missing key + `required_in_ci=true` → error + exit 1.
 
 Prompt templates live as Jinja files under `src/irminsul/llm/prompts/` and are rendered by each check at call time.
+
+## Scope & Limitations
+
+LLM checks never block merges — all findings are advisory severity only. The in-memory spending counter does not persist across invocations; each run starts at $0. The client does not support streaming; each API call is a single synchronous request/response.

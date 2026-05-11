@@ -21,4 +21,8 @@ A `LanguageProfile` is a pure-data record:
 
 Patterns are anchored at start-of-line (with leading whitespace allowed) so casual prose mentions don't trigger findings — only lines that look like definitions match.
 
-v0.1.0 ships `python` and `typescript` profiles. Adding Go or Rust requires creating a profile and registering it in `LANGUAGE_REGISTRY` — no core changes.
+Python and TypeScript profiles are included. Adding Go or Rust requires creating a profile and registering it in `LANGUAGE_REGISTRY` — no core changes.
+
+## Scope & Limitations
+
+Language profiles are pure-data records — they contain no behavioral logic. Adding a language by creating a new profile does not change any check behavior; checks that use profiles (schema-leak, init detector) consume them generically. Profiles do not validate that source files conform to the expected language syntax.

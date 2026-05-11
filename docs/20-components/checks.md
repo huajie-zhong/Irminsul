@@ -4,6 +4,13 @@ title: Checks
 audience: explanation
 tier: 3
 status: stable
+depends_on:
+  - config
+  - docgraph
+  - frontmatter
+  - languages
+  - llm
+  - new-list-regen
 describes:
   - src/irminsul/checks/**
 tests:
@@ -33,3 +40,7 @@ Checks consume a [DocGraph](docgraph.md) and return `Finding` records with sever
 | `prose-file-reference` | Local `.md` references in prose must be real links or explicitly ignored | error |
 
 Checks are registered in `HARD_REGISTRY`, `SOFT_REGISTRY`, and `LLM_REGISTRY` keyed by name. The CLI selects checks with `--profile`: `hard` runs configured hard checks, `configured` adds configured soft deterministic checks, `advisory` adds configured LLM checks, and `all-available` runs every implemented deterministic check regardless of config.
+
+## Scope & Limitations
+
+Checks do not apply fixes — findings are advisory output only; call `irminsul fix` to remediate. They do not evaluate prose quality or writing style. They do not modify source files or docs.
