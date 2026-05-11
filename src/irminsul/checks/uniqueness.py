@@ -96,6 +96,7 @@ class UniquenessCheck:
                     Finding(
                         check=self.name,
                         severity=Severity.error,
+                        path=Path(source_file),
                         message=(
                             f"source file '{source_file}' is claimed at the same "
                             f"specificity by: {claim_descs}"
@@ -119,6 +120,7 @@ class UniquenessCheck:
                 Finding(
                     check=self.name,
                     severity=Severity.warning,
+                    path=Path(source_file),
                     message=(
                         f"source file '{source_file}' lives in a doc-covered "
                         "directory but no doc claims it"

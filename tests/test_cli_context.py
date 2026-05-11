@@ -8,6 +8,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
+import irminsul.context as context_module
 from irminsul.cli import app
 
 runner = CliRunner()
@@ -223,6 +224,47 @@ def test_context_changed_groups_by_owner_and_reports_unmatched(tmp_path: Path) -
     assert data["unmatched"] == [
         {
             "path": "src/mylib/new.py",
+            "reason": "no owning doc found",
+            "candidates": [],
+        }
+    ]
+
+
+def test_git_changed_paths_parses_nul_porcelain_special_paths(tmp_path: Path, monkeypatch) -> None:
+    class Result:
+        returncode = 0
+        stdout = " M src/tab\tfile.py\0?? src/back\\slash.py\0R  src/new name.py\0src/old name.py\0"
+        stderr = ""
+
+    def fake_run(args, **kwargs):
+        assert "-z" in args
+        return Result()
+
+    monkeypatch.setattr(context_module.subprocess, "run", fake_run)
+
+    assert context_module._git_changed_paths(tmp_path) == [
+        "src/back\\slash.py",
+        "src/new name.py",
+        "src/tab\tfile.py",
+    ]
+
+
+def test_context_changed_reports_rename_destination_only(tmp_path: Path) -> None:
+    repo = _make_context_repo(tmp_path)
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "dev@example.com")
+    _git(repo, "config", "user.name", "Dev")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "initial")
+    _git(repo, "mv", "src/mylib/core.py", "src/mylib/core-renamed.py")
+
+    result = runner.invoke(app, ["context", "--changed", "--format", "json", "--path", str(repo)])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["unmatched"] == [
+        {
+            "path": "src/mylib/core-renamed.py",
             "reason": "no owning doc found",
             "candidates": [],
         }
