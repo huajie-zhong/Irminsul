@@ -23,7 +23,10 @@
 - `irminsul list orphans` — list docs with no inbound references
 - `irminsul list stale` — list deprecated docs past the stale threshold
 - `irminsul list undocumented` — list source files in covered dirs that no doc claims
-- `irminsul regen --language=python` — write mkdocstrings stubs under `docs/40-reference/python/`
+- `irminsul context <path>|--topic <query>|--changed` — return task-specific ownership, dependency, test, and finding context
+- `irminsul regen python` — write mkdocstrings stubs under `docs/40-reference/python/`
+- `irminsul regen docs-surfaces` — write generated frontmatter, CLI, and check registry references
+- `irminsul regen all` — regenerate every configured generated artifact
 - `irminsul init-docs-only --code-repo <spec>` — scaffold a docs-only repo where code lives in a separate GitHub repo (Topology A)
 
 ### Enhancements

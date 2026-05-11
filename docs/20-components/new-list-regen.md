@@ -38,12 +38,14 @@ Thin wrappers over existing soft checks: `orphans` delegates to `OrphansCheck`, 
 
 Applies deterministic remediations for fixable findings selected by `--profile`. The default profile is `configured`; `hard`, `configured`, `advisory`, and `all-available` use the same selection policy as `irminsul check`, but LLM advisory checks are never used for file mutation. The first implementation target is `SupersessionCheck`: when a new doc lists an old doc in `supersedes:`, `fix` can set the old doc's `status: deprecated` and `superseded_by: <new-id>` frontmatter. `--dry-run` prints the edits that would be applied without writing files; normal runs group fixes by path and write updated files atomically.
 
-## `irminsul regen --language=python|typescript`
+## `irminsul regen {python,typescript,docs-surfaces,all}`
 
 For Python, walks `source_roots`, finds all non-private `.py` files, and writes a mkdocstrings stub (`:::<dotted.module>`) under `docs/40-reference/python/`. The `id` in each stub matches the filename stem per the frontmatter rule.
 
-For TypeScript, `irminsul regen --language=typescript` requires local TypeDoc (`node_modules/.bin/typedoc` or `npx --no-install typedoc`) and writes minimal reference stubs under `docs/40-reference/typescript/`, mirroring the source directory layout. Stub IDs are derived from the full relative module path with `-` separators so nested files keep unique IDs.
+For TypeScript, `irminsul regen typescript` requires local TypeDoc (`node_modules/.bin/typedoc` or `npx --no-install typedoc`) and writes minimal reference stubs under `docs/40-reference/typescript/`, mirroring the source directory layout. Stub IDs are derived from the full relative module path with `-` separators so nested files keep unique IDs.
+
+`irminsul regen docs-surfaces` writes generated references for code-derived documentation surfaces, such as CLI commands and check registries. `irminsul regen all` runs every configured generated artifact.
 
 ## Scope & Limitations
 
-`list` subcommands are read-only — they report findings but do not modify any docs. `regen` generates structural stubs only; it does not produce prose descriptions or infer intent from source code. `fix` applies deterministic, pre-coded remediations only — it does not use LLM-based judgment to mutate files.
+`list` subcommands are read-only — they report findings but do not modify any docs. `regen` generates deterministic artifacts only; it does not produce prose descriptions or infer intent from source code. `fix` applies deterministic, pre-coded remediations only — it does not use LLM-based judgment to mutate files.

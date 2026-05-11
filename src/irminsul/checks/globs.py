@@ -34,7 +34,10 @@ def walk_source_files(
         for path in abs_root.rglob("*"):
             if not path.is_file():
                 continue
-            if any(part.startswith(".") for part in path.relative_to(abs_root).parts):
+            parts = path.relative_to(abs_root).parts
+            if any(part.startswith(".") or part == "__pycache__" for part in parts):
+                continue
+            if path.suffix in {".pyc", ".pyo"}:
                 continue
             try:
                 display = str(PurePosixPath(*path.relative_to(repo_root).parts))
