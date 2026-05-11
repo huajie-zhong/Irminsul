@@ -3,7 +3,7 @@ id: 0007-fresh-start-init
 title: Fresh-start init
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
 ---
 
