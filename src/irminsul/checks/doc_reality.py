@@ -546,7 +546,7 @@ class ClaimProvenanceCheck:
         path_posix = path.as_posix()
         return (
             path_posix == "irminsul.toml"
-            or path_posix == "action.yml"
+            or path_posix in {"action.yml", "action.yaml"}
             or (path_posix.startswith(".github/workflows/") and path.suffix in {".yml", ".yaml"})
         )
 
@@ -556,8 +556,8 @@ class ClaimProvenanceCheck:
         return (
             path_posix.startswith(f"{docs_root}/")
             or path_posix == "irminsul.toml"
-            or path_posix == "action.yml"
-            or path_posix == ".pre-commit-config.yaml"
+            or path_posix in {"action.yml", "action.yaml"}
+            or path_posix in {".pre-commit-config.yaml", ".pre-commit-config.yml"}
             or path_posix.startswith(".github/")
         ) and not self._is_source_evidence(graph, path)
 
