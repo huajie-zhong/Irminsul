@@ -109,14 +109,14 @@ For an existing same-repo codebase, adoption is roughly:
 1. Add the tool as a dev dependency.
 2. Run `irminsul init` — generates `/docs` skeleton, `irminsul.toml`, GitHub Actions workflow, and pre-commit hooks.
 3. Write [`00-foundation/principles.md`](../00-foundation/principles.md) and [`10-architecture/overview.md`](overview.md).
-4. Commit. CI now enforces the system from PR #1.
+4. Commit. CI can run the system from PR #1.
 
 For a fresh same-repo project with no code yet:
 
 1. Run `irminsul init --fresh --path my-new-project`.
 2. Add application code under `src/` when the project generator or first implementation is ready.
 3. Write the foundation and architecture docs.
-4. Commit. CI now enforces the system from PR #1.
+4. Commit. CI can run the system from PR #1.
 
 For an existing public-code + private-docs case:
 

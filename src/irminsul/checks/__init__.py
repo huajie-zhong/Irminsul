@@ -13,6 +13,7 @@ from irminsul.checks.coverage import CoverageCheck
 from irminsul.checks.dependency_check import DependencyCheck
 from irminsul.checks.doc_reality import (
     CheckSurfaceDriftCheck,
+    ClaimProvenanceCheck,
     CliDocDriftCheck,
     ProseFileReferenceCheck,
     SchemaDocDriftCheck,
@@ -66,6 +67,7 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     CliDocDriftCheck.name: CliDocDriftCheck,
     CheckSurfaceDriftCheck.name: CheckSurfaceDriftCheck,
     TerminologyOverloadCheck.name: TerminologyOverloadCheck,
+    ClaimProvenanceCheck.name: ClaimProvenanceCheck,
 }
 
 LLM_REGISTRY: dict[str, type] = {
@@ -81,6 +83,7 @@ __all__ = [
     "BoundaryCheck",
     "Check",
     "CheckSurfaceDriftCheck",
+    "ClaimProvenanceCheck",
     "CliDocDriftCheck",
     "CoverageCheck",
     "DependencyCheck",

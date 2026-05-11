@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
+
+from git import Repo
 
 from irminsul.checks.doc_reality import (
     CheckSurfaceDriftCheck,
+    ClaimProvenanceCheck,
     CliDocDriftCheck,
     ProseFileReferenceCheck,
     SchemaDocDriftCheck,
@@ -23,7 +27,15 @@ def _write_config(repo: Path) -> None:
     )
 
 
-def _write_doc(repo: Path, rel: str, *, doc_id: str, status: str = "stable", body: str) -> None:
+def _write_doc(
+    repo: Path,
+    rel: str,
+    *,
+    doc_id: str,
+    status: str = "stable",
+    body: str,
+    frontmatter_extra: list[str] | None = None,
+) -> None:
     path = repo / rel
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -36,6 +48,7 @@ def _write_doc(repo: Path, rel: str, *, doc_id: str, status: str = "stable", bod
                 "tier: 2",
                 f"status: {status}",
                 "describes: []",
+                *(frontmatter_extra or []),
                 "---",
                 "",
                 f"# {doc_id}",
@@ -49,6 +62,228 @@ def _write_doc(repo: Path, rel: str, *, doc_id: str, status: str = "stable", bod
 
 def _graph(repo: Path):
     return build_graph(repo, load(repo / "irminsul.toml"))
+
+
+def _init_repo(root: Path) -> Repo:
+    repo = Repo.init(root)
+    with repo.config_writer() as cw:
+        cw.set_value("user", "name", "Test")
+        cw.set_value("user", "email", "test@example.com")
+    return repo
+
+
+def _commit(repo: Repo, rel_path: str, content: str, message: str) -> None:
+    fp = Path(repo.working_dir) / rel_path
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    fp.write_text(content, encoding="utf-8")
+    repo.index.add([rel_path])
+    repo.index.commit(message)
+
+
+def test_claim_provenance_accepts_valid_claim_states(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    (tmp_path / "src" / "checks").mkdir(parents=True)
+    (tmp_path / "src" / "checks" / "claim.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "action.yml").write_text("name: docs\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/20-components/claim-check.md",
+        doc_id="claim-check",
+        body="Implementation docs.",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/40-reference/checks.md",
+        doc_id="checks",
+        body="Enablement docs.",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/80-evolution/rfcs/0001-thing.md",
+        doc_id="0001-thing",
+        status="draft",
+        body="Future work.",
+        frontmatter_extra=["rfc_state: open"],
+    )
+    _write_doc(
+        tmp_path,
+        "docs/00-foundation/enforcement.md",
+        doc_id="enforcement",
+        body=(
+            "CI blocks invalid docs. <!-- claim:enabled-claim -->\n\n"
+            "A planned feature exists. <!-- claim:planned-claim -->"
+        ),
+        frontmatter_extra=[
+            "claims:",
+            "  - id: planned-claim",
+            "    state: planned",
+            "    kind: feature",
+            "    claim: Planned feature.",
+            "    evidence:",
+            "      - docs/80-evolution/rfcs/0001-thing.md",
+            "  - id: implemented-claim",
+            "    state: implemented",
+            "    kind: check",
+            "    claim: Source exists.",
+            "    evidence:",
+            "      - src/checks/claim.py",
+            "  - id: available-claim",
+            "    state: available",
+            "    kind: check",
+            "    claim: Source and docs exist.",
+            "    evidence:",
+            "      - src/checks/claim.py",
+            "      - docs/40-reference/checks.md",
+            "  - id: enabled-claim",
+            "    state: enabled",
+            "    kind: ci_gate",
+            "    claim: Workflow evidence exists.",
+            "    evidence:",
+            "      - action.yml",
+            "  - id: external-claim",
+            "    state: external",
+            "    kind: local_tool",
+            "    claim: External config exists.",
+            "    evidence:",
+            "      - action.yml",
+        ],
+    )
+
+    assert ClaimProvenanceCheck().run(_graph(tmp_path)) == []
+
+
+def test_claim_provenance_flags_state_inappropriate_evidence(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "claim.py").write_text("x = 1\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/00-foundation/enforcement.md",
+        doc_id="enforcement",
+        body="CI blocks invalid docs. <!-- claim:enabled-claim -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: enabled-claim",
+            "    state: enabled",
+            "    kind: ci_gate",
+            "    claim: Workflow evidence exists.",
+            "    evidence:",
+            "      - src/claim.py",
+        ],
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert findings[0].severity.value == "error"
+    assert "state 'enabled'" in findings[0].message
+
+
+def test_claim_provenance_warns_on_risky_prose_without_reference(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/00-foundation/enforcement.md",
+        doc_id="enforcement",
+        body="CI automatically rewrites old docs.",
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert findings[0].severity.value == "warning"
+    assert "high-risk" in findings[0].message
+
+
+def test_claim_provenance_warns_on_unknown_claim_reference(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/00-foundation/enforcement.md",
+        doc_id="enforcement",
+        body="CI blocks invalid docs. <!-- claim:missing -->",
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert any("unknown structured claim reference" in finding.message for finding in findings)
+
+
+def test_claim_provenance_warns_on_resolved_planned_rfc(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/50-decisions/0001-thing.md",
+        doc_id="0001-thing-decision",
+        body="Accepted.",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/80-evolution/rfcs/0001-thing.md",
+        doc_id="0001-thing",
+        status="draft",
+        body="Future work.",
+        frontmatter_extra=[
+            "rfc_state: accepted",
+            "resolved_by: docs/50-decisions/0001-thing.md",
+        ],
+    )
+    _write_doc(
+        tmp_path,
+        "docs/00-foundation/enforcement.md",
+        doc_id="enforcement",
+        body="A planned feature exists. <!-- claim:planned-claim -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: planned-claim",
+            "    state: planned",
+            "    kind: feature",
+            "    claim: Planned feature.",
+            "    evidence:",
+            "      - docs/80-evolution/rfcs/0001-thing.md",
+        ],
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert "resolved RFC" in findings[0].message
+
+
+def test_claim_provenance_warns_when_evidence_changed_after_doc(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    repo = _init_repo(tmp_path)
+    _commit(repo, "irminsul.toml", (tmp_path / "irminsul.toml").read_text(), "config")
+    _commit(
+        repo,
+        "action.yml",
+        "name: docs\n",
+        "workflow",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/00-foundation/enforcement.md",
+        doc_id="enforcement",
+        body="CI blocks invalid docs. <!-- claim:enabled-claim -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: enabled-claim",
+            "    state: enabled",
+            "    kind: ci_gate",
+            "    claim: Workflow evidence exists.",
+            "    evidence:",
+            "      - action.yml",
+        ],
+    )
+    repo.index.add(["docs/00-foundation/enforcement.md"])
+    repo.index.commit("doc claim")
+    time.sleep(1.1)
+    _commit(repo, "action.yml", "name: docs\non: [push]\n", "workflow update")
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert "changed after the doc" in findings[0].message
 
 
 def test_prose_file_reference_flags_unlinked_md(tmp_path: Path) -> None:

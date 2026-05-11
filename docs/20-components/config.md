@@ -12,12 +12,14 @@ tests:
 
 # Config
 
-`irminsul.toml` lives at the root of every codebase that adopts Irminsul. It's a small Pydantic-validated TOML file declaring where docs and source live, which checks are active, and which language profiles to apply.
+`irminsul.toml` lives at the root of every codebase that adopts Irminsul. It is a Pydantic-validated TOML file declaring where docs and source live, which checks are active, and which language profiles to apply.
 
-The schema enforces structural invariants (unknown check names are rejected; render targets are an enum) but stays out of the way for everything else. Defaults exist for every section so a minimal toml works.
+The schema enforces structural invariants (unknown check names are rejected; render targets are an enum) but stays out of the way for everything else. Defaults exist for every section so a minimal toml works, while the scaffold writes the useful knobs explicitly so projects can discover them without reading source.
 
-Hard checks and deterministic soft checks are enabled by default. Projects can override `checks.hard` or `checks.soft_deterministic` when they need a narrower profile. LLM checks remain opt-in through `checks.soft_llm`.
+Hard checks and deterministic soft checks are enabled by default. Projects can override `checks.hard` or `checks.soft_deterministic` when they need a narrower profile. `external-links` is included in the soft deterministic list, but `[checks.external_links].enabled` remains `false` by default because it performs network I/O.
 
 `checks.terminology_overload.rules` configures ambiguous terminology warnings. Irminsul ships a default `coverage` rule, but projects can replace it with their own domain terms.
+
+Generated configs include the stable/useful deterministic sections: paths, tiers, hard and soft checks, implemented nested check settings, overrides, languages, optional TypeScript reference regeneration, and render output. LLM config is supported by the schema but intentionally omitted from the scaffold until LLM checks are part of the normal rollout.
 
 A loader walks up from the invocation directory looking for `irminsul.toml` so subcommands work regardless of cwd.

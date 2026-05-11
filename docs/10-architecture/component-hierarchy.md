@@ -5,13 +5,35 @@ audience: explanation
 tier: 2
 status: stable
 describes: []
+claims:
+  - id: parent-child-check-available
+    state: available
+    kind: advisory_check
+    claim: The parent-child check validates broad INDEX globs and long INDEX bodies.
+    evidence:
+      - src/irminsul/checks/parent_child.py
+      - docs/40-reference/check-registries.md
+  - id: schema-leak-enabled
+    state: enabled
+    kind: ci_gate
+    claim: Schema-leak detection is part of the hard check profile run by this repository's CI.
+    evidence:
+      - src/irminsul/checks/schema_leak.py
+      - .github/workflows/ci.yml
+  - id: llm-scope-available
+    state: available
+    kind: advisory_check
+    claim: LLM scope and semantic checks are available as advisory checks.
+    evidence:
+      - src/irminsul/checks/scope_appropriateness.py
+      - docs/40-reference/check-registries.md
 ---
 
 # Component Hierarchy and Doctrine
 
 A component is a single Markdown file by default. **The hierarchical structure (folder with an index doc plus children) is the exception, not the rule.** It applies only when one file becomes unreadable — rule of thumb: >~500 lines, or covering multiple subsystems each with their own design narrative.
 
-Most components in most codebases stay single-file forever. For those, none of the parent-child machinery in the next subsection (doctrine, mtime cascade, children registry, contradiction detector) applies at all. The single file owns its `describes` claim, runs through normal staleness checks, and that's it.
+Most components in most codebases stay single-file forever. For those, none of the parent-child machinery in the next subsection applies at all. The single file owns its `describes` claim, runs through normal staleness checks, and that's it.
 
 The system warns when a doc exceeds an extreme length (~800 lines) but never forces the split. Promotion to a folder is a human judgment call, made when one file genuinely doesn't fit anymore:
 
@@ -20,7 +42,7 @@ The system warns when a doc exceeds an extreme length (~800 lines) but never for
 ├── composer.md                # Simple: single file
 ├── interpreter.md
 └── planner/                   # Complex: folder
-    ├── INDEX.md               # L3 entry, broad describes
+    ├── INDEX.md               # L3 entry, broad describes <!-- irminsul:ignore prose-file-reference reason="example tree" -->
     ├── routing.md             # Subsystem doc, narrower describes
     ├── caching.md
     └── error-handling.md
@@ -50,18 +72,16 @@ Without doctrine, no mechanical check rescues this — every parent accumulates 
 
 ### Mechanical Enforcement of the Doctrine
 
-Several checks make the highest-frequency doctrine violations costly and visible. These are deterministic and build-blocking unless noted:
+Several checks make the highest-frequency doctrine violations costly and visible:
 
-1. **Schema/code-leak detection in parent index docs.** The schema-leak rule applies extra strictly to parent docs: regex bans on class definitions, type signatures, specific library-version strings, and substantive code blocks. These belong in children.
-2. **No-broad-globs in parents-with-children.** If a folder has children, its index doc's `describes` field must be empty or an explicit list of files — never directory wildcards. Forces the parent to declare exactly what it owns versus what it delegates to children. Build fails on broad globs in parent docs.
+1. **Schema/code-leak detection in parent index docs.** The schema-leak rule applies extra strictly to parent docs: regex bans on class definitions, type signatures, specific library-version strings, and substantive code blocks. These belong in children. <!-- claim:schema-leak-enabled -->
+2. **No-broad-globs in parents-with-children.** If a folder has children, its index doc's `describes` field must be empty or an explicit list of files — never directory wildcards. The parent-child check reports an error on broad globs in parent docs. <!-- claim:parent-child-check-available -->
 3. **Length cap as smell.** Warn if an index doc exceeds ~300 lines. Architecture writing should be concise; long parents indicate accumulated implementation detail. Advisory.
-4. **Children registry consistency.** The folder's index doc declares `children: [routing, caching, error-handling]` in frontmatter. CI verifies this matches the folder contents on disk. Adding or removing a child without updating the registry fails the build — forces an explicit decision about whether the parent narrative needs to acknowledge the change.
-5. **Mtime cascade.** A parent's *effective* mtime is `max(own_mtime, max(child_mtimes))`. When any child is edited substantively, the parent's effective mtime updates and the staleness check re-evaluates against the parent's `last_reviewed` field. If the parent hasn't been reviewed since a child was rewritten, the renderer injects a `[CHILD-DRIFT]` badge. Advisory, not blocking.
-6. **LLM contradiction detector (advisory).** Nightly job reads each parent together with all its children and asks the model to flag direct contradictions. Catches cases where two prose statements happen to disagree (parent says "synchronous flow," child says "events queue for async processing"). Opens an issue, never blocks.
-7. **LLM scope-appropriateness check (advisory).** Reads each parent and flags paragraphs that look like implementation detail rather than architecture/integration. Opens an issue, never blocks.
+4. **Folder auto-ownership.** An `INDEX.md` auto-owns sibling docs in its folder. No `children:` registry is required. <!-- irminsul:ignore prose-file-reference reason="literal filename rule" -->
+5. **LLM contradiction and scope checks.** Advisory LLM checks can flag semantic overlap, drift, or inappropriate detail. They are review signals, not hard gates. <!-- claim:llm-scope-available -->
 
 ### The Honest Limit
 
 The semantic boundary between "architectural" and "implementational" cannot be fully mechanized. Two reviewers can legitimately disagree about which side a paragraph falls on. No regex catches "this is too detailed for a parent doc."
 
-The deterministic checks (1–5) reduce the surface area where doctrine can be violated. The LLM advisory checks (6, 7) catch a fraction of the residual semantic cases. Everything else is review quality — every PR touching a folder index doc should be reviewed by someone who understands the doctrine, and the children-registry rule (4) guarantees such PRs always exist when structure changes.
+The deterministic checks reduce the surface area where doctrine can be violated. The LLM advisory checks catch a fraction of the residual semantic cases. Everything else is review quality — every PR touching a folder index doc should be reviewed by someone who understands the doctrine.

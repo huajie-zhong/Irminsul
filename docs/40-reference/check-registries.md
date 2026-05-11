@@ -37,6 +37,7 @@ describes: []
 | `soft` | cli-doc-drift |
 | `soft` | check-surface-drift |
 | `soft` | terminology-overload |
+| `soft` | claim-provenance |
 | `llm` | overlap |
 | `llm` | semantic-drift |
 | `llm` | scope-appropriateness |

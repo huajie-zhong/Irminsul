@@ -41,6 +41,20 @@ def test_init_no_interactive_creates_expected_tree(tmp_path: Path) -> None:
         assert (target / rel).is_file(), f"missing scaffold output: {rel}"
 
 
+def test_init_scaffold_config_includes_only_useful_default_knobs(tmp_path: Path) -> None:
+    target = tmp_path / "demo"
+    target.mkdir()
+    (target / "src").mkdir()
+    result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
+    assert result.exit_code == 0, result.stdout
+
+    toml = (target / "irminsul.toml").read_text(encoding="utf-8")
+    assert "[checks.external_links]" in toml
+    assert "enabled = false" in toml
+    assert "[checks.parent_child]" in toml
+    assert "[checks.stale_reaper]" in toml
+
+
 def test_init_fresh_no_interactive_creates_source_root(tmp_path: Path) -> None:
     target = tmp_path / "demo"
     result = runner.invoke(app, ["init", "--fresh", "--no-interactive", "--path", str(target)])
