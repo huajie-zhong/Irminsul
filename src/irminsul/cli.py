@@ -49,6 +49,11 @@ class Profile(StrEnum):
     all_available = "all-available"
 
 
+class ContextProfile(StrEnum):
+    configured = "configured"
+    all_available = "all-available"
+
+
 class FreshTopology(StrEnum):
     same_repo = "same-repo"
     docs_only = "docs-only"
@@ -524,6 +529,75 @@ def check(
     raise typer.Exit(code=1 if fail else 0)
 
 
+@app.command("context")
+def context_command(
+    target: Annotated[
+        Path | None,
+        typer.Argument(help="Source or doc path to inspect."),
+    ] = None,
+    topic: Annotated[
+        str | None,
+        typer.Option("--topic", help="Find docs by deterministic substring search."),
+    ] = None,
+    changed: Annotated[
+        bool,
+        typer.Option("--changed", help="Inspect staged, unstaged, and untracked git files."),
+    ] = False,
+    profile: Annotated[
+        ContextProfile,
+        typer.Option(
+            "--profile",
+            help="Deterministic finding breadth: configured or all-available.",
+        ),
+    ] = ContextProfile.configured,
+    fmt: Annotated[
+        str,
+        typer.Option("--format", help="Output format: plain or json."),
+    ] = "plain",
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path",
+            help="Root of the codebase to inspect. Defaults to current directory.",
+        ),
+    ] = Path("."),
+) -> None:
+    """Return task-specific navigation context."""
+    from irminsul.context import (
+        ContextError,
+        build_context_report,
+        context_report_should_fail,
+        context_report_to_json,
+        format_context_plain,
+    )
+
+    if fmt not in ("plain", "json"):
+        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+        raise typer.Exit(code=2)
+
+    repo_root = path.resolve()
+    config = load(find_config(repo_root))
+    try:
+        report = build_context_report(
+            repo_root,
+            config,
+            target_path=target,
+            topic=topic,
+            changed=changed,
+            profile=profile.value,
+        )
+    except ContextError as exc:
+        typer.echo(typer.style(str(exc), fg="red"))
+        raise typer.Exit(code=exc.code) from exc
+
+    if fmt == "json":
+        typer.echo(context_report_to_json(report))
+    else:
+        typer.echo(format_context_plain(report))
+
+    raise typer.Exit(code=1 if context_report_should_fail(report) else 0)
+
+
 @app.command()
 def fix(
     profile: Annotated[
@@ -739,53 +813,83 @@ def list_undocumented(
     _list_undocumented(path.resolve(), fmt=fmt)
 
 
-@app.command()
-def regen(
-    language: Annotated[
-        str,
-        typer.Option("--language", help="Reference docs to regenerate."),
-    ] = "python",
-    path: Annotated[Path, typer.Option("--path")] = Path("."),
-) -> None:
-    """Regenerate reference docs from source."""
+_regen_app = typer.Typer(
+    name="regen",
+    help="Regenerate generated documentation artifacts.",
+    no_args_is_help=True,
+)
+app.add_typer(_regen_app)
+
+
+def _load_repo(path: Path) -> tuple[Path, IrminsulConfig]:
     repo_root = path.resolve()
     config = load(find_config(repo_root))
+    return repo_root, config
 
-    written: list[Path] = []
-    if language in ("docs-surfaces", "all"):
-        from irminsul.regen.doc_surfaces import regen_doc_surfaces
 
-        written.extend(regen_doc_surfaces(repo_root, config))
-
-    if language in ("python", "all"):
-        from irminsul.regen.python import regen_python
-
-        written.extend(regen_python(repo_root, config))
-    elif language not in ("typescript", "docs-surfaces"):
-        typer.echo(
-            typer.style(
-                f"unknown --language '{language}'; expected python, typescript, "
-                "docs-surfaces, or all",
-                fg="red",
-            )
-        )
-        raise typer.Exit(code=2)
-
-    if language in ("typescript", "all") and (
-        language == "typescript" or "typescript" in config.languages.enabled
-    ):
-        from irminsul.regen.typescript import TypeScriptRegenError, regen_typescript
-
-        try:
-            written.extend(regen_typescript(repo_root, config))
-        except TypeScriptRegenError as exc:
-            typer.echo(typer.style(str(exc), fg="red"))
-            raise typer.Exit(code=1) from exc
-
+def _print_regen_result(repo_root: Path, written: list[Path]) -> None:
     for p in written:
         rel = p.relative_to(repo_root).as_posix()
         typer.echo(f"  {rel}")
-    typer.echo(typer.style(f"regenerated {len(written)} reference stub(s)", fg="green"))
+    typer.echo(typer.style(f"regenerated {len(written)} artifact(s)", fg="green"))
+
+
+def _regen_typescript_or_exit(repo_root: Path, config: IrminsulConfig) -> list[Path]:
+    from irminsul.regen.typescript import TypeScriptRegenError, regen_typescript
+
+    try:
+        return regen_typescript(repo_root, config)
+    except TypeScriptRegenError as exc:
+        typer.echo(typer.style(str(exc), fg="red"))
+        raise typer.Exit(code=1) from exc
+
+
+@_regen_app.command("python")
+def regen_python_command(
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Regenerate Python reference stubs."""
+    from irminsul.regen.python import regen_python
+
+    repo_root, config = _load_repo(path)
+    _print_regen_result(repo_root, regen_python(repo_root, config))
+
+
+@_regen_app.command("typescript")
+def regen_typescript_command(
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Regenerate TypeScript reference stubs."""
+    repo_root, config = _load_repo(path)
+    _print_regen_result(repo_root, _regen_typescript_or_exit(repo_root, config))
+
+
+@_regen_app.command("docs-surfaces")
+def regen_docs_surfaces_command(
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Regenerate code-derived documentation surface references."""
+    from irminsul.regen.doc_surfaces import regen_doc_surfaces
+
+    repo_root, config = _load_repo(path)
+    _print_regen_result(repo_root, regen_doc_surfaces(repo_root, config))
+
+
+@_regen_app.command("all")
+def regen_all_command(
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Regenerate every configured generated documentation artifact."""
+    from irminsul.regen.doc_surfaces import regen_doc_surfaces
+    from irminsul.regen.python import regen_python
+
+    repo_root, config = _load_repo(path)
+    written: list[Path] = []
+    written.extend(regen_doc_surfaces(repo_root, config))
+    written.extend(regen_python(repo_root, config))
+    if "typescript" in config.languages.enabled:
+        written.extend(_regen_typescript_or_exit(repo_root, config))
+    _print_regen_result(repo_root, written)
 
 
 if __name__ == "__main__":  # pragma: no cover

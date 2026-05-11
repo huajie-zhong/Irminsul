@@ -21,5 +21,5 @@ In-flight proposals. See [`80-evolution`](../INDEX.md) for the RFC lifecycle.
 - [`0008-check-profiles-and-warning-policy`](0008-check-profiles-and-warning-policy.md) — Check profiles and warning policy
 - [`0009-deterministic-doc-reality-audits`](0009-deterministic-doc-reality-audits.md) — Deterministic audits for doc/code reality drift
 - [`0010-structured-claim-provenance`](0010-structured-claim-provenance.md) — Structured provenance for enforcement and automation claims
-- [`0011-generated-agent-discovery-index`](0011-generated-agent-discovery-index.md) — Generated first-hop index for agents and contributors
+- [`0011-agent-context-command`](0011-agent-context-command.md) — Agent context command
 - [`0012-generated-code-reference-surfaces`](0012-generated-code-reference-surfaces.md) — Generated references for code-derived doc surfaces

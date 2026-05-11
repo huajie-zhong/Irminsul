@@ -15,6 +15,7 @@ Each architectural piece of Irminsul has a dedicated doc here. Frontmatter `desc
 
 - [`cli`](cli.md) — CLI entry point
 - [`config`](config.md) — `irminsul.toml` schema
+- [`context`](context.md) — task-specific agent navigation context
 - [`frontmatter`](frontmatter.md) — per-doc YAML frontmatter parser/validator
 - [`docgraph`](docgraph.md) — in-memory representation of a repo's docs
 - [`checks`](checks.md) — registered checks; exact names are generated in the [check registries reference](../40-reference/check-registries.md)

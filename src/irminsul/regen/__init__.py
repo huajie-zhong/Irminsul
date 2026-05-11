@@ -1,1 +1,1 @@
-"""irminsul regen reference — regenerate reference docs from source."""
+"""Regenerate deterministic documentation artifacts."""

@@ -42,6 +42,7 @@ Self-check (dogfood) — must pass before merging:
 irminsul check --profile=hard              # the gate CI enforces on this repo
 irminsul check --profile=configured        # hard + configured soft deterministic
 irminsul check --profile=hard --format json  # machine-readable output (CI parsers)
+irminsul context --changed                 # ownership, tests, deps, and findings for current edits
 irminsul list orphans                    # docs with no inbound refs
 irminsul list stale                      # deprecated docs past stale threshold
 irminsul list undocumented               # source files in covered dirs with no doc claim
@@ -73,7 +74,7 @@ All checks subclass `Check` and return `list[Finding]` with `(check, severity, p
 
 **Init scaffolder** (`src/irminsul/init/`) walks Jinja2 templates under `init/scaffolds/` and `init/workflows/` to bootstrap a new repo. Two modes: `init` (single-repo, the common case) and `init-docs-only` (Topology A: docs repo + sibling code repo cloned as gitignored subfolder). `detect_code_signals()` decides which to suggest.
 
-**`new`, `regen`, and `list`**. `irminsul new {adr,component,rfc}` writes templated atoms from `src/irminsul/new/templates/`. `irminsul regen --language=python` regenerates Python `40-reference/` stubs from source via `src/irminsul/regen/python.py`; `--language=typescript` writes TypeScript stubs via `src/irminsul/regen/typescript.py` after confirming local TypeDoc is available. `irminsul list {orphans,stale,undocumented}` (`src/irminsul/listing/command.py`) wraps three checks with custom filtering; each subcommand supports `--format plain|json`.
+**`context`, `new`, `regen`, and `list`**. `irminsul context <path>|--topic <query>|--changed` (`src/irminsul/context.py`) returns ownership, tests, dependencies, relevant deterministic findings, and next command hints. `irminsul new {adr,component,rfc}` writes templated atoms from `src/irminsul/new/templates/`. `irminsul regen {python,typescript,docs-surfaces,all}` regenerates deterministic artifacts from `src/irminsul/regen/`; TypeScript confirms local TypeDoc is available. `irminsul list {orphans,stale,undocumented}` (`src/irminsul/listing/command.py`) wraps three checks with custom filtering; each subcommand supports `--format plain|json`.
 
 **The composite Action** (`action.yml`) is a thin shell wrapper: `pip install irminsul[==version]` → `irminsul check --profile=…`. Don't add logic here; add it to the CLI and let the Action call it.
 

@@ -1,4 +1,4 @@
-"""`irminsul regen reference --language=python` — write mkdocstrings stubs."""
+"""`irminsul regen python` — write mkdocstrings stubs."""
 
 from __future__ import annotations
 

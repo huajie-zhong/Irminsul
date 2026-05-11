@@ -27,7 +27,7 @@ copies and make explanation docs link to generated references.
 Add a docs-surface regeneration path:
 
 ```text
-irminsul regen --language=docs-surfaces
+irminsul regen docs-surfaces
 ```
 
 The first generated files live under `docs/40-reference/`:

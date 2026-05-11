@@ -75,6 +75,18 @@ def test_dot_directories_skipped_same_repo(tmp_path: Path) -> None:
     assert not any(".venv" in d for d in displays)
 
 
+def test_python_bytecode_cache_skipped_same_repo(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _make_tree(repo, ["src/a.py", "src/__pycache__/a.cpython-312.pyc"])
+
+    entries, _ = walk_source_files(repo, ["src"])
+
+    displays = {display for _, display in entries}
+    assert "src/a.py" in displays
+    assert not any("__pycache__" in d for d in displays)
+    assert not any(d.endswith(".pyc") for d in displays)
+
+
 def test_dot_directories_skipped_cross_repo(tmp_path: Path) -> None:
     docs = tmp_path / "docs"
     docs.mkdir()

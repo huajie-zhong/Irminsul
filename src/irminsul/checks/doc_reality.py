@@ -588,7 +588,7 @@ class _GeneratedSurfaceDriftCheck:
                     severity=self.default_severity,
                     message=f"generated reference '{rel_path.as_posix()}' is missing",
                     path=rel_path,
-                    suggestion="Run `irminsul regen --language=docs-surfaces`",
+                    suggestion="Run `irminsul regen docs-surfaces`",
                 )
             ]
 
@@ -600,7 +600,7 @@ class _GeneratedSurfaceDriftCheck:
                     severity=self.default_severity,
                     message=f"generated reference '{rel_path.as_posix()}' is stale",
                     path=rel_path,
-                    suggestion="Run `irminsul regen --language=docs-surfaces`",
+                    suggestion="Run `irminsul regen docs-surfaces`",
                 )
             ]
         return []
