@@ -87,6 +87,14 @@ class _Ownership:
 
 
 @dataclass(frozen=True)
+class _ClaimSpec:
+    node: DocNode
+    pattern: str
+    score: tuple[int, int, int]
+    spec: GitIgnoreSpec
+
+
+@dataclass(frozen=True)
 class _PendingResult:
     node: DocNode
     inputs: tuple[str, ...]
@@ -196,7 +204,7 @@ def _pending_for_path(
             )
         ], []
 
-    ownership = _ownership_for_source_path(graph, display)
+    ownership = _ownership_for_source_path(display, _claim_specs(graph))
     if ownership.node is not None:
         return [
             _PendingResult(
@@ -250,6 +258,7 @@ def _pending_for_changed(
 ) -> tuple[list[_PendingResult], list[UnmatchedPath]]:
     groups: dict[str, _ChangedGroup] = {}
     unmatched: list[UnmatchedPath] = []
+    claim_specs = _claim_specs(graph)
 
     for changed_path in _git_changed_paths(repo_root):
         rel = Path(PurePosixPath(changed_path))
@@ -263,7 +272,7 @@ def _pending_for_changed(
             group.source_claims.update(node.frontmatter.describes)
             continue
 
-        ownership = _ownership_for_source_path(graph, changed_path)
+        ownership = _ownership_for_source_path(changed_path, claim_specs)
         if ownership.node is not None:
             group = groups.setdefault(
                 ownership.node.id,
@@ -317,13 +326,27 @@ def _node_matches_topic(node: DocNode, query_lower: str) -> bool:
     return any(query_lower in item.lower() for item in haystack)
 
 
-def _ownership_for_source_path(graph: DocGraph, source_path: str) -> _Ownership:
-    claims: list[tuple[DocNode, str, tuple[int, int, int]]] = []
-    for node in graph.nodes.values():
-        for pattern in node.frontmatter.describes:
-            spec = GitIgnoreSpec.from_lines([pattern])
-            if spec.match_file(source_path):
-                claims.append((node, pattern, specificity(pattern)))
+def _claim_specs(graph: DocGraph) -> tuple[_ClaimSpec, ...]:
+    return tuple(
+        _ClaimSpec(
+            node=node,
+            pattern=pattern,
+            score=specificity(pattern),
+            spec=GitIgnoreSpec.from_lines([pattern]),
+        )
+        for node in graph.nodes.values()
+        for pattern in node.frontmatter.describes
+    )
+
+
+def _ownership_for_source_path(
+    source_path: str,
+    claim_specs: Iterable[_ClaimSpec],
+) -> _Ownership:
+    claims: list[_ClaimSpec] = []
+    for claim in claim_specs:
+        if claim.spec.match_file(source_path):
+            claims.append(claim)
 
     if not claims:
         return _Ownership(
@@ -333,26 +356,39 @@ def _ownership_for_source_path(graph: DocGraph, source_path: str) -> _Ownership:
             reason="no owning doc found",
         )
 
-    top_score = max(claim[2] for claim in claims)
+    top_score = max(claim.score for claim in claims)
     top_claims = sorted(
-        [claim for claim in claims if claim[2] == top_score],
-        key=lambda claim: claim[0].path.as_posix(),
+        [claim for claim in claims if claim.score == top_score],
+        key=lambda claim: claim.node.path.as_posix(),
     )
     if len(top_claims) > 1:
         return _Ownership(
             node=None,
             pattern=None,
-            candidates=tuple(claim[0] for claim in top_claims),
+            candidates=tuple(claim.node for claim in top_claims),
             reason="ambiguous ownership",
         )
 
-    node, pattern, _score = top_claims[0]
-    return _Ownership(node=node, pattern=pattern, candidates=(node,), reason=None)
+    claim = top_claims[0]
+    return _Ownership(
+        node=claim.node,
+        pattern=claim.pattern,
+        candidates=(claim.node,),
+        reason=None,
+    )
 
 
 def _git_changed_paths(repo_root: Path) -> list[str]:
     result = subprocess.run(
-        ["git", "-C", str(repo_root), "status", "--porcelain", "--untracked-files=all"],
+        [
+            "git",
+            "-C",
+            str(repo_root),
+            "status",
+            "--porcelain",
+            "-z",
+            "--untracked-files=all",
+        ],
         check=False,
         capture_output=True,
         text=True,
@@ -362,13 +398,23 @@ def _git_changed_paths(repo_root: Path) -> list[str]:
         raise ContextError(detail, code=1)
 
     paths: list[str] = []
-    for line in result.stdout.splitlines():
-        if not line:
+    records = result.stdout.split("\0")
+    index = 0
+    while index < len(records):
+        record = records[index]
+        index += 1
+        if not record:
             continue
-        raw = line[3:]
-        if " -> " in raw:
-            raw = raw.split(" -> ", 1)[1]
-        paths.append(Path(PurePosixPath(raw)).as_posix())
+
+        status = record[:2]
+        path = record[3:]
+        if not path:
+            continue
+        paths.append(path)
+
+        if "R" in status or "C" in status:
+            index += 1
+
     return sorted(paths)
 
 
@@ -447,8 +493,6 @@ def _relevant_findings(
         if finding_path in relevant_paths:
             out.append(finding)
             continue
-        if any(f"'{path}'" in finding.message for path in input_paths):
-            out.append(finding)
     return out
 
 
