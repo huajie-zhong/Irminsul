@@ -82,7 +82,7 @@ YAML frontmatter editing is done with `ruamel.yaml` (already a dep) to preserve 
 
 ### TypeScript reference regen
 
-`irminsul regen typescript` invokes TypeDoc to produce a JSON manifest, then walks the manifest to emit `docs/40-reference/typescript/<package>.<Module>.md` stubs. `irminsul regen all` includes TypeScript only when TypeScript is enabled in config.
+`irminsul regen typescript` invokes TypeDoc to produce a JSON manifest, then walks the manifest to emit `docs/40-reference/typescript/<package>.<Module>.md` stubs. `irminsul regen all` includes TypeScript only when `[regen.typescript] enabled = true` is set in config.
 
 **Toolchain dependency.** TypeDoc is a Node.js tool. Rather than shell out blindly, `irminsul regen typescript` checks for `npx typedoc --version` and fails with an actionable message if Node/npx is absent:
 

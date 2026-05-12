@@ -887,8 +887,7 @@ def regen_all_command(
     written: list[Path] = []
     written.extend(regen_doc_surfaces(repo_root, config))
     written.extend(regen_python(repo_root, config))
-    if "typescript" in config.languages.enabled:
-        written.extend(_regen_typescript_or_exit(repo_root, config))
+    written.extend(_regen_typescript_or_exit(repo_root, config))
     _print_regen_result(repo_root, written)
 
 
