@@ -189,7 +189,7 @@ class Languages(BaseModel):
 class RegenTypescript(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    enabled: bool = True
+    enabled: bool = False
     tsconfig: str = "tsconfig.json"
     out_dir: str = "docs/40-reference/typescript"
 

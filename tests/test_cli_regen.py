@@ -41,6 +41,8 @@ def _make_typescript_repo(tmp_path: Path) -> Path:
                 'source_roots = ["src"]',
                 "[languages]",
                 'enabled = ["typescript"]',
+                "[regen.typescript]",
+                "enabled = true",
                 "",
             ]
         ),
@@ -160,3 +162,35 @@ def test_regen_all_does_not_create_agent_index(tmp_path: Path) -> None:
     assert (repo / "docs" / "40-reference" / "cli-commands.md").is_file()
     assert (repo / "docs" / "40-reference" / "python" / "mylib" / "core.md").is_file()
     assert not (repo / "docs" / "90-meta" / "agent-index.md").exists()
+
+
+def test_regen_all_uses_typescript_regen_config_not_language_flag(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    repo = _make_repo(tmp_path)
+    (repo / "irminsul.toml").write_text(
+        "\n".join(
+            [
+                'project_name = "r"',
+                "[paths]",
+                'docs_root = "docs"',
+                'source_roots = ["src"]',
+                "[regen.typescript]",
+                "enabled = true",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    ts_root = repo / "src" / "ui"
+    ts_root.mkdir()
+    (ts_root / "button.ts").write_text("export function Button() {}\n", encoding="utf-8")
+
+    import irminsul.regen.typescript as regen_typescript
+
+    monkeypatch.setattr(regen_typescript, "_ensure_typedoc", lambda repo_root: None)
+    result = runner.invoke(app, ["regen", "all", "--path", str(repo)])
+
+    assert result.exit_code == 0, result.output
+    assert (repo / "docs" / "40-reference" / "typescript" / "ui" / "button.md").is_file()
