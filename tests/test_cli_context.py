@@ -6,6 +6,7 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 import irminsul.context as context_module
@@ -230,15 +231,45 @@ def test_context_changed_groups_by_owner_and_reports_unmatched(tmp_path: Path) -
     ]
 
 
+def test_context_changed_normalizes_monorepo_subfolder_paths(tmp_path: Path) -> None:
+    mono = tmp_path / "mono"
+    mono.mkdir()
+    repo = _make_context_repo(mono)
+    (mono / "outside.py").write_text("print('outside')\n", encoding="utf-8")
+    _git(mono, "init")
+    _git(mono, "config", "user.email", "dev@example.com")
+    _git(mono, "config", "user.name", "Dev")
+    _git(mono, "add", ".")
+    _git(mono, "commit", "-m", "initial")
+
+    (repo / "src" / "mylib" / "core.py").write_text("def run(): pass\n", encoding="utf-8")
+    (mono / "outside.py").write_text("print('changed outside')\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["context", "--changed", "--format", "json", "--path", str(repo)])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["unmatched"] == []
+    [context] = data["results"]
+    assert context["owner"]["id"] == "core"
+    assert context["input"] == ["src/mylib/core.py"]
+
+
 def test_git_changed_paths_parses_nul_porcelain_special_paths(tmp_path: Path, monkeypatch) -> None:
     class Result:
-        returncode = 0
-        stdout = " M src/tab\tfile.py\0?? src/back\\slash.py\0R  src/new name.py\0src/old name.py\0"
-        stderr = ""
+        def __init__(self, stdout: str) -> None:
+            self.returncode = 0
+            self.stdout = stdout
+            self.stderr = ""
 
     def fake_run(args, **kwargs):
+        if args[-1] == "--show-prefix":
+            return Result("")
         assert "-z" in args
-        return Result()
+        assert args[-2:] == ["--", "."]
+        return Result(
+            " M src/tab\tfile.py\0?? src/back\\slash.py\0R  src/new name.py\0src/old name.py\0"
+        )
 
     monkeypatch.setattr(context_module.subprocess, "run", fake_run)
 
@@ -247,6 +278,40 @@ def test_git_changed_paths_parses_nul_porcelain_special_paths(tmp_path: Path, mo
         "src/new name.py",
         "src/tab\tfile.py",
     ]
+
+
+def test_git_changed_paths_strips_worktree_prefix(tmp_path: Path, monkeypatch) -> None:
+    class Result:
+        def __init__(self, stdout: str) -> None:
+            self.returncode = 0
+            self.stdout = stdout
+            self.stderr = ""
+
+    def fake_run(args, **kwargs):
+        if args[-1] == "--show-prefix":
+            return Result("project/docs/\n")
+        return Result(
+            " M project/docs/src/mylib/core.py\0"
+            "?? project/docs/src/mylib/new.py\0"
+            " M other-project/outside.py\0"
+        )
+
+    monkeypatch.setattr(context_module.subprocess, "run", fake_run)
+
+    assert context_module._git_changed_paths(tmp_path) == [
+        "src/mylib/core.py",
+        "src/mylib/new.py",
+    ]
+
+
+def test_git_changed_paths_reports_missing_git(tmp_path: Path, monkeypatch) -> None:
+    def fake_run(args, **kwargs):
+        raise FileNotFoundError("git")
+
+    monkeypatch.setattr(context_module.subprocess, "run", fake_run)
+
+    with pytest.raises(context_module.ContextError, match="git command not found"):
+        context_module._git_changed_paths(tmp_path)
 
 
 def test_context_changed_reports_rename_destination_only(tmp_path: Path) -> None:
@@ -291,10 +356,16 @@ def test_context_missing_path_is_nonzero(tmp_path: Path) -> None:
     assert "path does not exist" in result.output
 
 
-def test_context_no_topic_matches_is_nonzero(tmp_path: Path) -> None:
+def test_context_no_topic_matches_returns_empty_json(tmp_path: Path) -> None:
     repo = _make_context_repo(tmp_path)
 
-    result = runner.invoke(app, ["context", "--topic", "absent", "--path", str(repo)])
+    result = runner.invoke(
+        app,
+        ["context", "--topic", "absent", "--format", "json", "--path", str(repo)],
+    )
 
-    assert result.exit_code == 1
-    assert "no docs matched topic" in result.output
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["mode"] == "topic"
+    assert data["results"] == []
+    assert data["unmatched"] == []
