@@ -23,3 +23,5 @@ In-flight proposals. See [`80-evolution`](../INDEX.md) for the RFC lifecycle.
 - [`0010-structured-claim-provenance`](0010-structured-claim-provenance.md) — Structured provenance for enforcement and automation claims
 - [`0011-agent-context-command`](0011-agent-context-command.md) — Agent context command
 - [`0012-generated-code-reference-surfaces`](0012-generated-code-reference-surfaces.md) — Generated references for code-derived doc surfaces
+- [`0013-agents-manifest`](0013-agents-manifest.md) — `AGENTS.md` agent navigation manifest
+- [`0014-backlinks-and-refs`](0014-backlinks-and-refs.md) — Backlinks and symbol-reference query
