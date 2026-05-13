@@ -3,7 +3,7 @@ id: 0011-agent-context-command
 title: "RFC-0011: Agent context command"
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
 ---
 
