@@ -17,8 +17,9 @@ Irminsul is built on a specific view of the modern development environment:
 
 1. **LLMs are the primary consumers.** LLM agents are now the most frequent "readers" of documentation. They are exceptionally good at processing volume but exceptionally bad at resolving contradiction.
 2. **Rot is the primary failure mode.** The issue isn't that documentation is hard to write; it's that it is impossible to keep accurate as code evolves. "Silent rot"—where docs and code diverge—is the deadliest threat to LLM-driven workflows because it triggers invisible hallucinations.
-3. **The Harness Principle.** LLMs follow rules most of the time, but they fail silently and confidently. To make LLM-driven development safe, the system must provide **Hard Checks** (deterministic checks). When a check fails, it provides a clear signal that allows the LLM to self-correct without human intervention.
-4. **Mechanical Necessity.** We assume that humans will only maintain documentation if the system makes it a mechanical necessity. If the doc doesn't *have* to be updated to merge the code, it eventually won't be.
+3. **Principle-first bootstrapping.** A project may begin before code exists. The first useful user input is a well-expressed principle, idea, or belief about what should be built; Irminsul turns that foundation into docs that guide later AI-assisted implementation.
+4. **The Harness Principle.** LLMs follow rules most of the time, but they fail silently and confidently. To make LLM-driven development safe, the system must provide **Hard Checks** (deterministic checks). When a check fails, it provides a clear signal that allows the LLM to self-correct without human intervention.
+5. **Mechanical Necessity.** We assume that humans will only maintain documentation if the system makes it a mechanical necessity. If the doc doesn't *have* to be updated to merge the code, it eventually won't be.
 
 ## The Five Core Principles
 
@@ -43,6 +44,7 @@ If `composer.md` references `data-model.md`, then `data-model.md` should automat
 - **One fact, one home.** Every domain definition lives in exactly one place. References point at it; copies don't exist.
 - **Build correctness never depends on LLM judgment.** Hard checks are pure graph operations, regex, glob resolution, and git arithmetic. LLM checks may exist, but they only ever surface advisories and stay outside the hard profile.
 - **Adoption in three commands.** `pipx install irminsul && cd repo && irminsul init` produces a fully wired skeleton. Friction at adoption is fatal.
+- **Useful from the first belief.** `irminsul init --fresh` supports a project that starts with only user intent. The user's principle, idea, or belief belongs in foundation docs first; agents can elaborate docs and code from there.
 
 ## Non-goals
 
