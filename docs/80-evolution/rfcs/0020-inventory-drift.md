@@ -28,6 +28,15 @@ This is the missing deterministic counterpart to RFC-0010: where RFC-0010 asks
 "does this claim point at evidence," `inventory-drift` asks "does this complete
 list match the code."
 
+A concrete instance this RFC must catch: the `new-list-regen` component doc
+enumerated the `irminsul regen` subcommands in prose. When `regen agents-md`
+was added, the doc was not updated and nothing flagged it — the prose silently
+went stale. `cli-doc-drift` (RFC-0009) did not catch it because that check only
+compares the *generated* CLI reference against Typer, not hand-written
+component prose. The design below must flag this case even though the stale doc
+carried no structured inventory and does not `describes` the file where the
+commands are defined.
+
 ## Detailed Design
 
 ### Frontmatter shape
@@ -35,15 +44,19 @@ list match the code."
 ```yaml
 inventory:
   kind: cli            # cli | http | exports | env-vars
+  source: src/irminsul/cli.py   # optional; defaults to the doc's describes globs
   items:
     - irminsul check
     - irminsul context
     - irminsul fix
 ```
 
-`kind` selects the extractor; `items` declares the canonical list. The field is
-optional and only meaningful on component docs whose `describes` paths point at
-real code.
+`kind` selects the extractor; `items` declares the canonical list. The optional
+`source` path points the extractor at the code that defines the surface — it
+defaults to the doc's `describes` globs, but a doc often documents a surface
+that is *defined* elsewhere (CLI commands are registered in a central
+entrypoint like `src/irminsul/cli.py`, not in the implementation modules the
+doc `describes`). Without `source`, such a doc could never diff cleanly.
 
 ### Per-language extractors
 
@@ -62,11 +75,30 @@ source-root candidates and schema-leak regexes):
 
 ### Check semantics
 
-Add `inventory-drift` to the soft deterministic registry:
+Add `inventory-drift` to the soft deterministic registry. It compares each
+extracted code surface against the union of all `inventory:` blocks of the same
+`kind` across the doc graph:
 
-- *Claimed in doc, missing in code* → error. Lies in the doc.
-- *Present in code, unclaimed in doc* → soft. Potentially intentional (hidden
-  commands, internal endpoints) but worth surfacing.
+- *Claimed in a doc inventory, missing in code* → error. Lies in the doc.
+- *Present in code, not in any doc inventory of that kind* → soft. The surface
+  item is undocumented. Potentially intentional (hidden commands, internal
+  endpoints) but worth surfacing.
+
+The second direction is surface-wide on purpose: it does not matter *which* doc
+ought to own a given command — if a command exists and no inventory anywhere
+lists it, that is the finding. This is what would have caught `regen agents-md`.
+
+### Docs that should declare an inventory
+
+The check is only useful if docs that document an inventoried surface actually
+carry the field. So `inventory-drift` also emits a soft finding when a
+component doc describes or names a surface an extractor recognizes — for the
+CLI extractor, a doc whose body contains command-signature headings or
+`irminsul <subcommand>` prose patterns — but declares no `inventory:` block.
+This is the rule that closes the prose-drift hole directly: a doc listing
+commands in prose with no structured inventory is flagged so the gap is fixed
+before the prose can rot. The `new-list-regen` doc would be flagged by this
+rule today.
 
 Both kinds of finding name the specific items so a fix is unambiguous.
 
@@ -78,8 +110,13 @@ and lands inside RFC-0022's rollout.
 ### Dogfood
 
 Irminsul itself is a Typer CLI, so the Python/Typer extractor lands first and
-validates the CLI component doc against `src/irminsul/cli.py`. This catches
-drift in the very command list agents rely on for navigation.
+validates the CLI component docs against `src/irminsul/cli.py`. This catches
+drift in the very command list agents rely on for navigation. The acceptance
+bar for the dogfood extractor is the `regen agents-md` incident: with this RFC
+implemented, adding a subcommand without updating its component doc must
+produce a finding — either an unclaimed-surface finding (the command is in code
+but no inventory lists it) or a missing-inventory finding (the documenting doc
+still lists commands only in prose).
 
 ## Relationship to Existing RFCs
 
@@ -99,7 +136,10 @@ extractors are mature.
 ## Alternatives
 
 - Require docs to enumerate inventory in prose. Rejected because prose cannot
-  be diffed deterministically.
+  be diffed deterministically. Note this is *not* the same as the
+  missing-inventory rule above: that rule detects a doc relying on prose and
+  tells it to adopt the structured field — it never tries to diff the prose
+  itself.
 - Treat inventory as another evidence kind under RFC-0010. Rejected because
   inventories are list-shaped and benefit from a dedicated diff, not a
   per-item evidence pointer.
