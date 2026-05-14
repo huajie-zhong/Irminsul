@@ -5,6 +5,26 @@ documentation-tree table below is generated; the Foundations and Protocol
 sections are curated. Run `irminsul regen agents-md` after adding or
 moving docs.
 
+New and updated docs should set a one-line `summary:` in their frontmatter
+so they describe themselves in the table below; the Summary column appears
+automatically once any doc declares one.
+
+## About this manifest
+
+- **Don't hand-edit between the markers.** Anything between
+  `agents-manifest:generated-start` and `agents-manifest:generated-end` is
+  rewritten by `irminsul regen agents-md`. Edits to the intro, this section,
+  Foundations, and Protocol are curated and survive regens.
+- **How to read the table.** Rows are grouped by docs-tree layer. Docs that
+  live directly under `docs/` (a project-wide INDEX, this manifest itself)
+  appear under `(root)`. Exempt navigation files — `README.md`, `GLOSSARY.md`,
+  `CONTRIBUTING.md`, and `AGENTS.md` itself — are intentionally not listed;
+  they aren't doc atoms.
+- **The Foundations and Protocol sections are yours.** They scaffold with
+  Irminsul's default doc-system framing, but downstream projects are meant to
+  edit them to their own taste; `irminsul regen agents-md` preserves the
+  edits.
+
 ## Documentation Tree
 
 <!-- agents-manifest:generated-start -->
