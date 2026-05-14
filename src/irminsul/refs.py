@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
@@ -148,8 +149,9 @@ def _repo_relative_path(repo_root: Path, target: str) -> Path:
 def _weak_refs_to(repo_root: Path, graph: DocGraph, target_id: str) -> list[RefHit]:
     md = MarkdownIt("commonmark")
     hits: list[RefHit] = []
-    for node in graph.nodes.values():
-        if node.id == target_id:
+    for source_id in graph.inbound_weak.get(target_id, set()):
+        node = graph.nodes.get(source_id)
+        if node is None or node.id == target_id:
             continue
         line_offset = _body_line_offset(repo_root, node)
         for href, line in _link_hrefs_with_lines(node.body, md):
@@ -274,7 +276,9 @@ def _first_text_line(repo_root: Path, node: DocNode, text: str) -> int:
 
 def _line_mentions_value(line: str, value: str) -> bool:
     cleaned = line.strip().strip("'\"")
-    return cleaned == value or value in line
+    if cleaned == value:
+        return True
+    return value in re.split(r"[^A-Za-z0-9_-]+", line)
 
 
 def _symbol_matches(candidate: str, symbol: str) -> bool:

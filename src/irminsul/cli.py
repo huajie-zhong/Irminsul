@@ -635,7 +635,9 @@ def refs_command(
         typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
         raise typer.Exit(code=2)
     if (target is None) == (symbol is None):
-        typer.echo(typer.style("choose exactly one input: <doc-id|path> or --symbol <name>", fg="red"))
+        typer.echo(
+            typer.style("choose exactly one input: <doc-id|path> or --symbol <name>", fg="red")
+        )
         raise typer.Exit(code=2)
 
     repo_root = path.resolve()
