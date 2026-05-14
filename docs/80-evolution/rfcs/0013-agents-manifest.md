@@ -29,14 +29,17 @@ Require `docs/AGENTS.md` with three stable sections:
   optional one-line `summary` frontmatter field.
 - A curated foundation-principles digest of roughly 40 lines covering the Three
   Laws, the nine-layer overview, and the three-tier overview.
-- A task playbook table mapping common agent tasks to relevant docs, checks,
-  and commands.
+- A pointer to the agent lifecycle protocol defined in
+  [`0016-agent-lifecycle-protocol`](0016-agent-lifecycle-protocol.md). The
+  manifest exposes the protocol's work order via a one-paragraph summary and
+  a deep link, so the protocol stays single-source. The full protocol lives
+  at `docs/90-meta/agent-protocol.md`.
 
 Add a hard `agents-manifest` check that errors when:
 
 - `docs/AGENTS.md` is missing.
 - The generated section has drifted from the current doc graph.
-- Required `Foundations` or `Task Playbook` headings are absent.
+- Required `Foundations` or `Protocol` headings are absent.
 
 Add a regeneration target:
 
@@ -45,7 +48,23 @@ irminsul regen agents-md
 ```
 
 `irminsul fix` should auto-regenerate the generated section while preserving
-the curated foundations and task playbook sections.
+the curated foundations section and the protocol-summary section. The fix
+mechanics are part of RFC-0022.
+
+## Relationship to Existing RFCs
+
+- Builds on the agent context command in
+  [`0011-agent-context-command`](0011-agent-context-command.md): the manifest
+  is the structural map, `irminsul context` answers per-task questions.
+- Surfaces the backlinks command in
+  [`0014-backlinks-and-refs`](0014-backlinks-and-refs.md) as a recommended
+  step before renames or moves.
+- Delegates protocol content to
+  [`0016-agent-lifecycle-protocol`](0016-agent-lifecycle-protocol.md). The
+  manifest summarizes; the protocol owns.
+- Depends on the auto-fix expansion in
+  [`0022-universal-fix-coverage`](0022-universal-fix-coverage.md) for the
+  AGENTS.md regeneration fix.
 
 ## Alternatives
 

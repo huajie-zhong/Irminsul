@@ -37,12 +37,31 @@ For docs under `docs/80-evolution/rfcs/`:
 - `rfc_state: accepted` requires `resolved_by`.
 - `resolved_by` must point to an existing Markdown doc.
 - Accepted RFCs should have `status: stable`.
-- Rejected and withdrawn RFCs should also have `status: stable` once the
-  rejection or withdrawal rationale is recorded.
+- Rejected RFCs should also have `status: stable` once the rejection rationale
+  is recorded. They should include a `## Resolution` section (or a more
+  specific `## Rejection Rationale` section).
+- Withdrawn RFCs (`rfc_state: withdrawn`) should have `status: stable`, must
+  include a `## Withdrawal Rationale` section (or reuse `## Resolution` if the
+  rationale is short), do not require `resolved_by`, and should not retain a
+  non-empty `## Unresolved Questions` section.
 - Resolved RFCs should include a `## Resolution` section.
 - Accepted RFCs should not have a non-empty `## Unresolved Questions` section
   unless the body explicitly names follow-up work.
 - The resolved-by doc should link back to the RFC.
+
+### Atomicity
+
+Accepting an RFC requires `rfc_state: accepted`, `status: stable`, and
+`resolved_by` to be set in a single edit. The check catches inconsistency
+post hoc; `irminsul fix` (per RFC-0022) provides an atomic helper that
+performs all three on confirm and inserts a stub `## Resolution` section.
+
+### Time Handling
+
+The `target_decision_date` comparison defaults to the system date at
+check-run time. A `--now YYYY-MM-DD` flag overrides the comparison basis for
+deterministic test fixtures. Other date-sensitive checks adopt the same
+convention.
 
 Add these optional RFC frontmatter fields:
 

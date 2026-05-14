@@ -33,17 +33,30 @@ Add optional frontmatter fields:
 
 ```yaml
 followups:
-  - docs/20-components/example.md
+  - path: docs/20-components/example.md
+    reason: Add coverage for the new check
+    kind: update           # create | update | review
 implements:
   - 0017-rfc-resolution-check
 ```
 
 `followups` belongs primarily on RFCs and ADRs. It lists docs or generated
 surfaces that must be created, updated, or reviewed before the decision is
-considered fully integrated.
+considered fully integrated. Each entry carries a `reason` so the queue can
+explain why an item matters, and a `kind` so the agent knows whether to
+create, update, or merely review the target. Bare-string entries (a plain
+path) remain valid for terse use, but the structured form is preferred where
+the queue is the primary consumer.
 
 `implements` belongs on ADRs, component docs, workflow docs, and reference docs.
 It lists RFC or ADR IDs that the doc implements or operationalizes.
+`implements` is the *source of truth* for the decision-to-doc relationship.
+The inverse (`implemented_by` on the RFC or ADR) is auto-derived at
+graph-build time from the existing inbound-index pattern
+(`docgraph_index.py`) and exposed through `irminsul refs <rfc-id>` (per
+RFC-0014). Authors do not maintain the back-link manually; the check that
+"follow-up docs link back to the RFC" is satisfied by the presence of
+`implements` on the follow-up doc.
 
 Add a command:
 
@@ -65,9 +78,28 @@ The command reports:
 The command is read-only and supports `--format plain|json`, matching existing
 list commands.
 
+### Unified queue mode
+
+`irminsul list lifecycle --queue` flattens all seven dimensions above into one
+sorted work list for agents that want a single triage surface. Each queue
+item carries:
+
+- `priority` — overdue decision dates first, then missing follow-ups, then
+  drift signals.
+- `kind` — `create`, `update`, `review`, or `resolve`.
+- `target_path` — the doc that needs action.
+- `related_rfc` or `related_adr` — the decision driving the work.
+- `reason` — copied from the `followups` entry where applicable.
+- `suggested_command` — the next CLI invocation (for example,
+  `irminsul fix --check ...` or `irminsul new component ...`).
+
+`--format json` produces the same structure machine-readably for agent
+consumption. The non-queue mode remains the human-friendly view.
+
 Add a soft deterministic check named `decision-followups` that emits the same
 core findings during `irminsul check --profile configured`. Keep the list
-command as the human-friendly queue view.
+command as the human-friendly queue view, and `--queue` as the agent-friendly
+worklist.
 
 ## Relationship to Existing RFCs
 
