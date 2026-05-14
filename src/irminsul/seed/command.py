@@ -119,10 +119,17 @@ def gather_answers_from_flags(
         if not value
     ]
     if missing:
-        raise typer.BadParameter(
-            f"non-interactive seed requires {', '.join(missing)} "
-            "(or pass --json with a complete seed file)"
+        typer.echo(
+            typer.style(
+                "Error: "
+                + (
+                    f"non-interactive seed requires {', '.join(missing)} "
+                    "(or pass --json with a complete seed file)"
+                ),
+                fg="red",
+            )
         )
+        raise typer.Exit(code=2)
     assert principle is not None and idea is not None
     assert belief is not None and first_user is not None
     return SeedAnswers(
