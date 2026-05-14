@@ -164,7 +164,9 @@ def test_regen_idempotent(tmp_path: Path) -> None:
 
 def test_regen_without_target_shows_help() -> None:
     result = runner.invoke(app, ["regen"])
-    assert result.exit_code == 0
+    # `no_args_is_help` prints help; the exit code is 0 on older Click and 2 on
+    # newer Click (which treats a missing subcommand as a usage error).
+    assert result.exit_code in (0, 2)
     assert "docs-surfaces" in result.output
     assert "agent-index" not in result.output
 

@@ -28,18 +28,23 @@ def _docs_root(config: IrminsulConfig) -> str:
 
 
 def _layer_of(node: DocNode, docs_root: str) -> str:
-    parts = node.path.as_posix().split("/")
-    if len(parts) >= 3 and parts[0] == docs_root:
-        return parts[1]
-    return "(root)"
+    """The layer directory a doc lives in, relative to `docs_root`. Docs that
+    sit directly under the docs root (the manifest, a top-level INDEX) have no
+    layer and are grouped under `(root)`."""
+    try:
+        rel = node.path.relative_to(docs_root)
+    except ValueError:
+        return "(root)"
+    return rel.parts[0] if len(rel.parts) >= 2 else "(root)"
 
 
 def _doc_relpath(node: DocNode, docs_root: str) -> str:
-    rel = node.path.as_posix()
-    prefix = f"{docs_root}/"
-    if rel.startswith(prefix):
-        return rel[len(prefix) :]
-    return rel
+    """The doc path relative to `docs_root` — i.e. relative to the manifest,
+    which lives at `<docs_root>/AGENTS.md`."""
+    try:
+        return node.path.relative_to(docs_root).as_posix()
+    except ValueError:
+        return node.path.as_posix()
 
 
 def _cell(text: str) -> str:
