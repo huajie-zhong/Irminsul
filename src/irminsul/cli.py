@@ -598,6 +598,70 @@ def context_command(
     raise typer.Exit(code=1 if context_report_should_fail(report) else 0)
 
 
+@app.command("refs")
+def refs_command(
+    target: Annotated[
+        str | None,
+        typer.Argument(help="Doc id or repo-relative doc path to inspect."),
+    ] = None,
+    symbol: Annotated[
+        str | None,
+        typer.Option("--symbol", help="Find docs that own or reference a symbol."),
+    ] = None,
+    fmt: Annotated[
+        str,
+        typer.Option("--format", help="Output format: plain or json."),
+    ] = "plain",
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path",
+            help="Root of the codebase to inspect. Defaults to current directory.",
+        ),
+    ] = Path("."),
+) -> None:
+    """Return doc backlinks or symbol references."""
+    from irminsul.refs import (
+        RefsError,
+        build_doc_refs_report,
+        build_symbol_refs_report,
+        doc_refs_report_to_json,
+        format_doc_refs_plain,
+        format_symbol_refs_plain,
+        symbol_refs_report_to_json,
+    )
+
+    if fmt not in ("plain", "json"):
+        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+        raise typer.Exit(code=2)
+    if (target is None) == (symbol is None):
+        typer.echo(typer.style("choose exactly one input: <doc-id|path> or --symbol <name>", fg="red"))
+        raise typer.Exit(code=2)
+
+    repo_root = path.resolve()
+    config = load(find_config(repo_root))
+    graph = build_graph(repo_root, config)
+
+    try:
+        if symbol is not None:
+            symbol_report = build_symbol_refs_report(graph, symbol, repo_root)
+            typer.echo(
+                symbol_refs_report_to_json(symbol_report)
+                if fmt == "json"
+                else format_symbol_refs_plain(symbol_report)
+            )
+        elif target is not None:
+            doc_report = build_doc_refs_report(repo_root, graph, target)
+            typer.echo(
+                doc_refs_report_to_json(doc_report)
+                if fmt == "json"
+                else format_doc_refs_plain(doc_report)
+            )
+    except RefsError as exc:
+        typer.echo(typer.style(str(exc), fg="red"))
+        raise typer.Exit(code=exc.code) from exc
+
+
 @app.command()
 def fix(
     profile: Annotated[

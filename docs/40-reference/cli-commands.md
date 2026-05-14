@@ -32,4 +32,5 @@ describes: []
 | `regen docs-surfaces` | command |
 | `regen python` | command |
 | `regen typescript` | command |
+| `refs` | command |
 | `render` | command |
