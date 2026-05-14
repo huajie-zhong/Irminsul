@@ -8,6 +8,7 @@ from pathlib import Path
 from git import Repo
 
 from irminsul.checks.doc_reality import (
+    AgentsManifestCheck,
     CheckSurfaceDriftCheck,
     ClaimProvenanceCheck,
     CliDocDriftCheck,
@@ -17,6 +18,7 @@ from irminsul.checks.doc_reality import (
 )
 from irminsul.config import load
 from irminsul.docgraph import build_graph
+from irminsul.regen.agents_md import regen_agents_md
 from irminsul.regen.doc_surfaces import regen_doc_surfaces
 
 
@@ -454,6 +456,90 @@ def test_terminology_overload_allows_explicit_coverage(tmp_path: Path) -> None:
     )
 
     assert TerminologyOverloadCheck().run(_graph(tmp_path)) == []
+
+
+def _agents_repo(tmp_path: Path) -> Path:
+    # Opt in to `agents-manifest` so a missing manifest is treated as an error.
+    (tmp_path / "irminsul.toml").write_text(
+        "\n".join(
+            [
+                'project_name = "agents"',
+                "[paths]",
+                'docs_root = "docs"',
+                'source_roots = ["src"]',
+                "[checks]",
+                'hard = ["agents-manifest"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/20-components/widget.md",
+        doc_id="widget",
+        body="A component.",
+    )
+    return tmp_path
+
+
+def test_agents_manifest_missing(tmp_path: Path) -> None:
+    _agents_repo(tmp_path)
+
+    findings = AgentsManifestCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert findings[0].severity.value == "error"
+    assert "missing" in findings[0].message
+
+
+def test_agents_manifest_current_after_regen(tmp_path: Path) -> None:
+    repo = _agents_repo(tmp_path)
+    regen_agents_md(repo, load(repo / "irminsul.toml"))
+
+    assert AgentsManifestCheck().run(_graph(repo)) == []
+
+
+def test_agents_manifest_flags_drift(tmp_path: Path) -> None:
+    repo = _agents_repo(tmp_path)
+    regen_agents_md(repo, load(repo / "irminsul.toml"))
+    manifest = repo / "docs" / "AGENTS.md"
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace("| Audience |", "| Aud |"),
+        encoding="utf-8",
+    )
+
+    findings = AgentsManifestCheck().run(_graph(repo))
+
+    assert len(findings) == 1
+    assert "drifted" in findings[0].message
+
+
+def test_agents_manifest_flags_missing_markers(tmp_path: Path) -> None:
+    repo = _agents_repo(tmp_path)
+    (repo / "docs" / "AGENTS.md").write_text(
+        "# Agent Navigation Manifest\n\n## Foundations\n\n## Protocol\n",
+        encoding="utf-8",
+    )
+
+    findings = AgentsManifestCheck().run(_graph(repo))
+
+    assert any("markers" in finding.message for finding in findings)
+
+
+def test_agents_manifest_flags_missing_heading(tmp_path: Path) -> None:
+    repo = _agents_repo(tmp_path)
+    regen_agents_md(repo, load(repo / "irminsul.toml"))
+    manifest = repo / "docs" / "AGENTS.md"
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace("## Protocol", "## Process"),
+        encoding="utf-8",
+    )
+
+    findings = AgentsManifestCheck().run(_graph(repo))
+
+    assert len(findings) == 1
+    assert "Protocol" in findings[0].message
 
 
 def test_terminology_overload_uses_configured_rules(tmp_path: Path) -> None:

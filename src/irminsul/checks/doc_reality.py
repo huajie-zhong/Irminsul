@@ -13,6 +13,12 @@ from irminsul.config import TerminologyRule
 from irminsul.docgraph import DocGraph, DocNode
 from irminsul.frontmatter import ClaimStateEnum, RfcStateEnum, StatusEnum
 from irminsul.git.mtime import last_commit_time_any_repo
+from irminsul.regen.agents_md import (
+    GENERATED_END,
+    GENERATED_START,
+    manifest_rel_path,
+    render_generated_section,
+)
 from irminsul.regen.doc_surfaces import surface_by_filename
 
 _LOCAL_MD_RE = re.compile(r"(?<![\w.-])((?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.md)(?![\w.-])")
@@ -665,6 +671,89 @@ class TerminologyOverloadCheck:
                             suggestion=rule.suggestion,
                         )
                     )
+        return out
+
+
+class AgentsManifestCheck:
+    name: ClassVar[str] = "agents-manifest"
+    default_severity: ClassVar[Severity] = Severity.error
+
+    _REQUIRED_HEADINGS: ClassVar[tuple[str, ...]] = ("Foundations", "Protocol")
+
+    def run(self, graph: DocGraph) -> list[Finding]:
+        if graph.repo_root is None or graph.config is None:
+            return []
+
+        rel_path = manifest_rel_path(graph.config)
+        abs_path = graph.repo_root / rel_path
+        suggestion = "Run `irminsul regen agents-md`"
+
+        if not abs_path.exists():
+            # The check ships opt-in: a missing manifest is only an error for
+            # repos that have adopted it by listing the check in `checks.hard`.
+            # An existing manifest is always validated, regardless of opt-in.
+            if self.name not in graph.config.checks.hard:
+                return []
+            return [
+                Finding(
+                    check=self.name,
+                    severity=self.default_severity,
+                    message=f"agent manifest '{rel_path.as_posix()}' is missing",
+                    path=rel_path,
+                    suggestion=suggestion,
+                )
+            ]
+
+        text = abs_path.read_text(encoding="utf-8").replace("\r\n", "\n")
+        out: list[Finding] = []
+
+        start = text.find(GENERATED_START)
+        end = text.find(GENERATED_END)
+        if start == -1 or end == -1 or end < start:
+            out.append(
+                Finding(
+                    check=self.name,
+                    severity=self.default_severity,
+                    message=(
+                        f"agent manifest '{rel_path.as_posix()}' is missing the "
+                        "generated-section markers"
+                    ),
+                    path=rel_path,
+                    suggestion=suggestion,
+                )
+            )
+        else:
+            actual = text[start + len(GENERATED_START) : end].strip()
+            expected = render_generated_section(graph).strip()
+            if actual != expected:
+                out.append(
+                    Finding(
+                        check=self.name,
+                        severity=self.default_severity,
+                        message=(
+                            f"agent manifest '{rel_path.as_posix()}' generated section "
+                            "has drifted from the doc graph"
+                        ),
+                        path=rel_path,
+                        suggestion=suggestion,
+                    )
+                )
+
+        for heading in self._REQUIRED_HEADINGS:
+            if not re.search(rf"^#{{1,6}}\s+{re.escape(heading)}\s*$", text, re.MULTILINE):
+                out.append(
+                    Finding(
+                        check=self.name,
+                        severity=self.default_severity,
+                        message=(
+                            f"agent manifest '{rel_path.as_posix()}' is missing the "
+                            f"required '{heading}' heading"
+                        ),
+                        path=rel_path,
+                        suggestion=f"Add a '## {heading}' section to the manifest",
+                    )
+                )
+
         return out
 
 

@@ -22,6 +22,7 @@ hard = [
     "coverage",
     "liar",
     "prose-file-reference",
+    "agents-manifest",
 ]
 soft_deterministic = [
     "mtime-drift",

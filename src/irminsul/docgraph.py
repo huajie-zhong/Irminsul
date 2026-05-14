@@ -24,8 +24,10 @@ if TYPE_CHECKING:
     from irminsul.git.mtime import GitTime
 
 # Top-level docs that aren't doc atoms — `README.md`, the glossary, contributor
-# guidance — and don't carry frontmatter. They're navigation, not content.
-EXEMPT_TOPLEVEL_NAMES = frozenset({"README.md", "GLOSSARY.md", "CONTRIBUTING.md"})
+# guidance, the agent manifest — and don't carry frontmatter. They're
+# navigation, not content. `AGENTS.md` is validated by the `agents-manifest`
+# check instead, which reads it directly from disk.
+EXEMPT_TOPLEVEL_NAMES = frozenset({"README.md", "GLOSSARY.md", "CONTRIBUTING.md", "AGENTS.md"})
 
 
 @dataclass(frozen=True)

@@ -25,6 +25,11 @@ HARD_CHECKS = (
     "liar",
     "prose-file-reference",
 )
+# Hard checks that ship registered and valid in `checks.hard` but are not
+# enabled by default; projects opt in by listing them. `agents-manifest`
+# (RFC 0013) is opt-in because it requires a `docs/AGENTS.md` that not every
+# repo has yet.
+OPT_IN_HARD_CHECKS = ("agents-manifest",)
 SOFT_DETERMINISTIC_CHECKS = (
     "mtime-drift",
     "stale-reaper",
@@ -155,7 +160,12 @@ class Checks(BaseModel):
     @field_validator("hard", "soft_deterministic", "soft_llm")
     @classmethod
     def _no_unknown_checks(cls, v: list[str]) -> list[str]:
-        known = set(HARD_CHECKS) | set(SOFT_DETERMINISTIC_CHECKS) | set(SOFT_LLM_CHECKS)
+        known = (
+            set(HARD_CHECKS)
+            | set(OPT_IN_HARD_CHECKS)
+            | set(SOFT_DETERMINISTIC_CHECKS)
+            | set(SOFT_LLM_CHECKS)
+        )
         unknown = [c for c in v if c not in known]
         if unknown:
             raise ValueError(f"unknown check name(s): {unknown}")

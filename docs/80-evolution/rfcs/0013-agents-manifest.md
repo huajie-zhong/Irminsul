@@ -3,8 +3,10 @@ id: 0013-agents-manifest
 title: "RFC-0013: AGENTS.md agent navigation manifest"
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
+rfc_state: accepted
+resolved_by: docs/50-decisions/0004-agents-manifest.md
 ---
 
 # RFC 0013: AGENTS.md agent navigation manifest
@@ -74,3 +76,22 @@ mechanics are part of RFC-0022.
   tree changes.
 - Pure-generated `AGENTS.md`. Rejected because generated data alone loses the
   foundation framing agents need before editing docs.
+
+## Resolution
+
+Accepted and resolved by [`ADR-0004`](../../50-decisions/0004-agents-manifest.md).
+
+Landed: `docs/AGENTS.md` with the generated documentation-tree section plus
+curated Foundations and Protocol sections; the `irminsul regen agents-md`
+target; and the hard `agents-manifest` check (registered and accepted in
+`checks.hard`, enabled in this repo's `irminsul.toml`).
+
+Deferred and documented elsewhere:
+
+- `irminsul fix` auto-regeneration of the manifest belongs to
+  [`0022-universal-fix-coverage`](0022-universal-fix-coverage.md).
+- The canonical lifecycle protocol document under `docs/90-meta/` belongs to
+  [`0016-agent-lifecycle-protocol`](0016-agent-lifecycle-protocol.md). Until it
+  lands, the manifest's Protocol section deep-links to RFC 0016.
+- Making `agents-manifest` a default-on hard check for every consuming project
+  is a later rollout step; it currently ships opt-in.

@@ -29,3 +29,4 @@ describes: []
 | `claims` | no |
 | `rfc_state` | no |
 | `resolved_by` | no |
+| `summary` | no |

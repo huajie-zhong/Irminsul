@@ -875,11 +875,23 @@ def regen_docs_surfaces_command(
     _print_regen_result(repo_root, regen_doc_surfaces(repo_root, config))
 
 
+@_regen_app.command("agents-md")
+def regen_agents_md_command(
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Regenerate the docs/AGENTS.md agent navigation manifest."""
+    from irminsul.regen.agents_md import regen_agents_md
+
+    repo_root, config = _load_repo(path)
+    _print_regen_result(repo_root, regen_agents_md(repo_root, config))
+
+
 @_regen_app.command("all")
 def regen_all_command(
     path: Annotated[Path, typer.Option("--path")] = Path("."),
 ) -> None:
     """Regenerate every configured generated documentation artifact."""
+    from irminsul.regen.agents_md import regen_agents_md
     from irminsul.regen.doc_surfaces import regen_doc_surfaces
     from irminsul.regen.python import regen_python
 
@@ -888,6 +900,7 @@ def regen_all_command(
     written.extend(regen_doc_surfaces(repo_root, config))
     written.extend(regen_python(repo_root, config))
     written.extend(_regen_typescript_or_exit(repo_root, config))
+    written.extend(regen_agents_md(repo_root, config))
     _print_regen_result(repo_root, written)
 
 

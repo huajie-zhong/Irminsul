@@ -27,6 +27,7 @@ describes: []
 | `new component` | command |
 | `new rfc` | command |
 | `regen` | group |
+| `regen agents-md` | command |
 | `regen all` | command |
 | `regen docs-surfaces` | command |
 | `regen python` | command |
