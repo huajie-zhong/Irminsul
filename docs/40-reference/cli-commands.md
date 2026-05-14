@@ -34,3 +34,4 @@ describes: []
 | `regen python` | command |
 | `regen typescript` | command |
 | `render` | command |
+| `seed` | command |

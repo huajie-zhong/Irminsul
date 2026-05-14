@@ -33,6 +33,13 @@ from irminsul.init.command import (
     run_init_fresh_docs_only,
 )
 from irminsul.render.mkdocs import MkDocsRenderer, MkDocsRenderError
+from irminsul.seed.command import (
+    PIB_INTRO,
+    gather_answers_from_flags,
+    gather_answers_from_json,
+    gather_answers_interactive,
+    run_seed,
+)
 
 app = typer.Typer(
     name="irminsul",
@@ -78,6 +85,30 @@ def _root(
     ] = False,
 ) -> None:
     """Irminsul — enforce a documentation system in CI."""
+
+
+def _offer_seed_after_fresh_init(target: Path, *, interactive: bool) -> None:
+    """After an interactive fresh-start init, offer to capture the PIB now.
+
+    Non-interactive init gains no new prompts — it stays fully scriptable.
+    `irminsul seed` remains the standalone command for capturing or redoing
+    the seed later.
+    """
+    if not interactive:
+        return
+    typer.echo()
+    typer.echo(typer.style(PIB_INTRO, fg="cyan"))
+    typer.echo()
+    if not typer.confirm("Capture your project's principle, idea, and belief now?", default=False):
+        typer.echo("Hint: run `irminsul seed` whenever you're ready.")
+        return
+    config = load(find_config(target))
+    answers = gather_answers_interactive(config.project_name, show_intro=False)
+    result = run_seed(target, config, answers)
+    typer.echo()
+    typer.echo(typer.style("Seeded:", fg="green", bold=True))
+    for p in result.written:
+        typer.echo(f"  {p.as_posix()}")
 
 
 @app.command()
@@ -177,6 +208,7 @@ def init(
             )
         else:
             run_init_fresh(target, interactive=interactive, force=force)
+        _offer_seed_after_fresh_init(target, interactive=interactive)
         return
 
     if interactive and not has_code:
@@ -188,11 +220,13 @@ def init(
         answer = typer.prompt("Choose", default="1")
         if answer == "1":
             run_init_fresh(target, interactive=interactive, force=force)
+            _offer_seed_after_fresh_init(target, interactive=interactive)
             return
         if answer == "2":
             run_init_fresh_docs_only(
                 target, interactive=interactive, code_repo=code_repo, force=force
             )
+            _offer_seed_after_fresh_init(target, interactive=interactive)
             return
         if answer == "3":
             run_init_docs_only(target, interactive=interactive, code_repo=None, force=force)
@@ -268,6 +302,88 @@ def init_docs_only(
         raise typer.Exit(code=2)
 
     run_init_docs_only(target, interactive=interactive, code_repo=code_repo, force=force)
+
+
+@app.command()
+def seed(
+    principle: Annotated[
+        str | None,
+        typer.Option("--principle", help="What must stay true even if features change."),
+    ] = None,
+    idea: Annotated[
+        str | None,
+        typer.Option("--idea", help="What should be built first."),
+    ] = None,
+    belief: Annotated[
+        str | None,
+        typer.Option("--belief", help="Why this direction is worth pursuing."),
+    ] = None,
+    first_user: Annotated[
+        str | None,
+        typer.Option("--first-user", help="The first audience the app should serve."),
+    ] = None,
+    non_goals: Annotated[
+        str | None,
+        typer.Option("--non-goals", help="What the app should not become; separate with ';'."),
+    ] = None,
+    direction_risks: Annotated[
+        str | None,
+        typer.Option(
+            "--direction-risks",
+            help="What would make the product drift; separate with ';'.",
+        ),
+    ] = None,
+    json_file: Annotated[
+        Path | None,
+        typer.Option("--json", help="JSON file with the full seed statement."),
+    ] = None,
+    reseed: Annotated[
+        bool,
+        typer.Option(
+            "--reseed", help="Overwrite foundation docs even if edited away from scaffold."
+        ),
+    ] = False,
+    merge: Annotated[
+        bool,
+        typer.Option(
+            "--merge", help="Append this seed pass under a dated heading instead of overwriting."
+        ),
+    ] = False,
+    no_interactive: Annotated[
+        bool,
+        typer.Option(
+            "--no-interactive", help="Use flags or --json instead of prompting. CI-friendly."
+        ),
+    ] = False,
+    path: Annotated[
+        Path,
+        typer.Option("--path", help="Root of the codebase. Defaults to current directory."),
+    ] = Path("."),
+) -> None:
+    """Capture the project's principle, idea, and belief into the foundation layer."""
+    repo_root = path.resolve()
+    config = load(find_config(repo_root))
+
+    if json_file is not None:
+        answers = gather_answers_from_json(json_file, project_name=config.project_name)
+    elif no_interactive:
+        answers = gather_answers_from_flags(
+            project_name=config.project_name,
+            principle=principle,
+            idea=idea,
+            belief=belief,
+            first_user=first_user,
+            non_goals=non_goals,
+            direction_risks=direction_risks,
+        )
+    else:
+        answers = gather_answers_interactive(config.project_name)
+
+    result = run_seed(repo_root, config, answers, reseed=reseed, merge=merge)
+    typer.echo()
+    typer.echo(typer.style("Seeded:", fg="green", bold=True))
+    for p in result.written:
+        typer.echo(f"  {p.as_posix()}")
 
 
 _SEVERITY_STYLE = {

@@ -1,0 +1,34 @@
+---
+id: principles
+title: Principles
+audience: explanation
+tier: 2
+status: draft
+describes: []
+---
+
+# Principles
+
+What {{ project_name }} is, what it isn't, and the design choices that follow
+from those answers.
+
+## Starting belief
+
+- **Principle** — {{ principle }}
+- **Idea** — {{ idea }}
+- **Belief** — {{ belief }}
+
+## First user
+
+{{ first_user }}
+
+## Non-goals
+
+{% if non_goals %}{% for item in non_goals %}- {{ item }}
+{% endfor %}{% else %}- None recorded yet.
+{% endif %}
+## Direction risks
+
+{% if direction_risks %}{% for item in direction_risks %}- {{ item }}
+{% endfor %}{% else %}- None recorded yet.
+{% endif %}

@@ -80,7 +80,9 @@ def test_init_interactive_no_code_can_choose_fresh_start(tmp_path: Path) -> None
     target = tmp_path / "demo"
     target.mkdir()
 
-    result = runner.invoke(app, ["init", "--path", str(target)], input="1\n\n\n")
+    # "1" choose fresh-start, project name + render target defaults, "n" declines
+    # the post-init seed prompt.
+    result = runner.invoke(app, ["init", "--path", str(target)], input="1\n\n\nn\n")
 
     assert result.exit_code == 0, result.stdout
     assert "Fresh-start, same repo" in result.stdout
@@ -152,7 +154,8 @@ def test_init_fresh_docs_only_warns_on_unknown_render_target(tmp_path: Path) -> 
             "--path",
             str(target),
         ],
-        input="\nwat\n",
+        # project name default, "wat" render target, "n" declines the seed prompt.
+        input="\nwat\nn\n",
     )
 
     assert result.exit_code == 0, result.stdout
