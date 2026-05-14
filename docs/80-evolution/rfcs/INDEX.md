@@ -25,3 +25,7 @@ In-flight proposals. See [`80-evolution`](../INDEX.md) for the RFC lifecycle.
 - [`0012-generated-code-reference-surfaces`](0012-generated-code-reference-surfaces.md) — Generated references for code-derived doc surfaces
 - [`0013-agents-manifest`](0013-agents-manifest.md) — `AGENTS.md` agent navigation manifest
 - [`0014-backlinks-and-refs`](0014-backlinks-and-refs.md) — Backlinks and symbol-reference query
+- [`0015-pib-seed-and-foundation-readiness`](0015-pib-seed-and-foundation-readiness.md) — PIB seed flow and foundation readiness checks
+- [`0016-agent-lifecycle-protocol`](0016-agent-lifecycle-protocol.md) — Agent work order for docs, RFCs, ADRs, and checks
+- [`0017-rfc-resolution-check`](0017-rfc-resolution-check.md) — RFC lifecycle validation and resolution metadata
+- [`0018-decision-followups-and-maintenance-queue`](0018-decision-followups-and-maintenance-queue.md) — Decision follow-up tracking and lifecycle listing
