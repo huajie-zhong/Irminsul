@@ -14,6 +14,7 @@ depends_on:
   - new-list-regen
   - refs
   - render
+  - seed
 describes:
   - src/irminsul/cli.py
   - src/irminsul/__init__.py

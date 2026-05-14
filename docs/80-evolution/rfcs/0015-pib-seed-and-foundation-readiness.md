@@ -3,9 +3,10 @@ id: 0015-pib-seed-and-foundation-readiness
 title: PIB seed and foundation readiness
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: accepted
+resolved_by: docs/50-decisions/0006-implement-rfc-0015-pib-seed-and-foundation-readiness.md
 ---
 
 # RFC 0015: PIB seed and foundation readiness
@@ -101,7 +102,6 @@ ensuring the manifest has real foundation content to point at.
 
 The command introduces a second bootstrapping step after init. That is
 intentional: `init` creates structure, while `seed` captures project intent.
-Combining them would make `init --fresh` too interactive for automation.
 
 The seed output can only structure the user's belief; it cannot decide whether
 the belief is good. That remains a user judgment.
@@ -110,8 +110,15 @@ the belief is good. That remains a user judgment.
 
 - Keep seed text as manual edits to `principles.md`. Rejected because agents
   need a clear post-init step, not another convention.
-- Add more prompts directly to `irminsul init --fresh`. Rejected because init
-  must remain safe and scriptable.
+- Add more prompts directly to `irminsul init --fresh`. Originally rejected
+  because init must remain safe and scriptable. **Resolved during
+  implementation** (see
+  [ADR-0006](../../50-decisions/0006-implement-rfc-0015-pib-seed-and-foundation-readiness.md)):
+  the interactive fresh-start path of `init` offers an *opt-in* prompt to run
+  seed inline, while `init --no-interactive` gains no new prompts and stays
+  fully scriptable. This keeps the scriptability concern intact while giving
+  fresh-start a unified onboarding flow; `irminsul seed` still works
+  standalone as the redo path.
 - Use an LLM to infer the seed from a chat transcript. Rejected for the first
   version because the root intent should come from explicit user input.
 

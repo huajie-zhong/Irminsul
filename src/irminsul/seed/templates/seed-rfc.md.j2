@@ -1,0 +1,56 @@
+---
+id: {{ id }}
+title: "{{ title }}"
+audience: explanation
+tier: 2
+status: draft
+describes: []
+rfc_state: accepted
+resolved_by: {{ adr_id }}
+---
+
+# RFC: {{ title }}
+
+## Summary
+
+This RFC records the original direction of {{ project_name }} — the principle,
+idea, and belief the project was seeded with. It is the project's first
+evolution event, so the evolution layer is not empty at project birth.
+
+## Motivation
+
+A project that begins from intent needs that intent captured explicitly. Without
+an anchoring record, later direction changes cannot be compared against the
+original statement, and lifecycle checks have nothing to measure against on day
+one.
+
+## Detailed Design
+
+The seeded direction is:
+
+- **Principle** — {{ principle }}
+- **Idea** — {{ idea }}
+- **Belief** — {{ belief }}
+- **First user** — {{ first_user }}
+
+{% if non_goals %}Non-goals:
+
+{% for item in non_goals %}- {{ item }}
+{% endfor %}
+{% endif %}{% if direction_risks %}Direction risks:
+
+{% for item in direction_risks %}- {{ item }}
+{% endfor %}
+{% endif %}## Drawbacks
+
+The seed statement structures intent but cannot decide whether the intent is
+good. That remains a human judgment.
+
+## Alternatives
+
+Leaving the original direction as untracked prose. Rejected because future
+direction changes would have nothing explicit to be compared against.
+
+## Unresolved Questions
+
+None — this RFC is a record of direction, not a proposal under debate.

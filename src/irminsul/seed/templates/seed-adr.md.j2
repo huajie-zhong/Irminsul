@@ -1,0 +1,41 @@
+---
+id: {{ id }}
+title: "{{ title }}"
+audience: adr
+tier: 2
+status: draft
+describes: []
+---
+
+# {{ title }}
+
+## Context
+
+{{ project_name }} starts from intent rather than from existing code. Before any
+architecture or implementation work begins, the project's root direction needs a
+single, explicit home so later drift can be measured against it.
+
+## Decision
+
+Anchor {{ project_name }} on the following principle, idea, and belief:
+
+- **Principle** — {{ principle }}
+- **Idea** — {{ idea }}
+- **Belief** — {{ belief }}
+
+The first user this should serve is {{ first_user }}.
+
+{% if non_goals %}Non-goals:
+
+{% for item in non_goals %}- {{ item }}
+{% endfor %}
+{% endif %}{% if direction_risks %}Direction risks to watch:
+
+{% for item in direction_risks %}- {{ item }}
+{% endfor %}
+{% endif %}## Consequences
+
+The foundation layer now carries real project intent instead of scaffold
+placeholders. Architecture and component work can proceed against a stated
+direction, and the anchoring RFC records this statement so future direction
+changes are explicit rather than silent.

@@ -39,6 +39,7 @@ describes: []
 | `soft` | check-surface-drift |
 | `soft` | terminology-overload |
 | `soft` | claim-provenance |
+| `soft` | foundation-readiness |
 | `llm` | overlap |
 | `llm` | semantic-drift |
 | `llm` | scope-appropriateness |

@@ -8,6 +8,7 @@ depends_on:
   - config
   - docgraph
   - frontmatter
+  - init
   - languages
   - llm
   - new-list-regen
@@ -38,6 +39,8 @@ Checks consume a [DocGraph](docgraph.md) and return `Finding` records with sever
 | `links` | Internal markdown links resolve; external/anchor-only skipped | error |
 | `schema-leak` | No type/schema definitions inside `docs/20-components/` (those belong in `40-reference/`) | error |
 | `prose-file-reference` | Local `.md` references in prose must be real links or explicitly ignored | error |
+
+Soft deterministic checks warn rather than block. For example, `foundation-readiness` warns when a `00-foundation/` or `10-architecture/` doc still contains literal scaffold placeholder phrases — a signal the project never ran [`irminsul seed`](seed.md) to capture real intent.
 
 Checks are registered in `HARD_REGISTRY`, `SOFT_REGISTRY`, and `LLM_REGISTRY` keyed by name. The CLI selects checks with `--profile`: `hard` runs configured hard checks, `configured` adds configured soft deterministic checks, `advisory` adds configured LLM checks, and `all-available` runs every implemented deterministic check regardless of config.
 
