@@ -3,8 +3,10 @@ id: 0014-backlinks-and-refs
 title: "RFC-0014: Backlinks and symbol-reference query"
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
+rfc_state: accepted
+resolved_by: docs/50-decisions/0005-backlinks-and-refs.md
 ---
 
 # RFC 0014: Backlinks and symbol-reference query
@@ -61,3 +63,13 @@ blast-radius lookup before renaming code symbols.
   checks.
 - Fold this into `irminsul context`. Rejected because references are a direct
   query with a compact output shape, while context remains task-oriented.
+
+## Resolution
+
+Accepted and resolved by [`ADR-0005`](../../50-decisions/0005-backlinks-and-refs.md).
+
+Landed: `irminsul refs <doc-id|path>` for strong (`depends_on`) and weak (body
+link) backlinks, and `irminsul refs --symbol <name>` for `describes` owners and
+`claims.evidence` references, both with `--format plain|json`. Implementation in
+`src/irminsul/refs.py`, wired in `src/irminsul/cli.py`; the command surface is
+recorded in [`cli-commands`](../../40-reference/cli-commands.md).

@@ -26,11 +26,11 @@ describes: []
 | `new adr` | command |
 | `new component` | command |
 | `new rfc` | command |
+| `refs` | command |
 | `regen` | group |
 | `regen agents-md` | command |
 | `regen all` | command |
 | `regen docs-surfaces` | command |
 | `regen python` | command |
 | `regen typescript` | command |
-| `refs` | command |
 | `render` | command |
