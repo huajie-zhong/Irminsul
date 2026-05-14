@@ -58,8 +58,9 @@ performs all three on confirm and inserts a stub `## Resolution` section.
 
 ### Time Handling
 
-The `target_decision_date` comparison defaults to the system date at
-check-run time. A `--now YYYY-MM-DD` flag overrides the comparison basis for
+The `target_decision_date` comparison defaults to the system UTC date at
+check-run time, so behavior is consistent across CI runners in different
+timezones. A `--now YYYY-MM-DD` flag overrides the comparison basis for
 deterministic test fixtures. Other date-sensitive checks adopt the same
 convention.
 

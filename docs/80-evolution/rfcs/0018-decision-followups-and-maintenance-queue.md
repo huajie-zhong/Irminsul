@@ -52,9 +52,11 @@ the queue is the primary consumer.
 It lists RFC or ADR IDs that the doc implements or operationalizes.
 `implements` is the *source of truth* for the decision-to-doc relationship.
 The inverse (`implemented_by` on the RFC or ADR) is auto-derived at
-graph-build time from the existing inbound-index pattern
+graph-build time following the existing inbound-index pattern
 (`docgraph_index.py`) and exposed through `irminsul refs <rfc-id>` (per
-RFC-0014). Authors do not maintain the back-link manually; the check that
+RFC-0014). This requires extending the strong-reference collection in
+`build_inbound_strong`, which today indexes only `depends_on`, to also
+index `implements`. Authors do not maintain the back-link manually; the check that
 "follow-up docs link back to the RFC" is satisfied by the presence of
 `implements` on the follow-up doc.
 
