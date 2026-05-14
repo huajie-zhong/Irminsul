@@ -67,6 +67,7 @@ automatically once any doc declares one.
 | `languages` | [Language profiles](20-components/languages.md) | reference | 3 |  |
 | `llm` | [LLM Client](20-components/llm.md) | explanation | 3 |  |
 | `new-list-regen` | [New / List / Regen / Fix commands](20-components/new-list-regen.md) | explanation | 3 |  |
+| `refs` | [Refs backlink and symbol query](20-components/refs.md) | explanation | 3 |  |
 | `render` | [Renderer](20-components/render.md) | explanation | 3 |  |
 
 ### 30-workflows
@@ -93,6 +94,7 @@ automatically once any doc declares one.
 | `0002-support-fresh-start-init` | [Support fresh-start init](50-decisions/0002-support-fresh-start-init.md) | adr | 2 |  |
 | `0003-generated-code-reference-surfaces` | [ADR-0003: Generate code-derived reference surfaces](50-decisions/0003-generated-code-reference-surfaces.md) | adr | 2 | Adopt generated reference docs for code-derived surfaces; verify them in CI. |
 | `0004-agents-manifest` | [ADR-0004: Add the agent navigation manifest](50-decisions/0004-agents-manifest.md) | adr | 2 | Add an agent navigation manifest plus an opt-in hard check and a regen target. |
+| `0005-backlinks-and-refs` | [ADR-0005: Add the refs backlink and symbol-reference query](50-decisions/0005-backlinks-and-refs.md) | adr | 2 | Add `irminsul refs` as a CLI surface over the strong and weak inbound indexes plus claim and describes provenance. |
 | `50-decisions` | [Architecture decisions](50-decisions/INDEX.md) | reference | 2 |  |
 
 ### 60-operations

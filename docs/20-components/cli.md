@@ -12,6 +12,7 @@ depends_on:
   - init
   - llm
   - new-list-regen
+  - refs
   - render
 describes:
   - src/irminsul/cli.py
