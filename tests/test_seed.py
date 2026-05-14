@@ -127,8 +127,15 @@ def test_seed_missing_required_flags_errors(tmp_path: Path) -> None:
         app,
         ["seed", "--no-interactive", "--principle", "only this", "--path", str(repo)],
     )
-    assert result.exit_code != 0
-    assert "--idea" in result.stdout
+    # typer.BadParameter exits 2; the message lands on stdout or stderr depending
+    # on the click version, so check both.
+    assert result.exit_code == 2
+    message = result.output
+    try:
+        message += result.stderr
+    except ValueError:
+        pass
+    assert "--idea" in message
 
 
 def test_seed_refuses_edited_foundation(tmp_path: Path) -> None:
