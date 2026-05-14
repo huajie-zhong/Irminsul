@@ -3,8 +3,10 @@ id: 0012-generated-code-reference-surfaces
 title: Generated code reference surfaces
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
+rfc_state: accepted
+resolved_by: docs/50-decisions/0003-generated-code-reference-surfaces.md
 ---
 
 # RFC 0012: Generated code reference surfaces
@@ -57,3 +59,17 @@ language profiles, and machine-readable command option details.
   policy because it preserves duplicate truth.
 - Generate references only nightly. Rejected because stale docs could merge
   before the nightly job catches them.
+
+## Resolution
+
+Accepted and resolved by
+[`ADR-0003`](../../50-decisions/0003-generated-code-reference-surfaces.md).
+
+Landed: `irminsul regen docs-surfaces` and the generated atoms under
+`docs/40-reference/` (shipped with RFC 0009), and the CI Policy — the dogfood
+job now runs `irminsul check --profile=configured` so the `schema-doc-drift`,
+`cli-doc-drift`, and `check-surface-drift` checks run as visible warnings on
+every pull request.
+
+Deferred: the Future Work surfaces (config models, renderer options, language
+profiles, machine-readable command option detail) are left to a follow-up RFC.

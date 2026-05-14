@@ -12,6 +12,7 @@ from irminsul.checks.boundary import BoundaryCheck
 from irminsul.checks.coverage import CoverageCheck
 from irminsul.checks.dependency_check import DependencyCheck
 from irminsul.checks.doc_reality import (
+    AgentsManifestCheck,
     CheckSurfaceDriftCheck,
     ClaimProvenanceCheck,
     CliDocDriftCheck,
@@ -48,6 +49,7 @@ HARD_REGISTRY: dict[str, type[Check]] = {
     CoverageCheck.name: CoverageCheck,
     LiarCheck.name: LiarCheck,
     ProseFileReferenceCheck.name: ProseFileReferenceCheck,
+    AgentsManifestCheck.name: AgentsManifestCheck,
 }
 
 SOFT_REGISTRY: dict[str, type[Check]] = {
@@ -80,6 +82,7 @@ __all__ = [
     "HARD_REGISTRY",
     "LLM_REGISTRY",
     "SOFT_REGISTRY",
+    "AgentsManifestCheck",
     "BoundaryCheck",
     "Check",
     "CheckSurfaceDriftCheck",

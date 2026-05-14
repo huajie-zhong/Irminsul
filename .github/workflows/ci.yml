@@ -70,5 +70,7 @@ jobs:
           pip install -e ".[mkdocs]"
       - name: irminsul check (self)
         run: irminsul check --profile=hard
+      - name: irminsul check configured (self)
+        run: irminsul check --profile=configured
       - name: irminsul render (self)
         run: irminsul render

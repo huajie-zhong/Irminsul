@@ -85,6 +85,7 @@ class DocFrontmatter(BaseModel):
     claims: list[Claim] = Field(default_factory=list)
     rfc_state: RfcStateEnum | None = None
     resolved_by: str | None = None
+    summary: str | None = None
 
     @model_validator(mode="after")
     def _validate_structured_claims(self) -> DocFrontmatter:

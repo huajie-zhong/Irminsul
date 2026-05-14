@@ -21,6 +21,7 @@ describes: []
 | `hard` | coverage |
 | `hard` | liar |
 | `hard` | prose-file-reference |
+| `hard` | agents-manifest |
 | `soft` | mtime-drift |
 | `soft` | orphans |
 | `soft` | stale-reaper |

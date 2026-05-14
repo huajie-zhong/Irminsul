@@ -80,6 +80,34 @@ def test_regen_docs_surfaces_creates_generated_refs(tmp_path: Path) -> None:
     )
 
 
+def test_regen_agents_md_creates_manifest(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    result = runner.invoke(app, ["regen", "agents-md", "--path", str(repo)])
+    assert result.exit_code == 0, result.output
+    manifest = repo / "docs" / "AGENTS.md"
+    assert manifest.is_file()
+    text = manifest.read_text(encoding="utf-8")
+    assert "<!-- agents-manifest:generated-start -->" in text
+    assert "<!-- agents-manifest:generated-end -->" in text
+    assert "## Foundations" in text
+    assert "## Protocol" in text
+
+
+def test_regen_agents_md_preserves_curated_sections(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    runner.invoke(app, ["regen", "agents-md", "--path", str(repo)])
+    manifest = repo / "docs" / "AGENTS.md"
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace(
+            "## Foundations", "## Foundations\n\nCURATED EDIT SURVIVES"
+        ),
+        encoding="utf-8",
+    )
+    result = runner.invoke(app, ["regen", "agents-md", "--path", str(repo)])
+    assert result.exit_code == 0, result.output
+    assert "CURATED EDIT SURVIVES" in manifest.read_text(encoding="utf-8")
+
+
 def test_regen_python_stub_has_valid_frontmatter(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
     runner.invoke(app, ["regen", "python", "--path", str(repo)])
@@ -161,6 +189,7 @@ def test_regen_all_does_not_create_agent_index(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert (repo / "docs" / "40-reference" / "cli-commands.md").is_file()
     assert (repo / "docs" / "40-reference" / "python" / "mylib" / "core.md").is_file()
+    assert (repo / "docs" / "AGENTS.md").is_file()
     assert not (repo / "docs" / "90-meta" / "agent-index.md").exists()
 
 
