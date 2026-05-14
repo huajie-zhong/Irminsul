@@ -1,0 +1,91 @@
+---
+id: 0017-rfc-resolution-check
+title: RFC resolution check
+audience: explanation
+tier: 2
+status: draft
+describes: []
+rfc_state: draft
+---
+
+# RFC 0017: RFC resolution check
+
+## Summary
+
+Add a deterministic soft check named `rfc-resolution` that validates RFC
+lifecycle state. The check makes sure resolved RFCs become reliable historical
+records and accepted RFCs point to the ADR or decision doc that carries the
+canonical decision forward.
+
+## Motivation
+
+The frontmatter schema already has `rfc_state` and requires `resolved_by` when
+`rfc_state: accepted`, but the lifecycle is incomplete. A resolved RFC can stay
+`status: draft`, accepted proposals can fail to link to an existing ADR, and the
+RFC index can say a process exists that no check actually enforces.
+
+This is the specific gap where agents lack enforcement after RFC completion.
+Once a proposal is accepted, the agent should mark the RFC as a stable record,
+create or update the ADR, link both directions, and update affected docs.
+
+## Detailed Design
+
+Add `rfc-resolution` to the deterministic soft registry.
+
+For docs under `docs/80-evolution/rfcs/`:
+
+- `rfc_state: accepted` requires `resolved_by`.
+- `resolved_by` must point to an existing Markdown doc.
+- Accepted RFCs should have `status: stable`.
+- Rejected and withdrawn RFCs should also have `status: stable` once the
+  rejection or withdrawal rationale is recorded.
+- Resolved RFCs should include a `## Resolution` section.
+- Accepted RFCs should not have a non-empty `## Unresolved Questions` section
+  unless the body explicitly names follow-up work.
+- The resolved-by doc should link back to the RFC.
+
+Add these optional RFC frontmatter fields:
+
+```yaml
+decision_owner: ""
+target_decision_date: "YYYY-MM-DD"
+```
+
+If an RFC is `draft`, `open`, or `fcp` and `target_decision_date` is in the
+past, the check emits a warning. If `decision_owner` is missing on an open RFC,
+the check emits a warning.
+
+The check should stay soft at first. A project can opt into strict treatment by
+running configured checks with `--strict` after the process proves useful.
+
+## Relationship to Existing RFCs
+
+This RFC extends the structured claim lifecycle from
+[`0010-structured-claim-provenance`](0010-structured-claim-provenance.md). It
+also supports the agent lifecycle protocol proposed in
+[`0016-agent-lifecycle-protocol`](0016-agent-lifecycle-protocol.md).
+
+## Drawbacks
+
+The check cannot prove that an ADR fully implements an RFC's intent. It can only
+prove lifecycle structure: state, links, and required follow-up markers.
+
+Resolved RFCs without a clean ADR mapping may need a short migration period.
+That is why the check starts as soft.
+
+## Alternatives
+
+- Keep RFC lifecycle as prose in the evolution index. Rejected because agents
+  need machine-readable feedback.
+- Make accepted RFCs move into the ADR folder. Rejected because RFCs are useful
+  historical artifacts and should remain in the evolution layer.
+- Treat `status: stable` as the acceptance state. Rejected because doc
+  reliability and proposal outcome are separate concepts.
+
+## Unresolved Questions
+
+- Should `resolved_by` accept doc IDs, paths, or both? The first implementation
+  should prefer existing path semantics because the current schema stores a
+  string path.
+- Should rejected RFCs require a `## Resolution` section or a more specific
+  `## Rejection Rationale` section?
