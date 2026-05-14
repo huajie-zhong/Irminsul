@@ -162,7 +162,7 @@ def test_seed_missing_required_flags_errors(tmp_path: Path) -> None:
         app,
         ["seed", "--no-interactive", "--principle", "only this", "--path", str(repo)],
     )
-    # typer.BadParameter exits 2; the message lands on stdout or stderr depending
+    # The validation exits 2; the message lands on stdout or stderr depending
     # on the click version, so check both.
     assert result.exit_code == 2
     message = result.output
