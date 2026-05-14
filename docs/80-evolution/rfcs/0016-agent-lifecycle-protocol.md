@@ -36,6 +36,10 @@ surface that exposes agent navigation.
 
 The protocol requires this work order:
 
+0. Read `docs/AGENTS.md` (RFC-0013) before any other step. The manifest names
+   the layers and tiers, the Three Laws, and this protocol. If the manifest is
+   missing or its generated section is stale, run `irminsul regen agents-md`
+   and proceed.
 1. Before editing, run `irminsul context <target>`, `irminsul context --topic
    <query>`, or `irminsul context --changed` to locate ownership, dependencies,
    tests, and relevant findings.
@@ -46,7 +50,10 @@ The protocol requires this work order:
 4. When an RFC is accepted, create or update an ADR and link the RFC to that
    decision record.
 5. When code is added or moved, create or update component docs with `describes`
-   coverage and tests metadata.
+   coverage and tests metadata. Before renaming or moving a code symbol, doc,
+   or directory, run `irminsul refs <symbol-or-path>` (RFC-0014) to enumerate
+   strong and weak inbound references, and update each before completing the
+   move.
 6. When workflows, commands, or reference surfaces change, update the
    corresponding workflow, component, or generated reference docs.
 7. When a doc replaces another doc, use `supersedes` on the new doc and run
@@ -57,8 +64,9 @@ The protocol requires this work order:
 9. Report any remaining warnings, skipped checks, or follow-up decisions in the
    final response.
 
-The protocol should be included in fresh scaffolds and referenced from the
-agent-facing manifest once RFC 0013 is implemented.
+The protocol lives at `docs/90-meta/agent-protocol.md` once RFC-0013 lands;
+`docs/AGENTS.md` summarizes it and deep-links here. This keeps the manifest
+scannable and the protocol authoritative.
 
 ## Relationship to Existing RFCs
 
@@ -87,7 +95,5 @@ RFCs can add checks that detect incomplete lifecycle transitions.
 
 ## Unresolved Questions
 
-- Should the protocol live at `docs/AGENTS.md`, `docs/90-meta/agent-protocol.md`,
-  or both after RFC 0013 lands?
 - Should the final-response reporting requirement be represented in generated
   agent instructions outside the docs tree?
