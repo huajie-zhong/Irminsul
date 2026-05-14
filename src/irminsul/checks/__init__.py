@@ -22,6 +22,7 @@ from irminsul.checks.doc_reality import (
 )
 from irminsul.checks.env_check import EnvCheck
 from irminsul.checks.external_links import ExternalLinksCheck
+from irminsul.checks.foundation_readiness import FoundationReadinessCheck
 from irminsul.checks.frontmatter import FrontmatterCheck
 from irminsul.checks.globs import GlobsCheck
 from irminsul.checks.glossary import GlossaryCheck
@@ -70,6 +71,7 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     CheckSurfaceDriftCheck.name: CheckSurfaceDriftCheck,
     TerminologyOverloadCheck.name: TerminologyOverloadCheck,
     ClaimProvenanceCheck.name: ClaimProvenanceCheck,
+    FoundationReadinessCheck.name: FoundationReadinessCheck,
 }
 
 LLM_REGISTRY: dict[str, type] = {
@@ -93,6 +95,7 @@ __all__ = [
     "EnvCheck",
     "Finding",
     "Fix",
+    "FoundationReadinessCheck",
     "LiarCheck",
     "OverlapCheck",
     "PhantomLayerCheck",

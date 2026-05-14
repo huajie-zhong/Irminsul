@@ -42,6 +42,7 @@ soft_deterministic = [
     "check-surface-drift",
     "terminology-overload",
     "claim-provenance",
+    "foundation-readiness",
 ]
 
 [checks.schema_leak]
