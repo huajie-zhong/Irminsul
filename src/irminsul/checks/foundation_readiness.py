@@ -29,9 +29,10 @@ class FoundationReadinessCheck:
             return []
 
         docs_root = graph.config.paths.docs_root.strip("/\\")
+        prefix = "" if docs_root in ("", ".") else f"{docs_root}/"
         foundation_prefixes = (
-            f"{docs_root}/00-foundation/",
-            f"{docs_root}/10-architecture/",
+            f"{prefix}00-foundation/",
+            f"{prefix}10-architecture/",
         )
 
         out: list[Finding] = []

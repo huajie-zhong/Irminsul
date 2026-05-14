@@ -102,6 +102,41 @@ def test_seed_from_json(tmp_path: Path) -> None:
     assert "Stay deterministic" in principles
 
 
+def test_seed_from_json_reports_decode_errors(tmp_path: Path) -> None:
+    repo = _fresh_repo(tmp_path)
+    seed_file = tmp_path / "seed.json"
+    seed_file.write_bytes(b"\xff")
+
+    result = runner.invoke(app, ["seed", "--json", str(seed_file), "--path", str(repo)])
+
+    assert result.exit_code == 2
+    assert "could not decode seed JSON file" in result.output
+
+
+def test_seed_multiline_idea_keeps_adr_frontmatter_valid(tmp_path: Path) -> None:
+    repo = _fresh_repo(tmp_path)
+    seed_file = tmp_path / "seed.json"
+    seed_file.write_text(
+        json.dumps(
+            {
+                "principle": "Stay deterministic",
+                "idea": "Ship a check engine\nwith clean frontmatter",
+                "belief": "Determinism builds trust",
+                "first_user": "A CI pipeline",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["seed", "--json", str(seed_file), "--path", str(repo)])
+
+    assert result.exit_code == 0, result.stdout
+    graph = build_graph(repo, load(find_config(repo)))
+    assert graph.parse_failures == []
+    adr = repo / "docs/50-decisions/0002-ship-a-check-engine-with-clean-frontmatter.md"
+    assert 'title: "Ship a check engine with clean frontmatter"' in adr.read_text(encoding="utf-8")
+
+
 def test_seed_interactive_prompts(tmp_path: Path) -> None:
     repo = _fresh_repo(tmp_path)
     answers = "\n".join(

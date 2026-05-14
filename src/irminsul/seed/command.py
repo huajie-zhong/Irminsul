@@ -142,6 +142,10 @@ def gather_answers_from_json(json_path: Path, *, project_name: str) -> SeedAnswe
         raw = json.loads(json_path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
         raise typer.BadParameter(f"seed JSON file not found: {json_path}") from exc
+    except UnicodeDecodeError as exc:
+        raise typer.BadParameter(f"could not decode seed JSON file {json_path}: {exc}") from exc
+    except OSError as exc:
+        raise typer.BadParameter(f"could not read seed JSON file {json_path}: {exc}") from exc
     except json.JSONDecodeError as exc:
         raise typer.BadParameter(f"invalid JSON in {json_path}: {exc}") from exc
     if not isinstance(raw, dict):
@@ -200,15 +204,14 @@ def foundation_state(repo_root: Path, config: IrminsulConfig) -> FoundationState
 # --- rendering & writing --------------------------------------------------
 
 
-def _env() -> Environment:
-    return Environment(
-        loader=FileSystemLoader(str(_TEMPLATES_DIR)),
-        keep_trailing_newline=True,
-    )
+_ENV = Environment(
+    loader=FileSystemLoader(str(_TEMPLATES_DIR)),
+    keep_trailing_newline=True,
+)
 
 
 def _render(template_name: str, **context: object) -> str:
-    return _env().get_template(template_name).render(**context)
+    return _ENV.get_template(template_name).render(**context)
 
 
 def _atomic_write(path: Path, content: str) -> None:
@@ -308,7 +311,7 @@ def run_seed(
         rfc_dir = docs_root / "80-evolution" / "rfcs"
         adr_n = _next_number(adr_dir)
         rfc_n = _next_number(rfc_dir)
-        adr_title = answers.idea.replace('"', "'")
+        adr_title = " ".join(answers.idea.replace('"', "'").splitlines()).strip()
         adr_id = f"{adr_n}-{_slugify(answers.idea) or 'initial-direction'}"
         rfc_id = f"{rfc_n}-initial-direction"
 

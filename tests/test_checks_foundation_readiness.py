@@ -23,6 +23,48 @@ def test_scaffold_placeholders_flagged(fixture_repo: Callable[[str], Path]) -> N
     assert "overview" in flagged
 
 
+def test_scaffold_placeholders_flagged_when_docs_root_is_repo_root(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    (repo / "00-foundation").mkdir(parents=True)
+    (repo / "10-architecture").mkdir()
+    (repo / "irminsul.toml").write_text(
+        'project_name = "root-docs"\n[paths]\ndocs_root = "."\nsource_roots = []\n',
+        encoding="utf-8",
+    )
+    (repo / "00-foundation" / "principles.md").write_text(
+        """---
+id: principles
+title: Principles
+audience: explanation
+tier: 2
+status: draft
+---
+
+# Principles
+
+Replace this paragraph with your own principle, idea, or belief about the app.
+""",
+        encoding="utf-8",
+    )
+    (repo / "10-architecture" / "overview.md").write_text(
+        """---
+id: overview
+title: Overview
+audience: explanation
+tier: 2
+status: draft
+---
+
+# Overview
+
+Replace the diagram and prose to match your system.
+""",
+        encoding="utf-8",
+    )
+
+    assert _flagged_ids(repo) == {"principles", "overview"}
+
+
 def test_real_foundation_content_not_flagged(fixture_repo: Callable[[str], Path]) -> None:
     repo = fixture_repo("soft-foundation-fresh")
     assert "laws" not in _flagged_ids(repo)
