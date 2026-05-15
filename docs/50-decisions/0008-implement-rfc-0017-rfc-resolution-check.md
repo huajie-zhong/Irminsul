@@ -1,6 +1,6 @@
 ---
-id: 0007-implement-rfc-0017-rfc-resolution-check
-title: "ADR-0007: Implement RFC-0017 RFC resolution check"
+id: 0008-implement-rfc-0017-rfc-resolution-check
+title: "ADR-0008: Implement RFC-0017 RFC resolution check"
 audience: adr
 tier: 2
 status: stable
@@ -8,7 +8,7 @@ describes: []
 summary: Add the `rfc-resolution` soft deterministic check and a `--now` override so the RFC lifecycle is machine-enforced end to end.
 ---
 
-# ADR-0007: Implement RFC-0017 RFC resolution check
+# ADR-0008: Implement RFC-0017 RFC resolution check
 
 ## Context
 

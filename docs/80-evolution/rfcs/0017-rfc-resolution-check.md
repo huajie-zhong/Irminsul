@@ -6,7 +6,7 @@ tier: 2
 status: stable
 describes: []
 rfc_state: accepted
-resolved_by: docs/50-decisions/0007-implement-rfc-0017-rfc-resolution-check.md
+resolved_by: docs/50-decisions/0008-implement-rfc-0017-rfc-resolution-check.md
 ---
 
 # RFC 0017: RFC resolution check
@@ -106,7 +106,7 @@ That is why the check starts as soft.
 ## Resolution
 
 Accepted and implemented in
-[ADR-0007](../../50-decisions/0007-implement-rfc-0017-rfc-resolution-check.md).
+[ADR-0008](../../50-decisions/0008-implement-rfc-0017-rfc-resolution-check.md).
 The check ships in `src/irminsul/checks/rfc_resolution.py` with tests in
 `tests/test_checks_rfc_resolution.py` and a `--now YYYY-MM-DD` flag on
 `irminsul check` so date-sensitive checks share one source of "today".

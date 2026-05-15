@@ -136,11 +136,8 @@ def _protocol_section() -> list[str]:
         "changes, keep component docs and generated references current, and run",
         "`irminsul check --profile hard` before returning work.",
         "",
-        "The full lifecycle work order is defined in",
-        "[`0016-agent-lifecycle-protocol`]"
-        "(80-evolution/rfcs/0016-agent-lifecycle-protocol.md). Its canonical",
-        "protocol document under `docs/90-meta/` lands with RFC 0016; until then",
-        "the RFC is authoritative.",
+        "The full lifecycle work order lives at",
+        "[`90-meta/agent-protocol`](90-meta/agent-protocol.md).",
     ]
 
 

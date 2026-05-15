@@ -12,3 +12,4 @@ describes: []
 Docs about the doc system itself — style guide, health dashboard, system reference.
 
 - [`style-guide`](style-guide.md) — authoring conventions not enforced by checks
+- [`agent-protocol`](agent-protocol.md) — the lifecycle work order agents must follow
