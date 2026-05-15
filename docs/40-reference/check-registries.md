@@ -27,6 +27,7 @@ describes: []
 | `soft` | stale-reaper |
 | `soft` | supersession |
 | `soft` | parent-child |
+| `soft` | rfc-resolution |
 | `soft` | glossary |
 | `soft` | external-links |
 | `soft` | reality |

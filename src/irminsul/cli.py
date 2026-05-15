@@ -5,6 +5,7 @@ Two scripts in `pyproject.toml` (`irminsul` and `irm`) both bind to `app`.
 
 from __future__ import annotations
 
+import datetime as _dt
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -598,16 +599,36 @@ def check(
             help="Root of the codebase to check. Defaults to current directory.",
         ),
     ] = Path("."),
+    now: Annotated[
+        str | None,
+        typer.Option(
+            "--now",
+            help=(
+                "Override today's date (YYYY-MM-DD) for date-sensitive checks. "
+                "Intended for deterministic test fixtures and CI runs."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Run the configured checks. Errors exit non-zero."""
     if fmt not in ("plain", "json"):
         typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
         raise typer.Exit(code=2)
 
+    now_date: _dt.date | None = None
+    if now is not None:
+        try:
+            now_date = _dt.date.fromisoformat(now)
+        except ValueError:
+            typer.echo(
+                typer.style(f"unknown --now '{now}'; expected YYYY-MM-DD", fg="red"),
+            )
+            raise typer.Exit(code=2) from None
+
     repo_root = path.resolve()
     config_path = find_config(repo_root)
     config = load(config_path)
-    graph = build_graph(repo_root, config)
+    graph = build_graph(repo_root, config, now=now_date)
 
     findings: list[Finding] = []
     findings.extend(

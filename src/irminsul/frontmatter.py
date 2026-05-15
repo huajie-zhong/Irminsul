@@ -8,6 +8,7 @@ from rejecting unknown ones.
 
 from __future__ import annotations
 
+import datetime as _dt
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -85,6 +86,8 @@ class DocFrontmatter(BaseModel):
     claims: list[Claim] = Field(default_factory=list)
     rfc_state: RfcStateEnum | None = None
     resolved_by: str | None = None
+    decision_owner: str | None = None
+    target_decision_date: str | None = None
     summary: str | None = None
 
     @model_validator(mode="after")
@@ -97,6 +100,11 @@ class DocFrontmatter(BaseModel):
             raise ValueError(f"duplicate claim id(s): {duplicate_ids}")
         if self.rfc_state == RfcStateEnum.accepted and not self.resolved_by:
             raise ValueError("resolved_by is required when rfc_state is accepted")
+        if self.target_decision_date is not None:
+            try:
+                _dt.date.fromisoformat(self.target_decision_date)
+            except ValueError as exc:
+                raise ValueError(f"target_decision_date must be YYYY-MM-DD ({exc})") from exc
         return self
 
 

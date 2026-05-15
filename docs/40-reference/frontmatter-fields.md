@@ -29,4 +29,6 @@ describes: []
 | `claims` | no |
 | `rfc_state` | no |
 | `resolved_by` | no |
+| `decision_owner` | no |
+| `target_decision_date` | no |
 | `summary` | no |

@@ -10,6 +10,7 @@ depends_on:
 describes:
   - src/irminsul/docgraph.py
   - src/irminsul/docgraph_index.py
+  - src/irminsul/clock.py
 tests:
   - tests/test_docgraph.py
   - tests/test_docgraph_index.py
@@ -28,6 +29,8 @@ Three sidebands surface conditions checks need to report cleanly:
 A small set of top-level filenames are exempt from the frontmatter requirement: [`README.md`](../README.md), [`GLOSSARY.md`](../GLOSSARY.md), [`CONTRIBUTING.md`](../CONTRIBUTING.md). They're navigation, not doc atoms.
 
 Paths stored on `DocNode` are repo-relative and POSIX-normalized so they're stable as dict keys and human-readable on Windows.
+
+`build_graph` accepts an optional `now` kwarg that's stored on `DocGraph.now` and read by date-sensitive checks (`stale-reaper`, `rfc-resolution`) through the `clock.today(graph.now)` helper. The `--now YYYY-MM-DD` flag on `irminsul check` threads through to here; without it the system date is used.
 
 ## Scope & Limitations
 

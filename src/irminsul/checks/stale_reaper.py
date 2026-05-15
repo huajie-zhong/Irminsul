@@ -7,9 +7,9 @@ is past due — either delete it, mark it `removed`, or rewrite and recommit.
 
 from __future__ import annotations
 
-import datetime as _dt
 from typing import ClassVar
 
+from irminsul import clock
 from irminsul.checks.base import Finding, Severity
 from irminsul.docgraph import DocGraph
 from irminsul.frontmatter import StatusEnum
@@ -25,7 +25,7 @@ class StaleReaperCheck:
             return []
 
         threshold = graph.config.checks.stale_reaper.deprecated_threshold_days
-        today = _dt.date.today()
+        today = clock.today(graph.now)
 
         out: list[Finding] = []
         for node in graph.nodes.values():

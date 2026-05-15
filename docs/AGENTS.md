@@ -98,6 +98,7 @@ automatically once any doc declares one.
 | `0005-backlinks-and-refs` | [ADR-0005: Add the refs backlink and symbol-reference query](50-decisions/0005-backlinks-and-refs.md) | adr | 2 | Add `irminsul refs` as a CLI surface over the strong and weak inbound indexes plus claim and describes provenance. |
 | `0006-implement-rfc-0015-pib-seed-and-foundation-readiness` | [ADR-0006: Implement RFC-0015 PIB seed and foundation readiness](50-decisions/0006-implement-rfc-0015-pib-seed-and-foundation-readiness.md) | adr | 2 | Add `irminsul seed` and the `foundation-readiness` check, with an opt-in seed prompt on interactive fresh-start init. |
 | `0007-implement-rfc-0016-agent-lifecycle-protocol` | [ADR-0007: Implement RFC-0016 agent lifecycle protocol](50-decisions/0007-implement-rfc-0016-agent-lifecycle-protocol.md) | adr | 2 | Add the canonical agent lifecycle protocol document and ship it via the init scaffold. |
+| `0008-implement-rfc-0017-rfc-resolution-check` | [ADR-0008: Implement RFC-0017 RFC resolution check](50-decisions/0008-implement-rfc-0017-rfc-resolution-check.md) | adr | 2 | Add the `rfc-resolution` soft deterministic check and a `--now` override so the RFC lifecycle is machine-enforced end to end. |
 | `50-decisions` | [Architecture decisions](50-decisions/INDEX.md) | reference | 2 |  |
 
 ### 60-operations

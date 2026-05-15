@@ -49,6 +49,7 @@ SOFT_DETERMINISTIC_CHECKS = (
     "terminology-overload",
     "claim-provenance",
     "foundation-readiness",
+    "rfc-resolution",
 )
 SOFT_LLM_CHECKS = ("overlap", "semantic-drift", "scope-appropriateness")
 

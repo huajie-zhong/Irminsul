@@ -3,9 +3,10 @@ id: 0017-rfc-resolution-check
 title: RFC resolution check
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: accepted
+resolved_by: docs/50-decisions/0008-implement-rfc-0017-rfc-resolution-check.md
 ---
 
 # RFC 0017: RFC resolution check
@@ -102,10 +103,20 @@ That is why the check starts as soft.
 - Treat `status: stable` as the acceptance state. Rejected because doc
   reliability and proposal outcome are separate concepts.
 
-## Unresolved Questions
+## Resolution
 
-- Should `resolved_by` accept doc IDs, paths, or both? The first implementation
-  should prefer existing path semantics because the current schema stores a
-  string path.
-- Should rejected RFCs require a `## Resolution` section or a more specific
-  `## Rejection Rationale` section?
+Accepted and implemented in
+[ADR-0008](../../50-decisions/0008-implement-rfc-0017-rfc-resolution-check.md).
+The check ships in `src/irminsul/checks/rfc_resolution.py` with tests in
+`tests/test_checks_rfc_resolution.py` and a `--now YYYY-MM-DD` flag on
+`irminsul check` so date-sensitive checks share one source of "today".
+
+Two open design questions were settled during implementation:
+
+- **`resolved_by` accepts paths**, matching the existing schema. Doc IDs were
+  not added; the existing path string is unambiguous and survives renames
+  about as well as IDs do.
+- **Rejected RFCs may carry either `## Resolution` or
+  `## Rejection Rationale`.** The check accepts either, since the cost of
+  forcing a specific heading on already-closed proposals outweighs the
+  benefit.
