@@ -17,7 +17,7 @@ from irminsul.docgraph import DocGraph, DocNode
 from irminsul.frontmatter import ClaimStateEnum, RfcStateEnum
 
 _RESOLVED_STATES = frozenset({RfcStateEnum.accepted, RfcStateEnum.rejected, RfcStateEnum.withdrawn})
-_RFC_PATH_RE = re.compile(r"80-evolution/rfcs/[^/]+\.md$")
+_RFC_PATH_RE = re.compile(r"80-evolution/rfcs/[^/\s)]+\.md")
 
 
 class DecisionFollowupsCheck:
@@ -34,7 +34,7 @@ class DecisionFollowupsCheck:
             if is_rfc and node.frontmatter.rfc_state == RfcStateEnum.accepted:
                 out.extend(self._check_accepted_rfc(graph, node))
             out.extend(self._check_implements(graph, node))
-            out.extend(self._check_planned_claims(graph, node, rfc_prefix))
+            out.extend(self._check_planned_claims(graph, node, docs_root))
 
         return out
 
@@ -46,6 +46,7 @@ class DecisionFollowupsCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    category="no-followups-field",
                     severity=Severity.warning,
                     message=(
                         "accepted RFC has no `followups` field; "
@@ -66,6 +67,7 @@ class DecisionFollowupsCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        category="missing-followup-path",
                         severity=Severity.warning,
                         message=(
                             f"follow-up path '{entry.path}' listed on accepted RFC "
@@ -82,6 +84,7 @@ class DecisionFollowupsCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            category="missing-backlink",
                             severity=Severity.warning,
                             message=(
                                 f"follow-up doc '{target.path.as_posix()}' does not "
@@ -104,6 +107,7 @@ class DecisionFollowupsCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        category="broken-implements",
                         severity=Severity.warning,
                         message=(
                             f"`implements` entry '{impl_id}' does not match any doc in the graph"
@@ -116,16 +120,17 @@ class DecisionFollowupsCheck:
         return out
 
     def _check_planned_claims(
-        self, graph: DocGraph, node: DocNode, rfc_prefix: str
+        self, graph: DocGraph, node: DocNode, docs_root: str
     ) -> list[Finding]:
         out: list[Finding] = []
         for claim in node.frontmatter.claims:
             if claim.state != ClaimStateEnum.planned:
                 continue
             for evidence in claim.evidence:
-                if not _RFC_PATH_RE.search(evidence):
+                match = _RFC_PATH_RE.search(evidence)
+                if match is None:
                     continue
-                rfc_path = Path(PurePosixPath(evidence))
+                rfc_path = Path(PurePosixPath(docs_root) / match.group(0))
                 rfc_node = graph.by_path.get(rfc_path)
                 if rfc_node is None:
                     continue
@@ -134,6 +139,7 @@ class DecisionFollowupsCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            category="stale-claim",
                             severity=Severity.warning,
                             message=(
                                 f"planned claim '{claim.id}' cites RFC "

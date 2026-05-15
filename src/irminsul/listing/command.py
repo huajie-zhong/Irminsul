@@ -64,18 +64,7 @@ _KIND_MAP: dict[str, str] = {
 
 
 def _finding_category(f: Finding) -> str:
-    msg = f.message
-    if "no `followups` field" in msg:
-        return "no-followups-field"
-    if "does not exist in the graph" in msg and "follow-up path" in msg:
-        return "missing-followup-path"
-    if "does not link back" in msg and "implements" in msg:
-        return "missing-backlink"
-    if "`implements` entry" in msg and "does not match" in msg:
-        return "broken-implements"
-    if "planned claim" in msg and "update the claim state" in msg:
-        return "stale-claim"
-    return "other"
+    return f.category or "other"
 
 
 def _to_queue_item(f: Finding) -> _QueueItem:

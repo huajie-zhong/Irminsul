@@ -55,3 +55,10 @@ def test_broken_implements_warns(repo: Path) -> None:
     findings = _by_doc(_findings(repo), "broken-implements")
     assert len(findings) == 1
     assert "does not match any doc" in findings[0].message
+
+
+def test_stale_planned_claim_warns(repo: Path) -> None:
+    findings = _by_doc(_findings(repo), "stale-claim")
+    assert len(findings) == 1
+    assert findings[0].category == "stale-claim"
+    assert "is now accepted" in findings[0].message
