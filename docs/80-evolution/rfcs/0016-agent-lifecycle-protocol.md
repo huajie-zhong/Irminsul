@@ -3,9 +3,10 @@ id: 0016-agent-lifecycle-protocol
 title: Agent lifecycle protocol
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: accepted
+resolved_by: docs/50-decisions/0007-implement-rfc-0016-agent-lifecycle-protocol.md
 ---
 
 # RFC 0016: Agent lifecycle protocol
@@ -97,3 +98,14 @@ RFCs can add checks that detect incomplete lifecycle transitions.
 
 - Should the final-response reporting requirement be represented in generated
   agent instructions outside the docs tree?
+
+## Resolution
+
+Accepted 2026-05-15 by
+[`ADR-0007`](../../50-decisions/0007-implement-rfc-0016-agent-lifecycle-protocol.md).
+The canonical protocol document lives at
+[`docs/90-meta/agent-protocol.md`](../../90-meta/agent-protocol.md) and is
+shipped as an init-scaffold template so every new project gets it on day one.
+No new check ships with this resolution; enforcement of incomplete lifecycle
+transitions is deferred to later RFCs (notably
+[`0017-rfc-resolution-check`](0017-rfc-resolution-check.md)).
