@@ -7,6 +7,7 @@ status: stable
 describes: []
 rfc_state: accepted
 resolved_by: docs/50-decisions/0003-generated-code-reference-surfaces.md
+followups: []
 ---
 
 # RFC 0012: Generated code reference surfaces

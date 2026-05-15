@@ -52,6 +52,8 @@ def build_inbound_strong(nodes: dict[str, DocNode]) -> dict[str, set[str]]:
     for src_id, node in nodes.items():
         for target_id in node.frontmatter.depends_on:
             inbound.setdefault(target_id, set()).add(src_id)
+        for target_id in node.frontmatter.implements:
+            inbound.setdefault(target_id, set()).add(src_id)
     return inbound
 
 

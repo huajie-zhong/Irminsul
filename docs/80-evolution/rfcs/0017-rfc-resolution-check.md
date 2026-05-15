@@ -7,6 +7,7 @@ status: stable
 describes: []
 rfc_state: accepted
 resolved_by: docs/50-decisions/0008-implement-rfc-0017-rfc-resolution-check.md
+followups: []
 ---
 
 # RFC 0017: RFC resolution check

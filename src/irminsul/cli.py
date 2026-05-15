@@ -1016,6 +1016,18 @@ def list_undocumented(
     _list_undocumented(path.resolve(), fmt=fmt)
 
 
+@_list_app.command("lifecycle")
+def list_lifecycle(
+    fmt: Annotated[str, typer.Option("--format")] = "plain",
+    queue: Annotated[bool, typer.Option("--queue")] = False,
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """List unfinished decision follow-up work."""
+    from irminsul.listing.command import list_lifecycle as _list_lifecycle
+
+    _list_lifecycle(path.resolve(), fmt=fmt, queue=queue)
+
+
 _regen_app = typer.Typer(
     name="regen",
     help="Regenerate generated documentation artifacts.",

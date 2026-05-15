@@ -7,6 +7,7 @@ status: stable
 describes: []
 rfc_state: accepted
 resolved_by: docs/50-decisions/0005-backlinks-and-refs.md
+followups: []
 ---
 
 # RFC 0014: Backlinks and symbol-reference query

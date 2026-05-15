@@ -52,6 +52,20 @@ class RfcStateEnum(StrEnum):
     withdrawn = "withdrawn"
 
 
+class FollowupKindEnum(StrEnum):
+    create = "create"
+    update = "update"
+    review = "review"
+
+
+class FollowupEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(min_length=1)
+    reason: str = ""
+    kind: FollowupKindEnum = FollowupKindEnum.update
+
+
 class Claim(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -89,6 +103,8 @@ class DocFrontmatter(BaseModel):
     decision_owner: str | None = None
     target_decision_date: str | None = None
     summary: str | None = None
+    followups: list[FollowupEntry] | None = None
+    implements: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate_structured_claims(self) -> DocFrontmatter:

@@ -7,6 +7,7 @@ status: stable
 describes: []
 rfc_state: accepted
 resolved_by: docs/50-decisions/0006-implement-rfc-0015-pib-seed-and-foundation-readiness.md
+followups: []
 ---
 
 # RFC 0015: PIB seed and foundation readiness
