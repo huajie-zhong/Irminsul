@@ -1,8 +1,8 @@
 """RfcResolutionCheck — RFC lifecycle invariants (RFC-0017).
 
-Enforces that RFCs under `docs/80-evolution/rfcs/` move through their lifecycle
-cleanly: accepted RFCs become stable records linked bidirectionally to a
-decision doc, rejected and withdrawn RFCs carry rationale sections, and
+Enforces that RFCs under `<docs_root>/80-evolution/rfcs/` move through their
+lifecycle cleanly: accepted RFCs become stable records linked bidirectionally
+to a decision doc, rejected and withdrawn RFCs carry rationale sections, and
 in-flight RFCs that have blown past their target decision date or that lack a
 decision owner get flagged.
 
@@ -22,7 +22,6 @@ from irminsul.docgraph import DocGraph, DocNode
 from irminsul.docgraph_index import Heading
 from irminsul.frontmatter import RfcStateEnum, StatusEnum
 
-_RFC_PREFIX = "docs/80-evolution/rfcs/"
 _IN_FLIGHT = frozenset({RfcStateEnum.draft, RfcStateEnum.open, RfcStateEnum.fcp})
 
 
@@ -34,8 +33,11 @@ class RfcResolutionCheck:
         today = clock.today(graph.now)
         out: list[Finding] = []
 
+        docs_root = graph.config.paths.docs_root.strip("/\\") if graph.config else "docs"
+        rfc_prefix = f"{docs_root}/80-evolution/rfcs/" if docs_root else "80-evolution/rfcs/"
+
         for node in graph.nodes.values():
-            if not node.path.as_posix().startswith(_RFC_PREFIX):
+            if not node.path.as_posix().startswith(rfc_prefix):
                 continue
             state = node.frontmatter.rfc_state
             if state is None:

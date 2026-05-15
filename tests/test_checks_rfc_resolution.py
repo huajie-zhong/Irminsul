@@ -91,3 +91,32 @@ def test_check_ignores_non_rfc_docs(repo: Path) -> None:
     # The 0001-good-adr doc lives outside docs/80-evolution/rfcs/ and has no
     # rfc_state, so the check must not fire on it.
     assert _by_doc(findings, "0001-good-adr") == []
+
+
+def test_rfc_prefix_honours_custom_docs_root() -> None:
+    """Projects can override `paths.docs_root`; the check must follow."""
+    from irminsul.config import IrminsulConfig, Paths
+    from irminsul.docgraph import DocGraph, DocNode
+    from irminsul.frontmatter import AudienceEnum, DocFrontmatter, RfcStateEnum, StatusEnum
+
+    fm = DocFrontmatter(
+        id="0099-stale",
+        title="Stale draft",
+        audience=AudienceEnum.explanation,
+        tier=2,
+        status=StatusEnum.draft,
+        rfc_state=RfcStateEnum.draft,
+        target_decision_date="2024-01-01",
+    )
+    path = Path("documentation/80-evolution/rfcs/0099-stale.md")
+    node = DocNode(id="0099-stale", path=path, frontmatter=fm, body="# x")
+    config = IrminsulConfig(paths=Paths(docs_root="documentation"))
+    graph = DocGraph(
+        nodes={"0099-stale": node},
+        by_path={path: node},
+        config=config,
+        now=_dt.date(2026, 1, 1),
+    )
+
+    findings = RfcResolutionCheck().run(graph)
+    assert any("target_decision_date" in f.message for f in findings)
