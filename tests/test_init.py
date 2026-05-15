@@ -34,6 +34,7 @@ def test_init_no_interactive_creates_expected_tree(tmp_path: Path) -> None:
         "docs/70-knowledge/INDEX.md",
         "docs/80-evolution/INDEX.md",
         "docs/90-meta/INDEX.md",
+        "docs/90-meta/agent-protocol.md",
         ".github/workflows/docs-pr.yml",
         ".github/workflows/docs-nightly.yml",
     ]

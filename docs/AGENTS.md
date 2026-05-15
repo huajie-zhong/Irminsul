@@ -97,6 +97,7 @@ automatically once any doc declares one.
 | `0004-agents-manifest` | [ADR-0004: Add the agent navigation manifest](50-decisions/0004-agents-manifest.md) | adr | 2 | Add an agent navigation manifest plus an opt-in hard check and a regen target. |
 | `0005-backlinks-and-refs` | [ADR-0005: Add the refs backlink and symbol-reference query](50-decisions/0005-backlinks-and-refs.md) | adr | 2 | Add `irminsul refs` as a CLI surface over the strong and weak inbound indexes plus claim and describes provenance. |
 | `0006-implement-rfc-0015-pib-seed-and-foundation-readiness` | [ADR-0006: Implement RFC-0015 PIB seed and foundation readiness](50-decisions/0006-implement-rfc-0015-pib-seed-and-foundation-readiness.md) | adr | 2 | Add `irminsul seed` and the `foundation-readiness` check, with an opt-in seed prompt on interactive fresh-start init. |
+| `0007-implement-rfc-0016-agent-lifecycle-protocol` | [ADR-0007: Implement RFC-0016 agent lifecycle protocol](50-decisions/0007-implement-rfc-0016-agent-lifecycle-protocol.md) | adr | 2 | Add the canonical agent lifecycle protocol document and ship it via the init scaffold. |
 | `50-decisions` | [Architecture decisions](50-decisions/INDEX.md) | reference | 2 |  |
 
 ### 60-operations
@@ -149,6 +150,7 @@ automatically once any doc declares one.
 | ID | Doc | Audience | Tier | Summary |
 |----|-----|----------|------|---------|
 | `90-meta` | [Meta](90-meta/INDEX.md) | meta | 2 |  |
+| `agent-protocol` | [Agent lifecycle protocol](90-meta/agent-protocol.md) | explanation | 3 | The required work order any agent must follow when editing this repository. |
 | `style-guide` | [Style Guide](90-meta/style-guide.md) | reference | 3 |  |
 
 <!-- agents-manifest:generated-end -->
@@ -200,7 +202,7 @@ and findings, create or update RFCs and ADRs for direction or behavior
 changes, keep component docs and generated references current, and run
 `irminsul check --profile hard` before returning work.
 
-The full lifecycle work order is defined in
-[`0016-agent-lifecycle-protocol`](80-evolution/rfcs/0016-agent-lifecycle-protocol.md). Its canonical
-protocol document under `docs/90-meta/` lands with RFC 0016; until then
-the RFC is authoritative.
+The full lifecycle work order lives at
+[`90-meta/agent-protocol`](90-meta/agent-protocol.md); its rationale and
+alternatives live in
+[`0016-agent-lifecycle-protocol`](80-evolution/rfcs/0016-agent-lifecycle-protocol.md).
