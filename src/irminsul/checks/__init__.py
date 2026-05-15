@@ -10,6 +10,7 @@ from __future__ import annotations
 from irminsul.checks.base import Check, Finding, Fix, Severity, sort_findings, summarize
 from irminsul.checks.boundary import BoundaryCheck
 from irminsul.checks.coverage import CoverageCheck
+from irminsul.checks.decision_followups import DecisionFollowupsCheck
 from irminsul.checks.dependency_check import DependencyCheck
 from irminsul.checks.doc_reality import (
     AgentsManifestCheck,
@@ -74,6 +75,7 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     TerminologyOverloadCheck.name: TerminologyOverloadCheck,
     ClaimProvenanceCheck.name: ClaimProvenanceCheck,
     FoundationReadinessCheck.name: FoundationReadinessCheck,
+    DecisionFollowupsCheck.name: DecisionFollowupsCheck,
 }
 
 LLM_REGISTRY: dict[str, type] = {
@@ -93,6 +95,7 @@ __all__ = [
     "ClaimProvenanceCheck",
     "CliDocDriftCheck",
     "CoverageCheck",
+    "DecisionFollowupsCheck",
     "DependencyCheck",
     "EnvCheck",
     "Finding",

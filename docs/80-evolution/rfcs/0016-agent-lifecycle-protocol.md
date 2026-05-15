@@ -7,6 +7,7 @@ status: stable
 describes: []
 rfc_state: accepted
 resolved_by: docs/50-decisions/0007-implement-rfc-0016-agent-lifecycle-protocol.md
+followups: []
 ---
 
 # RFC 0016: Agent lifecycle protocol

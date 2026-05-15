@@ -7,6 +7,7 @@ status: stable
 describes: []
 rfc_state: accepted
 resolved_by: docs/50-decisions/0004-agents-manifest.md
+followups: []
 ---
 
 # RFC 0013: AGENTS.md agent navigation manifest

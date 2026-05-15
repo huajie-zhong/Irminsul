@@ -1,0 +1,9 @@
+project_name = "soft-lifecycle"
+
+[paths]
+docs_root = "docs"
+source_roots = ["src"]
+
+[checks]
+hard = ["frontmatter", "globs", "uniqueness", "links"]
+soft_deterministic = ["decision-followups"]

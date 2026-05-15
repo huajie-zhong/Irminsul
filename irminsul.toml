@@ -44,6 +44,7 @@ soft_deterministic = [
     "claim-provenance",
     "foundation-readiness",
     "rfc-resolution",
+    "decision-followups",
 ]
 
 [checks.schema_leak]

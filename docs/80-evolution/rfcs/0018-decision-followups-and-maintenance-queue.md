@@ -3,9 +3,11 @@ id: 0018-decision-followups-and-maintenance-queue
 title: Decision followups and maintenance queue
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: accepted
+resolved_by: docs/50-decisions/0009-implement-rfc-0018-decision-followups-and-maintenance-queue.md
+followups: []
 ---
 
 # RFC 0018: Decision followups and maintenance queue
@@ -131,9 +133,19 @@ downstream doc is wrong.
 - Make every accepted RFC require implementation code. Rejected because some
   accepted RFCs are process or documentation changes.
 
-## Unresolved Questions
+## Resolution
 
-- Should `followups: []` be required on every accepted RFC, or only on RFCs that
-  affect docs outside the RFC itself?
-- Should `irminsul list lifecycle` include supersession warnings, or should it
-  stay focused on decision follow-through?
+Implemented as specified; see
+[ADR-0009](../../50-decisions/0009-implement-rfc-0018-decision-followups-and-maintenance-queue.md).
+
+The two unresolved questions were settled during implementation:
+
+- **`followups` requirement scope**: The `decision-followups` check warns whenever an
+  accepted RFC has no `followups` field at all. Authors must explicitly write
+  `followups: []` to acknowledge that no downstream docs need updating. This keeps
+  the field's absence distinguishable from a deliberate empty declaration.
+
+- **Supersession warnings**: `irminsul list lifecycle` stays focused on decision
+  follow-through only. Supersession drift is already handled by `SupersessionCheck`
+  and surfaced via `irminsul check`; merging the two surfaces would dilute the queue's
+  signal.
