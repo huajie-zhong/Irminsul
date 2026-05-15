@@ -43,6 +43,7 @@ soft_deterministic = [
     "terminology-overload",
     "claim-provenance",
     "foundation-readiness",
+    "rfc-resolution",
 ]
 
 [checks.schema_leak]

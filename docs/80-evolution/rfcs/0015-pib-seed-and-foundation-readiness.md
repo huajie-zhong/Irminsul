@@ -122,6 +122,13 @@ the belief is good. That remains a user judgment.
 - Use an LLM to infer the seed from a chat transcript. Rejected for the first
   version because the root intent should come from explicit user input.
 
+## Resolution
+
+Accepted and implemented in
+[ADR-0006](../../50-decisions/0006-implement-rfc-0015-pib-seed-and-foundation-readiness.md).
+`irminsul seed`, the `foundation-readiness` check, and the opt-in seed prompt
+on interactive fresh-start init all ship as described.
+
 ## Unresolved Questions
 
 - Should the non-interactive input be JSON only, or should individual flags be

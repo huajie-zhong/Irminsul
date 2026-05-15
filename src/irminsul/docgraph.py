@@ -8,6 +8,7 @@ loaded. Every check in the system runs over this graph.
 
 from __future__ import annotations
 
+import datetime as _dt
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
@@ -55,6 +56,7 @@ class DocGraph:
     inbound_weak: dict[str, set[str]] = field(default_factory=dict)
     headings: dict[str, list[Heading]] = field(default_factory=dict)
     git_times: dict[Path, GitTime] = field(default_factory=dict)
+    now: _dt.date | None = None
 
 
 def _to_repo_relative(absolute: Path, repo_root: Path) -> Path:
@@ -64,9 +66,14 @@ def _to_repo_relative(absolute: Path, repo_root: Path) -> Path:
     return Path(PurePosixPath(*rel.parts))
 
 
-def build_graph(repo_root: Path, config: IrminsulConfig) -> DocGraph:
+def build_graph(
+    repo_root: Path,
+    config: IrminsulConfig,
+    *,
+    now: _dt.date | None = None,
+) -> DocGraph:
     docs_root_abs = (repo_root / config.paths.docs_root).resolve()
-    graph = DocGraph(config=config, repo_root=repo_root)
+    graph = DocGraph(config=config, repo_root=repo_root, now=now)
 
     if not docs_root_abs.exists():
         return graph

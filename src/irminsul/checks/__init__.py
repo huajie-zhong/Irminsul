@@ -34,6 +34,7 @@ from irminsul.checks.overlap import OverlapCheck
 from irminsul.checks.parent_child import ParentChildCheck
 from irminsul.checks.phantom_layer import PhantomLayerCheck
 from irminsul.checks.reality import RealityCheck
+from irminsul.checks.rfc_resolution import RfcResolutionCheck
 from irminsul.checks.schema_leak import SchemaLeakCheck
 from irminsul.checks.scope_appropriateness import ScopeAppropriatenessCheck
 from irminsul.checks.semantic_drift import SemanticDriftCheck
@@ -59,6 +60,7 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     StaleReaperCheck.name: StaleReaperCheck,
     SupersessionCheck.name: SupersessionCheck,
     ParentChildCheck.name: ParentChildCheck,
+    RfcResolutionCheck.name: RfcResolutionCheck,
     GlossaryCheck.name: GlossaryCheck,
     ExternalLinksCheck.name: ExternalLinksCheck,
     RealityCheck.name: RealityCheck,
@@ -101,6 +103,7 @@ __all__ = [
     "PhantomLayerCheck",
     "ProseFileReferenceCheck",
     "RealityCheck",
+    "RfcResolutionCheck",
     "SchemaDocDriftCheck",
     "ScopeAppropriatenessCheck",
     "SemanticDriftCheck",

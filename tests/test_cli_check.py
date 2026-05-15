@@ -190,3 +190,29 @@ def test_check_all_available_runs_unconfigured_deterministic_checks(
     result = runner.invoke(app, ["check", "--profile", "all-available", "--path", str(repo)])
     assert result.exit_code == 0, result.stdout
     assert "[boundary]" in result.stdout
+
+
+def test_check_now_flag_rejects_garbage(fixture_repo: Callable[[str], Path]) -> None:
+    repo = fixture_repo("good")
+    result = runner.invoke(
+        app, ["check", "--profile", "hard", "--now", "yesterday", "--path", str(repo)]
+    )
+    assert result.exit_code == 2
+    assert "yesterday" in result.stdout
+
+
+def test_check_now_flag_threads_through_to_rfc_resolution(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("soft-rfc-resolution")
+    # With a 2025 "now" the stale-target RFC fires; with a 2020 "now" it does not.
+    late = runner.invoke(
+        app,
+        ["check", "--profile", "configured", "--now", "2025-01-01", "--path", str(repo)],
+    )
+    early = runner.invoke(
+        app,
+        ["check", "--profile", "configured", "--now", "2020-01-01", "--path", str(repo)],
+    )
+    assert "target_decision_date" in late.stdout
+    assert "target_decision_date" not in early.stdout
