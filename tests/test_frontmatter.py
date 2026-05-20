@@ -42,6 +42,30 @@ def test_doc_frontmatter_allows_extra_keys() -> None:
     assert fm.model_extra["custom_company_field"] == "ok"
 
 
+def test_doc_frontmatter_accepts_required_updates() -> None:
+    payload = _good_payload() | {
+        "required_updates": [
+            {
+                "path": "docs/20-components/widget.md",
+                "reason": "Document the new widget behavior",
+                "kind": "update",
+            }
+        ]
+    }
+    fm = DocFrontmatter.model_validate(payload)
+    assert fm.required_updates is not None
+    assert fm.required_updates[0].path == "docs/20-components/widget.md"
+
+
+def test_doc_frontmatter_treats_followups_as_extra_key() -> None:
+    payload = _good_payload() | {"followups": []}
+    fm = DocFrontmatter.model_validate(payload)
+    assert "followups" not in DocFrontmatter.model_fields
+    assert fm.required_updates is None
+    assert fm.model_extra is not None
+    assert fm.model_extra["followups"] == []
+
+
 def test_doc_frontmatter_rejects_missing_audience() -> None:
     payload = _good_payload()
     del payload["audience"]

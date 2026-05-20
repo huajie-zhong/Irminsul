@@ -19,7 +19,7 @@ queue from RFC-0018.
 
 ## Motivation
 
-RFC-0018 tracks *declared* follow-ups: an accepted RFC names the docs it will
+RFC-0018 tracks *declared* required updates: an accepted RFC names the docs it will
 touch, and the queue surfaces unfinished work. But most code edits do not pass
 through an RFC. When `src/irminsul/checks/links.py` changes, the doc that
 `describes` it can sit untouched indefinitely. Today this is caught only by

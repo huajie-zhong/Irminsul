@@ -99,7 +99,7 @@ automatically once any doc declares one.
 | `0006-implement-rfc-0015-pib-seed-and-foundation-readiness` | [ADR-0006: Implement RFC-0015 PIB seed and foundation readiness](50-decisions/0006-implement-rfc-0015-pib-seed-and-foundation-readiness.md) | adr | 2 | Add `irminsul seed` and the `foundation-readiness` check, with an opt-in seed prompt on interactive fresh-start init. |
 | `0007-implement-rfc-0016-agent-lifecycle-protocol` | [ADR-0007: Implement RFC-0016 agent lifecycle protocol](50-decisions/0007-implement-rfc-0016-agent-lifecycle-protocol.md) | adr | 2 | Add the canonical agent lifecycle protocol document and ship it via the init scaffold. |
 | `0008-implement-rfc-0017-rfc-resolution-check` | [ADR-0008: Implement RFC-0017 RFC resolution check](50-decisions/0008-implement-rfc-0017-rfc-resolution-check.md) | adr | 2 | Add the `rfc-resolution` soft deterministic check and a `--now` override so the RFC lifecycle is machine-enforced end to end. |
-| `0009-implement-rfc-0018-decision-followups-and-maintenance-queue` | [ADR-0009: Implement RFC-0018 decision follow-ups and maintenance queue](50-decisions/0009-implement-rfc-0018-decision-followups-and-maintenance-queue.md) | adr | 2 | Add `followups` and `implements` frontmatter fields, a `decision-followups` soft check, and `irminsul list lifecycle [--queue]` to surface unfinished decision work. |
+| `0009-implement-rfc-0018-decision-followups-and-maintenance-queue` | [ADR-0009: Implement RFC-0018 decision updates and maintenance queue](50-decisions/0009-implement-rfc-0018-decision-followups-and-maintenance-queue.md) | adr | 2 | Add `required_updates` and `implements` frontmatter fields, a `decision-updates` soft check, and `irminsul list lifecycle [--queue]` to surface unfinished decision work. |
 | `50-decisions` | [Architecture decisions](50-decisions/INDEX.md) | reference | 2 |  |
 
 ### 60-operations
@@ -137,7 +137,7 @@ automatically once any doc declares one.
 | `0015-pib-seed-and-foundation-readiness` | [PIB seed and foundation readiness](80-evolution/rfcs/0015-pib-seed-and-foundation-readiness.md) | explanation | 2 |  |
 | `0016-agent-lifecycle-protocol` | [Agent lifecycle protocol](80-evolution/rfcs/0016-agent-lifecycle-protocol.md) | explanation | 2 |  |
 | `0017-rfc-resolution-check` | [RFC resolution check](80-evolution/rfcs/0017-rfc-resolution-check.md) | explanation | 2 |  |
-| `0018-decision-followups-and-maintenance-queue` | [Decision followups and maintenance queue](80-evolution/rfcs/0018-decision-followups-and-maintenance-queue.md) | explanation | 2 |  |
+| `0018-decision-followups-and-maintenance-queue` | [Decision required updates and maintenance queue](80-evolution/rfcs/0018-decision-followups-and-maintenance-queue.md) | explanation | 2 |  |
 | `0019-glossary-discipline` | [Glossary discipline and terminology resolution](80-evolution/rfcs/0019-glossary-discipline.md) | explanation | 2 |  |
 | `0020-inventory-drift` | [Inventory drift for endpoints, commands, and exports](80-evolution/rfcs/0020-inventory-drift.md) | explanation | 2 |  |
 | `0021-code-doc-cochange` | [Code-doc co-change drift signal](80-evolution/rfcs/0021-code-doc-cochange.md) | explanation | 2 |  |

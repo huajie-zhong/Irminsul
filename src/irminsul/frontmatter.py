@@ -52,18 +52,18 @@ class RfcStateEnum(StrEnum):
     withdrawn = "withdrawn"
 
 
-class FollowupKindEnum(StrEnum):
+class RequiredUpdateKindEnum(StrEnum):
     create = "create"
     update = "update"
     review = "review"
 
 
-class FollowupEntry(BaseModel):
+class RequiredUpdateEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     path: str = Field(min_length=1)
     reason: str = ""
-    kind: FollowupKindEnum = FollowupKindEnum.update
+    kind: RequiredUpdateKindEnum = RequiredUpdateKindEnum.update
 
 
 class Claim(BaseModel):
@@ -103,7 +103,7 @@ class DocFrontmatter(BaseModel):
     decision_owner: str | None = None
     target_decision_date: str | None = None
     summary: str | None = None
-    followups: list[FollowupEntry] | None = None
+    required_updates: list[RequiredUpdateEntry] | None = None
     implements: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")

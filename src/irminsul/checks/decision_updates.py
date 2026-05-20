@@ -1,9 +1,9 @@
-"""DecisionFollowupsCheck — decision follow-through invariants (RFC-0018).
+"""DecisionUpdatesCheck - decision integration invariants (RFC-0018).
 
 Surfaces unfinished decision work: accepted RFCs that have not declared or
-completed their follow-up docs, follow-up docs that haven't linked back to
-the driving decision, broken `implements` references, and planned claims
-whose cited RFC has already been resolved.
+completed their required doc updates, required update docs that have not linked
+back to the driving decision, broken `implements` references, and planned
+claims whose cited RFC has already been resolved.
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ _RESOLVED_STATES = frozenset({RfcStateEnum.accepted, RfcStateEnum.rejected, RfcS
 _RFC_PATH_RE = re.compile(r"80-evolution/rfcs/[^/\s)]+\.md")
 
 
-class DecisionFollowupsCheck:
-    name: ClassVar[str] = "decision-followups"
+class DecisionUpdatesCheck:
+    name: ClassVar[str] = "decision-updates"
     default_severity: ClassVar[Severity] = Severity.warning
 
     def run(self, graph: DocGraph) -> list[Finding]:
@@ -40,26 +40,29 @@ class DecisionFollowupsCheck:
 
     def _check_accepted_rfc(self, graph: DocGraph, node: DocNode) -> list[Finding]:
         out: list[Finding] = []
-        followups = node.frontmatter.followups
+        required_updates = node.frontmatter.required_updates
 
-        if followups is None:
+        if required_updates is None:
             out.append(
                 Finding(
                     check=self.name,
-                    category="no-followups-field",
+                    category="no-required-updates-field",
                     severity=Severity.warning,
                     message=(
-                        "accepted RFC has no `followups` field; "
-                        "add `followups: []` if no docs need updating"
+                        "accepted RFC has no `required_updates` field; "
+                        "add `required_updates: []` if no downstream docs need updating"
                     ),
                     path=node.path,
                     doc_id=node.id,
-                    suggestion="add `followups: []` or list docs that must be created/updated",
+                    suggestion=(
+                        "add `required_updates: []` or list docs that must be "
+                        "created/updated/reviewed"
+                    ),
                 )
             )
             return out
 
-        for entry in followups:
+        for entry in required_updates:
             target_path = Path(PurePosixPath(entry.path))
             target = graph.by_path.get(target_path)
 
@@ -67,38 +70,43 @@ class DecisionFollowupsCheck:
                 out.append(
                     Finding(
                         check=self.name,
-                        category="missing-followup-path",
+                        category="missing-required-update-path",
                         severity=Severity.warning,
                         message=(
-                            f"follow-up path '{entry.path}' listed on accepted RFC "
+                            f"required update path '{entry.path}' listed on accepted RFC "
                             f"does not exist in the graph"
                         ),
                         path=node.path,
                         doc_id=node.id,
-                        suggestion="create the doc or correct the path in `followups`",
+                        suggestion="create the doc or correct the path in `required_updates`",
                     )
                 )
-            else:
-                back_linkers = graph.inbound_strong.get(node.id, set())
-                if target.id not in back_linkers:
-                    out.append(
-                        Finding(
-                            check=self.name,
-                            category="missing-backlink",
-                            severity=Severity.warning,
-                            message=(
-                                f"follow-up doc '{target.path.as_posix()}' does not "
-                                f"link back to RFC '{node.id}' via `implements`"
-                            ),
-                            path=target.path,
-                            doc_id=target.id,
-                            suggestion=(
-                                f'add `implements: ["{node.id}"]` to {target.path.as_posix()}'
-                            ),
-                        )
+            elif (
+                not self._is_resolved_by_target(node, target)
+                and node.id not in target.frontmatter.implements
+            ):
+                out.append(
+                    Finding(
+                        check=self.name,
+                        category="missing-backlink",
+                        severity=Severity.warning,
+                        message=(
+                            f"required update doc '{target.path.as_posix()}' does not "
+                            f"link back to RFC '{node.id}' via `implements`"
+                        ),
+                        path=target.path,
+                        doc_id=target.id,
+                        suggestion=(f'add `implements: ["{node.id}"]` to {target.path.as_posix()}'),
                     )
+                )
 
         return out
+
+    def _is_resolved_by_target(self, node: DocNode, target: DocNode) -> bool:
+        resolved_by = node.frontmatter.resolved_by
+        if resolved_by is None:
+            return False
+        return target.path == Path(PurePosixPath(resolved_by))
 
     def _check_implements(self, graph: DocGraph, node: DocNode) -> list[Finding]:
         out: list[Finding] = []

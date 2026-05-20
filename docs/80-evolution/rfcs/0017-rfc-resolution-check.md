@@ -7,7 +7,7 @@ status: stable
 describes: []
 rfc_state: accepted
 resolved_by: docs/50-decisions/0008-implement-rfc-0017-rfc-resolution-check.md
-followups: []
+required_updates: []
 ---
 
 # RFC 0017: RFC resolution check
@@ -48,7 +48,7 @@ For docs under `docs/80-evolution/rfcs/`:
   non-empty `## Unresolved Questions` section.
 - Resolved RFCs should include a `## Resolution` section.
 - Accepted RFCs should not have a non-empty `## Unresolved Questions` section
-  unless the body explicitly names follow-up work.
+  unless the body explicitly names required update work.
 - The resolved-by doc should link back to the RFC.
 
 ### Atomicity
@@ -90,7 +90,7 @@ also supports the agent lifecycle protocol proposed in
 ## Drawbacks
 
 The check cannot prove that an ADR fully implements an RFC's intent. It can only
-prove lifecycle structure: state, links, and required follow-up markers.
+prove lifecycle structure: state, links, and required update markers.
 
 Resolved RFCs without a clean ADR mapping may need a short migration period.
 That is why the check starts as soft.

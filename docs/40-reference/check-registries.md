@@ -41,7 +41,7 @@ describes: []
 | `soft` | terminology-overload |
 | `soft` | claim-provenance |
 | `soft` | foundation-readiness |
-| `soft` | decision-followups |
+| `soft` | decision-updates |
 | `llm` | overlap |
 | `llm` | semantic-drift |
 | `llm` | scope-appropriateness |

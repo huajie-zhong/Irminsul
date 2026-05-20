@@ -47,17 +47,17 @@ class _QueueItem:
 
 
 _PRIORITY_MAP: dict[str, int] = {
-    "missing-followup-path": 1,
+    "missing-required-update-path": 1,
     "missing-backlink": 2,
-    "no-followups-field": 3,
+    "no-required-updates-field": 3,
     "broken-implements": 4,
     "stale-claim": 5,
 }
 
 _KIND_MAP: dict[str, str] = {
-    "missing-followup-path": "create",
+    "missing-required-update-path": "create",
     "missing-backlink": "update",
-    "no-followups-field": "resolve",
+    "no-required-updates-field": "resolve",
     "broken-implements": "resolve",
     "stale-claim": "update",
 }
@@ -86,10 +86,10 @@ def _to_queue_item(f: Finding) -> _QueueItem:
 
 
 def list_lifecycle(repo_root: Path, *, fmt: str, queue: bool) -> None:
-    from irminsul.checks.decision_followups import DecisionFollowupsCheck
+    from irminsul.checks.decision_updates import DecisionUpdatesCheck
 
     graph = build_graph(repo_root, load(find_config(repo_root)))
-    findings = DecisionFollowupsCheck().run(graph)
+    findings = DecisionUpdatesCheck().run(graph)
 
     if not queue:
         _print(findings, fmt)

@@ -13,6 +13,7 @@ runner = CliRunner()
 
 _ORPHAN_FIXTURE = Path(__file__).parent / "fixtures" / "repos" / "soft-orphans"
 _STALE_FIXTURE = Path(__file__).parent / "fixtures" / "repos" / "soft-stale-reaper"
+_LIFECYCLE_FIXTURE = Path(__file__).parent / "fixtures" / "repos" / "soft-lifecycle"
 
 
 def test_list_orphans_plain(tmp_path: Path) -> None:
@@ -48,3 +49,22 @@ def test_list_undocumented_no_sources(tmp_path: Path) -> None:
     result = runner.invoke(app, ["list", "undocumented", "--path", str(repo)])
     assert result.exit_code == 0
     assert "(none)" in result.output
+
+
+def test_list_lifecycle_queue_uses_required_update_categories() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "list",
+            "lifecycle",
+            "--queue",
+            "--format",
+            "json",
+            "--path",
+            str(_LIFECYCLE_FIXTURE),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert any("required update path" in item["reason"] for item in data)
+    assert all("follow-up path" not in item["reason"] for item in data)

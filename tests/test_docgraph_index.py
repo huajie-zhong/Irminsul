@@ -79,6 +79,56 @@ def test_build_inbound_strong_isolated() -> None:
     assert inbound["c"] == set()
 
 
+def test_build_inbound_strong_includes_implements_and_resolved_by() -> None:
+    from irminsul.docgraph import DocNode
+    from irminsul.frontmatter import AudienceEnum, DocFrontmatter, RfcStateEnum, StatusEnum
+
+    fm_kwargs = {
+        "audience": AudienceEnum.explanation,
+        "tier": 2,
+        "status": StatusEnum.stable,
+    }
+    rfc = DocNode(
+        id="rfc-1",
+        path=Path("docs/80-evolution/rfcs/rfc-1.md"),
+        frontmatter=DocFrontmatter(
+            id="rfc-1",
+            title="RFC",
+            rfc_state=RfcStateEnum.accepted,
+            resolved_by="docs/50-decisions/adr-1.md",
+            required_updates=[],
+            **fm_kwargs,
+        ),
+        body="",
+    )
+    adr = DocNode(
+        id="adr-1",
+        path=Path("docs/50-decisions/adr-1.md"),
+        frontmatter=DocFrontmatter(
+            id="adr-1",
+            title="ADR",
+            audience=AudienceEnum.adr,
+            tier=2,
+            status=StatusEnum.stable,
+        ),
+        body="",
+    )
+    component = DocNode(
+        id="component",
+        path=Path("docs/20-components/component.md"),
+        frontmatter=DocFrontmatter(
+            id="component",
+            title="Component",
+            implements=["rfc-1"],
+            **fm_kwargs,
+        ),
+        body="",
+    )
+
+    inbound = build_inbound_strong({"rfc-1": rfc, "adr-1": adr, "component": component})
+    assert inbound["rfc-1"] == {"adr-1", "component"}
+
+
 def test_build_inbound_weak_skips_externals() -> None:
     from irminsul.docgraph import DocNode
     from irminsul.frontmatter import AudienceEnum, DocFrontmatter, StatusEnum

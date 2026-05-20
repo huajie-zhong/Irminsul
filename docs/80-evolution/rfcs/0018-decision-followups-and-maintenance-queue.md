@@ -1,20 +1,20 @@
 ---
 id: 0018-decision-followups-and-maintenance-queue
-title: Decision followups and maintenance queue
+title: Decision required updates and maintenance queue
 audience: explanation
 tier: 2
 status: stable
 describes: []
 rfc_state: accepted
 resolved_by: docs/50-decisions/0009-implement-rfc-0018-decision-followups-and-maintenance-queue.md
-followups: []
+required_updates: []
 ---
 
-# RFC 0018: Decision followups and maintenance queue
+# RFC 0018: Decision required updates and maintenance queue
 
 ## Summary
 
-Add explicit follow-up tracking for accepted decisions and a lifecycle listing
+Add explicit required update tracking for accepted decisions and a lifecycle listing
 command that gives agents a durable maintenance queue. The queue surfaces
 accepted RFCs that have not updated downstream docs, implementation records, or
 planned claims.
@@ -34,7 +34,7 @@ long-term documentation rot.
 Add optional frontmatter fields:
 
 ```yaml
-followups:
+required_updates:
   - path: docs/20-components/example.md
     reason: Add coverage for the new check
     kind: update           # create | update | review
@@ -42,25 +42,25 @@ implements:
   - 0017-rfc-resolution-check
 ```
 
-`followups` belongs primarily on RFCs and ADRs. It lists docs or generated
+`required_updates` belongs primarily on RFCs and ADRs. It lists docs or generated
 surfaces that must be created, updated, or reviewed before the decision is
 considered fully integrated. Each entry carries a `reason` so the queue can
 explain why an item matters, and a `kind` so the agent knows whether to
-create, update, or merely review the target. Bare-string entries (a plain
-path) remain valid for terse use, but the structured form is preferred where
-the queue is the primary consumer.
+create, update, or merely review the target. Entries use the structured form
+because the queue is the primary consumer.
 
 `implements` belongs on ADRs, component docs, workflow docs, and reference docs.
 It lists RFC or ADR IDs that the doc implements or operationalizes.
 `implements` is the *source of truth* for the decision-to-doc relationship.
-The inverse (`implemented_by` on the RFC or ADR) is auto-derived at
-graph-build time following the existing inbound-index pattern
-(`docgraph_index.py`) and exposed through `irminsul refs <rfc-id>` (per
-RFC-0014). This requires extending the strong-reference collection in
-`build_inbound_strong`, which today indexes only `depends_on`, to also
-index `implements`. Authors do not maintain the back-link manually; the check that
-"follow-up docs link back to the RFC" is satisfied by the presence of
-`implements` on the follow-up doc.
+The inverse (`implemented_by` on the RFC or ADR) is auto-derived at graph-build
+time following the existing inbound-index pattern (`docgraph_index.py`) and
+exposed through `irminsul refs <rfc-id>` (per RFC-0014). This requires extending
+the strong-reference collection in `build_inbound_strong`, which today indexes
+only `depends_on`, to also index `implements` and the implicit `resolved_by`
+ADR relationship. Authors do not maintain the back-link manually; the check
+that required update docs link back to the RFC is satisfied by the presence of
+`implements` on the required update doc. The canonical ADR named by
+`resolved_by` is implicit and does not need to be listed in `required_updates`.
 
 Add a command:
 
@@ -71,9 +71,9 @@ irminsul list lifecycle
 The command reports:
 
 - accepted RFCs without `resolved_by`
-- accepted RFCs without follow-ups or an explicit empty `followups: []`
-- follow-up paths that do not exist
-- follow-up docs that do not link back to the RFC or ADR
+- accepted RFCs without required updates or an explicit empty `required_updates: []`
+- required update paths that do not exist
+- required update docs that do not link back to the RFC or ADR
 - docs with `implements` entries pointing at missing or unresolved decisions
 - planned claims whose cited RFC is accepted, rejected, or withdrawn
 - foundation or architecture docs changed after dependent stable docs, requiring
@@ -88,19 +88,19 @@ list commands.
 sorted work list for agents that want a single triage surface. Each queue
 item carries:
 
-- `priority` — overdue decision dates first, then missing follow-ups, then
+- `priority` — overdue decision dates first, then missing required updates, then
   drift signals.
 - `kind` — `create`, `update`, `review`, or `resolve`.
 - `target_path` — the doc that needs action.
 - `related_rfc` or `related_adr` — the decision driving the work.
-- `reason` — copied from the `followups` entry where applicable.
+- `reason` — copied from the `required_updates` entry where applicable.
 - `suggested_command` — the next CLI invocation (for example,
   `irminsul fix --check ...` or `irminsul new component ...`).
 
 `--format json` produces the same structure machine-readably for agent
 consumption. The non-queue mode remains the human-friendly view.
 
-Add a soft deterministic check named `decision-followups` that emits the same
+Add a soft deterministic check named `decision-updates` that emits the same
 core findings during `irminsul check --profile configured`. Keep the list
 command as the human-friendly queue view, and `--queue` as the agent-friendly
 worklist.
@@ -125,7 +125,7 @@ downstream doc is wrong.
 
 ## Alternatives
 
-- Use GitHub issues for follow-ups. Rejected because Irminsul must work without
+- Use GitHub issues for required updates. Rejected because Irminsul must work without
   hosted state and because lifecycle health should be visible from the docs
   tree.
 - Depend only on `mtime-drift`. Rejected because file modification time cannot
@@ -140,10 +140,11 @@ Implemented as specified; see
 
 The two unresolved questions were settled during implementation:
 
-- **`followups` requirement scope**: The `decision-followups` check warns whenever an
-  accepted RFC has no `followups` field at all. Authors must explicitly write
-  `followups: []` to acknowledge that no downstream docs need updating. This keeps
-  the field's absence distinguishable from a deliberate empty declaration.
+- **`required_updates` requirement scope**: The `decision-updates` check warns whenever
+  an accepted RFC has no `required_updates` field at all. Authors must explicitly
+  write `required_updates: []` to acknowledge that no downstream docs beyond the
+  canonical `resolved_by` ADR need updating. This keeps the field's absence
+  distinguishable from a deliberate empty declaration.
 
 - **Supersession warnings**: `irminsul list lifecycle` stays focused on decision
   follow-through only. Supersession drift is already handled by `SupersessionCheck`

@@ -6,4 +6,4 @@ source_roots = ["src"]
 
 [checks]
 hard = ["frontmatter", "globs", "uniqueness", "links"]
-soft_deterministic = ["decision-followups"]
+soft_deterministic = ["decision-updates"]

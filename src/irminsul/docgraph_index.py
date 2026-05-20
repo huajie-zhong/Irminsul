@@ -3,8 +3,9 @@
 Three indexes are built once at the end of `build_graph` and used by Sprint 2
 checks:
 
-- `inbound_strong` — for each doc id, the set of doc ids whose `depends_on`
-  includes it. Used by orphans and supersession reciprocity.
+- `inbound_strong` — for each doc id, the set of doc ids whose `depends_on`,
+  `implements`, or implicit `resolved_by` relationship points at it. Used by
+  orphans, supersession reciprocity, and refs.
 - `inbound_weak` — for each doc id, the set of doc ids whose body contains a
   markdown link resolving to that doc. Used by orphans.
 - `headings` — for each doc id, the ordered list of headings in its body. Used
@@ -48,12 +49,18 @@ def slugify(text: str) -> str:
 
 
 def build_inbound_strong(nodes: dict[str, DocNode]) -> dict[str, set[str]]:
+    by_path = {node.path: node for node in nodes.values()}
     inbound: dict[str, set[str]] = {doc_id: set() for doc_id in nodes}
     for src_id, node in nodes.items():
         for target_id in node.frontmatter.depends_on:
             inbound.setdefault(target_id, set()).add(src_id)
         for target_id in node.frontmatter.implements:
             inbound.setdefault(target_id, set()).add(src_id)
+        if node.frontmatter.resolved_by is not None:
+            target_path = Path(PurePosixPath(node.frontmatter.resolved_by))
+            target = by_path.get(target_path)
+            if target is not None:
+                inbound.setdefault(src_id, set()).add(target.id)
     return inbound
 
 

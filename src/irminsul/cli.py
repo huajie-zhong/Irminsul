@@ -1022,7 +1022,7 @@ def list_lifecycle(
     queue: Annotated[bool, typer.Option("--queue")] = False,
     path: Annotated[Path, typer.Option("--path")] = Path("."),
 ) -> None:
-    """List unfinished decision follow-up work."""
+    """List unfinished decision update work."""
     from irminsul.listing.command import list_lifecycle as _list_lifecycle
 
     _list_lifecycle(path.resolve(), fmt=fmt, queue=queue)
