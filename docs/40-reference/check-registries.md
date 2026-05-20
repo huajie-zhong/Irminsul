@@ -28,7 +28,7 @@ describes: []
 | `soft` | supersession |
 | `soft` | parent-child |
 | `soft` | rfc-resolution |
-| `soft` | glossary |
+| `soft` | glossary-discipline |
 | `soft` | external-links |
 | `soft` | reality |
 | `soft` | boundary |

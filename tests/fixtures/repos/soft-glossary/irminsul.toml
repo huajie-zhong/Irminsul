@@ -5,4 +5,4 @@ docs_root = "docs"
 source_roots = ["app"]
 
 [checks]
-soft_deterministic = ["glossary"]
+soft_deterministic = ["glossary-discipline"]

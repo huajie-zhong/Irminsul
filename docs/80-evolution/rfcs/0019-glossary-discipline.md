@@ -3,9 +3,11 @@ id: 0019-glossary-discipline
 title: Glossary discipline and terminology resolution
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: accepted
+resolved_by: docs/50-decisions/0010-implement-rfc-0019-glossary-discipline.md
+required_updates: []
 ---
 
 # RFC 0019: Glossary discipline and terminology resolution
@@ -114,3 +116,24 @@ opt-in.
 - Should plural forms be handled by a small stemmer or by explicit `match`
   enumeration? The first version should prefer explicit enumeration.
 - Should rule 3 be opt-in per doc via frontmatter rather than globally?
+
+## Resolution
+
+Implemented as specified; see
+[ADR-0010](../../50-decisions/0010-implement-rfc-0019-glossary-discipline.md).
+
+The two unresolved questions were settled during implementation:
+
+- **Plural and variant forms**: the first implementation uses explicit
+  `match` enumeration only. Glossary maintainers list plural forms and aliases
+  intentionally rather than relying on stemming.
+- **Used-defined advisory scope**: the advisory runs globally at info level and
+  reports at most one missing glossary link per term per doc. It does not block
+  CI unless a future policy promotes info findings.
+
+Two implementation choices were also locked:
+
+- The public check name is `glossary-discipline`, replacing the old `glossary`
+  registry entry.
+- Settings live under `[checks.glossary_discipline]`; the old settings table is
+  not kept as a compatibility alias.

@@ -26,7 +26,7 @@ from irminsul.checks.external_links import ExternalLinksCheck
 from irminsul.checks.foundation_readiness import FoundationReadinessCheck
 from irminsul.checks.frontmatter import FrontmatterCheck
 from irminsul.checks.globs import GlobsCheck
-from irminsul.checks.glossary import GlossaryCheck
+from irminsul.checks.glossary import GlossaryDisciplineCheck
 from irminsul.checks.liar import LiarCheck
 from irminsul.checks.links import LinksCheck
 from irminsul.checks.mtime_drift import MtimeDriftCheck
@@ -62,7 +62,7 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     SupersessionCheck.name: SupersessionCheck,
     ParentChildCheck.name: ParentChildCheck,
     RfcResolutionCheck.name: RfcResolutionCheck,
-    GlossaryCheck.name: GlossaryCheck,
+    GlossaryDisciplineCheck.name: GlossaryDisciplineCheck,
     ExternalLinksCheck.name: ExternalLinksCheck,
     RealityCheck.name: RealityCheck,
     BoundaryCheck.name: BoundaryCheck,
@@ -101,6 +101,7 @@ __all__ = [
     "Finding",
     "Fix",
     "FoundationReadinessCheck",
+    "GlossaryDisciplineCheck",
     "LiarCheck",
     "OverlapCheck",
     "PhantomLayerCheck",
