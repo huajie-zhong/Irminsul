@@ -28,7 +28,7 @@ In-flight proposals. See [`80-evolution`](../INDEX.md) for the RFC lifecycle.
 - [`0015-pib-seed-and-foundation-readiness`](0015-pib-seed-and-foundation-readiness.md) — PIB seed flow and foundation readiness checks
 - [`0016-agent-lifecycle-protocol`](0016-agent-lifecycle-protocol.md) — Agent work order for docs, RFCs, ADRs, and checks
 - [`0017-rfc-resolution-check`](0017-rfc-resolution-check.md) — RFC lifecycle validation and resolution metadata
-- [`0018-decision-followups-and-maintenance-queue`](0018-decision-followups-and-maintenance-queue.md) — Decision follow-up tracking and lifecycle listing
+- [`0018-decision-followups-and-maintenance-queue`](0018-decision-followups-and-maintenance-queue.md) — Decision required update tracking and lifecycle listing
 - [`0019-glossary-discipline`](0019-glossary-discipline.md) — Glossary discipline and terminology resolution
 - [`0020-inventory-drift`](0020-inventory-drift.md) — Inventory drift for endpoints, commands, and exports
 - [`0021-code-doc-cochange`](0021-code-doc-cochange.md) — Code-doc co-change drift signal for PR diffs

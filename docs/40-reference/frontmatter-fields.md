@@ -32,3 +32,5 @@ describes: []
 | `decision_owner` | no |
 | `target_decision_date` | no |
 | `summary` | no |
+| `required_updates` | no |
+| `implements` | no |

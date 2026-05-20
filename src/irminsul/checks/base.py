@@ -10,7 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import ClassVar, Literal, Protocol, runtime_checkable
+from typing import ClassVar, Protocol, runtime_checkable
 
 from irminsul.docgraph import DocGraph
 
@@ -33,7 +33,7 @@ class Finding:
     doc_id: str | None = None
     line: int | None = None
     suggestion: str | None = None
-    category: Literal["hard", "soft", "llm"] | None = None
+    category: str | None = None
 
 
 @dataclass(frozen=True)

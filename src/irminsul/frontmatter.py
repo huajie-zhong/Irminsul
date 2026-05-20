@@ -52,6 +52,20 @@ class RfcStateEnum(StrEnum):
     withdrawn = "withdrawn"
 
 
+class RequiredUpdateKindEnum(StrEnum):
+    create = "create"
+    update = "update"
+    review = "review"
+
+
+class RequiredUpdateEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(min_length=1)
+    reason: str = ""
+    kind: RequiredUpdateKindEnum = RequiredUpdateKindEnum.update
+
+
 class Claim(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -89,6 +103,8 @@ class DocFrontmatter(BaseModel):
     decision_owner: str | None = None
     target_decision_date: str | None = None
     summary: str | None = None
+    required_updates: list[RequiredUpdateEntry] | None = None
+    implements: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate_structured_claims(self) -> DocFrontmatter:

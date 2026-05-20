@@ -73,7 +73,7 @@ In rough priority order for agent leverage:
 8. **RFC state transition** (RFC-0017). On accepting an RFC, atomically set
    `rfc_state: accepted`, `status: stable`, `resolved_by`, and insert a stub
    `## Resolution` section.
-9. **Follow-up back-link** (RFC-0018). When a follow-up doc is created, add
+9. **Required update back-link** (RFC-0018). When a required update doc is created, add
    its `implements:` field via fix so the inverse relationship is computable
    without manual maintenance on both sides.
 
@@ -89,7 +89,7 @@ load-bearing metadata.
 
 - Generalizes RFC-0002, which introduced the fix framework on supersession.
 - Provides the underlying mechanics expected by RFC-0013 (AGENTS.md regen),
-  RFC-0017 (atomic state transition), RFC-0018 (follow-up back-link),
+  RFC-0017 (atomic state transition), RFC-0018 (required update back-link),
   RFC-0019 (glossary auto-link), and RFC-0020 (inventory rewrite).
 
 ## Drawbacks

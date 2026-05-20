@@ -19,6 +19,7 @@ describes: []
 | `init` | command |
 | `init-docs-only` | command |
 | `list` | group |
+| `list lifecycle` | command |
 | `list orphans` | command |
 | `list stale` | command |
 | `list undocumented` | command |

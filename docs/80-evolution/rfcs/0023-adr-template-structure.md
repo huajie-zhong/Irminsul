@@ -15,7 +15,7 @@ rfc_state: draft
 Standardize the ADR shape: required frontmatter fields, required body
 sections, and a new hard check `adr-structure` that enforces the shape. This
 closes the loop that RFC-0017 (`resolved_by` lifecycle) and RFC-0018
-(`implements` follow-ups) silently depend on.
+(`implements` required updates) silently depend on.
 
 ## Motivation
 
@@ -66,7 +66,7 @@ Enforced by a new hard check `adr-structure`:
 - `## Decision` — the concrete choice, written in active voice ("We will
   ..."). Avoid hedging.
 - `## Consequences` — positive, negative, and follow-on work. Follow-on work
-  here is the natural seed for `followups:` per RFC-0018.
+  here is the natural seed for `required_updates:` per RFC-0018.
 - `## Status history` — an append-only log of state transitions:
 
   ```text

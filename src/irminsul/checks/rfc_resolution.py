@@ -143,7 +143,7 @@ class RfcResolutionCheck:
                     message=("accepted RFC retains an empty '## Unresolved Questions' section"),
                     path=node.path,
                     doc_id=node.id,
-                    suggestion=("remove the section or list explicit follow-up work"),
+                    suggestion=("remove the section or list explicit required update work"),
                 )
             )
 
