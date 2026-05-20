@@ -81,3 +81,27 @@ def test_stale_planned_claim_warns(repo: Path) -> None:
     assert len(findings) == 1
     assert findings[0].category == "stale-claim"
     assert "is now accepted" in findings[0].message
+
+
+def test_rfc_prefix_honours_repo_root_docs_root() -> None:
+    """Projects can set `paths.docs_root = "."`; RFC detection still applies."""
+    from irminsul.config import IrminsulConfig, Paths
+    from irminsul.docgraph import DocGraph, DocNode
+    from irminsul.frontmatter import AudienceEnum, DocFrontmatter, RfcStateEnum, StatusEnum
+
+    fm = DocFrontmatter(
+        id="0099-root-docs",
+        title="Root docs RFC",
+        audience=AudienceEnum.explanation,
+        tier=2,
+        status=StatusEnum.stable,
+        rfc_state=RfcStateEnum.accepted,
+        resolved_by="50-decisions/0099-root-docs.md",
+    )
+    path = Path("80-evolution/rfcs/0099-root-docs.md")
+    node = DocNode(id="0099-root-docs", path=path, frontmatter=fm, body="# x")
+    config = IrminsulConfig(paths=Paths(docs_root="."))
+    graph = DocGraph(nodes={"0099-root-docs": node}, by_path={path: node}, config=config)
+
+    findings = DecisionUpdatesCheck().run(graph)
+    assert _by_doc(findings, "0099-root-docs")[0].category == "no-required-updates-field"

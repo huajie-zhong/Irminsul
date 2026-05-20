@@ -7,7 +7,9 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
+from irminsul.checks.base import Finding, Severity
 from irminsul.cli import app
+from irminsul.listing.command import _to_queue_item
 
 runner = CliRunner()
 
@@ -68,3 +70,17 @@ def test_list_lifecycle_queue_uses_required_update_categories() -> None:
     data = json.loads(result.output)
     assert any("required update path" in item["reason"] for item in data)
     assert all("follow-up path" not in item["reason"] for item in data)
+
+
+def test_lifecycle_queue_quotes_suggested_context_path() -> None:
+    finding = Finding(
+        check="decision-updates",
+        category="missing-backlink",
+        severity=Severity.warning,
+        message="required update doc is missing a backlink",
+        path=Path("docs/20-components/doc with spaces.md"),
+        doc_id="doc-with-spaces",
+    )
+
+    item = _to_queue_item(finding)
+    assert item.suggested_command == 'irminsul context "docs/20-components/doc with spaces.md"'

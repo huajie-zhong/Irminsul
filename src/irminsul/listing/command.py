@@ -67,6 +67,11 @@ def _finding_category(f: Finding) -> str:
     return f.category or "other"
 
 
+def _quote_path(path: str) -> str:
+    escaped = path.replace('"', '\\"')
+    return f'"{escaped}"'
+
+
 def _to_queue_item(f: Finding) -> _QueueItem:
     cat = _finding_category(f)
     priority = _PRIORITY_MAP.get(cat, 9)
@@ -74,7 +79,11 @@ def _to_queue_item(f: Finding) -> _QueueItem:
     target = f.path.as_posix() if f.path else "<repo>"
     related = f.doc_id or ""
     reason = f.message
-    cmd = f"irminsul context {target}" if target != "<repo>" else "irminsul list lifecycle"
+    cmd = (
+        f"irminsul context {_quote_path(target)}"
+        if target != "<repo>"
+        else "irminsul list lifecycle"
+    )
     return _QueueItem(
         priority=priority,
         kind=kind,

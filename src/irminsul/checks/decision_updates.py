@@ -20,14 +20,20 @@ _RESOLVED_STATES = frozenset({RfcStateEnum.accepted, RfcStateEnum.rejected, RfcS
 _RFC_PATH_RE = re.compile(r"80-evolution/rfcs/[^/\s)]+\.md")
 
 
+def _docs_root_prefix(docs_root: str) -> str:
+    normalized = docs_root.replace("\\", "/").strip("/")
+    parts = [part for part in normalized.split("/") if part not in ("", ".")]
+    return PurePosixPath(*parts).as_posix() if parts else ""
+
+
 class DecisionUpdatesCheck:
     name: ClassVar[str] = "decision-updates"
     default_severity: ClassVar[Severity] = Severity.warning
 
     def run(self, graph: DocGraph) -> list[Finding]:
         out: list[Finding] = []
-        docs_root = graph.config.paths.docs_root.strip("/\\") if graph.config else "docs"
-        rfc_prefix = f"{docs_root}/80-evolution/rfcs/"
+        docs_root = _docs_root_prefix(graph.config.paths.docs_root if graph.config else "docs")
+        rfc_prefix = f"{docs_root}/80-evolution/rfcs/" if docs_root else "80-evolution/rfcs/"
 
         for node in graph.nodes.values():
             is_rfc = node.path.as_posix().startswith(rfc_prefix)
