@@ -100,6 +100,7 @@ automatically once any doc declares one.
 | `0007-implement-rfc-0016-agent-lifecycle-protocol` | [ADR-0007: Implement RFC-0016 agent lifecycle protocol](50-decisions/0007-implement-rfc-0016-agent-lifecycle-protocol.md) | adr | 2 | Add the canonical agent lifecycle protocol document and ship it via the init scaffold. |
 | `0008-implement-rfc-0017-rfc-resolution-check` | [ADR-0008: Implement RFC-0017 RFC resolution check](50-decisions/0008-implement-rfc-0017-rfc-resolution-check.md) | adr | 2 | Add the `rfc-resolution` soft deterministic check and a `--now` override so the RFC lifecycle is machine-enforced end to end. |
 | `0009-implement-rfc-0018-decision-followups-and-maintenance-queue` | [ADR-0009: Implement RFC-0018 decision updates and maintenance queue](50-decisions/0009-implement-rfc-0018-decision-followups-and-maintenance-queue.md) | adr | 2 | Add `required_updates` and `implements` frontmatter fields, a `decision-updates` soft check, and `irminsul list lifecycle [--queue]` to surface unfinished decision work. |
+| `0010-implement-rfc-0019-glossary-discipline` | [ADR-0010: Implement RFC-0019 glossary discipline](50-decisions/0010-implement-rfc-0019-glossary-discipline.md) | adr | 2 | Rename the glossary check to `glossary-discipline` and enforce explicit glossary metadata for term usage, forbidden synonyms, and glossary links. |
 | `50-decisions` | [Architecture decisions](50-decisions/INDEX.md) | reference | 2 |  |
 
 ### 60-operations

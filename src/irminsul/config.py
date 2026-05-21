@@ -36,7 +36,7 @@ SOFT_DETERMINISTIC_CHECKS = (
     "orphans",
     "supersession",
     "parent-child",
-    "glossary",
+    "glossary-discipline",
     "external-links",
     "reality",
     "boundary",
@@ -96,7 +96,7 @@ class StaleReaperSettings(BaseModel):
     deprecated_threshold_days: int = 180
 
 
-class GlossarySettings(BaseModel):
+class GlossaryDisciplineSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     glossary_path: str = "docs/GLOSSARY.md"
@@ -154,7 +154,9 @@ class Checks(BaseModel):
     schema_leak: SchemaLeakSettings = Field(default_factory=SchemaLeakSettings)
     external_links: ExternalLinksSettings = Field(default_factory=ExternalLinksSettings)
     stale_reaper: StaleReaperSettings = Field(default_factory=StaleReaperSettings)
-    glossary: GlossarySettings = Field(default_factory=GlossarySettings)
+    glossary_discipline: GlossaryDisciplineSettings = Field(
+        default_factory=GlossaryDisciplineSettings
+    )
     parent_child: ParentChildSettings = Field(default_factory=ParentChildSettings)
     terminology_overload: TerminologyOverloadSettings = Field(
         default_factory=TerminologyOverloadSettings

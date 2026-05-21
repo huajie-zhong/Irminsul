@@ -8,4 +8,4 @@ status: stable
 
 # Composer
 
-Redefines the term Composer with a level-1 heading. GlossaryCheck should flag.
+Redefines the term Composer with a level-1 heading. GlossaryDisciplineCheck should flag.
