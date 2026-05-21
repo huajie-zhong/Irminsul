@@ -8,6 +8,7 @@ from pathlib import Path
 from irminsul.checks.base import Severity
 from irminsul.checks.glossary import (
     GlossaryDisciplineCheck,
+    _blank_preserve_newlines,
     _parse_glossary_entries,
     _parse_glossary_terms,
 )
@@ -171,6 +172,27 @@ def test_existing_glossary_link_suppresses_info(tmp_path: Path) -> None:
     assert not any(finding.severity == Severity.info for finding in findings)
 
 
+def test_local_glossary_anchor_suppresses_info_for_glossary_doc(tmp_path: Path) -> None:
+    repo = _write_repo(
+        tmp_path,
+        glossary=(
+            "# Glossary\n\n"
+            "## DocGraph\n\n"
+            'match: ["DocGraph"]\n'
+            "case_sensitive: true\n\n"
+            "The [DocGraph](#docgraph) is canonical.\n"
+        ),
+        docs={},
+        glossary_path="docs/20-components/GLOSSARY.md",
+        glossary_frontmatter=True,
+    )
+
+    findings = _run_glossary(repo)
+    assert not any(
+        finding.severity == Severity.info and finding.doc_id == "glossary" for finding in findings
+    )
+
+
 def test_unused_declared_term_warns(tmp_path: Path) -> None:
     repo = _write_repo(
         tmp_path,
@@ -207,24 +229,49 @@ def test_plural_forms_must_be_explicit(tmp_path: Path) -> None:
     assert not any(finding.severity == Severity.info for finding in findings)
 
 
+def test_blank_preserve_newlines_keeps_shape() -> None:
+    assert _blank_preserve_newlines("abc\n`x`") == "   \n   "
+
+
 def _run_glossary(repo: Path) -> list:
     config = load(find_config(repo))
     graph = build_graph(repo, config)
     return GlossaryDisciplineCheck().run(graph)
 
 
-def _write_repo(tmp_path: Path, *, glossary: str, docs: dict[str, str]) -> Path:
+def _write_repo(
+    tmp_path: Path,
+    *,
+    glossary: str,
+    docs: dict[str, str],
+    glossary_path: str = "docs/GLOSSARY.md",
+    glossary_frontmatter: bool = False,
+) -> Path:
     repo = tmp_path / "repo"
     repo.mkdir()
     (repo / "irminsul.toml").write_text(
         'project_name = "repo"\n'
         '[paths]\ndocs_root = "docs"\nsource_roots = []\n'
         '[checks]\nsoft_deterministic = ["glossary-discipline"]\n'
-        '[checks.glossary_discipline]\nglossary_path = "docs/GLOSSARY.md"\n',
+        f'[checks.glossary_discipline]\nglossary_path = "{glossary_path}"\n',
         encoding="utf-8",
     )
     (repo / "docs").mkdir()
-    (repo / "docs" / "GLOSSARY.md").write_text(glossary, encoding="utf-8")
+    glossary_body = glossary
+    if glossary_frontmatter:
+        glossary_body = (
+            "---\n"
+            "id: glossary\n"
+            "title: Glossary\n"
+            "audience: reference\n"
+            "tier: 1\n"
+            "status: stable\n"
+            "---\n\n"
+            f"{glossary}"
+        )
+    glossary_file = repo / glossary_path
+    glossary_file.parent.mkdir(parents=True, exist_ok=True)
+    glossary_file.write_text(glossary_body, encoding="utf-8")
     for rel_path, body in docs.items():
         path = repo / rel_path
         path.parent.mkdir(parents=True, exist_ok=True)

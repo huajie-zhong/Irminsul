@@ -42,6 +42,13 @@ class GlossaryParseIssue:
     message: str
 
 
+@dataclass(frozen=True)
+class _NodeGlossaryCache:
+    node: DocNode
+    masked_body: str
+    glossary_anchors: frozenset[str]
+
+
 def _parse_glossary_entries(
     glossary_text: str,
 ) -> tuple[list[GlossaryEntry], set[str], list[GlossaryParseIssue]]:
@@ -223,18 +230,18 @@ def _masked_body(body: str) -> str:
 
 
 def _blank_preserve_newlines(text: str) -> str:
-    return "".join("\n" if char == "\n" else " " for char in text)
+    return re.sub(r"[^\n]", " ", text)
 
 
-def _first_match_line(body: str, term: str, *, case_sensitive: bool) -> int | None:
-    match = _term_pattern(term, case_sensitive=case_sensitive).search(_masked_body(body))
+def _first_match_line(masked_body: str, term: str, *, case_sensitive: bool) -> int | None:
+    match = _term_pattern(term, case_sensitive=case_sensitive).search(masked_body)
     if match is None:
         return None
-    return body[: match.start()].count("\n") + 1
+    return masked_body[: match.start()].count("\n") + 1
 
 
-def _has_match(body: str, term: str, *, case_sensitive: bool) -> bool:
-    return _first_match_line(body, term, case_sensitive=case_sensitive) is not None
+def _has_match(masked_body: str, term: str, *, case_sensitive: bool) -> bool:
+    return _first_match_line(masked_body, term, case_sensitive=case_sensitive) is not None
 
 
 def _term_pattern(term: str, *, case_sensitive: bool) -> re.Pattern[str]:
@@ -242,12 +249,12 @@ def _term_pattern(term: str, *, case_sensitive: bool) -> re.Pattern[str]:
     return re.compile(rf"(?<!\w){re.escape(term)}(?!\w)", flags)
 
 
-def _doc_links_to_glossary_anchor(
+def _linked_glossary_anchors(
     node: DocNode,
     glossary_rel: Path,
-    anchor: str,
     md: MarkdownIt,
-) -> bool:
+) -> set[str]:
+    anchors: set[str] = set()
     tokens = md.parse(node.body)
     for token in tokens:
         if token.type != "inline" or not token.children:
@@ -256,11 +263,21 @@ def _doc_links_to_glossary_anchor(
             if child.type != "link_open":
                 continue
             href = child.attrGet("href")
-            if isinstance(href, str) and _href_targets_glossary_anchor(
-                node, href, glossary_rel, anchor
-            ):
-                return True
-    return False
+            if not isinstance(href, str):
+                continue
+            anchor = _href_glossary_anchor(node, href, glossary_rel)
+            if anchor is not None:
+                anchors.add(anchor)
+    return anchors
+
+
+def _doc_links_to_glossary_anchor(
+    node: DocNode,
+    glossary_rel: Path,
+    anchor: str,
+    md: MarkdownIt,
+) -> bool:
+    return anchor in _linked_glossary_anchors(node, glossary_rel, md)
 
 
 def _href_targets_glossary_anchor(
@@ -269,11 +286,23 @@ def _href_targets_glossary_anchor(
     glossary_rel: Path,
     anchor: str,
 ) -> bool:
+    return _href_glossary_anchor(src_node, href, glossary_rel) == anchor
+
+
+def _href_glossary_anchor(
+    src_node: DocNode,
+    href: str,
+    glossary_rel: Path,
+) -> str | None:
     target, raw_anchor = _split_href(href)
-    if raw_anchor != anchor:
-        return False
-    if not target or "://" in target or target.startswith(("mailto:", "tel:")):
-        return False
+    if raw_anchor is None:
+        return None
+    if not target:
+        if src_node.path.as_posix() == glossary_rel.as_posix():
+            return raw_anchor
+        return None
+    if "://" in target or target.startswith(("mailto:", "tel:")):
+        return None
     doc_parent = PurePosixPath(src_node.path.as_posix()).parent
     raw = doc_parent / target
     parts: list[str] = []
@@ -283,7 +312,9 @@ def _href_targets_glossary_anchor(
                 parts.pop()
         elif part != ".":
             parts.append(part)
-    return Path(*parts).as_posix() == glossary_rel.as_posix()
+    if Path(*parts).as_posix() != glossary_rel.as_posix():
+        return None
+    return raw_anchor
 
 
 def _split_href(href: str) -> tuple[str, str | None]:
@@ -315,6 +346,14 @@ class GlossaryDisciplineCheck:
 
         md = MarkdownIt("commonmark")
         glossary_path_posix = glossary_rel.as_posix()
+        node_caches = [
+            _NodeGlossaryCache(
+                node=node,
+                masked_body=_masked_body(node.body),
+                glossary_anchors=frozenset(_linked_glossary_anchors(node, glossary_rel, md)),
+            )
+            for node in graph.nodes.values()
+        ]
         out: list[Finding] = [
             Finding(
                 check=self.name,
@@ -328,7 +367,8 @@ class GlossaryDisciplineCheck:
 
         for entry in entries:
             slug = slugify(entry.term)
-            for node in graph.nodes.values():
+            for cache in node_caches:
+                node = cache.node
                 if node.path.as_posix() == glossary_path_posix:
                     continue
                 if _doc_redefines_term(node.body, entry.term):
@@ -349,9 +389,9 @@ class GlossaryDisciplineCheck:
             if not entry.has_metadata:
                 continue
 
-            out.extend(self._forbidden_synonym_findings(graph, entry))
-            out.extend(self._unlinked_term_findings(graph, entry, glossary_rel, md))
-            if self._entry_is_unused(graph, entry, glossary_rel, md):
+            out.extend(self._forbidden_synonym_findings(node_caches, entry))
+            out.extend(self._unlinked_term_findings(node_caches, entry, glossary_rel))
+            if self._entry_is_unused(node_caches, entry):
                 out.append(
                     Finding(
                         check=self.name,
@@ -370,13 +410,18 @@ class GlossaryDisciplineCheck:
 
     def _forbidden_synonym_findings(
         self,
-        graph: DocGraph,
+        node_caches: list[_NodeGlossaryCache],
         entry: GlossaryEntry,
     ) -> list[Finding]:
         out: list[Finding] = []
         for synonym in entry.forbidden_synonyms:
-            for node in graph.nodes.values():
-                line = _first_match_line(node.body, synonym, case_sensitive=entry.case_sensitive)
+            for cache in node_caches:
+                node = cache.node
+                line = _first_match_line(
+                    cache.masked_body,
+                    synonym,
+                    case_sensitive=entry.case_sensitive,
+                )
                 if line is None:
                     continue
                 out.append(
@@ -396,22 +441,22 @@ class GlossaryDisciplineCheck:
 
     def _unlinked_term_findings(
         self,
-        graph: DocGraph,
+        node_caches: list[_NodeGlossaryCache],
         entry: GlossaryEntry,
         glossary_rel: Path,
-        md: MarkdownIt,
     ) -> list[Finding]:
         out: list[Finding] = []
         anchor = slugify(entry.term)
-        for node in graph.nodes.values():
-            if _doc_links_to_glossary_anchor(node, glossary_rel, anchor, md):
+        for cache in node_caches:
+            node = cache.node
+            if anchor in cache.glossary_anchors:
                 continue
             matching_lines = [
                 line
                 for match_term in entry.match_terms
                 if (
                     line := _first_match_line(
-                        node.body,
+                        cache.masked_body,
                         match_term,
                         case_sensitive=entry.case_sensitive,
                     )
@@ -438,16 +483,14 @@ class GlossaryDisciplineCheck:
 
     def _entry_is_unused(
         self,
-        graph: DocGraph,
+        node_caches: list[_NodeGlossaryCache],
         entry: GlossaryEntry,
-        glossary_rel: Path,
-        md: MarkdownIt,
     ) -> bool:
         anchor = slugify(entry.term)
-        for node in graph.nodes.values():
-            if _doc_links_to_glossary_anchor(node, glossary_rel, anchor, md):
+        for cache in node_caches:
+            if anchor in cache.glossary_anchors:
                 return False
             for match_term in entry.match_terms:
-                if _has_match(node.body, match_term, case_sensitive=entry.case_sensitive):
+                if _has_match(cache.masked_body, match_term, case_sensitive=entry.case_sensitive):
                     return False
         return True
