@@ -3,7 +3,8 @@ id: 0003-generated-code-reference-surfaces
 title: "ADR-0003: Generate code-derived reference surfaces"
 audience: adr
 tier: 2
-status: stable
+status: deprecated
+superseded_by: 0011-derive-dont-materialize
 describes: []
 summary: Adopt generated reference docs for code-derived surfaces; verify them in CI.
 ---
@@ -14,6 +15,8 @@ summary: Adopt generated reference docs for code-derived surfaces; verify them i
 
 Accepted, 2026-05-14. Resolves
 [`0012-generated-code-reference-surfaces`](../80-evolution/rfcs/0012-generated-code-reference-surfaces.md).
+Superseded by [`ADR-0011`](0011-derive-dont-materialize.md) on 2026-05-30: committed
+code-derived surfaces are retired in favor of on-demand derivation.
 
 ## Context
 

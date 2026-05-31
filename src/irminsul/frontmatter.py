@@ -76,6 +76,23 @@ class Claim(BaseModel):
     evidence: list[str] = Field(min_length=1)
 
 
+class InventoryEntry(BaseModel):
+    """A curated *subset* of a code surface a doc deliberately calls out.
+
+    `kind` selects the extractor (cli/http/exports/env-vars, or a generic kind);
+    `source` is an optional glob pointing at the code that defines the surface
+    (defaults to the doc's `describes`); `items` are the identities the doc claims
+    exist. The check verifies each item still exists in code — it never demands the
+    list be complete.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str = Field(min_length=1)
+    source: str | None = None
+    items: list[str] = Field(default_factory=list)
+
+
 class DocFrontmatter(BaseModel):
     """Canonical frontmatter for a single doc atom (see Appendix B)."""
 
@@ -105,6 +122,7 @@ class DocFrontmatter(BaseModel):
     summary: str | None = None
     required_updates: list[RequiredUpdateEntry] | None = None
     implements: list[str] = Field(default_factory=list)
+    inventory: list[InventoryEntry] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate_structured_claims(self) -> DocFrontmatter:

@@ -19,7 +19,6 @@ from irminsul.regen.agents_md import (
     manifest_rel_path,
     render_generated_section,
 )
-from irminsul.regen.doc_surfaces import surface_by_filename
 
 _LOCAL_MD_RE = re.compile(r"(?<![\w.-])((?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.md)(?![\w.-])")
 _MARKDOWN_LINK_RE = re.compile(r"!?\[[^\]\n]*\](?:\([^\)\n]*\)|\[[^\]\n]*\])")
@@ -566,73 +565,6 @@ class ClaimProvenanceCheck:
             or path_posix in {".pre-commit-config.yaml", ".pre-commit-config.yml"}
             or path_posix.startswith(".github/")
         ) and not self._is_source_evidence(graph, path)
-
-
-class _GeneratedSurfaceDriftCheck:
-    name: ClassVar[str]
-    default_severity: ClassVar[Severity] = Severity.warning
-    surface_filename: ClassVar[str]
-    relevant_doc_ids: ClassVar[set[str]]
-
-    def run(self, graph: DocGraph) -> list[Finding]:
-        if graph.repo_root is None or graph.config is None:
-            return []
-
-        rel_path = Path(graph.config.paths.docs_root) / "40-reference" / self.surface_filename
-        if not self._is_applicable(graph, rel_path):
-            return []
-
-        expected = surface_by_filename(self.surface_filename)
-        if expected is None:
-            return []
-
-        abs_path = graph.repo_root / rel_path
-        if not abs_path.exists():
-            return [
-                Finding(
-                    check=self.name,
-                    severity=self.default_severity,
-                    message=f"generated reference '{rel_path.as_posix()}' is missing",
-                    path=rel_path,
-                    suggestion="Run `irminsul regen docs-surfaces`",
-                )
-            ]
-
-        actual = abs_path.read_text(encoding="utf-8").replace("\r\n", "\n")
-        if actual != expected.content:
-            return [
-                Finding(
-                    check=self.name,
-                    severity=self.default_severity,
-                    message=f"generated reference '{rel_path.as_posix()}' is stale",
-                    path=rel_path,
-                    suggestion="Run `irminsul regen docs-surfaces`",
-                )
-            ]
-        return []
-
-    def _is_applicable(self, graph: DocGraph, rel_path: Path) -> bool:
-        if rel_path in graph.by_path:
-            return True
-        return any(doc_id in graph.nodes for doc_id in self.relevant_doc_ids)
-
-
-class SchemaDocDriftCheck(_GeneratedSurfaceDriftCheck):
-    name: ClassVar[str] = "schema-doc-drift"
-    surface_filename: ClassVar[str] = "frontmatter-fields.md"
-    relevant_doc_ids: ClassVar[set[str]] = {"frontmatter", "doc-atom"}
-
-
-class CliDocDriftCheck(_GeneratedSurfaceDriftCheck):
-    name: ClassVar[str] = "cli-doc-drift"
-    surface_filename: ClassVar[str] = "cli-commands.md"
-    relevant_doc_ids: ClassVar[set[str]] = {"cli"}
-
-
-class CheckSurfaceDriftCheck(_GeneratedSurfaceDriftCheck):
-    name: ClassVar[str] = "check-surface-drift"
-    surface_filename: ClassVar[str] = "check-registries.md"
-    relevant_doc_ids: ClassVar[set[str]] = {"checks"}
 
 
 class TerminologyOverloadCheck:

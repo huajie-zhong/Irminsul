@@ -12,7 +12,7 @@ tests:
 
 # Frontmatter
 
-Every doc atom carries a YAML frontmatter block matching Appendix B of the [Doc Atom reference](doc-atom.md). The canonical field surface is generated from `DocFrontmatter` in the [frontmatter fields reference](../40-reference/frontmatter-fields.md).
+Every doc atom carries a YAML frontmatter block matching Appendix B of the [Doc Atom reference](doc-atom.md). The canonical field surface is defined by `DocFrontmatter` in `src/irminsul/frontmatter.py`.
 
 `extra="allow"` is intentional — projects extend the schema with their own fields. Strictness comes from validating canonical fields, not from forbidding unknown ones.
 

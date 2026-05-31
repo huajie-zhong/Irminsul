@@ -21,11 +21,19 @@ describes:
 tests:
   - tests/test_cli.py
   - tests/test_cli_check.py
+inventory:
+  - kind: cli
+    source: src/irminsul/cli.py
+    items:
+      - init
+      - check
+      - context
+      - render
 ---
 
 # CLI
 
-The Typer app that backs both the `irminsul` and `irm` console scripts. The exact command surface is generated from the Typer app in the [CLI commands reference](../40-reference/cli-commands.md).
+The Typer app that backs both the `irminsul` and `irm` console scripts. The exact command surface is derived on demand from the Typer app — run `irminsul surface cli`.
 
 Common command paths:
 

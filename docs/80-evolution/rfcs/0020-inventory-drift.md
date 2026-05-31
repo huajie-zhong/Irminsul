@@ -1,154 +1,82 @@
 ---
 id: 0020-inventory-drift
-title: Inventory drift for endpoints, commands, and exports
+title: Derive, don't materialize — surfaces, curated inventory, and the boundary lint
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: accepted
+resolved_by: docs/50-decisions/0011-derive-dont-materialize.md
+required_updates: []
 ---
 
-# RFC 0020: Inventory drift for endpoints, commands, and exports
+# RFC 0020: Derive, don't materialize
 
 ## Summary
 
-Add an optional `inventory` frontmatter field on component docs and a soft
-deterministic check `inventory-drift` that compares the declared inventory
-against the actual surface extracted from the code the doc describes.
+Originally proposed as an `inventory` frontmatter field plus an `inventory-drift`
+check that diffs a declared list against code. The interview reframed it: a list
+reconstructable from code is a *derivation*, and a committed copy of a derivation —
+whether a generated `.md` or a hand-declared "complete" list — is a cache that goes
+stale. The accepted design **derives surfaces on demand**, keeps in docs only what
+code cannot express, and adds a lint that enforces that boundary.
 
 ## Motivation
 
-Component docs can claim `commands: [irminsul check]` or `endpoints: [GET
-/api/check]` today with nothing verifying these against the code. RFC-0010
-handles structured *evidence* for individual claims, but it does not compare a
-declared inventory against the actual code surface. Drift accumulates silently
-until a human or LLM notices.
+Component docs hand-copied code-derived facts (the `regen` subcommands listed in
+`new-list-regen` prose) and rotted when the code changed (`regen agents-md` landed
+with no update). The pre-existing drift checks (`cli-doc-drift`, `schema-doc-drift`,
+`check-surface-drift`) only policed *committed generated* references — they could
+not see hand-written prose, and they existed only because we had materialized a
+cache in the first place.
 
-This is the missing deterministic counterpart to RFC-0010: where RFC-0010 asks
-"does this claim point at evidence," `inventory-drift` asks "does this complete
-list match the code."
+## Detailed Design (as shipped)
 
-A concrete instance this RFC must catch: the `new-list-regen` component doc
-enumerated the `irminsul regen` subcommands in prose. When `regen agents-md`
-was added, the doc was not updated and nothing flagged it — the prose silently
-went stale. `cli-doc-drift` (RFC-0009) did not catch it because that check only
-compares the *generated* CLI reference against Typer, not hand-written
-component prose. The design below must flag this case even though the stale doc
-carried no structured inventory and does not `describes` the file where the
-commands are defined.
+**Static extractors** (`src/irminsul/inventory/`). One small extractor per surface
+*kind* — `cli` (Typer, AST), `http` (FastAPI, AST), `exports` (TypeScript, static
+scan, no node toolchain), `env-vars` (regex), plus a config-declared generic regex
+fallback. Extraction is static only: `irminsul check` runs against untrusted repos
+and must never import their code. Identity-only comparison (command path,
+`METHOD /path`, symbol name, var name) keeps every consumer free of false positives
+from imperfect parsing. A test pins the CLI extractor to Typer's live command
+resolution for irminsul itself.
 
-## Detailed Design
+**On-demand derivation** (`irminsul surface <kind>`). Derives and aggregates a
+surface from code at call time and persists nothing — the positive replacement for
+committed reference docs.
 
-### Frontmatter shape
+**`inventory:` as curated intent.** A doc may declare a deliberately-chosen *subset*
+of a surface (`kind` / optional `source` / `items`). The `inventory-drift` check
+runs the anti-lie direction only: a declared item that no longer exists in code is
+flagged. There is deliberately no completeness rule — that would be the same
+materialization, relocated into frontmatter. Use `irminsul surface` for the full
+surface.
 
-```yaml
-inventory:
-  kind: cli            # cli | http | exports | env-vars
-  source: src/irminsul/cli.py   # optional; defaults to the doc's describes globs
-  items:
-    - irminsul check
-    - irminsul context
-    - irminsul fix
-```
+**Boundary lint** (the generalized `liar` check). A doc whose prose enumerates a
+derivable surface (≥3 identities of one kind, in invoked/exact form, in
+explanation/reference docs not already declaring an `inventory` block) is told to
+declare a curated inventory or link to the derivation. This is the principled
+successor to the old "fields duplicated from a reference doc" check, now sourced
+from the extractors rather than a committed generated doc.
 
-`kind` selects the extractor; `items` declares the canonical list. The optional
-`source` path points the extractor at the code that defines the surface — it
-defaults to the doc's `describes` globs, but a doc often documents a surface
-that is *defined* elsewhere (CLI commands are registered in a central
-entrypoint like `src/irminsul/cli.py`, not in the implementation modules the
-doc `describes`). Without `source`, such a doc could never diff cleanly.
+**Retirements.** `cli-doc-drift`, `schema-doc-drift`, `check-surface-drift` and the
+committed `docs/40-reference/{cli-commands,frontmatter-fields,check-registries}.md`
+are removed; `regen docs-surfaces` is deprecated. `requires-env` and `import-deps`
+are relaxed to their intent-only (anti-lie) directions. Render-time mkdocstrings
+stubs stay — their content is pulled from live code at build.
 
-### Per-language extractors
+The principle is recorded in the foundation docs ("Derive, don't materialize") and
+the decision in ADR-0011.
 
-Reuse the existing `src/irminsul/languages/` plugin pattern (already used for
-source-root candidates and schema-leak regexes):
+## Resolution
 
-- **Python/Typer** (dogfood target). AST-walk files matching the doc's
-  `describes` glob; collect `@app.command(...)` decorators and Typer
-  subcommand functions; emit the actual command list.
-- **Python/FastAPI**. Route decorators (`@app.get`, `@app.post`, …) → HTTP
-  inventory.
-- **TypeScript**. Reuse the TypeDoc surface produced by RFC-0012 → exported
-  names or route registrations.
-- **Generic regex fallback**. A per-language regex declared in `irminsul.toml`
-  for languages without a plugin.
+Accepted and implemented; resolved by
+[`ADR-0011`](../../50-decisions/0011-derive-dont-materialize.md), which also
+supersedes ADR-0003 (the committed-generated-surfaces decision this reverses).
 
-### Check semantics
-
-Add `inventory-drift` to the soft deterministic registry. It compares each
-extracted code surface against the union of all `inventory:` blocks of the same
-`kind` across the doc graph:
-
-- *Claimed in a doc inventory, missing in code* → error. Lies in the doc.
-- *Present in code, not in any doc inventory of that kind* → soft. The surface
-  item is undocumented. Potentially intentional (hidden commands, internal
-  endpoints) but worth surfacing.
-
-The second direction is surface-wide on purpose: it does not matter *which* doc
-ought to own a given command — if a command exists and no inventory anywhere
-lists it, that is the finding. This is what would have caught `regen agents-md`.
-
-### Docs that should declare an inventory
-
-The check is only useful if docs that document an inventoried surface actually
-carry the field. So `inventory-drift` also emits a soft finding when a
-component doc describes or names a surface an extractor recognizes — for the
-CLI extractor, a doc whose body contains command-signature headings or
-`irminsul <subcommand>` prose patterns — but declares no `inventory:` block.
-This is the rule that closes the prose-drift hole directly: a doc listing
-commands in prose with no structured inventory is flagged so the gap is fixed
-before the prose can rot. The `new-list-regen` doc would be flagged by this
-rule today.
-
-Both kinds of finding name the specific items so a fix is unambiguous.
-
-### Auto-fix
-
-Replace the `inventory:` block with the extractor's output. The fix is atomic
-and lands inside RFC-0022's rollout.
-
-### Dogfood
-
-Irminsul itself is a Typer CLI, so the Python/Typer extractor lands first and
-validates the CLI component docs against `src/irminsul/cli.py`. This catches
-drift in the very command list agents rely on for navigation. The acceptance
-bar for the dogfood extractor is the `regen agents-md` incident: with this RFC
-implemented, adding a subcommand without updating its component doc must
-produce a finding — either an unclaimed-surface finding (the command is in code
-but no inventory lists it) or a missing-inventory finding (the documenting doc
-still lists commands only in prose).
-
-## Relationship to Existing RFCs
-
-- Complements RFC-0010 (claim provenance): evidence vs. inventory.
-- Reuses the language plugin layout established for source-root and
-  schema-leak handling.
-- TypeScript inventory builds on RFC-0012's TypeDoc reference surface.
-- Auto-fix lands as part of RFC-0022.
-
-## Drawbacks
-
-Each extractor is its own surface area. The plugin pattern keeps additions
-contained, but a poorly written extractor could produce false positives. The
-check stays soft for that reason; promotion to hard is left to projects whose
-extractors are mature.
-
-## Alternatives
-
-- Require docs to enumerate inventory in prose. Rejected because prose cannot
-  be diffed deterministically. Note this is *not* the same as the
-  missing-inventory rule above: that rule detects a doc relying on prose and
-  tells it to adopt the structured field — it never tries to diff the prose
-  itself.
-- Treat inventory as another evidence kind under RFC-0010. Rejected because
-  inventories are list-shaped and benefit from a dedicated diff, not a
-  per-item evidence pointer.
-- Generate the inventory from code only, never from doc frontmatter. Rejected
-  because human-curated ordering and grouping is sometimes load-bearing.
-
-## Unresolved Questions
-
-- Should `items` allow grouped sub-lists (e.g., command groups), or should
-  groups be a separate field?
-- For HTTP inventories, should query parameters and request bodies be part of
-  the canonical surface, or stay out of scope for this RFC?
+The two original Unresolved Questions are resolved by the reframe: `inventory.items`
+is a flat list (grouped sub-lists are unnecessary for a curated subset), and HTTP
+query parameters / request bodies stay out of scope — comparison is identity-only
+(`METHOD /path`). The complementary RFC-0024 (anchored prose claims) adds the
+deterministic intent-staleness backstop that the shift to category-2 content makes
+necessary.

@@ -33,10 +33,25 @@ Every non-trivial claim in the docs must trace back to one of three sources: **t
 Every document is written for one reader in one mental state. The Diataxis framework names four such moments: *learning* (tutorial), *doing* (how-to), *understanding* (explanation), *referring* (reference). A doc that tries to serve two of these serves neither.
 
 ### 4. Code as Ultimate Truth
-When code and docs disagree, code wins by default. This means anything that *can* be generated from code *should* be — schemas, type signatures, API surfaces, config references, error catalogs. Hand-written docs cover only what code cannot express: intent, trade-offs, and process.
+When code and docs disagree, code wins by default. This means anything that *can* be derived from code *should* be — schemas, type signatures, API surfaces, config references, error catalogs — and derived *on demand*, never hand-copied into the docs (see the *Derive, don't materialize* principle below). Hand-written docs cover only what code cannot express: intent, trade-offs, and process.
 
 ### 5. The Doc Graph is Bidirectional
 If `composer.md` references `data-model.md`, then `data-model.md` should automatically show "referenced by composer.md" at the bottom. Backlinks are generated, not maintained. This makes "what breaks if I change this?" a one-glance question. <!-- irminsul:ignore prose-file-reference reason="example skeleton" -->
+
+## Derive, don't materialize
+
+Code is the ultimate truth. Any fact a doc states that is reconstructable from code is a *derivation* of that code, and a committed copy of a derivation is a cache that goes stale. Irminsul does not police stale caches it told you to create — it tells you not to create them.
+
+Every fact a doc can state falls into one of two buckets:
+
+1. **Derivable from code.** Reconstructable from the source: the CLI command list, HTTP endpoints, public exports, env vars read, frontmatter fields, the check registry. The human contributes nothing to the *content* of these facts. Derivable facts are never hand-copied into prose and never committed as a generated artifact. They are **derived on demand** — exposed through a query (`irminsul surface <kind>`) or projected at render time — so they are fresh by construction and cannot drift. A doc that needs them *links or derives*; it does not restate.
+2. **Not derivable from code.** Rationale, invariants, the mental model, "why the CLI is thin," design tensions, gotchas — and curated human *intent* about bucket-1 facts ("these are the *public* exports," "these are the commands agents navigate by"). Code cannot produce any of this; it is the doc's real content. It is grounded by claim provenance — pointed at evidence — not surface-diffed, because there is nothing in code to diff it against.
+
+What Irminsul therefore checks:
+
+- **Governance of the non-derivable.** Code is truth for *what*; it is emphatically not truth for *why*. The *why* — rationale, invariants, "the CLI is thin because…", design tensions — is exactly what rots silently and what no compiler ever checks. Claim provenance (claims↔evidence) and why-freshness (semantic and mtime drift) are the real product.
+- **Structure of the doc graph.** Coverage, orphans, layering, uniqueness, glossary. These are facts about the documentation *system*, underivable from any single source file.
+- **The boundary itself.** A lint that catches a doc hand-copying a derivable fact and says: *derive or link instead.* Keeping each fact in its category is arguably Irminsul's highest-leverage role.
 
 ## Goals
 

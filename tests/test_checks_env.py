@@ -21,11 +21,12 @@ def test_good_fixture_no_findings(fixture_repo: Callable[[str], Path]) -> None:
     assert _findings(repo) == []
 
 
-def test_undeclared_env_var_flagged(fixture_repo: Callable[[str], Path]) -> None:
+def test_undeclared_env_var_not_flagged(fixture_repo: Callable[[str], Path]) -> None:
+    # RFC 0020 intent-only: an env var used in code but not declared is NOT flagged
+    # (that completeness direction was the materialization pressure we removed).
     repo = fixture_repo("bad-env")
     findings = _findings(repo)
-    undeclared = [f for f in findings if "used in code but not declared" in f.message]
-    assert any("DB_URL" in f.message for f in undeclared)
+    assert not [f for f in findings if "used in code but not declared" in f.message]
 
 
 def test_stale_env_var_flagged(fixture_repo: Callable[[str], Path]) -> None:

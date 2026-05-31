@@ -912,6 +912,32 @@ def render(
     typer.echo(typer.style(f"site built at {target_out}", fg="green"))
 
 
+@app.command("surface")
+def surface_command(
+    kind: Annotated[
+        str,
+        typer.Argument(
+            help="Surface kind: cli, http, exports, env-vars (or a configured generic kind)."
+        ),
+    ],
+    source: Annotated[
+        str | None,
+        typer.Option("--source", help="Glob limiting which source files to scan."),
+    ] = None,
+    fmt: Annotated[str, typer.Option("--format", help="Output format: plain or json.")] = "plain",
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Derive a code surface on demand — commands, endpoints, exports, or env vars.
+
+    Nothing is written: the surface is recomputed from source each call, so it is
+    fresh by construction and cannot drift.
+    """
+    from irminsul.surface import run_surface
+
+    repo_root, config = _load_repo(path)
+    run_surface(repo_root, config, kind, source, fmt)
+
+
 _new_app = typer.Typer(name="new", help="Scaffold a new doc atom.", no_args_is_help=True)
 app.add_typer(_new_app)
 
@@ -1079,17 +1105,6 @@ def regen_typescript_command(
     _print_regen_result(repo_root, _regen_typescript_or_exit(repo_root, config))
 
 
-@_regen_app.command("docs-surfaces")
-def regen_docs_surfaces_command(
-    path: Annotated[Path, typer.Option("--path")] = Path("."),
-) -> None:
-    """Regenerate code-derived documentation surface references."""
-    from irminsul.regen.doc_surfaces import regen_doc_surfaces
-
-    repo_root, config = _load_repo(path)
-    _print_regen_result(repo_root, regen_doc_surfaces(repo_root, config))
-
-
 @_regen_app.command("agents-md")
 def regen_agents_md_command(
     path: Annotated[Path, typer.Option("--path")] = Path("."),
@@ -1107,12 +1122,10 @@ def regen_all_command(
 ) -> None:
     """Regenerate every configured generated documentation artifact."""
     from irminsul.regen.agents_md import regen_agents_md
-    from irminsul.regen.doc_surfaces import regen_doc_surfaces
     from irminsul.regen.python import regen_python
 
     repo_root, config = _load_repo(path)
     written: list[Path] = []
-    written.extend(regen_doc_surfaces(repo_root, config))
     written.extend(regen_python(repo_root, config))
     written.extend(_regen_typescript_or_exit(repo_root, config))
     written.extend(regen_agents_md(repo_root, config))

@@ -43,14 +43,12 @@ SOFT_DETERMINISTIC_CHECKS = (
     "phantom-layer",
     "requires-env",
     "import-deps",
-    "schema-doc-drift",
-    "cli-doc-drift",
-    "check-surface-drift",
     "terminology-overload",
     "claim-provenance",
     "foundation-readiness",
     "rfc-resolution",
     "decision-updates",
+    "inventory-drift",
 )
 SOFT_LLM_CHECKS = ("overlap", "semantic-drift", "scope-appropriateness")
 
@@ -144,6 +142,20 @@ class TerminologyOverloadSettings(BaseModel):
     )
 
 
+class GenericInventoryRule(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str
+    glob: str
+    pattern: str
+
+
+class InventoryDriftSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    generic: list[GenericInventoryRule] = Field(default_factory=list)
+
+
 class Checks(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -161,6 +173,7 @@ class Checks(BaseModel):
     terminology_overload: TerminologyOverloadSettings = Field(
         default_factory=TerminologyOverloadSettings
     )
+    inventory_drift: InventoryDriftSettings = Field(default_factory=InventoryDriftSettings)
 
     @field_validator("hard", "soft_deterministic", "soft_llm")
     @classmethod
