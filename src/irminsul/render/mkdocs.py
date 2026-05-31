@@ -103,6 +103,9 @@ class MkDocsRenderer:
 
         yaml = YAML()
         yaml.default_flow_style = False
+        # Don't fold long scalars: a long nav title wrapped mid-string puts the
+        # trailing ": path" on a continuation line and breaks YAML parsing.
+        yaml.width = 4096
         with config_path.open("w", encoding="utf-8") as f:
             yaml.dump(config, f)
 
