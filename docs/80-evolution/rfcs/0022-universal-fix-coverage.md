@@ -63,8 +63,11 @@ In rough priority order for agent leverage:
    protocol-summary section.
 4. **Glossary auto-link** (RFC-0019). Wrap the first occurrence of a known
    `match` term with the glossary anchor link.
-5. **Inventory rewrite** (RFC-0020). Replace the `inventory:` block in a
-   component doc with the extractor's output.
+5. **Inventory item pruning** (RFC-0020). When `inventory-drift` flags a declared
+   item that no longer exists in code, drop that item from the `inventory:` block.
+   The block is *curated human intent*, not a mirror of the surface, so the fix only
+   removes items the author already declared — it never adds the full extracted
+   surface back in.
 6. **Dead-glob suggestion**. When a `describes` glob matches zero files,
    propose the nearest existing path via Levenshtein distance and write the
    replacement on confirm.
@@ -76,6 +79,13 @@ In rough priority order for agent leverage:
 9. **Required update back-link** (RFC-0018). When a required update doc is created, add
    its `implements:` field via fix so the inverse relationship is computable
    without manual maintenance on both sides.
+
+### Explicitly out of scope: anchor re-pinning
+
+RFC-0024's `claim-anchor` is **not** part of this manifest. Re-pinning an anchor is a
+deliberate human acknowledgement that the prose was re-read and is still true; doing
+it automatically would rubber-stamp the staleness the anchor exists to catch. It
+stays its own command (`irminsul anchors --re-pin`), never an `irminsul fix` action.
 
 ### Confirmation modes
 
