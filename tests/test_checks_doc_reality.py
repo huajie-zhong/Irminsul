@@ -9,17 +9,13 @@ from git import Repo
 
 from irminsul.checks.doc_reality import (
     AgentsManifestCheck,
-    CheckSurfaceDriftCheck,
     ClaimProvenanceCheck,
-    CliDocDriftCheck,
     ProseFileReferenceCheck,
-    SchemaDocDriftCheck,
     TerminologyOverloadCheck,
 )
 from irminsul.config import load
 from irminsul.docgraph import build_graph
 from irminsul.regen.agents_md import regen_agents_md
-from irminsul.regen.doc_surfaces import regen_doc_surfaces
 
 
 def _write_config(repo: Path) -> None:
@@ -367,68 +363,6 @@ def test_prose_file_reference_flags_unclosed_block_ignore(tmp_path: Path) -> Non
 
     assert len(findings) == 1
     assert "without matching ignore-end" in findings[0].message
-
-
-def test_generated_surface_missing_when_relevant_doc_exists(tmp_path: Path) -> None:
-    _write_config(tmp_path)
-    _write_doc(
-        tmp_path,
-        "docs/20-components/frontmatter.md",
-        doc_id="frontmatter",
-        body="See the generated reference.",
-    )
-
-    findings = SchemaDocDriftCheck().run(_graph(tmp_path))
-
-    assert len(findings) == 1
-    assert "missing" in findings[0].message
-
-
-def test_generated_surface_stale_after_regen(tmp_path: Path) -> None:
-    _write_config(tmp_path)
-    _write_doc(
-        tmp_path,
-        "docs/20-components/cli.md",
-        doc_id="cli",
-        body="See the generated reference.",
-    )
-    config = load(tmp_path / "irminsul.toml")
-    regen_doc_surfaces(tmp_path, config)
-    generated = tmp_path / "docs" / "40-reference" / "cli-commands.md"
-    generated.write_text(generated.read_text(encoding="utf-8") + "\nextra\n", encoding="utf-8")
-
-    findings = CliDocDriftCheck().run(_graph(tmp_path))
-
-    assert len(findings) == 1
-    assert "stale" in findings[0].message
-
-
-def test_generated_surface_current_after_regen(tmp_path: Path) -> None:
-    _write_config(tmp_path)
-    _write_doc(
-        tmp_path,
-        "docs/20-components/checks.md",
-        doc_id="checks",
-        body="See the generated reference.",
-    )
-    config = load(tmp_path / "irminsul.toml")
-    regen_doc_surfaces(tmp_path, config)
-
-    assert CheckSurfaceDriftCheck().run(_graph(tmp_path)) == []
-
-
-def test_generated_surface_irrelevant_for_unrelated_repo(tmp_path: Path) -> None:
-    _write_config(tmp_path)
-    _write_doc(
-        tmp_path,
-        "docs/20-components/widget.md",
-        doc_id="widget",
-        body="No Irminsul internals documented here.",
-    )
-
-    assert SchemaDocDriftCheck().run(_graph(tmp_path)) == []
-    assert CliDocDriftCheck().run(_graph(tmp_path)) == []
-    assert CheckSurfaceDriftCheck().run(_graph(tmp_path)) == []
 
 
 def test_terminology_overload_flags_ambiguous_coverage(tmp_path: Path) -> None:

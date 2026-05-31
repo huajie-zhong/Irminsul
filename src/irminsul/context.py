@@ -533,21 +533,7 @@ def _relevant_findings(
 
 def _hints(node: DocNode, findings: list[Finding]) -> list[str]:
     hints = ["irminsul check --profile hard"]
-    if _is_docs_surface(node) or any(_is_surface_drift_finding(finding) for finding in findings):
-        hints.append("irminsul regen docs-surfaces")
     return _unique(hints)
-
-
-def _is_docs_surface(node: DocNode) -> bool:
-    return node.path.as_posix().startswith("docs/40-reference/")
-
-
-def _is_surface_drift_finding(finding: Finding) -> bool:
-    return finding.check in {
-        "schema-doc-drift",
-        "cli-doc-drift",
-        "check-surface-drift",
-    } or (finding.suggestion is not None and "irminsul regen docs-surfaces" in finding.suggestion)
 
 
 def _doc_ref(node: DocNode) -> DocRef:

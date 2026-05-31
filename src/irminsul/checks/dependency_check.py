@@ -1,9 +1,10 @@
 """DependencyCheck — verify `depends_on` declarations match actual import relationships.
 
 Only applies to Python source files. Uses `ast.parse` to extract imports and
-resolves module paths to file paths via source_roots. Flags:
-- hallucinated deps: declared in `depends_on` but no import relationship found
-- undeclared deps: source imports from a doc's files but not listed in `depends_on`
+resolves module paths to file paths via source_roots. Flags hallucinated deps:
+`depends_on` declared but with no import relationship found. The reverse direction
+(imports not declared) is intentionally not flagged — see RFC 0020: `depends_on` is
+curated intent, not a complete projection of the import graph.
 """
 
 from __future__ import annotations
@@ -122,23 +123,17 @@ class DependencyCheck:
 
             declared_deps = set(node.frontmatter.depends_on)
 
+            # Intent-only (RFC 0020): flag a declared dependency that has no actual
+            # import (a hallucinated/stale declaration), but never the reverse —
+            # forcing `depends_on` to mirror every import is the materialization
+            # pressure the "derive, don't materialize" principle rejects. depends_on
+            # is curated intent, not a complete projection of the import graph.
             for dep_id in sorted(declared_deps - actual_deps):
                 out.append(
                     Finding(
                         check=self.name,
                         severity=Severity.warning,
                         message=f"depends_on '{dep_id}' declared but no import relationship found",
-                        path=node.path,
-                        doc_id=node.id,
-                    )
-                )
-
-            for dep_id in sorted(actual_deps - declared_deps):
-                out.append(
-                    Finding(
-                        check=self.name,
-                        severity=Severity.warning,
-                        message=f"source imports from '{dep_id}' but depends_on is not declared",
                         path=node.path,
                         doc_id=node.id,
                     )

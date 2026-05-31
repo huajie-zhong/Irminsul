@@ -29,7 +29,7 @@ tests:
 
 # Checks
 
-Checks consume a [DocGraph](docgraph.md) and return `Finding` records with severity, message, and a path/line where applicable. The exact registry surface is generated from the Python registries in the [check registries reference](../40-reference/check-registries.md).
+Checks consume a [DocGraph](docgraph.md) and return `Finding` records with severity, message, and a path/line where applicable. The exact registry surface is defined by the Python registries in `src/irminsul/checks/__init__.py`.
 
 | Example check | What it enforces | Severity |
 |---------------|------------------|----------|

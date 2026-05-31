@@ -37,14 +37,12 @@ soft_deterministic = [
     "phantom-layer",
     "requires-env",
     "import-deps",
-    "schema-doc-drift",
-    "cli-doc-drift",
-    "check-surface-drift",
     "terminology-overload",
     "claim-provenance",
     "foundation-readiness",
     "rfc-resolution",
     "decision-updates",
+    "inventory-drift",
 ]
 
 [checks.schema_leak]

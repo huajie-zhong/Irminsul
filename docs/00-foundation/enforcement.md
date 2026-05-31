@@ -20,14 +20,14 @@ claims:
     claim: Deterministic soft checks are implemented and can be enabled through check profiles or config.
     evidence:
       - src/irminsul/checks/doc_reality.py
-      - docs/40-reference/check-registries.md
+      - docs/20-components/checks.md
   - id: llm-advisory-available
     state: available
     kind: advisory_checks
     claim: LLM checks are implemented as advisory checks and are separate from hard deterministic checks.
     evidence:
       - src/irminsul/checks/semantic_drift.py
-      - docs/40-reference/check-registries.md
+      - docs/20-components/checks.md
   - id: precommit-external
     state: external
     kind: local_tooling

@@ -73,4 +73,4 @@ Landed: `irminsul refs <doc-id|path>` for strong (`depends_on`) and weak (body
 link) backlinks, and `irminsul refs --symbol <name>` for `describes` owners and
 `claims.evidence` references, both with `--format plain|json`. Implementation in
 `src/irminsul/refs.py`, wired in `src/irminsul/cli.py`; the command surface is
-recorded in [`cli-commands`](../../40-reference/cli-commands.md).
+derived on demand via `irminsul surface cli`.

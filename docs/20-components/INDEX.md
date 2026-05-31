@@ -18,7 +18,7 @@ Each architectural piece of Irminsul has a dedicated doc here. Frontmatter `desc
 - [`context`](context.md) — task-specific agent navigation context
 - [`frontmatter`](frontmatter.md) — per-doc YAML frontmatter parser/validator
 - [`docgraph`](docgraph.md) — in-memory representation of a repo's docs
-- [`checks`](checks.md) — registered checks; exact names are generated in the [check registries reference](../40-reference/check-registries.md)
+- [`checks`](checks.md) — registered checks; exact names live in `src/irminsul/checks/__init__.py`
 - [`languages`](languages.md) — language-profile registry
 - [`render`](render.md) — MkDocs renderer
 - [`init`](init.md) — scaffolding command and templates

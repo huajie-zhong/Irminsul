@@ -12,7 +12,7 @@ claims:
     claim: The parent-child check validates broad INDEX globs and long INDEX bodies.
     evidence:
       - src/irminsul/checks/parent_child.py
-      - docs/40-reference/check-registries.md
+      - docs/20-components/checks.md
   - id: schema-leak-enabled
     state: enabled
     kind: ci_gate
@@ -26,7 +26,7 @@ claims:
     claim: LLM scope and semantic checks are available as advisory checks.
     evidence:
       - src/irminsul/checks/scope_appropriateness.py
-      - docs/40-reference/check-registries.md
+      - docs/20-components/checks.md
 ---
 
 # Component Hierarchy and Doctrine

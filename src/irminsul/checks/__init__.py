@@ -9,16 +9,14 @@ from __future__ import annotations
 
 from irminsul.checks.base import Check, Finding, Fix, Severity, sort_findings, summarize
 from irminsul.checks.boundary import BoundaryCheck
+from irminsul.checks.claim_anchor import ClaimAnchorCheck
 from irminsul.checks.coverage import CoverageCheck
 from irminsul.checks.decision_updates import DecisionUpdatesCheck
 from irminsul.checks.dependency_check import DependencyCheck
 from irminsul.checks.doc_reality import (
     AgentsManifestCheck,
-    CheckSurfaceDriftCheck,
     ClaimProvenanceCheck,
-    CliDocDriftCheck,
     ProseFileReferenceCheck,
-    SchemaDocDriftCheck,
     TerminologyOverloadCheck,
 )
 from irminsul.checks.env_check import EnvCheck
@@ -27,6 +25,7 @@ from irminsul.checks.foundation_readiness import FoundationReadinessCheck
 from irminsul.checks.frontmatter import FrontmatterCheck
 from irminsul.checks.globs import GlobsCheck
 from irminsul.checks.glossary import GlossaryDisciplineCheck
+from irminsul.checks.inventory_drift import InventoryDriftCheck
 from irminsul.checks.liar import LiarCheck
 from irminsul.checks.links import LinksCheck
 from irminsul.checks.mtime_drift import MtimeDriftCheck
@@ -69,13 +68,12 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     PhantomLayerCheck.name: PhantomLayerCheck,
     EnvCheck.name: EnvCheck,
     DependencyCheck.name: DependencyCheck,
-    SchemaDocDriftCheck.name: SchemaDocDriftCheck,
-    CliDocDriftCheck.name: CliDocDriftCheck,
-    CheckSurfaceDriftCheck.name: CheckSurfaceDriftCheck,
     TerminologyOverloadCheck.name: TerminologyOverloadCheck,
     ClaimProvenanceCheck.name: ClaimProvenanceCheck,
     FoundationReadinessCheck.name: FoundationReadinessCheck,
     DecisionUpdatesCheck.name: DecisionUpdatesCheck,
+    InventoryDriftCheck.name: InventoryDriftCheck,
+    ClaimAnchorCheck.name: ClaimAnchorCheck,
 }
 
 LLM_REGISTRY: dict[str, type] = {
@@ -91,9 +89,8 @@ __all__ = [
     "AgentsManifestCheck",
     "BoundaryCheck",
     "Check",
-    "CheckSurfaceDriftCheck",
+    "ClaimAnchorCheck",
     "ClaimProvenanceCheck",
-    "CliDocDriftCheck",
     "CoverageCheck",
     "DecisionUpdatesCheck",
     "DependencyCheck",
@@ -102,13 +99,13 @@ __all__ = [
     "Fix",
     "FoundationReadinessCheck",
     "GlossaryDisciplineCheck",
+    "InventoryDriftCheck",
     "LiarCheck",
     "OverlapCheck",
     "PhantomLayerCheck",
     "ProseFileReferenceCheck",
     "RealityCheck",
     "RfcResolutionCheck",
-    "SchemaDocDriftCheck",
     "ScopeAppropriatenessCheck",
     "SemanticDriftCheck",
     "Severity",

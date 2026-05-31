@@ -35,6 +35,46 @@ def test_render_good_fixture_produces_index(
     assert (repo / "mkdocs.yml").is_file()
 
 
+def test_long_nav_title_produces_valid_yaml(tmp_path: Path) -> None:
+    """A long nav title must not fold mid-string and break mkdocs.yml parsing."""
+    from ruamel.yaml import YAML
+
+    repo = tmp_path / "r"
+    (repo / "src").mkdir(parents=True)
+    (repo / "irminsul.toml").write_text(
+        'project_name = "r"\n[paths]\ndocs_root = "docs"\nsource_roots = ["src"]\n',
+        encoding="utf-8",
+    )
+    long_title = "Derive, don't materialize — surfaces, curated inventory, and the boundary lint"
+    doc = repo / "docs" / "20-components" / "c.md"
+    doc.parent.mkdir(parents=True)
+    doc.write_text(
+        f"---\nid: c\ntitle: {long_title}\naudience: explanation\ntier: 3\n"
+        "status: stable\ndescribes: []\n---\n\n# C\n",
+        encoding="utf-8",
+    )
+
+    graph = build_graph(repo, load(repo / "irminsul.toml"))
+    config_path = repo / "mkdocs.yml"
+    MkDocsRenderer()._write_config(graph, config_path)
+
+    # Parses without error, and the long title survives as a single nav key.
+    data = YAML(typ="safe").load(config_path.read_text(encoding="utf-8"))
+    titles: set[str] = set()
+
+    def _walk(node: object) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                titles.add(key)
+                _walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                _walk(item)
+
+    _walk(data["nav"])
+    assert long_title in titles
+
+
 def test_render_without_mkdocs_raises(
     tmp_path: Path, fixture_repo: Callable[[str], Path], monkeypatch: pytest.MonkeyPatch
 ) -> None:

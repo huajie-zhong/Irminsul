@@ -912,6 +912,75 @@ def render(
     typer.echo(typer.style(f"site built at {target_out}", fg="green"))
 
 
+@app.command("surface")
+def surface_command(
+    kind: Annotated[
+        str,
+        typer.Argument(
+            help="Surface kind: cli, http, exports, env-vars (or a configured generic kind)."
+        ),
+    ],
+    source: Annotated[
+        str | None,
+        typer.Option("--source", help="Glob limiting which source files to scan."),
+    ] = None,
+    fmt: Annotated[str, typer.Option("--format", help="Output format: plain or json.")] = "plain",
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Derive a code surface on demand — commands, endpoints, exports, or env vars.
+
+    Nothing is written: the surface is recomputed from source each call, so it is
+    fresh by construction and cannot drift.
+    """
+    from irminsul.surface import run_surface
+
+    repo_root, config = _load_repo(path)
+    run_surface(repo_root, config, kind, source, fmt)
+
+
+@app.command("anchors")
+def anchors_command(
+    re_pin: Annotated[
+        bool,
+        typer.Option(
+            "--re-pin",
+            help="Rewrite anchor hashes to the current code (acknowledge after re-reading).",
+        ),
+    ] = False,
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Report or re-pin anchored prose claims.
+
+    Re-pinning is a deliberate acknowledgement that you re-read the prose and it is
+    still true; it is never done automatically by `irminsul fix`.
+    """
+    from irminsul.anchors import repin_text
+    from irminsul.checks.claim_anchor import ClaimAnchorCheck
+
+    repo_root, config = _load_repo(path)
+    graph = build_graph(repo_root, config)
+
+    if re_pin:
+        written = 0
+        for node in graph.nodes.values():
+            abs_path = repo_root / node.path
+            try:
+                text = abs_path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            new_text, changed = repin_text(repo_root, text)
+            if changed:
+                abs_path.write_text(new_text, encoding="utf-8")
+                written += changed
+        typer.echo(typer.style(f"re-pinned {written} anchor(s)", fg="green"))
+        raise typer.Exit(code=0)
+
+    findings = sort_findings(ClaimAnchorCheck().run(graph))
+    for finding in findings:
+        _print_finding(finding)
+    typer.echo(f"{len(findings)} anchor finding(s)")
+
+
 _new_app = typer.Typer(name="new", help="Scaffold a new doc atom.", no_args_is_help=True)
 app.add_typer(_new_app)
 
@@ -1079,17 +1148,6 @@ def regen_typescript_command(
     _print_regen_result(repo_root, _regen_typescript_or_exit(repo_root, config))
 
 
-@_regen_app.command("docs-surfaces")
-def regen_docs_surfaces_command(
-    path: Annotated[Path, typer.Option("--path")] = Path("."),
-) -> None:
-    """Regenerate code-derived documentation surface references."""
-    from irminsul.regen.doc_surfaces import regen_doc_surfaces
-
-    repo_root, config = _load_repo(path)
-    _print_regen_result(repo_root, regen_doc_surfaces(repo_root, config))
-
-
 @_regen_app.command("agents-md")
 def regen_agents_md_command(
     path: Annotated[Path, typer.Option("--path")] = Path("."),
@@ -1107,12 +1165,10 @@ def regen_all_command(
 ) -> None:
     """Regenerate every configured generated documentation artifact."""
     from irminsul.regen.agents_md import regen_agents_md
-    from irminsul.regen.doc_surfaces import regen_doc_surfaces
     from irminsul.regen.python import regen_python
 
     repo_root, config = _load_repo(path)
     written: list[Path] = []
-    written.extend(regen_doc_surfaces(repo_root, config))
     written.extend(regen_python(repo_root, config))
     written.extend(_regen_typescript_or_exit(repo_root, config))
     written.extend(regen_agents_md(repo_root, config))

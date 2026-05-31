@@ -79,17 +79,11 @@ class EnvCheck:
                     continue
                 found.update(_scan_env_vars(text))
 
-            for key in sorted(found - declared):
-                out.append(
-                    Finding(
-                        check=self.name,
-                        severity=Severity.warning,
-                        message=f"env var '{key}' used in code but not declared in requires_env",
-                        path=node.path,
-                        doc_id=node.id,
-                    )
-                )
-
+            # Intent-only (RFC 0020): we flag a declared env var that the code does
+            # not read (a stale declaration), but never the reverse — requiring the
+            # doc to mirror every env read would be the materialization pressure the
+            # "derive, don't materialize" principle rejects. Use `irminsul surface
+            # env-vars` to see the full set of env vars the code reads.
             for key in sorted(declared - found):
                 out.append(
                     Finding(

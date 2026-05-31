@@ -6,6 +6,13 @@ tier: 3
 status: stable
 describes: []
 summary: The required work order any agent must follow when editing this repository.
+inventory:
+  - kind: cli
+    source: src/irminsul/cli.py
+    items:
+      - context
+      - check
+      - regen agents-md
 ---
 
 # Agent lifecycle protocol
@@ -68,7 +75,7 @@ just this one. Follow each step in order; do not skip ahead.
   conventions (those live in the project's own style guide).
 - Steps 8–9 require running `irminsul check`; the protocol does not itself
   define which checks are hard, soft, or advisory — that is the province of
-  the [check registries](../40-reference/check-registries.md) and the
+  the check registry in `src/irminsul/checks/__init__.py` and the
   project's `irminsul.toml`.
 - Violations are not yet enforced by a mechanical check; later RFCs add
   targeted checks for individual transitions (e.g. RFC resolution).
