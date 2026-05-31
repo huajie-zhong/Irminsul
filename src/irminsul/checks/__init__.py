@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from irminsul.checks.base import Check, Finding, Fix, Severity, sort_findings, summarize
 from irminsul.checks.boundary import BoundaryCheck
+from irminsul.checks.claim_anchor import ClaimAnchorCheck
 from irminsul.checks.coverage import CoverageCheck
 from irminsul.checks.decision_updates import DecisionUpdatesCheck
 from irminsul.checks.dependency_check import DependencyCheck
@@ -72,6 +73,7 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     FoundationReadinessCheck.name: FoundationReadinessCheck,
     DecisionUpdatesCheck.name: DecisionUpdatesCheck,
     InventoryDriftCheck.name: InventoryDriftCheck,
+    ClaimAnchorCheck.name: ClaimAnchorCheck,
 }
 
 LLM_REGISTRY: dict[str, type] = {
@@ -87,6 +89,7 @@ __all__ = [
     "AgentsManifestCheck",
     "BoundaryCheck",
     "Check",
+    "ClaimAnchorCheck",
     "ClaimProvenanceCheck",
     "CoverageCheck",
     "DecisionUpdatesCheck",

@@ -32,6 +32,8 @@ run their import-time side effects and pull their dependencies into our process.
 every extractor reads source as text or AST. The cost is a precision ceiling
 (dynamically registered routes, computed names, and re-exports through barrel files
 are invisible); the benefit is that extraction is safe everywhere.
+<!-- anchor: src/irminsul/inventory/cli_typer.py#CliTyperExtractor.extract @sha256:a4b306e37ce9 -->
+
 
 ## Shape
 

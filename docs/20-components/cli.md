@@ -47,6 +47,8 @@ Findings print one per line, sorted by severity then path. Severity colors are r
 `irminsul check --profile` accepts `hard`, `configured`, `advisory`, and `all-available`. `hard` runs configured hard checks, `configured` adds configured deterministic warning checks, `advisory` also runs configured LLM checks, and `all-available` runs every implemented deterministic check.
 
 The CLI is intentionally thin: every subcommand resolves config, builds a graph, calls into a registry of work, and prints. Logic lives in the modules it dispatches to.
+<!-- anchor: src/irminsul/cli.py#check @sha256:c78429e96b77 -->
+
 
 ## Scope & Limitations
 

@@ -56,6 +56,7 @@ automatically once any doc declares one.
 | ID | Doc | Audience | Tier | Summary |
 |----|-----|----------|------|---------|
 | `20-components` | [Components](20-components/INDEX.md) | reference | 3 |  |
+| `anchors` | [Anchored prose claims](20-components/anchors.md) | explanation | 3 |  |
 | `checks` | [Checks](20-components/checks.md) | explanation | 3 |  |
 | `cli` | [CLI](20-components/cli.md) | explanation | 3 |  |
 | `config` | [Config](20-components/config.md) | reference | 3 |  |
@@ -100,6 +101,7 @@ automatically once any doc declares one.
 | `0009-implement-rfc-0018-decision-followups-and-maintenance-queue` | [ADR-0009: Implement RFC-0018 decision updates and maintenance queue](50-decisions/0009-implement-rfc-0018-decision-followups-and-maintenance-queue.md) | adr | 2 | Add `required_updates` and `implements` frontmatter fields, a `decision-updates` soft check, and `irminsul list lifecycle [--queue]` to surface unfinished decision work. |
 | `0010-implement-rfc-0019-glossary-discipline` | [ADR-0010: Implement RFC-0019 glossary discipline](50-decisions/0010-implement-rfc-0019-glossary-discipline.md) | adr | 2 | Rename the glossary check to `glossary-discipline` and enforce explicit glossary metadata for term usage, forbidden synonyms, and glossary links. |
 | `0011-derive-dont-materialize` | [ADR-0011: Derive, don't materialize](50-decisions/0011-derive-dont-materialize.md) | adr | 2 | Retire committed code-derived reference surfaces; derive on demand and govern the non-derivable. |
+| `0012-anchored-prose-claims` | [ADR-0012: Anchored prose claims](50-decisions/0012-anchored-prose-claims.md) | adr | 2 | Pin intent paragraphs to code symbols with a content hash; flag drift deterministically. |
 | `50-decisions` | [Architecture decisions](50-decisions/INDEX.md) | reference | 2 |  |
 
 ### 60-operations
@@ -143,6 +145,7 @@ automatically once any doc declares one.
 | `0021-code-doc-cochange` | [Code-doc co-change drift signal](80-evolution/rfcs/0021-code-doc-cochange.md) | explanation | 2 |  |
 | `0022-universal-fix-coverage` | [Universal auto-fix coverage](80-evolution/rfcs/0022-universal-fix-coverage.md) | explanation | 2 |  |
 | `0023-adr-template-structure` | [ADR template and structured decision record](80-evolution/rfcs/0023-adr-template-structure.md) | explanation | 2 |  |
+| `0024-anchored-prose-claims` | [Anchored prose claims (pinned provenance)](80-evolution/rfcs/0024-anchored-prose-claims.md) | explanation | 2 |  |
 | `80-evolution` | [Evolution](80-evolution/INDEX.md) | reference | 4 |  |
 | `patterns` | [Evolution Patterns](80-evolution/patterns.md) | explanation | 2 |  |
 | `rfcs` | [RFCs](80-evolution/rfcs/INDEX.md) | reference | 2 |  |

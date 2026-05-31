@@ -938,6 +938,49 @@ def surface_command(
     run_surface(repo_root, config, kind, source, fmt)
 
 
+@app.command("anchors")
+def anchors_command(
+    re_pin: Annotated[
+        bool,
+        typer.Option(
+            "--re-pin",
+            help="Rewrite anchor hashes to the current code (acknowledge after re-reading).",
+        ),
+    ] = False,
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Report or re-pin anchored prose claims.
+
+    Re-pinning is a deliberate acknowledgement that you re-read the prose and it is
+    still true; it is never done automatically by `irminsul fix`.
+    """
+    from irminsul.anchors import repin_text
+    from irminsul.checks.claim_anchor import ClaimAnchorCheck
+
+    repo_root, config = _load_repo(path)
+    graph = build_graph(repo_root, config)
+
+    if re_pin:
+        written = 0
+        for node in graph.nodes.values():
+            abs_path = repo_root / node.path
+            try:
+                text = abs_path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            new_text, changed = repin_text(repo_root, text)
+            if changed:
+                abs_path.write_text(new_text, encoding="utf-8")
+                written += changed
+        typer.echo(typer.style(f"re-pinned {written} anchor(s)", fg="green"))
+        raise typer.Exit(code=0)
+
+    findings = sort_findings(ClaimAnchorCheck().run(graph))
+    for finding in findings:
+        _print_finding(finding)
+    typer.echo(f"{len(findings)} anchor finding(s)")
+
+
 _new_app = typer.Typer(name="new", help="Scaffold a new doc atom.", no_args_is_help=True)
 app.add_typer(_new_app)
 

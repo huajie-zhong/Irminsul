@@ -49,6 +49,7 @@ SOFT_DETERMINISTIC_CHECKS = (
     "rfc-resolution",
     "decision-updates",
     "inventory-drift",
+    "claim-anchor",
 )
 SOFT_LLM_CHECKS = ("overlap", "semantic-drift", "scope-appropriateness")
 
