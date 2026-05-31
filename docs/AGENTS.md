@@ -69,7 +69,6 @@ automatically once any doc declares one.
 | `llm` | [LLM Client](20-components/llm.md) | explanation | 3 |  |
 | `new-list-regen` | [New / List / Regen / Fix commands](20-components/new-list-regen.md) | explanation | 3 |  |
 | `refs` | [Refs backlink and symbol query](20-components/refs.md) | explanation | 3 |  |
-| `render` | [Renderer](20-components/render.md) | explanation | 3 |  |
 | `seed` | [Seed command](20-components/seed.md) | explanation | 3 |  |
 | `surface` | [Surface extraction & on-demand derivation](20-components/surface.md) | explanation | 3 |  |
 
@@ -102,6 +101,7 @@ automatically once any doc declares one.
 | `0010-implement-rfc-0019-glossary-discipline` | [ADR-0010: Implement RFC-0019 glossary discipline](50-decisions/0010-implement-rfc-0019-glossary-discipline.md) | adr | 2 | Rename the glossary check to `glossary-discipline` and enforce explicit glossary metadata for term usage, forbidden synonyms, and glossary links. |
 | `0011-derive-dont-materialize` | [ADR-0011: Derive, don't materialize](50-decisions/0011-derive-dont-materialize.md) | adr | 2 | Retire committed code-derived reference surfaces; derive on demand and govern the non-derivable. |
 | `0012-anchored-prose-claims` | [ADR-0012: Anchored prose claims](50-decisions/0012-anchored-prose-claims.md) | adr | 2 | Pin intent paragraphs to code symbols with a content hash; flag drift deterministically. |
+| `0013-retire-render-subsystem` | [ADR-0013: Retire the render and reference-stub subsystem](50-decisions/0013-retire-render-subsystem.md) | adr | 2 | Remove the MkDocs renderer and the regen python/typescript stubs; keep check + derive + agent manifest. |
 | `50-decisions` | [Architecture decisions](50-decisions/INDEX.md) | reference | 2 |  |
 
 ### 60-operations
@@ -146,6 +146,7 @@ automatically once any doc declares one.
 | `0022-universal-fix-coverage` | [Universal auto-fix coverage](80-evolution/rfcs/0022-universal-fix-coverage.md) | explanation | 2 |  |
 | `0023-adr-template-structure` | [ADR template and structured decision record](80-evolution/rfcs/0023-adr-template-structure.md) | explanation | 2 |  |
 | `0024-anchored-prose-claims` | [Anchored prose claims (pinned provenance)](80-evolution/rfcs/0024-anchored-prose-claims.md) | explanation | 2 |  |
+| `0025-retire-render-subsystem` | [Retire the render and reference-stub subsystem](80-evolution/rfcs/0025-retire-render-subsystem.md) | explanation | 2 |  |
 | `80-evolution` | [Evolution](80-evolution/INDEX.md) | reference | 4 |  |
 | `patterns` | [Evolution Patterns](80-evolution/patterns.md) | explanation | 2 |  |
 | `rfcs` | [RFCs](80-evolution/rfcs/INDEX.md) | reference | 2 |  |

@@ -67,10 +67,8 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[mkdocs]"
+          pip install -e ".[dev]"
       - name: irminsul check (self)
         run: irminsul check --profile=hard
       - name: irminsul check configured (self)
         run: irminsul check --profile=configured
-      - name: irminsul render (self)
-        run: irminsul render

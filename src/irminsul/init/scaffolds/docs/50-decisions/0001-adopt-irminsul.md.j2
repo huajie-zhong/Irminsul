@@ -30,4 +30,4 @@ Adopt Irminsul as the canonical doc system for {{ project_name }}. CI runs `irmi
 
 - Every PR that adds source code without doc updates gets flagged.
 - New contributors have an obvious place to put each kind of writing.
-- Schema definitions belong in `40-reference/` and are regenerated; they cannot live in component docs.
+- Schema definitions cannot live in component docs; facts reconstructable from code are derived on demand rather than hand-copied.

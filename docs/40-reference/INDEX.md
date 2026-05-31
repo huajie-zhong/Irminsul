@@ -9,4 +9,4 @@ describes: []
 
 # Reference
 
-This tier is derived, not authored. Don't hand-edit files here — they are reference stubs (e.g. from `irminsul regen python`) whose content is expanded from the source code at build time, so they cannot drift. Surfaces that need no committed file at all — the CLI command set, the check registry — are derived on demand instead; see `irminsul surface`.
+Surfaces reconstructable from code — the CLI command set, HTTP endpoints, the check registry — are not committed here. They are derived on demand so they cannot drift; see `irminsul surface`. What remains in this tier is hand-written reference that genuinely warrants a committed page rather than restating a derivable fact.

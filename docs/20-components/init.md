@@ -16,7 +16,7 @@ tests:
 
 # Init scaffolder
 
-`irminsul init` scaffolds a `/docs` skeleton, an `irminsul.toml`, and the two GitHub workflows (PR-time `docs-pr.yml`, nightly `docs-nightly.yml`) into a target codebase. Existing-code adoption auto-detects languages and source roots, then asks for project name and render target when interactive.
+`irminsul init` scaffolds a `/docs` skeleton, an `irminsul.toml`, and the two GitHub workflows (PR-time `docs-pr.yml`, nightly `docs-nightly.yml`) into a target codebase. Existing-code adoption auto-detects languages and source roots, then asks for the project name when interactive.
 
 The no-code path distinguishes setup intent:
 

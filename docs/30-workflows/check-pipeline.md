@@ -33,4 +33,4 @@ How `irminsul check` flows from CLI invocation to exit code.
 
 ## Scope & Limitations
 
-This doc covers `irminsul check` only. The init, render, regen, and fix pipelines are not documented here. LLM advisory check details (budget tracking, caching) are in [`llm`](../20-components/llm.md).
+This doc covers `irminsul check` only. The init, regen, and fix pipelines are not documented here. LLM advisory check details (budget tracking, caching) are in [`llm`](../20-components/llm.md).

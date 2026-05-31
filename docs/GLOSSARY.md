@@ -86,4 +86,4 @@ ephemeral.
 ## Anti-glossary
 
 - Don't say *Linter*; Irminsul is a *checker*. Linters are line-level; Irminsul works at the graph level.
-- Don't say *Documentation generator*; Irminsul *enforces structure*. The renderer is one optional component.
+- Don't say *Documentation generator*; Irminsul *enforces structure*. It checks the docs tree and derives code surfaces on demand; it does not host or render a site.

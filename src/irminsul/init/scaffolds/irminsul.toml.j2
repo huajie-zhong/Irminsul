@@ -79,15 +79,3 @@ mtime_drift_days = 30
 
 [languages]
 enabled = {{ languages | tojson }}
-
-{% if "typescript" in languages -%}
-[regen.typescript]
-enabled = true
-tsconfig = "tsconfig.json"
-out_dir = "docs/40-reference/typescript"
-
-{% endif -%}
-
-[render]
-target = "{{ render_target }}"
-site_dir = "site"

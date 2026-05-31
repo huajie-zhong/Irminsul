@@ -24,7 +24,6 @@ def test_defaults_are_valid() -> None:
     assert set(cfg.checks.soft_deterministic) == set(SOFT_DETERMINISTIC_CHECKS)
     assert cfg.checks.terminology_overload.rules[0].term == "coverage"
     assert cfg.llm.provider == "anthropic"
-    assert cfg.render.target == "mkdocs"
 
 
 def test_load_missing_file_returns_defaults(tmp_path: Path) -> None:

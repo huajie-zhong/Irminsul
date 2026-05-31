@@ -20,10 +20,9 @@ Each architectural piece of Irminsul has a dedicated doc here. Frontmatter `desc
 - [`docgraph`](docgraph.md) — in-memory representation of a repo's docs
 - [`checks`](checks.md) — registered checks; exact names live in `src/irminsul/checks/__init__.py`
 - [`languages`](languages.md) — language-profile registry
-- [`render`](render.md) — MkDocs renderer
 - [`init`](init.md) — scaffolding command and templates
 - [`llm`](llm.md) — LLM client (budget tracking, disk cache, LiteLLM wrapper)
-- [`new-list-regen`](new-list-regen.md) — `new`, `list`, `fix`, and `regen` commands
+- [`new-list-regen`](new-list-regen.md) — `new`, `list`, `fix`, and `regen agents-md` commands
 
 ## Scope & Limitations
 

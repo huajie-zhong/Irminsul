@@ -37,7 +37,6 @@ _CODE_SIGNAL_DIRS = ("src", "app", "lib")
 @dataclass(frozen=True)
 class InitAnswers:
     project_name: str
-    render_target: str
     languages: list[str]
     source_roots: list[str]
     github_user: str
@@ -79,13 +78,6 @@ def update_gitignore(target_root: Path, subfolder: str) -> None:
         gitignore.write_text(marker + "\n" + entry + "\n", encoding="utf-8")
 
 
-def _normalize_render_target(render_target: str) -> str:
-    if render_target in ("mkdocs", "none"):
-        return render_target
-    typer.echo(typer.style(f"unknown render target '{render_target}', using 'mkdocs'", fg="yellow"))
-    return "mkdocs"
-
-
 def gather_answers(
     *,
     repo_root: Path,
@@ -99,15 +91,11 @@ def gather_answers(
 
     if interactive:
         project_name = typer.prompt("Project name", default=default_project_name)
-        render_target = typer.prompt("Render target [mkdocs|none]", default="mkdocs")
-        render_target = _normalize_render_target(render_target)
     else:
         project_name = default_project_name
-        render_target = "mkdocs"
 
     return InitAnswers(
         project_name=project_name,
-        render_target=render_target,
         languages=languages,
         source_roots=source_roots,
         github_user=_GITHUB_USER_PLACEHOLDER,
@@ -126,15 +114,11 @@ def gather_answers_fresh(
 
     if interactive:
         project_name = typer.prompt("Project name", default=default_project_name)
-        render_target = typer.prompt("Render target [mkdocs|none]", default="mkdocs")
-        render_target = _normalize_render_target(render_target)
     else:
         project_name = default_project_name
-        render_target = "mkdocs"
 
     return InitAnswers(
         project_name=project_name,
-        render_target=render_target,
         languages=[],
         source_roots=["src"],
         github_user=_GITHUB_USER_PLACEHOLDER,
@@ -158,15 +142,12 @@ def gather_answers_docs_only(
                 "Code repo (GitHub owner/repo or local path, e.g. acme/my-public-code)"
             )
         project_name = typer.prompt("Project name", default=default_project_name)
-        render_target = typer.prompt("Render target [mkdocs|none]", default="mkdocs")
-        render_target = _normalize_render_target(render_target)
     else:
         if code_repo is None:
             raise typer.BadParameter(
                 "--code-repo is required in non-interactive mode", param_hint="--code-repo"
             )
         project_name = default_project_name
-        render_target = "mkdocs"
 
     github_spec, subfolder = parse_code_repo(code_repo)
 
@@ -181,7 +162,6 @@ def gather_answers_docs_only(
 
     return InitAnswers(
         project_name=project_name,
-        render_target=render_target,
         languages=languages,
         source_roots=source_roots,
         github_user=_GITHUB_USER_PLACEHOLDER,
@@ -207,15 +187,12 @@ def gather_answers_fresh_docs_only(
                 "Code repo (GitHub owner/repo or local path, e.g. acme/my-public-code)"
             )
         project_name = typer.prompt("Project name", default=default_project_name)
-        render_target = typer.prompt("Render target [mkdocs|none]", default="mkdocs")
-        render_target = _normalize_render_target(render_target)
     else:
         if code_repo is None:
             raise typer.BadParameter(
                 "--code-repo is required for fresh docs-only topology", param_hint="--code-repo"
             )
         project_name = default_project_name
-        render_target = "mkdocs"
 
     github_spec, subfolder = parse_code_repo(code_repo)
 
@@ -229,7 +206,6 @@ def gather_answers_fresh_docs_only(
 
     return InitAnswers(
         project_name=project_name,
-        render_target=render_target,
         languages=languages,
         source_roots=source_roots,
         github_user=_GITHUB_USER_PLACEHOLDER,
@@ -272,7 +248,6 @@ def write_scaffold(target_root: Path, answers: InitAnswers, *, force: bool = Fal
     files written (repo-relative)."""
     context = {
         "project_name": answers.project_name,
-        "render_target": answers.render_target,
         "languages": answers.languages,
         "source_roots": answers.source_roots,
         "github_user": answers.github_user,

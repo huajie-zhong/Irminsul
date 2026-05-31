@@ -15,7 +15,7 @@ The system is designed to absorb change without rewrites. Here are the recipes.
 1. Open an RFC in `80-evolution/rfcs/`. Get feedback.
 2. On acceptance: convert to ADR in `50-decisions/`, mark RFC `Accepted → see ADR-XXXX`.
 3. Implement: code + tests + relevant doc updates in one PR.
-4. New components get new files in `20-components/`. New cross-cutting flows get files in `30-workflows/`. The reference layer regenerates itself.
+4. New components get new files in `20-components/`. New cross-cutting flows get files in `30-workflows/`. Code-derivable reference is produced on demand (`irminsul surface`), not committed.
 5. If new domain terms appear, add them to [`GLOSSARY.md`](../GLOSSARY.md) in the same PR.
 
 ## Changing Philosophy (the hardest case)
