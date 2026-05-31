@@ -24,7 +24,9 @@ _DECL_RE = re.compile(
     r"(?:function|class|const|let|var|type|interface|enum)\s+([A-Za-z_$][\w$]*)"
 )
 _DEFAULT_RE = re.compile(r"^\s*export\s+default\b")
-_NAMED_RE = re.compile(r"^\s*export\s*\{([^}]*)\}")
+# Matched over the whole file so a named-export block wrapped across lines
+# (e.g. by Prettier) is still captured. `[^}]` spans newlines.
+_NAMED_RE = re.compile(r"\bexport\s*\{([^}]*)\}")
 
 
 def _named_exports(group: str) -> list[str]:
@@ -61,11 +63,10 @@ class TypeScriptExportsExtractor:
                 if decl:
                     items.append(SurfaceItem(identity=decl.group(1), display=display, line=lineno))
                     continue
-                named = _NAMED_RE.match(line)
-                if named:
-                    for name in _named_exports(named.group(1)):
-                        items.append(SurfaceItem(identity=name, display=display, line=lineno))
-                    continue
                 if _DEFAULT_RE.match(line) and not _DECL_RE.match(line):
                     items.append(SurfaceItem(identity="default", display=display, line=lineno))
+            for match in _NAMED_RE.finditer(text):
+                start_line = text.count("\n", 0, match.start()) + 1
+                for name in _named_exports(match.group(1)):
+                    items.append(SurfaceItem(identity=name, display=display, line=start_line))
         return dedupe(items)

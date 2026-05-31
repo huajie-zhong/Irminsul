@@ -103,13 +103,19 @@ def resolve(repo_root: Path, anchor: Anchor) -> Resolution:
     except OSError:
         return Resolution("unreadable")
 
-    if anchor.symbol is None:
-        return Resolution("ok", _hash(text))
-
     try:
         tree = ast.parse(text)
     except SyntaxError:
+        # Non-Python (or genuinely broken) source: a file-level anchor still pins
+        # to the raw text; a symbol anchor cannot be resolved.
+        if anchor.symbol is None:
+            return Resolution("ok", _hash(text))
         return Resolution("unreadable")
+
+    if anchor.symbol is None:
+        # AST-normalize even file-level anchors so formatting/comment churn does
+        # not trip them.
+        return Resolution("ok", _hash(ast.unparse(tree)))
     node = _find_symbol(tree, anchor.symbol)
     if node is None:
         return Resolution("missing_symbol")

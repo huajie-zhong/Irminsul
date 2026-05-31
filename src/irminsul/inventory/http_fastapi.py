@@ -66,4 +66,11 @@ def _route(dec: ast.expr) -> tuple[str, str] | None:
     for arg in dec.args:
         if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
             return method, arg.value
+    for kw in dec.keywords:
+        if (
+            kw.arg == "path"
+            and isinstance(kw.value, ast.Constant)
+            and isinstance(kw.value.value, str)
+        ):
+            return method, kw.value.value
     return None

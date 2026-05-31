@@ -120,5 +120,19 @@ def test_generic_regex_extractor_from_config(tmp_path: Path) -> None:
     assert ids == {"/a", "/b"}
 
 
+def test_exports_extractor_multiline_named_block(tmp_path: Path) -> None:
+    cfg = IrminsulConfig()
+    src = "export {\n  one,\n  two as Renamed,\n  three,\n};\n"
+    ids = _identities(get_extractor("exports", cfg), _files(tmp_path, "barrel.ts", src), cfg)
+    assert ids == {"one", "Renamed", "three"}
+
+
+def test_http_extractor_keyword_path(tmp_path: Path) -> None:
+    cfg = IrminsulConfig()
+    src = 'from fastapi import FastAPI\n\napp = FastAPI()\n\n\n@app.get(path="/kw")\ndef h():\n    pass\n'
+    ids = _identities(get_extractor("http", cfg), _files(tmp_path, "kw.py", src), cfg)
+    assert ids == {"GET /kw"}
+
+
 def test_unknown_kind_has_no_extractor() -> None:
     assert get_extractor("nope", IrminsulConfig()) is None

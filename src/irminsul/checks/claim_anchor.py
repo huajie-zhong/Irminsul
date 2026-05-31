@@ -55,6 +55,21 @@ class ClaimAnchorCheck:
                             suggestion="Fix the symbol name or remove the marker",
                         )
                     )
+                elif resolution.status == "unreadable":
+                    out.append(
+                        Finding(
+                            check=self.name,
+                            severity=Severity.warning,
+                            message=(
+                                f"anchor target '{anchor.path}' could not be read or parsed; "
+                                "the claim cannot be verified"
+                            ),
+                            path=node.path,
+                            doc_id=node.id,
+                            line=anchor.line,
+                            suggestion="Fix the source file's syntax or the anchor path",
+                        )
+                    )
                 elif resolution.status != "ok":
                     continue
                 elif anchor.pinned is None:

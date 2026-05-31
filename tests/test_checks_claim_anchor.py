@@ -99,6 +99,25 @@ def test_repin_updates_hash(tmp_path: Path) -> None:
     assert parse_anchors(new_text)[0].pinned is not None
 
 
+def test_file_level_anchor_is_ast_normalized(tmp_path: Path) -> None:
+    # A file-level anchor (no #symbol) hashes the AST, so reformatting the file
+    # must not change the hash.
+    reformatted = "def alpha():\n    return 1  # changed comment\n\n\ndef beta():\n    return 2\n"
+    file_anchor = Anchor(line=0, raw="", path="src/mod.py", symbol=None, pinned=None)
+    a = resolve(_repo(tmp_path / "a", "x", SRC), file_anchor)
+    b = resolve(_repo(tmp_path / "b", "x", reformatted), file_anchor)
+    assert a.current == b.current is not None
+
+
+def test_unreadable_target_warns(tmp_path: Path) -> None:
+    # A symbol anchor whose target file has a syntax error is reported, not skipped.
+    repo = _repo(tmp_path, "<!-- anchor: src/mod.py#alpha @sha256:abc123abc123 -->", "def (:\n")
+    findings = _run(repo)
+    assert len(findings) == 1
+    assert findings[0].severity == Severity.warning
+    assert "could not be read or parsed" in findings[0].message
+
+
 def test_hash_is_ast_normalized(tmp_path: Path) -> None:
     # Formatting/comment changes to the symbol must not change the hash.
     reformatted = "def alpha():\n    return 1  # different comment, extra spacing\n\n\ndef beta():\n    return 2\n"
