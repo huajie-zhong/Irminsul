@@ -91,7 +91,7 @@ def test_claim_provenance_accepts_valid_claim_states(tmp_path: Path) -> None:
     )
     _write_doc(
         tmp_path,
-        "docs/40-reference/checks.md",
+        "docs/20-components/checks.md",
         doc_id="checks",
         body="Enablement docs.",
     )
@@ -131,7 +131,7 @@ def test_claim_provenance_accepts_valid_claim_states(tmp_path: Path) -> None:
             "    claim: Source and docs exist.",
             "    evidence:",
             "      - src/checks/claim.py",
-            "      - docs/40-reference/checks.md",
+            "      - docs/20-components/checks.md",
             "  - id: enabled-claim",
             "    state: enabled",
             "    kind: ci_gate",

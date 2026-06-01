@@ -37,14 +37,14 @@ def test_bad_schema_leak_flags_class_in_components(
     assert all(f.line is not None and f.line > 0 for f in leaky_findings)
 
 
-def test_bad_schema_leak_does_not_flag_reference_layer(
+def test_bad_schema_leak_does_not_flag_outside_protected_glob(
     fixture_repo: Callable[[str], Path],
 ) -> None:
-    """40-reference/schema/thing.md contains the same class def, but lives
-    outside the protected glob — must NOT be flagged."""
+    """70-knowledge/thing.md contains the same class def, but lives outside the
+    protected glob (docs/20-components/**) — must NOT be flagged."""
     findings = _run(fixture_repo("bad-schema-leak"))
-    reference_findings = [f for f in findings if f.path and "40-reference" in f.path.as_posix()]
-    assert reference_findings == []
+    outside_findings = [f for f in findings if f.path and "70-knowledge" in f.path.as_posix()]
+    assert outside_findings == []
 
 
 def test_bad_schema_leak_ignores_toml_fenced_block(

@@ -64,7 +64,6 @@ class Paths(BaseModel):
 class Tiers(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    generated: list[str] = Field(default_factory=lambda: ["docs/40-reference/**"])
     stable: list[str] = Field(
         default_factory=lambda: [
             "docs/00-foundation/**",

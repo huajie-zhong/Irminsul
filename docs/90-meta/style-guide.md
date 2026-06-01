@@ -21,7 +21,6 @@ The `id` field must match the filename stem. For layer index docs (`INDEX.md`), 
 |---|---|---|
 | 00-foundation, 10-architecture, 50-decisions | T2 | Stable; change rarely |
 | 20-components, 30-workflows, 60-operations, 70-knowledge, 80-evolution | T3 | Living; change often |
-| 40-reference | T1 | Generated; do not edit by hand |
 | 90-meta | T3 | Living meta-docs |
 
 ## Audience values
@@ -46,4 +45,4 @@ Docs in `00-foundation/` and `10-architecture/` may carry structured claims in f
 
 ## Scope & Limitations
 
-This guide covers prose style and convention choices only. Structural rules (frontmatter fields, link targets, glob patterns) are enforced by `irminsul check` and documented in [`CONTRIBUTING.md`](../CONTRIBUTING.md) and the [`40-reference`](../40-reference/) layer.
+This guide covers prose style and convention choices only. Structural rules (frontmatter fields, link targets, glob patterns) are enforced by `irminsul check` and documented in [`CONTRIBUTING.md`](../CONTRIBUTING.md).

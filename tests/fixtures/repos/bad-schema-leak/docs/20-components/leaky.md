@@ -11,7 +11,7 @@ describes:
 # Leaky
 
 This component doc accidentally pastes a Pydantic model and an interface,
-which both belong in `40-reference/`.
+which belong in code (derivable via `irminsul surface`), not in component docs.
 
 ```python
 class Thing(BaseModel):

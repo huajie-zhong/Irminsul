@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import fnmatch
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,19 +44,8 @@ _STRUCTURED_SECTION_HEADINGS = {
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 
 
-def _is_generated(node: DocNode, graph: DocGraph) -> bool:
-    if graph.config is None:
-        return False
-    path = node.path.as_posix()
-    return any(fnmatch.fnmatch(path, pattern) for pattern in graph.config.tiers.generated)
-
-
 def _stable_audit_nodes(graph: DocGraph) -> list[DocNode]:
-    return [
-        node
-        for node in graph.nodes.values()
-        if node.frontmatter.status == StatusEnum.stable and not _is_generated(node, graph)
-    ]
+    return [node for node in graph.nodes.values() if node.frontmatter.status == StatusEnum.stable]
 
 
 def _is_rfc_doc(node: DocNode) -> bool:
