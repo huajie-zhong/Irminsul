@@ -33,7 +33,6 @@ from irminsul.init.command import (
     run_init_fresh,
     run_init_fresh_docs_only,
 )
-from irminsul.render.mkdocs import MkDocsRenderer, MkDocsRenderError
 from irminsul.seed.command import (
     PIB_INTRO,
     gather_answers_from_flags,
@@ -864,54 +863,6 @@ def fix(
     raise typer.Exit(code=0)
 
 
-@app.command()
-def render(
-    path: Annotated[
-        Path,
-        typer.Option(
-            "--path",
-            help="Root of the codebase to render. Defaults to current directory.",
-        ),
-    ] = Path("."),
-    out_dir: Annotated[
-        Path | None,
-        typer.Option(
-            "--out-dir",
-            help="Override the site output directory (default from irminsul.toml).",
-        ),
-    ] = None,
-) -> None:
-    """Build the rendered docs site."""
-    repo_root = path.resolve()
-    config_path = find_config(repo_root)
-    config = load(config_path)
-    graph = build_graph(repo_root, config)
-
-    target_out = (out_dir or repo_root / config.render.site_dir).resolve()
-
-    if config.render.target == "none":
-        typer.echo("render.target = 'none' in irminsul.toml; nothing to render.")
-        raise typer.Exit(code=0)
-
-    if config.render.target != "mkdocs":
-        typer.echo(
-            typer.style(
-                f"unknown render target '{config.render.target}'; only 'mkdocs' is implemented.",
-                fg="red",
-            )
-        )
-        raise typer.Exit(code=2)
-
-    renderer = MkDocsRenderer()
-    try:
-        renderer.build(graph, target_out)
-    except MkDocsRenderError as e:
-        typer.echo(typer.style(str(e), fg="red"))
-        raise typer.Exit(code=1) from e
-
-    typer.echo(typer.style(f"site built at {target_out}", fg="green"))
-
-
 @app.command("surface")
 def surface_command(
     kind: Annotated[
@@ -1118,36 +1069,6 @@ def _print_regen_result(repo_root: Path, written: list[Path]) -> None:
     typer.echo(typer.style(f"regenerated {len(written)} artifact(s)", fg="green"))
 
 
-def _regen_typescript_or_exit(repo_root: Path, config: IrminsulConfig) -> list[Path]:
-    from irminsul.regen.typescript import TypeScriptRegenError, regen_typescript
-
-    try:
-        return regen_typescript(repo_root, config)
-    except TypeScriptRegenError as exc:
-        typer.echo(typer.style(str(exc), fg="red"))
-        raise typer.Exit(code=1) from exc
-
-
-@_regen_app.command("python")
-def regen_python_command(
-    path: Annotated[Path, typer.Option("--path")] = Path("."),
-) -> None:
-    """Regenerate Python reference stubs."""
-    from irminsul.regen.python import regen_python
-
-    repo_root, config = _load_repo(path)
-    _print_regen_result(repo_root, regen_python(repo_root, config))
-
-
-@_regen_app.command("typescript")
-def regen_typescript_command(
-    path: Annotated[Path, typer.Option("--path")] = Path("."),
-) -> None:
-    """Regenerate TypeScript reference stubs."""
-    repo_root, config = _load_repo(path)
-    _print_regen_result(repo_root, _regen_typescript_or_exit(repo_root, config))
-
-
 @_regen_app.command("agents-md")
 def regen_agents_md_command(
     path: Annotated[Path, typer.Option("--path")] = Path("."),
@@ -1157,22 +1078,6 @@ def regen_agents_md_command(
 
     repo_root, config = _load_repo(path)
     _print_regen_result(repo_root, regen_agents_md(repo_root, config))
-
-
-@_regen_app.command("all")
-def regen_all_command(
-    path: Annotated[Path, typer.Option("--path")] = Path("."),
-) -> None:
-    """Regenerate every configured generated documentation artifact."""
-    from irminsul.regen.agents_md import regen_agents_md
-    from irminsul.regen.python import regen_python
-
-    repo_root, config = _load_repo(path)
-    written: list[Path] = []
-    written.extend(regen_python(repo_root, config))
-    written.extend(_regen_typescript_or_exit(repo_root, config))
-    written.extend(regen_agents_md(repo_root, config))
-    _print_regen_result(repo_root, written)
 
 
 if __name__ == "__main__":  # pragma: no cover

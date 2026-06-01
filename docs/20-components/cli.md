@@ -13,7 +13,6 @@ depends_on:
   - llm
   - new-list-regen
   - refs
-  - render
   - seed
 describes:
   - src/irminsul/cli.py
@@ -28,7 +27,6 @@ inventory:
       - init
       - check
       - context
-      - render
 ---
 
 # CLI
@@ -40,7 +38,6 @@ Common command paths:
 - `irminsul init` — scaffold a new codebase. Delegates to [`init`](init.md).
 - `irminsul check` — build the [DocGraph](docgraph.md) and run checks selected by `--profile`. Exits 1 on any error finding.
 - `irminsul context` — build the [DocGraph](docgraph.md) and delegate task-specific navigation lookup to [`context`](context.md).
-- `irminsul render` — build a static site via the [renderer](render.md).
 
 Findings print one per line, sorted by severity then path. Severity colors are red (error), yellow (warning), cyan (info). Paths are POSIX-normalized so output is stable across platforms.
 

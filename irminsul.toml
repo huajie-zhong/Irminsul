@@ -83,7 +83,3 @@ mtime_drift_days = 30
 
 [languages]
 enabled = ["python"]
-
-[render]
-target = "mkdocs"
-site_dir = "site"

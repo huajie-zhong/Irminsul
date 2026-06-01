@@ -1,4 +1,10 @@
-"""Tests for `irminsul regen`."""
+"""Tests for `irminsul regen`.
+
+Only `regen agents-md` survives. The Python/TypeScript reference stubs and the
+`regen all`/`docs-surfaces` aggregators were retired with the render subsystem
+(RFC-0025) and under "derive, don't materialize" (RFC-0020); code-derivable
+surfaces are now produced on demand via `irminsul surface <kind>`.
+"""
 
 from __future__ import annotations
 
@@ -6,10 +12,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from irminsul.checks.frontmatter import FrontmatterCheck
 from irminsul.cli import app
-from irminsul.config import find_config, load
-from irminsul.docgraph import build_graph
 
 runner = CliRunner()
 
@@ -27,52 +30,6 @@ def _make_repo(tmp_path: Path) -> Path:
     (src / "core.py").write_text("def run(): pass\n", encoding="utf-8")
     (repo / "docs").mkdir()
     return repo
-
-
-def _make_typescript_repo(tmp_path: Path) -> Path:
-    repo = tmp_path / "ts"
-    repo.mkdir()
-    (repo / "irminsul.toml").write_text(
-        "\n".join(
-            [
-                'project_name = "ts"',
-                "[paths]",
-                'docs_root = "docs"',
-                'source_roots = ["src"]',
-                "[languages]",
-                'enabled = ["typescript"]',
-                "[regen.typescript]",
-                "enabled = true",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    src = repo / "src" / "ui"
-    src.mkdir(parents=True)
-    (src / "button.ts").write_text("export function Button() {}\n", encoding="utf-8")
-    (src / "button.test.ts").write_text("test('x', () => {})\n", encoding="utf-8")
-    (repo / "docs").mkdir()
-    return repo
-
-
-def test_regen_python_creates_stubs(tmp_path: Path) -> None:
-    repo = _make_repo(tmp_path)
-    result = runner.invoke(app, ["regen", "python", "--path", str(repo)])
-    assert result.exit_code == 0, result.output
-    stubs = list((repo / "docs" / "40-reference" / "python").rglob("*.md"))
-    names = [s.stem for s in stubs]
-    # core.py -> stub; __init__.py -> skipped (underscore prefix)
-    assert "core" in names
-    assert "__init__" not in names
-
-
-def test_regen_docs_surfaces_command_removed(tmp_path: Path) -> None:
-    # Generated reference surfaces were retired under "derive, don't materialize";
-    # the surface is now derived on demand via `irminsul surface <kind>`.
-    repo = _make_repo(tmp_path)
-    result = runner.invoke(app, ["regen", "docs-surfaces", "--path", str(repo)])
-    assert result.exit_code != 0
 
 
 def test_regen_agents_md_creates_manifest(tmp_path: Path) -> None:
@@ -103,60 +60,6 @@ def test_regen_agents_md_preserves_curated_sections(tmp_path: Path) -> None:
     assert "CURATED EDIT SURVIVES" in manifest.read_text(encoding="utf-8")
 
 
-def test_regen_python_stub_has_valid_frontmatter(tmp_path: Path) -> None:
-    repo = _make_repo(tmp_path)
-    runner.invoke(app, ["regen", "python", "--path", str(repo)])
-    config = load(find_config(repo))
-    graph = build_graph(repo, config)
-    findings = FrontmatterCheck().run(graph)
-    errors = [f for f in findings if f.severity.value == "error"]
-    assert errors == [], errors
-
-
-def test_regen_typescript_requires_typedoc(tmp_path: Path) -> None:
-    repo = _make_typescript_repo(tmp_path)
-    result = runner.invoke(app, ["regen", "typescript", "--path", str(repo)])
-    assert result.exit_code == 1
-    assert "TypeDoc" in result.output
-
-
-def test_regen_typescript_creates_stubs(tmp_path: Path, monkeypatch) -> None:
-    repo = _make_typescript_repo(tmp_path)
-
-    import irminsul.regen.typescript as regen_typescript
-
-    monkeypatch.setattr(regen_typescript, "_ensure_typedoc", lambda repo_root: None)
-    result = runner.invoke(app, ["regen", "typescript", "--path", str(repo)])
-
-    assert result.exit_code == 0, result.output
-    stub = repo / "docs" / "40-reference" / "typescript" / "ui" / "button.md"
-    assert stub.is_file()
-    assert "id: ui-button" in stub.read_text(encoding="utf-8")
-    assert not (repo / "docs" / "40-reference" / "typescript" / "ui" / "button.test.md").exists()
-
-
-def test_regen_typescript_rejects_stub_collisions(tmp_path: Path, monkeypatch) -> None:
-    repo = _make_typescript_repo(tmp_path)
-    (repo / "src" / "ui" / "button.tsx").write_text("export function ButtonView() {}\n")
-
-    import irminsul.regen.typescript as regen_typescript
-
-    monkeypatch.setattr(regen_typescript, "_ensure_typedoc", lambda repo_root: None)
-    result = runner.invoke(app, ["regen", "typescript", "--path", str(repo)])
-
-    assert result.exit_code == 1
-    assert "collision" in result.output
-
-
-def test_regen_idempotent(tmp_path: Path) -> None:
-    repo = _make_repo(tmp_path)
-    runner.invoke(app, ["regen", "python", "--path", str(repo)])
-    stubs_before = sorted(p.name for p in (repo / "docs" / "40-reference" / "python").rglob("*.md"))
-    runner.invoke(app, ["regen", "python", "--path", str(repo)])
-    stubs_after = sorted(p.name for p in (repo / "docs" / "40-reference" / "python").rglob("*.md"))
-    assert stubs_before == stubs_after
-
-
 def test_regen_without_target_shows_help() -> None:
     result = runner.invoke(app, ["regen"])
     # `no_args_is_help` prints help; the exit code is 0 on older Click and 2 on
@@ -178,44 +81,29 @@ def test_regen_agent_index_is_rejected(tmp_path: Path) -> None:
     assert result.exit_code != 0
 
 
-def test_regen_all_does_not_create_agent_index(tmp_path: Path) -> None:
+def test_regen_docs_surfaces_command_removed(tmp_path: Path) -> None:
+    # Generated reference surfaces were retired under "derive, don't materialize";
+    # the surface is now derived on demand via `irminsul surface <kind>`.
     repo = _make_repo(tmp_path)
-
-    result = runner.invoke(app, ["regen", "all", "--path", str(repo)])
-
-    assert result.exit_code == 0, result.output
-    assert (repo / "docs" / "40-reference" / "python" / "mylib" / "core.md").is_file()
-    assert (repo / "docs" / "AGENTS.md").is_file()
-    assert not (repo / "docs" / "90-meta" / "agent-index.md").exists()
+    result = runner.invoke(app, ["regen", "docs-surfaces", "--path", str(repo)])
+    assert result.exit_code != 0
 
 
-def test_regen_all_uses_typescript_regen_config_not_language_flag(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
+def test_regen_python_command_removed(tmp_path: Path) -> None:
+    # Retired with the render subsystem (RFC-0025): the mkdocstrings stubs had no
+    # consumer once the renderer was gone.
     repo = _make_repo(tmp_path)
-    (repo / "irminsul.toml").write_text(
-        "\n".join(
-            [
-                'project_name = "r"',
-                "[paths]",
-                'docs_root = "docs"',
-                'source_roots = ["src"]',
-                "[regen.typescript]",
-                "enabled = true",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    ts_root = repo / "src" / "ui"
-    ts_root.mkdir()
-    (ts_root / "button.ts").write_text("export function Button() {}\n", encoding="utf-8")
+    result = runner.invoke(app, ["regen", "python", "--path", str(repo)])
+    assert result.exit_code != 0
 
-    import irminsul.regen.typescript as regen_typescript
 
-    monkeypatch.setattr(regen_typescript, "_ensure_typedoc", lambda repo_root: None)
+def test_regen_typescript_command_removed(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    result = runner.invoke(app, ["regen", "typescript", "--path", str(repo)])
+    assert result.exit_code != 0
+
+
+def test_regen_all_command_removed(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
     result = runner.invoke(app, ["regen", "all", "--path", str(repo)])
-
-    assert result.exit_code == 0, result.output
-    assert (repo / "docs" / "40-reference" / "typescript" / "ui" / "button.md").is_file()
+    assert result.exit_code != 0

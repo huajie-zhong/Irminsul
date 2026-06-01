@@ -81,9 +81,9 @@ def test_init_interactive_no_code_can_choose_fresh_start(tmp_path: Path) -> None
     target = tmp_path / "demo"
     target.mkdir()
 
-    # "1" choose fresh-start, project name + render target defaults, "n" declines
-    # the post-init seed prompt.
-    result = runner.invoke(app, ["init", "--path", str(target)], input="1\n\n\nn\n")
+    # "1" choose fresh-start, project name default, "n" declines the post-init
+    # seed prompt.
+    result = runner.invoke(app, ["init", "--path", str(target)], input="1\n\nn\n")
 
     assert result.exit_code == 0, result.stdout
     assert "Fresh-start, same repo" in result.stdout
@@ -139,29 +139,6 @@ def test_init_fresh_code_repo_requires_docs_only_topology(tmp_path: Path) -> Non
     assert result.exit_code == 2
     assert "--topology docs-only" in result.stdout
     assert not (target / "irminsul.toml").exists()
-
-
-def test_init_fresh_docs_only_warns_on_unknown_render_target(tmp_path: Path) -> None:
-    target = tmp_path / "docs-repo"
-    result = runner.invoke(
-        app,
-        [
-            "init",
-            "--fresh",
-            "--topology",
-            "docs-only",
-            "--code-repo",
-            "acme/future-public-repo",
-            "--path",
-            str(target),
-        ],
-        # project name default, "wat" render target, "n" declines the seed prompt.
-        input="\nwat\nn\n",
-    )
-
-    assert result.exit_code == 0, result.stdout
-    assert "unknown render target 'wat', using 'mkdocs'" in result.stdout
-    assert 'target = "mkdocs"' in (target / "irminsul.toml").read_text(encoding="utf-8")
 
 
 def test_init_fresh_docs_only_detects_existing_subfolder(tmp_path: Path) -> None:

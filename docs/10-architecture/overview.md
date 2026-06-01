@@ -21,7 +21,6 @@ flowchart LR
     graph --> checks[Hard checks]
     checks -->|findings| cli
     cli -->|exit 0/1| user
-    cli -->|render| mkdocs[MkDocs Material site]
 ```
 ## Structure
 
@@ -37,7 +36,6 @@ The Irminsul documentation system dictates strict structural rules for a codebas
 - The **DocGraph** ([`docgraph.md`](../20-components/docgraph.md)) is the canonical in-memory representation of a repo's docs.
 - The **checks** ([`checks.md`](../20-components/checks.md)) consume a DocGraph and emit findings. The exact check surface is the registry in `src/irminsul/checks/__init__.py`.
 - The **language profiles** ([`languages.md`](../20-components/languages.md)) are pure-data records (source-root candidates + schema-leak regexes) keyed by language name.
-- The **renderer** ([`render.md`](../20-components/render.md)) is a small Protocol with one MkDocs Material implementation.
 - The **init scaffolder** ([`init.md`](../20-components/init.md)) walks Jinja templates to bootstrap a new codebase's `/docs` tree, `irminsul.toml`, and CI workflows.
 
 Cross-cutting: the [composite GitHub Action](../20-components/init.md) (`action.yml` at repo root) wraps the CLI for one-line CI integration. The Dockerfile produces a `ghcr.io` image used in CI systems that prefer container steps.

@@ -38,9 +38,9 @@ Thin wrappers over existing soft checks: `orphans` delegates to `OrphansCheck`, 
 
 Applies deterministic remediations for fixable findings selected by `--profile`. The default profile is `configured`; `hard`, `configured`, `advisory`, and `all-available` use the same selection policy as `irminsul check`, but LLM advisory checks are never used for file mutation. The first implementation target is `SupersessionCheck`: when a new doc lists an old doc in `supersedes:`, `fix` can set the old doc's `status: deprecated` and `superseded_by: <new-id>` frontmatter. `--dry-run` prints the edits that would be applied without writing files; normal runs group fixes by path and write updated files atomically.
 
-## `irminsul regen {python,typescript,agents-md,all}`
+## `irminsul regen`
 
-`regen` produces deterministic generated artifacts and nothing else — it never writes prose or infers intent from code. For Python it walks `source_roots` and writes mkdocstrings stubs (`:::<dotted.module>`) under `docs/40-reference/python/`, whose content mkdocstrings expands from live code at build time, so the stub is a pointer rather than a stale copy. TypeScript reference stubs are produced only when `regen.typescript.enabled` and a local TypeDoc are present, mirroring the source layout. The `agents-md` artifact rewrites the generated section of the [`docs/AGENTS.md`](../AGENTS.md) manifest while preserving curated Foundations and Protocol sections, and the `all` artifact runs every configured one.
+`regen` produces deterministic generated artifacts and nothing else — it never writes prose or infers intent from code. The single artifact is `agents-md`: it rewrites the generated section of the [`docs/AGENTS.md`](../AGENTS.md) manifest from the doc graph while preserving the curated Foundations and Protocol sections.
 
 The exact, current subcommand list is derived from the Typer app, not restated here — run `irminsul surface cli`.
 

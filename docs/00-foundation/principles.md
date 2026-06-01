@@ -44,7 +44,7 @@ Code is the ultimate truth. Any fact a doc states that is reconstructable from c
 
 Every fact a doc can state falls into one of two buckets:
 
-1. **Derivable from code.** Reconstructable from the source: the CLI command list, HTTP endpoints, public exports, env vars read, frontmatter fields, the check registry. The human contributes nothing to the *content* of these facts. Derivable facts are never hand-copied into prose and never committed as a generated artifact. They are **derived on demand** — exposed through a query (`irminsul surface <kind>`) or projected at render time — so they are fresh by construction and cannot drift. A doc that needs them *links or derives*; it does not restate.
+1. **Derivable from code.** Reconstructable from the source: the CLI command list, HTTP endpoints, public exports, env vars read, frontmatter fields, the check registry. The human contributes nothing to the *content* of these facts. Derivable facts are never hand-copied into prose and never committed as a generated artifact. They are **derived on demand** — exposed through a query (`irminsul surface <kind>`) — so they are fresh by construction and cannot drift. A doc that needs them *links or derives*; it does not restate.
 2. **Not derivable from code.** Rationale, invariants, the mental model, "why the CLI is thin," design tensions, gotchas — and curated human *intent* about bucket-1 facts ("these are the *public* exports," "these are the commands agents navigate by"). Code cannot produce any of this; it is the doc's real content. It is grounded by claim provenance — pointed at evidence — not surface-diffed, because there is nothing in code to diff it against.
 
 What Irminsul therefore checks:
@@ -64,7 +64,7 @@ What Irminsul therefore checks:
 ## Non-goals
 
 - **Replacing prose-style linters.** Irminsul checks structure, not prose. Tools like Vale or markdownlint complement it; they don't compete.
-- **Hosting docs.** The renderer ships an MkDocs Material backend by design — Irminsul is a *checker*, not a hosting platform.
+- **Hosting docs.** Irminsul is a *checker*, not a hosting platform. The markdown tree is portable; point any static-site generator at it if you want a published site.
 - **Solving every doc problem.** The reference enumerates failure modes Irminsul deliberately leaves to humans (semantic boundaries between architectural and implementation detail, prose quality, narrative coherence). Where a check can't be made deterministic, the system makes violations costly and easy to spot in review instead.
 
 ## Design choices that follow
