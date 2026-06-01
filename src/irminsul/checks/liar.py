@@ -26,7 +26,6 @@ The surface is sourced from the Artifact-2 extractors, not any committed referen
 
 from __future__ import annotations
 
-import fnmatch
 import re
 from typing import ClassVar
 
@@ -75,7 +74,7 @@ class LiarCheck:
                 continue
             if node.frontmatter.audience not in _SCANNED_AUDIENCES:
                 continue
-            if self._is_generated(node, graph) or _is_rfc(node):
+            if _is_rfc(node):
                 continue
 
             declared_kinds = {entry.kind for entry in node.frontmatter.inventory}
@@ -125,11 +124,6 @@ class LiarCheck:
                     if any(_matches(kind, span, identity) for span in spans):
                         found.setdefault(kind, {})[identity] = lineno
         return found
-
-    def _is_generated(self, node: DocNode, graph: DocGraph) -> bool:
-        assert graph.config is not None
-        path = node.path.as_posix()
-        return any(fnmatch.fnmatch(path, pattern) for pattern in graph.config.tiers.generated)
 
 
 def _is_rfc(node: DocNode) -> bool:

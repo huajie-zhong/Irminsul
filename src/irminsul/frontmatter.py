@@ -102,7 +102,7 @@ class DocFrontmatter(BaseModel):
     id: str = Field(min_length=1)
     title: str = Field(min_length=1)
     audience: AudienceEnum
-    tier: int = Field(ge=1, le=4)
+    tier: int = Field(ge=2, le=4)  # T1 ("Generated") retired with the reference layer (ADR-0014)
     status: StatusEnum
 
     # Optional but recommended

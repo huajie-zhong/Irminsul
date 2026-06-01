@@ -264,7 +264,7 @@ def _write_repo(
             "id: glossary\n"
             "title: Glossary\n"
             "audience: reference\n"
-            "tier: 1\n"
+            "tier: 2\n"
             "status: stable\n"
             "---\n\n"
             f"{glossary}"

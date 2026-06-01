@@ -37,7 +37,7 @@ Checks consume a [DocGraph](docgraph.md) and return `Finding` records with sever
 | `globs` | Every `describes` pattern resolves to ≥1 source file | error |
 | `uniqueness` | Each source file claimed by exactly one most-specific doc; ties are silent duplication | error / warning |
 | `links` | Internal markdown links resolve; external/anchor-only skipped | error |
-| `schema-leak` | No type/schema definitions inside `docs/20-components/` (those belong in `40-reference/`) | error |
+| `schema-leak` | No type/schema definitions inside `docs/20-components/` (they live in code, not docs) | error |
 | `prose-file-reference` | Local `.md` references in prose must be real links or explicitly ignored | error |
 
 Soft deterministic checks warn rather than block. For example, `foundation-readiness` warns when a `00-foundation/` or `10-architecture/` doc still contains literal scaffold placeholder phrases — a signal the project never ran [`irminsul seed`](seed.md) to capture real intent.

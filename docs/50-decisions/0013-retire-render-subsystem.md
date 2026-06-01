@@ -12,7 +12,7 @@ summary: Remove the MkDocs renderer and the regen python/typescript stubs; keep 
 
 ## Status
 
-Accepted, 2026-05-31. Resolves [`0025-retire-render-subsystem`](../80-evolution/rfcs/0025-retire-render-subsystem.md).
+Accepted, 2026-05-31. Resolves [`0025-retire-render-subsystem`](../80-evolution/rfcs/0025-retire-render-subsystem.md). The "keep the `40-reference` layer for hand-written reference" clause below is superseded by [`ADR-0014`](0014-retire-tier-1-and-reference-layer.md).
 
 ## Context
 

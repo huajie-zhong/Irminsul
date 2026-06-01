@@ -18,5 +18,5 @@ These are the failure modes the system exists to prevent. Naming them helps you 
 - **Doc-as-Changelog.** Component docs that read "We used to do X, then we tried Y, now we do Z." History lives in ADRs; docs should describe present reality only.
 - **The Phantom Owner.** Docs with no `owner` field, or with an owner who left the org. Violates the accountability requirement of Tier 2 docs.
 - **Architecture-Astronaut Diagrams.** A single diagram trying to show everything. C4 levels exist to prevent this — pick a zoom level and stop.
-- **Schema Sprawl.** Type definitions appearing in three docs. Prevented by **Principle 4 (Code as Ultimate Truth)** and T1 generation.
+- **Schema Sprawl.** Type definitions appearing in three docs. Prevented by **Principle 4 (Code as Ultimate Truth)**, the `schema-leak` check, and deriving surfaces on demand (`irminsul surface`).
 - **The Inscrutable Acronym.** Domain acronyms used everywhere with no glossary entry. The glossary-discipline checker catches this.

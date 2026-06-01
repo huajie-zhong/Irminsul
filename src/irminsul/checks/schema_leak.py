@@ -97,7 +97,8 @@ class SchemaLeakCheck:
                                     message=(
                                         f"schema-leak: line matches "
                                         f"{profile.name}:/{_truncate_pattern(pattern)}/ -- "
-                                        "type/schema definitions belong in 40-reference/"
+                                        "type/schema definitions belong in code "
+                                        "(derive via `irminsul surface`), not in component docs"
                                     ),
                                     path=node.path,
                                     doc_id=node.id,

@@ -1,8 +1,9 @@
 """Go LanguageProfile.
 
 Schema-leak patterns target struct/interface declarations and SQL DDL — the
-shapes that signal "type definition" and belong in 40-reference rather than
-narrative component docs. All patterns are anchored at start-of-line so prose
+shapes that signal "type definition" and belong in code (derivable via
+`irminsul surface`) rather than narrative component docs. All patterns are
+anchored at start-of-line so prose
 mentions ("the User struct holds…") don't trigger findings.
 """
 

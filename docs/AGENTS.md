@@ -33,7 +33,7 @@ automatically once any doc declares one.
 
 | ID | Doc | Audience | Tier | Summary |
 |----|-----|----------|------|---------|
-| `00-foundation` | [Foundation](00-foundation/INDEX.md) | reference | 1 |  |
+| `00-foundation` | [Foundation](00-foundation/INDEX.md) | reference | 2 |  |
 | `anti-patterns` | [Anti-Patterns](00-foundation/anti-patterns.md) | explanation | 2 |  |
 | `enforcement` | [Mechanical Enforcement](00-foundation/enforcement.md) | explanation | 2 |  |
 | `laws` | [The Three Laws of Maintenance](00-foundation/laws.md) | explanation | 2 |  |
@@ -79,12 +79,6 @@ automatically once any doc declares one.
 | `30-workflows` | [Workflows](30-workflows/INDEX.md) | explanation | 3 |  |
 | `check-pipeline` | [Check Pipeline](30-workflows/check-pipeline.md) | explanation | 3 |  |
 
-### 40-reference
-
-| ID | Doc | Audience | Tier | Summary |
-|----|-----|----------|------|---------|
-| `40-reference` | [Reference](40-reference/INDEX.md) | reference | 1 |  |
-
 ### 50-decisions
 
 | ID | Doc | Audience | Tier | Summary |
@@ -102,6 +96,7 @@ automatically once any doc declares one.
 | `0011-derive-dont-materialize` | [ADR-0011: Derive, don't materialize](50-decisions/0011-derive-dont-materialize.md) | adr | 2 | Retire committed code-derived reference surfaces; derive on demand and govern the non-derivable. |
 | `0012-anchored-prose-claims` | [ADR-0012: Anchored prose claims](50-decisions/0012-anchored-prose-claims.md) | adr | 2 | Pin intent paragraphs to code symbols with a content hash; flag drift deterministically. |
 | `0013-retire-render-subsystem` | [ADR-0013: Retire the render and reference-stub subsystem](50-decisions/0013-retire-render-subsystem.md) | adr | 2 | Remove the MkDocs renderer and the regen python/typescript stubs; keep check + derive + agent manifest. |
+| `0014-retire-tier-1-and-reference-layer` | [ADR-0014: Retire Tier 1 and the reference layer](50-decisions/0014-retire-tier-1-and-reference-layer.md) | adr | 2 | Remove the Tier 1 ("Generated") tier and the 40-reference layer; non-derivable reference lives in its owning layer, derivable surfaces stay on-demand. |
 | `50-decisions` | [Architecture decisions](50-decisions/INDEX.md) | reference | 2 |  |
 
 ### 60-operations
@@ -147,6 +142,7 @@ automatically once any doc declares one.
 | `0023-adr-template-structure` | [ADR template and structured decision record](80-evolution/rfcs/0023-adr-template-structure.md) | explanation | 2 |  |
 | `0024-anchored-prose-claims` | [Anchored prose claims (pinned provenance)](80-evolution/rfcs/0024-anchored-prose-claims.md) | explanation | 2 |  |
 | `0025-retire-render-subsystem` | [Retire the render and reference-stub subsystem](80-evolution/rfcs/0025-retire-render-subsystem.md) | explanation | 2 |  |
+| `0026-retire-tier-1-and-reference-layer` | [Retire Tier 1 and the dedicated reference layer](80-evolution/rfcs/0026-retire-tier-1-and-reference-layer.md) | explanation | 2 |  |
 | `80-evolution` | [Evolution](80-evolution/INDEX.md) | reference | 4 |  |
 | `patterns` | [Evolution Patterns](80-evolution/patterns.md) | explanation | 2 |  |
 | `rfcs` | [RFCs](80-evolution/rfcs/INDEX.md) | reference | 2 |  |
@@ -182,7 +178,6 @@ Numeric prefixes give stable sort order and namespace doc IDs as bare slugs.
 - `10-architecture` — system context, containers, boundaries, deployment.
 - `20-components` — the per-component "what".
 - `30-workflows` — cross-component "how".
-- `40-reference` — generated; never hand-edited.
 - `50-decisions` — ADRs; the "why", append-only.
 - `60-operations` — runbooks, playbooks, SLOs.
 - `70-knowledge` — tutorials, how-tos, explanations.
@@ -195,7 +190,6 @@ Each doc's tier dictates its enforcement policy.
 
 | Tier | Name | Edited by | Examples |
 |------|------|-----------|----------|
-| T1 | Generated | CI only | API reference, type schemas, config reference |
 | T2 | Stable | Humans, rarely | Principles, architecture overview, ADRs |
 | T3 | Living | Humans, often | Component docs, workflows, runbooks |
 | T4 | Ephemeral | Anyone | Sprint plans, RFCs in flight |

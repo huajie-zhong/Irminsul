@@ -27,7 +27,6 @@ def test_init_no_interactive_creates_expected_tree(tmp_path: Path) -> None:
         "docs/10-architecture/overview.md",
         "docs/20-components/INDEX.md",
         "docs/30-workflows/INDEX.md",
-        "docs/40-reference/INDEX.md",
         "docs/50-decisions/INDEX.md",
         "docs/50-decisions/0001-adopt-irminsul.md",
         "docs/60-operations/INDEX.md",

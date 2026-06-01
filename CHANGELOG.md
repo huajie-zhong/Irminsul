@@ -24,9 +24,8 @@
 - `irminsul list stale` — list deprecated docs past the stale threshold
 - `irminsul list undocumented` — list source files in covered dirs that no doc claims
 - `irminsul context <path>|--topic <query>|--changed` — return task-specific ownership, dependency, test, and finding context
-- `irminsul regen python` — write mkdocstrings stubs under `docs/40-reference/python/`
-- `irminsul regen docs-surfaces` — write generated frontmatter, CLI, and check registry references
-- `irminsul regen all` — regenerate every configured generated artifact
+- `irminsul regen agents-md` — regenerate the `docs/AGENTS.md` agent navigation manifest
+- `irminsul surface <kind>` — derive a code surface (cli, http, exports, env-vars) on demand, written nowhere
 - `irminsul init-docs-only --code-repo <spec>` — scaffold a docs-only repo where code lives in a separate GitHub repo (Topology A)
 
 ### Enhancements
@@ -42,6 +41,10 @@
 
 ### Fixes
 - `irminsul init` now errors clearly when run in a directory with no code signals and `--no-interactive`
+
+### Removed
+- The render subsystem — `irminsul render`, `regen python`/`typescript`, the `[render]`/`[regen]` config, and the `[mkdocs]` extra (ADR-0013). Derivable reference is obtained on demand via `irminsul surface`.
+- Tier 1 ("Generated") and the `40-reference/` layer, plus the `[tiers].generated` config field (ADR-0014). `tier:` frontmatter now accepts 2–4; non-derivable reference lives in its owning layer.
 
 ## v0.1.0
 

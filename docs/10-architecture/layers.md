@@ -43,13 +43,6 @@ The numeric prefixes in the `docs/` folder serve two purposes: stable sort order
 │   ├── auth-flow.md
 │   └── ...
 │
-├── 40-reference/                  # Generated. Do not edit by hand. (T1)
-│   ├── api/                       # OpenAPI-rendered or auto-extracted
-│   ├── schema/                    # Pydantic/Zod/Proto → Markdown
-│   ├── config/                    # Settings reference
-│   ├── events/                    # Event catalog
-│   └── errors/                    # Error code dictionary
-│
 ├── 50-decisions/                  # The "why" (T2, append-only)
 │   ├── INDEX.md
 │   ├── 0001-monorepo-vs-polyrepo.md

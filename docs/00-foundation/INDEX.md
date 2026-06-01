@@ -2,7 +2,7 @@
 id: 00-foundation
 title: Foundation
 audience: reference
-tier: 1
+tier: 2
 status: stable
 describes: []
 ---

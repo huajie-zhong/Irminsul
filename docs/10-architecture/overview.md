@@ -25,7 +25,7 @@ flowchart LR
 ## Structure
 
 The Irminsul documentation system dictates strict structural rules for a codebase's documentation:
-- **[The Tier System](tiers.md)** defines maintenance and enforcement rules based on the doc's tier (T1-T4).
+- **[The Tier System](tiers.md)** defines maintenance and enforcement rules based on the doc's tier (T2-T4).
 - **[The Layered Directory Structure](layers.md)** defines where docs should be placed based on their specificity.
 
 ## Components
