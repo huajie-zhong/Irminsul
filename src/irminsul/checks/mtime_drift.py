@@ -105,7 +105,7 @@ class MtimeDriftCheck:
             if not patterns:
                 continue
             spec = GitIgnoreSpec.from_lines(patterns)
-            changed = sorted(path for path in diff if spec.match_file(path))
+            changed = sorted(spec.match_files(diff))
             if not changed:
                 continue
             if node.path.as_posix() in diff:

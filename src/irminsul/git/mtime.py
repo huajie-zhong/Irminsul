@@ -133,10 +133,10 @@ def diff_name_only(repo_root: Path, base_ref: str, head_ref: str) -> frozenset[s
         if repo is None:
             return None
         try:
-            out = repo.git.diff("--name-only", "--find-renames", f"{base_ref}...{head_ref}")
+            out = repo.git.diff("-z", "--name-only", "--find-renames", f"{base_ref}...{head_ref}")
         except Exception:
             return None
-    return frozenset(line.strip() for line in out.splitlines() if line.strip())
+    return frozenset(line for line in out.split("\0") if line)
 
 
 def last_commit_time_for_paths(repo_root: Path, paths: Iterable[Path]) -> GitTime:
