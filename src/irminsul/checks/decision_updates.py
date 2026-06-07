@@ -9,15 +9,24 @@ claims whose cited RFC has already been resolved.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from pathlib import Path, PurePosixPath
 from typing import ClassVar
 
-from irminsul.checks.base import Finding, Severity
+from irminsul.checks.base import Finding, Fix, Severity
 from irminsul.docgraph import DocGraph, DocNode
 from irminsul.frontmatter import ClaimStateEnum, RfcStateEnum
+from irminsul.frontmatter_edit import add_to_list
 
 _RESOLVED_STATES = frozenset({RfcStateEnum.accepted, RfcStateEnum.rejected, RfcStateEnum.withdrawn})
 _RFC_PATH_RE = re.compile(r"80-evolution/rfcs/[^/\s)]+\.md")
+
+
+def _implements_adder(rfc_id: str) -> Callable[[str], str]:
+    def apply(text: str) -> str:
+        return add_to_list(text, "implements", rfc_id)
+
+    return apply
 
 
 def _docs_root_prefix(docs_root: str) -> str:
@@ -106,6 +115,45 @@ class DecisionUpdatesCheck:
                     )
                 )
 
+        return out
+
+    def fixes(self, findings: list[Finding], graph: DocGraph) -> list[Fix]:
+        """Add the driving RFC's id to a required-update doc's `implements` list.
+
+        Purely additive inverse pointer (RFC 0018), so it applies without
+        `--confirm`. Gated on the `missing-backlink` findings already emitted.
+        """
+        fixable = {
+            finding.doc_id
+            for finding in findings
+            if finding.check == self.name and finding.category == "missing-backlink"
+        }
+        if not fixable:
+            return []
+
+        docs_root = _docs_root_prefix(graph.config.paths.docs_root if graph.config else "docs")
+        rfc_prefix = f"{docs_root}/80-evolution/rfcs/" if docs_root else "80-evolution/rfcs/"
+
+        out: list[Fix] = []
+        for node in graph.nodes.values():
+            is_rfc = node.path.as_posix().startswith(rfc_prefix)
+            if not (is_rfc and node.frontmatter.rfc_state == RfcStateEnum.accepted):
+                continue
+            for entry in node.frontmatter.required_updates or []:
+                target = graph.by_path.get(Path(PurePosixPath(entry.path)))
+                if target is None or target.id not in fixable:
+                    continue
+                if self._is_resolved_by_target(node, target):
+                    continue
+                if node.id in target.frontmatter.implements:
+                    continue
+                out.append(
+                    Fix(
+                        path=target.path,
+                        description=f"add implements: {node.id} to {target.path.as_posix()}",
+                        apply=_implements_adder(node.id),
+                    )
+                )
         return out
 
     def _is_resolved_by_target(self, node: DocNode, target: DocNode) -> bool:

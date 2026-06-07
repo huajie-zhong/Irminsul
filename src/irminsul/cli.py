@@ -842,6 +842,17 @@ def fix(
         bool,
         typer.Option("--dry-run", help="Print planned fixes without writing files."),
     ] = False,
+    confirm: Annotated[
+        bool,
+        typer.Option(
+            "--confirm",
+            help="Apply irreversible fixes (metadata/prose rewrites) that are otherwise held.",
+        ),
+    ] = False,
+    check_name: Annotated[
+        str | None,
+        typer.Option("--check", help="Harvest fixes from a single check by name."),
+    ] = None,
     path: Annotated[
         Path,
         typer.Option(
@@ -864,8 +875,13 @@ def fix(
         *[(name, HARD_REGISTRY) for name in _hard_check_names(profile, config)],
         *[(name, SOFT_REGISTRY) for name in _soft_check_names(profile, config)],
     ]
-    for check_name, registry in selected:
-        cls = registry.get(check_name)
+    if check_name is not None:
+        selected = [(name, registry) for name, registry in selected if name == check_name]
+        if not selected:
+            typer.echo(f"check '{check_name}' is not active under profile '{profile.value}'")
+            raise typer.Exit(code=0)
+    for name, registry in selected:
+        cls = registry.get(name)
         if cls is None:
             continue
         check = cls()
@@ -878,9 +894,11 @@ def fix(
         typer.echo("no automatic fixes available")
         raise typer.Exit(code=0)
 
-    result = apply_fixes(repo_root, fixes, dry_run=dry_run)
+    result = apply_fixes(repo_root, fixes, dry_run=dry_run, confirm=confirm)
     for planned in result.planned:
         typer.echo(f"  {planned.path.as_posix()}: {planned.description}")
+    for held in result.held:
+        typer.echo(typer.style(f"  held: {held.path.as_posix()}: {held.description}", fg="yellow"))
 
     if result.errors:
         for error in result.errors:
@@ -891,6 +909,13 @@ def fix(
         typer.echo(typer.style(f"planned {len(result.planned)} fix(es)", fg="green"))
     else:
         typer.echo(typer.style(f"updated {len(result.written)} file(s)", fg="green"))
+    if result.held:
+        typer.echo(
+            typer.style(
+                f"held {len(result.held)} fix(es); re-run with --confirm to apply",
+                fg="yellow",
+            )
+        )
 
     raise typer.Exit(code=0)
 
