@@ -40,45 +40,47 @@ that has no `## Decision` section, and nothing would notice.
 Add these fields to the ADR template and require them via the new check:
 
 ```yaml
-decided_at: "YYYY-MM-DD"
-decided_by: "owner-handle"
 implements: ["<rfc-id-or-empty-list>"]
 supersedes: ["<adr-id-or-empty-list>"]
+summary: "one-line decision summary"
 ```
 
-- `decided_at` is the date the ADR moved to its current state. Required for
-  any ADR with `status` other than `draft`.
-- `decided_by` names the decision owner.
 - `implements` is the source-of-truth link to RFCs the ADR implements; the
-  inverse is auto-derived (per RFC-0018).
+  inverse is auto-derived (per RFC-0018). It is already a real, checked field
+  (`decision_updates`).
 - `supersedes` lists prior ADRs this one replaces, in keeping with the
   supersession check.
+- `summary` is the one-line decision summary the existing ADRs already carry.
 
 Empty lists are valid for ADRs that do not implement an RFC or supersede a
-prior ADR.
+prior ADR. The decision date is **not** a separate frontmatter field: ADRs
+record it in the `## Status` line ("Accepted, YYYY-MM-DD."), matching the
+convention every existing ADR follows.
 
 ### Required body sections
 
-Enforced by a new hard check `adr-structure`:
+Enforced by a new hard check `adr-structure`. The required set matches the
+convention every current ADR (0001–0014) already follows, so no existing ADR
+needs restructuring:
 
+- `## Status` — the current state and its date, plus the resolved RFC link when
+  applicable ("Accepted, 2026-05-30. Resolves …").
 - `## Context` — the situation that prompted the decision, including the RFC
   link when applicable.
 - `## Decision` — the concrete choice, written in active voice ("We will
   ..."). Avoid hedging.
+- `## Alternatives Considered` — the options weighed and why they were rejected.
 - `## Consequences` — positive, negative, and follow-on work. Follow-on work
   here is the natural seed for `required_updates:` per RFC-0018.
-- `## Status history` — an append-only log of state transitions:
-
-  ```text
-  - 2026-01-15 — proposed
-  - 2026-02-03 — accepted
-  ```
 
 ### Backward fit
 
-Existing ADRs (0001, 0002) get a one-shot fixup PR. The new check ships soft
-for one release before being promoted to hard, matching the warning-policy
-rollout pattern from RFC-0008.
+The required sections were chosen to match what all 14 existing ADRs
+(0001–0014) already use, so the migration is small: only ADR-0001 (which has
+just a `## Status` line) needs the remaining sections backfilled, and any ADR
+missing `implements`/`supersedes` gets the empty-list fields added. The new
+check ships soft for one release before being promoted to hard, matching the
+warning-policy rollout pattern from RFC-0008.
 
 ### Template update
 
@@ -116,7 +118,5 @@ judgment.
 
 ## Unresolved Questions
 
-- Should `## Alternatives Considered` be required for ADRs, or remain
-  optional? Most ADRs benefit from it, but small decisions do not.
-- Should `decided_by` accept multiple owners for joint decisions, or
-  remain single-valued?
+- Should the soft-to-hard promotion wait a fixed release count, or gate on the
+  existing ADRs all passing first?

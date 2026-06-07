@@ -60,9 +60,9 @@ directly: changed path, owning doc id, owning doc path, reason
 - Commit or PR trailer `Doc-Impact: n/a — <reason>`. Parsed from the merge
   commit message (`git log` between refs) or from a PR body when running in
   CI.
-- Per-glob `docs-frozen: true` in `irminsul.toml`, matching the field
-  introduced for generated source. Files under a frozen glob never trigger
-  the check.
+- Per-glob `docs-frozen: true` in `irminsul.toml`: files under a frozen glob
+  never trigger the check. (A fresh field — the generated-source carve-out it
+  originally mirrored was retired with `[tiers].generated` in RFC-0026.)
 - Explicit `docs-n/a: true` claim on the owning doc itself, for code that is
   intentionally undocumented.
 

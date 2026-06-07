@@ -34,3 +34,6 @@ In-flight proposals. See [`80-evolution`](../INDEX.md) for the RFC lifecycle.
 - [`0021-code-doc-cochange`](0021-code-doc-cochange.md) — Code-doc co-change drift signal for PR diffs
 - [`0022-universal-fix-coverage`](0022-universal-fix-coverage.md) — Universal `irminsul fix` coverage across deterministic checks
 - [`0023-adr-template-structure`](0023-adr-template-structure.md) — ADR template and structured decision record
+- [`0024-anchored-prose-claims`](0024-anchored-prose-claims.md) — Anchored prose claims with pinned provenance
+- [`0025-retire-render-subsystem`](0025-retire-render-subsystem.md) — Retire the render and reference-stub subsystem
+- [`0026-retire-tier-1-and-reference-layer`](0026-retire-tier-1-and-reference-layer.md) — Retire Tier 1 and the dedicated reference layer
