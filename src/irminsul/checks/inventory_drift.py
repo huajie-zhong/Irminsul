@@ -151,6 +151,9 @@ class InventoryDriftCheck:
             for finding in findings
             if finding.check == self.name and finding.severity == self.default_severity
         }
+        if not fixable:
+            return []
+
         out: list[Fix] = []
         for node, kind, item in self._missing_items(graph):
             if node.id not in fixable:
