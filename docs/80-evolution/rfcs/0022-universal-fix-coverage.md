@@ -25,7 +25,7 @@ irreversible edits.
 but only the `supersession` check emits `Fix` objects today. Several later
 RFCs treat `irminsul fix` as the canonical low-touch maintenance command:
 
-- RFC-0017's atomicity rule expects `irminsul fix` to align an accepted RFC's
+- RFC-0017's atomicity rule expects `irminsul fix` to align a resolved RFC's
   `status` and resolution scaffolding.
 - RFC-0018 expects a required-update doc's inverse `implements:` link to be
   computable without hand-maintaining both sides.
@@ -83,10 +83,13 @@ emits.
    adds the full extracted surface back in. Removing curated content is
    irreversible-in-spirit, so it requires `--confirm`.
 4. **RFC-resolution metadata alignment** (`rfc-resolution`, RFC-0017). For an
-   RFC *already* marked `rfc_state: accepted`, align the load-bearing
-   scaffolding the check flags: set `status: stable` and insert a stub
-   `## Resolution` section when missing. Requires `--confirm`. This fix does
-   **not** decide acceptance — see out-of-scope below.
+   RFC *already* in a terminal `rfc_state` (`accepted`, `rejected`, or
+   `withdrawn`), align the load-bearing scaffolding the check flags: set
+   `status: stable` and insert the missing scaffolding section as a stub —
+   `## Resolution` for accepted, `## Rejection Rationale` / `## Withdrawal
+   Rationale` for rejected / withdrawn. Requires `--confirm`. The stub is a
+   scaffold for the human to fill; the fix does **not** decide the outcome —
+   see out-of-scope below.
 5. **Glossary auto-link** (`glossary-discipline`, RFC-0019). When the check
    emits the unlinked-term finding, wrap the first occurrence of the term with
    the glossary anchor link on the exact line the finding reports. Because it
@@ -102,8 +105,8 @@ emits.
 
 - **The act of accepting an RFC** (RFC-0017). Choosing to accept is a human
   decision; no finding drives it, so it does not fit the finding→fix model. Only
-  the *post-acceptance* metadata alignment (item 4) is a fix. The decision
-  itself stays a deliberate edit (or a future dedicated command), never a fix.
+  the *post-decision* metadata alignment (item 4) is a fix. The decision itself
+  stays a deliberate edit (or a future dedicated command), never a fix.
 
 - **AGENTS.md auto-section regeneration** (RFC-0013). This is already a command:
   `irminsul regen agents-md` regenerates the generated section from the graph.
