@@ -13,8 +13,11 @@ rfc_state: draft
 ## Summary
 
 Expand `irminsul fix` from a single-check surface (`supersession`) into a
-manifest of deterministic fix methods across the soft check registry. Track
-the rollout as one RFC so the contract stays consistent.
+focused manifest of deterministic, **finding-driven** fix methods across the
+soft check registry. Track the rollout as one RFC so the contract stays
+consistent. The contract itself is mostly already implemented in
+`apply_fixes`; the only new contract element is a `--confirm` gate for
+irreversible edits.
 
 ## Motivation
 
@@ -22,107 +25,152 @@ the rollout as one RFC so the contract stays consistent.
 but only the `supersession` check emits `Fix` objects today. Several later
 RFCs treat `irminsul fix` as the canonical low-touch maintenance command:
 
-- RFC-0016 step 7 invokes `irminsul fix` to update an old doc's metadata when
-  a new doc supersedes it.
-- RFC-0017's atomicity rule expects `irminsul fix` to set `rfc_state`,
-  `status`, and `resolved_by` together.
-- RFC-0013 expects `irminsul fix` to regenerate `AGENTS.md`'s auto section.
-- RFC-0019 and RFC-0020 both propose fix actions that need a shared
-  implementation surface.
+- RFC-0017's atomicity rule expects `irminsul fix` to align an accepted RFC's
+  `status` and resolution scaffolding.
+- RFC-0018 expects a required-update doc's inverse `implements:` link to be
+  computable without hand-maintaining both sides.
+- RFC-0019 expects the first use of a glossary term to be linkable on demand.
+- RFC-0020 expects a drifted `inventory:` item to be prunable without a manual
+  frontmatter edit.
 
 Without expanded fix coverage these RFCs silently regress to "the agent does
 this by hand," defeating the low-touch goal. The fix expansion is its own
 RFC because every individual fix shares a contract — atomicity, dry-run, the
-profile selector — and the contract should be specified once.
+profile selector, and the confirmation gate — and the contract should be
+specified once.
 
 ## Detailed Design
 
 ### Shared contract
 
 Every `Fix` object implements the same shape already established by
-`supersession`:
+`supersession` and enforced by `apply_fixes`:
 
-- Atomic write through a temporary file plus rename, never partial.
-- Idempotent: running the fix twice yields the same file.
-- Honors `--dry-run` by emitting the planned write set without touching the
-  filesystem.
-- Honors `--profile hard|configured|advisory|all-available` by harvesting
-  fixes only from checks active under that profile.
+- **Atomic** write through a same-directory temporary file plus `os.replace`,
+  never partial. *(Already implemented.)*
+- **Idempotent**: running the fix twice yields the same file. *(Already
+  implemented — fixes that are no-ops on already-correct files produce no
+  write.)*
+- Honors **`--dry-run`** by emitting the planned write set without touching the
+  filesystem. *(Already implemented.)*
+- Honors **`--profile hard|configured|advisory|all-available`** by harvesting
+  fixes only from checks active under that profile. *(Already implemented in
+  `cli.fix`.)*
+- Honors **`--confirm`** for irreversible edits (see below). *(New.)*
+- Honors **`--check <name>`** to harvest fixes from a single check for targeted
+  runs. *(New; resolves a prior Unresolved Question.)*
+
+Because the first four properties already hold, the implementation work is
+adding `fixes()` methods to checks plus the two new flags — not re-specifying
+the write machinery.
 
 ### Rollout manifest
 
-In rough priority order for agent leverage:
+In rough priority order for agent leverage. Each item names the check whose
+findings drive it; a fix only ever remediates a finding the check actually
+emits.
 
-1. **Frontmatter normalization** (`FrontmatterCheck`). Canonical key order,
-   normalized casing, unknown keys moved to a `legacy:` block rather than
-   dropped.
-2. **Supersession metadata**. Already shipped; listed here so the manifest is
-   one inventory.
-3. **AGENTS.md auto-section** (RFC-0013). Regenerate the generated portion of
-   `docs/AGENTS.md` while preserving the curated foundations section and the
-   protocol-summary section.
-4. **Glossary auto-link** (RFC-0019). Wrap the first occurrence of a known
-   `match` term with the glossary anchor link.
-5. **Inventory item pruning** (RFC-0020). When `inventory-drift` flags a declared
-   item that no longer exists in code, drop that item from the `inventory:` block.
-   The block is *curated human intent*, not a mirror of the surface, so the fix only
-   removes items the author already declared — it never adds the full extracted
-   surface back in.
-6. **Dead-glob suggestion**. When a `describes` glob matches zero files,
-   propose the nearest existing path via Levenshtein distance and write the
-   replacement on confirm.
-7. **Stale-flag bumping** (`stale-reaper`). `status: stable` past
-   `stale_after_days` becomes `status: review` with a timestamp.
-8. **RFC state transition** (RFC-0017). On accepting an RFC, atomically set
-   `rfc_state: accepted`, `status: stable`, `resolved_by`, and insert a stub
-   `## Resolution` section.
-9. **Required update back-link** (RFC-0018). When a required update doc is created, add
-   its `implements:` field via fix so the inverse relationship is computable
-   without manual maintenance on both sides.
+1. **Supersession metadata** (`supersession`). Already shipped; listed here so
+   the manifest is one inventory.
+2. **Required-update back-link** (`decision-updates`, RFC-0018). When the check
+   emits a `missing-backlink` finding, add the driving RFC's id to the required
+   update doc's `implements:` field. This is a purely *additive inverse
+   pointer*, so it applies without `--confirm`.
+3. **Inventory item pruning** (`inventory-drift`, RFC-0020). When the check
+   flags a declared `inventory:` item that no longer exists in code, drop that
+   item from the block. The block is *curated human intent*, not a mirror of the
+   surface, so the fix only removes items the author already declared — it never
+   adds the full extracted surface back in. Removing curated content is
+   irreversible-in-spirit, so it requires `--confirm`.
+4. **RFC-resolution metadata alignment** (`rfc-resolution`, RFC-0017). For an
+   RFC *already* marked `rfc_state: accepted`, align the load-bearing
+   scaffolding the check flags: set `status: stable` and insert a stub
+   `## Resolution` section when missing. Requires `--confirm`. This fix does
+   **not** decide acceptance — see out-of-scope below.
+5. **Glossary auto-link** (`glossary-discipline`, RFC-0019). When the check
+   emits the unlinked-term finding, wrap the first occurrence of the term with
+   the glossary anchor link on the exact line the finding reports. Because it
+   edits prose rather than frontmatter, it requires `--confirm`.
 
-### Explicitly out of scope: anchor re-pinning
+### Explicitly out of scope
 
-RFC-0024's `claim-anchor` is **not** part of this manifest. Re-pinning an anchor is a
-deliberate human acknowledgement that the prose was re-read and is still true; doing
-it automatically would rubber-stamp the staleness the anchor exists to catch. It
-stays its own command (`irminsul anchors --re-pin`), never an `irminsul fix` action.
+- **Anchor re-pinning** (RFC-0024's `claim-anchor`). Re-pinning an anchor is a
+  deliberate human acknowledgement that the prose was re-read and is still true;
+  doing it automatically would rubber-stamp the staleness the anchor exists to
+  catch. It stays its own command (`irminsul anchors --re-pin`), never an
+  `irminsul fix` action.
+
+- **The act of accepting an RFC** (RFC-0017). Choosing to accept is a human
+  decision; no finding drives it, so it does not fit the finding→fix model. Only
+  the *post-acceptance* metadata alignment (item 4) is a fix. The decision
+  itself stays a deliberate edit (or a future dedicated command), never a fix.
+
+- **AGENTS.md auto-section regeneration** (RFC-0013). This is already a command:
+  `irminsul regen agents-md` regenerates the generated section from the graph.
+  Folding it into `irminsul fix` would duplicate the `regen` surface, so the
+  manifest defers to `regen` here rather than re-implementing it.
+
+- **Stale-flag bumping.** Auto-advancing a staleness flag (e.g. bumping a doc to
+  a "review" state because it has aged) rubber-stamps the very staleness the flag
+  exists to surface — the same objection that excludes anchor re-pinning. It is
+  also not what `stale-reaper` checks: that check flags `status: deprecated` docs
+  past `deprecated_threshold_days`, where the remedy (delete, mark removed, or
+  rewrite-and-recommit) is a human judgement, not a mechanical edit. Rejected.
+
+- **Frontmatter normalization / dead-glob suggestion.** No check emits a finding
+  for non-canonical key order, unknown keys, or a near-miss `describes` glob
+  today, so there is nothing for a fix to remediate. These are deferred until a
+  check first *detects* the condition; adding a fix before the finding exists
+  inverts the finding→fix contract.
 
 ### Confirmation modes
 
-For irreversible edits (RFC state transitions, dead-glob replacements,
-inventory rewrites), `irminsul fix` requires `--confirm` to write. Without
-it, the command prints planned writes. This is stricter than the current
-behavior for `supersession`, and is intentional: the new fixes touch
-load-bearing metadata.
+`irminsul fix` defaults to applying fixes (subject to `--dry-run`). Fixes that
+modify or remove existing content, or rewrite load-bearing metadata, are tagged
+`requires_confirm` and are **skipped** unless `--confirm` is passed; without it,
+the command lists them as planned-but-held writes. Purely additive inverse
+pointers (item 2) apply without `--confirm`. This is stricter than the original
+`supersession` behavior, and is intentional: the new fixes touch load-bearing
+metadata and prose.
 
 ## Relationship to Existing RFCs
 
 - Generalizes RFC-0002, which introduced the fix framework on supersession.
-- Provides the underlying mechanics expected by RFC-0013 (AGENTS.md regen),
-  RFC-0017 (atomic state transition), RFC-0018 (required update back-link),
-  RFC-0019 (glossary auto-link), and RFC-0020 (inventory rewrite).
+- Provides the underlying mechanics expected by RFC-0017 (metadata alignment),
+  RFC-0018 (required-update back-link), RFC-0019 (glossary auto-link), and
+  RFC-0020 (inventory rewrite).
+- Defers to RFC-0013's existing `regen` surface for AGENTS.md rather than
+  duplicating it.
 
 ## Drawbacks
 
-A larger fix surface means a larger blast radius if a fix has a bug. The
-shared contract (atomic, idempotent, dry-run respected) is mitigation, but
-projects should pin the Irminsul version they use in CI rather than tracking
-floating versions while the fix surface expands.
+A larger fix surface means a larger blast radius if a fix has a bug. The shared
+contract (atomic, idempotent, dry-run respected, confirm-gated for irreversible
+edits) is mitigation, but projects should pin the Irminsul version they use in
+CI rather than tracking floating versions while the fix surface expands.
 
-Each fix is one PR. Tracking the rollout as one RFC risks slow progress if
-later items in the manifest never land. The RFC will note progress with a
-`## Status` log similar to RFC-0008's rollout style.
+Each fix is one PR. Tracking the rollout as one RFC risks slow progress if later
+items in the manifest never land. The RFC notes progress with a `## Status` log.
 
 ## Alternatives
 
-- One small RFC per fix. Rejected because the contract is shared; nine small
+- One small RFC per fix. Rejected because the contract is shared; several small
   RFCs would duplicate the contract text.
-- Skip the RFC and add fixes ad hoc. Rejected because the contract needs to
-  be specified before checks start emitting fixes that violate it.
+- Skip the RFC and add fixes ad hoc. Rejected because the contract needs to be
+  specified before checks start emitting fixes that violate it.
+- A maximal manifest covering every check (the original draft of this RFC).
+  Rejected: it included fixes with no driving finding (frontmatter
+  normalization, dead-glob), a fix redundant with `regen` (AGENTS.md), and a
+  fix that rubber-stamps staleness (stale-flag bumping). Trimming to
+  finding-driven, non-judgement fixes keeps the blast radius honest.
+
+## Status
+
+- Manifest item 1 (supersession): shipped pre-RFC.
+- Manifest items 2–5: proposed here; each lands as its own PR.
 
 ## Unresolved Questions
 
-- Should a planned-write report include the unified diff, or only the file
-  path? The diff is more useful but increases noise on large changes.
-- Should `irminsul fix` accept a per-check subset (e.g., `irminsul fix
-  --check inventory-drift`) for targeted runs?
+- Should a planned-write report include the unified diff, or only the file path
+  and description? Deferred: the current path+description report ships; a diff
+  mode can be added later if noise proves acceptable.
