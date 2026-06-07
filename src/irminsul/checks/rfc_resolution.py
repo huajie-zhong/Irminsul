@@ -3,8 +3,7 @@
 Enforces that RFCs under `<docs_root>/80-evolution/rfcs/` move through their
 lifecycle cleanly: accepted RFCs become stable records linked bidirectionally
 to a decision doc, rejected and withdrawn RFCs carry rationale sections, and
-in-flight RFCs that have blown past their target decision date or that lack a
-decision owner get flagged.
+in-flight RFCs that have blown past their target decision date get flagged.
 
 The check is intentionally narrow: it verifies structural shape only. It does
 not pass judgement on the substance of a decision.
@@ -252,19 +251,6 @@ class RfcResolutionCheck:
                         suggestion=("decide, withdraw, or update target_decision_date"),
                     )
                 )
-        if fm.rfc_state == RfcStateEnum.open and not fm.decision_owner:
-            out.append(
-                Finding(
-                    check=self.name,
-                    severity=Severity.warning,
-                    message="open RFC is missing decision_owner",
-                    path=node.path,
-                    doc_id=node.id,
-                    suggestion=(
-                        "set decision_owner to the person responsible for driving the decision"
-                    ),
-                )
-            )
         return out
 
 

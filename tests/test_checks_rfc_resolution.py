@@ -80,12 +80,6 @@ def test_target_decision_date_future_is_silent(repo: Path) -> None:
     assert all("target_decision_date" not in f.message for f in matched)
 
 
-def test_open_rfc_missing_decision_owner_warns(repo: Path) -> None:
-    findings = _findings(repo, now=_dt.date(2025, 1, 1))
-    matched = _by_doc(findings, "0008-no-owner")
-    assert any("decision_owner" in f.message for f in matched)
-
-
 def test_check_ignores_non_rfc_docs(repo: Path) -> None:
     findings = _findings(repo, now=_dt.date(2025, 1, 1))
     # The 0001-good-adr doc lives outside docs/80-evolution/rfcs/ and has no

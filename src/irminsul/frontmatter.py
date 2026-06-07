@@ -117,7 +117,6 @@ class DocFrontmatter(BaseModel):
     claims: list[Claim] = Field(default_factory=list)
     rfc_state: RfcStateEnum | None = None
     resolved_by: str | None = None
-    decision_owner: str | None = None
     target_decision_date: str | None = None
     summary: str | None = None
     required_updates: list[RequiredUpdateEntry] | None = None

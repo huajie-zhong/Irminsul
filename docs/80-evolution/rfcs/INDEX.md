@@ -31,7 +31,7 @@ In-flight proposals. See [`80-evolution`](../INDEX.md) for the RFC lifecycle.
 - [`0018-decision-followups-and-maintenance-queue`](0018-decision-followups-and-maintenance-queue.md) — Decision required update tracking and lifecycle listing
 - [`0019-glossary-discipline`](0019-glossary-discipline.md) — Glossary discipline and terminology resolution
 - [`0020-inventory-drift`](0020-inventory-drift.md) — Inventory drift for endpoints, commands, and exports
-- [`0021-code-doc-cochange`](0021-code-doc-cochange.md) — Code-doc co-change drift signal for PR diffs
+- [`0021-code-doc-cochange`](0021-code-doc-cochange.md) — Code-doc co-change signal folded into `context --changed` and diff-aware `mtime-drift`
 - [`0022-universal-fix-coverage`](0022-universal-fix-coverage.md) — Universal `irminsul fix` coverage across deterministic checks
 - [`0023-adr-template-structure`](0023-adr-template-structure.md) — ADR template and structured decision record
 - [`0024-anchored-prose-claims`](0024-anchored-prose-claims.md) — Anchored prose claims with pinned provenance

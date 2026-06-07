@@ -69,13 +69,11 @@ convention.
 Add these optional RFC frontmatter fields:
 
 ```yaml
-decision_owner: ""
 target_decision_date: "YYYY-MM-DD"
 ```
 
 If an RFC is `draft`, `open`, or `fcp` and `target_decision_date` is in the
-past, the check emits a warning. If `decision_owner` is missing on an open RFC,
-the check emits a warning.
+past, the check emits a warning.
 
 The check should stay soft at first. A project can opt into strict treatment by
 running configured checks with `--strict` after the process proves useful.
