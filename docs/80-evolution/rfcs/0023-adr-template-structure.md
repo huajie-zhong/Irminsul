@@ -42,7 +42,6 @@ Add these fields to the ADR template and require them via the new check:
 ```yaml
 implements: ["<rfc-id-or-empty-list>"]
 supersedes: ["<adr-id-or-empty-list>"]
-summary: "one-line decision summary"
 ```
 
 - `implements` is the source-of-truth link to RFCs the ADR implements; the
@@ -50,7 +49,6 @@ summary: "one-line decision summary"
   (`decision_updates`).
 - `supersedes` lists prior ADRs this one replaces, in keeping with the
   supersession check.
-- `summary` is the one-line decision summary the existing ADRs already carry.
 
 Empty lists are valid for ADRs that do not implement an RFC or supersede a
 prior ADR. The decision date is **not** a separate frontmatter field: ADRs
