@@ -369,3 +369,40 @@ def test_context_no_topic_matches_returns_empty_json(tmp_path: Path) -> None:
     assert data["mode"] == "topic"
     assert data["results"] == []
     assert data["unmatched"] == []
+
+
+def test_context_changed_flags_doc_not_co_changed(tmp_path: Path) -> None:
+    repo = _make_context_repo(tmp_path)
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "dev@example.com")
+    _git(repo, "config", "user.name", "Dev")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "initial")
+
+    # Touch a source file but not its owning doc.
+    (repo / "src" / "mylib" / "core.py").write_text("def run(): return 1\n", encoding="utf-8")
+
+    json_result = runner.invoke(
+        app, ["context", "--changed", "--format", "json", "--path", str(repo)]
+    )
+    assert json_result.exit_code == 0, json_result.output
+    core = next(
+        item for item in json.loads(json_result.output)["results"] if item["owner"]["id"] == "core"
+    )
+    assert core["doc_co_changed"] is False
+
+    plain_result = runner.invoke(app, ["context", "--changed", "--path", str(repo)])
+    assert "owning doc not updated in this change" in plain_result.output
+
+    # Now also update the owning doc; the gap closes.
+    doc = repo / "docs" / "20-components" / "core.md"
+    doc.write_text(doc.read_text(encoding="utf-8") + "\nUpdated.\n", encoding="utf-8")
+
+    json_result = runner.invoke(
+        app, ["context", "--changed", "--format", "json", "--path", str(repo)]
+    )
+    assert json_result.exit_code == 0, json_result.output
+    core = next(
+        item for item in json.loads(json_result.output)["results"] if item["owner"]["id"] == "core"
+    )
+    assert core["doc_co_changed"] is True

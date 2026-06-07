@@ -26,6 +26,7 @@ from irminsul.checks import (
 )
 from irminsul.config import IrminsulConfig, find_config, load
 from irminsul.docgraph import DocGraph, build_graph
+from irminsul.git.mtime import diff_name_only
 from irminsul.init.command import (
     detect_code_signals,
     run_init,
@@ -608,10 +609,28 @@ def check(
             ),
         ),
     ] = None,
+    base_ref: Annotated[
+        str | None,
+        typer.Option(
+            "--base-ref",
+            help="Base git ref for diff-aware checks. Use together with --head-ref.",
+        ),
+    ] = None,
+    head_ref: Annotated[
+        str | None,
+        typer.Option(
+            "--head-ref",
+            help="Head git ref for diff-aware checks. Use together with --base-ref.",
+        ),
+    ] = None,
 ) -> None:
     """Run the configured checks. Errors exit non-zero."""
     if fmt not in ("plain", "json"):
         typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+        raise typer.Exit(code=2)
+
+    if (base_ref is None) != (head_ref is None):
+        typer.echo(typer.style("--base-ref and --head-ref must be provided together", fg="red"))
         raise typer.Exit(code=2)
 
     now_date: _dt.date | None = None
@@ -627,7 +646,20 @@ def check(
     repo_root = path.resolve()
     config_path = find_config(repo_root)
     config = load(config_path)
-    graph = build_graph(repo_root, config, now=now_date)
+
+    diff_changed: frozenset[str] | None = None
+    if base_ref is not None and head_ref is not None:
+        diff_changed = diff_name_only(repo_root, base_ref, head_ref)
+        if diff_changed is None:
+            typer.echo(
+                typer.style(
+                    f"could not compute diff {base_ref}...{head_ref}; skipping diff-aware checks",
+                    fg="yellow",
+                ),
+                err=True,
+            )
+
+    graph = build_graph(repo_root, config, now=now_date, diff_changed_paths=diff_changed)
 
     findings: list[Finding] = []
     findings.extend(

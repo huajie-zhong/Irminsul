@@ -216,3 +216,59 @@ def test_check_now_flag_threads_through_to_rfc_resolution(
     )
     assert "target_decision_date" in late.stdout
     assert "target_decision_date" not in early.stdout
+
+
+def test_check_base_ref_requires_head_ref(fixture_repo: Callable[[str], Path]) -> None:
+    repo = fixture_repo("good")
+    result = runner.invoke(app, ["check", "--base-ref", "HEAD~1", "--path", str(repo)])
+    assert result.exit_code == 2
+    assert "must be provided together" in result.stdout
+
+
+def test_check_diff_aware_mtime_drift_flags_source_without_doc(tmp_path: Path) -> None:
+    from git import Repo
+
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    repo = Repo.init(repo_root)
+    with repo.config_writer() as cw:
+        cw.set_value("user", "name", "Test")
+        cw.set_value("user", "email", "test@example.com")
+
+    (repo_root / "app").mkdir()
+    (repo_root / "app" / "thing.py").write_text("x = 1\n", encoding="utf-8")
+    docs = repo_root / "docs" / "20-components"
+    docs.mkdir(parents=True)
+    (docs / "thing.md").write_text(
+        "---\nid: thing\ntitle: Thing\naudience: explanation\ntier: 3\n"
+        "status: stable\ndescribes:\n  - app/thing.py\n---\n\n# Thing\n",
+        encoding="utf-8",
+    )
+    (repo_root / "irminsul.toml").write_text(
+        'project_name = "diff-aware"\n'
+        '[paths]\ndocs_root = "docs"\nsource_roots = ["app"]\n'
+        '[checks]\nsoft_deterministic = ["mtime-drift"]\n',
+        encoding="utf-8",
+    )
+    repo.index.add(["app/thing.py", "docs/20-components/thing.md", "irminsul.toml"])
+    base = repo.index.commit("seed").hexsha
+    (repo_root / "app" / "thing.py").write_text("x = 2\n", encoding="utf-8")
+    repo.index.add(["app/thing.py"])
+    repo.index.commit("change source only")
+    repo.close()
+
+    result = runner.invoke(
+        app,
+        [
+            "check",
+            "--profile",
+            "configured",
+            "--base-ref",
+            base,
+            "--head-ref",
+            "HEAD",
+            "--path",
+            str(repo_root),
+        ],
+    )
+    assert "sources changed in this diff but the doc was not updated" in result.stdout

@@ -129,6 +129,59 @@ def test_doc_without_describes_skipped(tmp_path: Path) -> None:
     assert not findings
 
 
+def _diff_findings(findings: list) -> list:
+    return [f for f in findings if "not updated" in f.message]
+
+
+def test_diff_aware_flags_source_changed_without_doc(tmp_path: Path) -> None:
+    from irminsul.config import find_config, load
+    from irminsul.git.mtime import diff_name_only
+
+    repo_root = _bootstrap(tmp_path, doc_old=False)
+    repo = Repo(repo_root)
+    base = repo.head.commit.hexsha
+    (repo_root / "app" / "thing.py").write_text("x = 2\n", encoding="utf-8")
+    repo.index.add(["app/thing.py"])
+    repo.index.commit("change source only")
+    repo.close()
+
+    diff = diff_name_only(repo_root, base, "HEAD")
+    assert diff == frozenset({"app/thing.py"})
+
+    config = load(find_config(repo_root))
+    graph = build_graph(repo_root, config, diff_changed_paths=diff)
+    findings = _diff_findings(MtimeDriftCheck().run(graph))
+    assert [f.doc_id for f in findings] == ["thing"]
+    assert findings[0].severity.value == "warning"
+
+
+def test_diff_aware_silent_when_doc_co_changed(tmp_path: Path) -> None:
+    from irminsul.config import find_config, load
+    from irminsul.git.mtime import diff_name_only
+
+    repo_root = _bootstrap(tmp_path, doc_old=False)
+    repo = Repo(repo_root)
+    base = repo.head.commit.hexsha
+    (repo_root / "app" / "thing.py").write_text("x = 2\n", encoding="utf-8")
+    doc = repo_root / "docs" / "20-components" / "thing.md"
+    doc.write_text(doc.read_text(encoding="utf-8") + "\nMore.\n", encoding="utf-8")
+    repo.index.add(["app/thing.py", "docs/20-components/thing.md"])
+    repo.index.commit("change both")
+    repo.close()
+
+    diff = diff_name_only(repo_root, base, "HEAD")
+    config = load(find_config(repo_root))
+    graph = build_graph(repo_root, config, diff_changed_paths=diff)
+    assert not _diff_findings(MtimeDriftCheck().run(graph))
+
+
+def test_diff_name_only_returns_none_for_bad_ref(tmp_path: Path) -> None:
+    from irminsul.git.mtime import diff_name_only
+
+    repo_root = _bootstrap(tmp_path, doc_old=False)
+    assert diff_name_only(repo_root, "does-not-exist", "HEAD") is None
+
+
 def test_no_git_history_skips_silently(tmp_path: Path) -> None:
     """When no git history exists, the check returns no findings rather than
     erroring. Lets `irminsul check` work on tarball checkouts."""

@@ -87,4 +87,43 @@ class MtimeDriftCheck:
                     )
                 )
 
+        out.extend(self._diff_findings(graph))
+        return out
+
+    def _diff_findings(self, graph: DocGraph) -> list[Finding]:
+        """Diff-precise co-change signal (RFC-0021): when `--base-ref`/`--head-ref`
+        are supplied, flag any doc whose described sources changed in the range
+        while the doc's own path did not. Unlike the clock signal, this needs no
+        threshold — the diff is the evidence."""
+        diff = graph.diff_changed_paths
+        if diff is None:
+            return []
+
+        out: list[Finding] = []
+        for node in graph.nodes.values():
+            patterns = node.frontmatter.describes
+            if not patterns:
+                continue
+            spec = GitIgnoreSpec.from_lines(patterns)
+            changed = sorted(spec.match_files(diff))
+            if not changed:
+                continue
+            if node.path.as_posix() in diff:
+                continue
+            out.append(
+                Finding(
+                    check=self.name,
+                    severity=Severity.warning,
+                    message=(
+                        "sources changed in this diff but the doc was not updated: "
+                        f"{', '.join(changed)}"
+                    ),
+                    path=node.path,
+                    doc_id=node.id,
+                    suggestion=(
+                        "update the doc to reflect the changed sources, "
+                        "or confirm the change is doc-irrelevant"
+                    ),
+                )
+            )
         return out
