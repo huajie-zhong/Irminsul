@@ -120,6 +120,25 @@ def last_commit_time_any_repo(path: Path, docs_root: Path) -> GitTime | None:
         return last_commit_time(root, path)
 
 
+def diff_name_only(repo_root: Path, base_ref: str, head_ref: str) -> frozenset[str] | None:
+    """Repo-relative POSIX paths changed between `base_ref` and `head_ref`.
+
+    Uses the three-dot (merge-base) range and follows renames, so a renamed
+    source file shows up once at its destination rather than as an add plus a
+    delete. Returns None when the repo has no usable history or either ref
+    cannot be resolved — the caller treats that as "no diff coverage" rather
+    than an error.
+    """
+    with _open_repo(repo_root) as repo:
+        if repo is None:
+            return None
+        try:
+            out = repo.git.diff("--name-only", "--find-renames", f"{base_ref}...{head_ref}")
+        except Exception:
+            return None
+    return frozenset(line.strip() for line in out.splitlines() if line.strip())
+
+
 def last_commit_time_for_paths(repo_root: Path, paths: Iterable[Path]) -> GitTime:
     """Maximum (latest) GitTime across `paths`. None when none of the paths
     have any committed history."""

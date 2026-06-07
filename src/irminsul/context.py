@@ -61,6 +61,7 @@ class ContextResult:
     depended_on_by: list[DocRef]
     findings: list[FindingSummary]
     hints: list[str]
+    doc_co_changed: bool = True
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,7 @@ class _PendingResult:
     node: DocNode
     inputs: tuple[str, ...]
     source_claims: tuple[str, ...]
+    doc_co_changed: bool = True
 
 
 @dataclass
@@ -260,7 +262,10 @@ def _pending_for_changed(
     unmatched: list[UnmatchedPath] = []
     claim_specs = _claim_specs(graph)
 
-    for changed_path in _git_changed_paths(repo_root):
+    changed_paths = _git_changed_paths(repo_root)
+    changed_set = set(changed_paths)
+
+    for changed_path in changed_paths:
         rel = Path(PurePosixPath(changed_path))
         node = graph.by_path.get(rel)
         if node is not None:
@@ -296,6 +301,7 @@ def _pending_for_changed(
             node=group.node,
             inputs=tuple(sorted(group.inputs)),
             source_claims=tuple(sorted(group.source_claims)),
+            doc_co_changed=group.node.path.as_posix() in changed_set,
         )
         for group in sorted(groups.values(), key=lambda g: g.node.path.as_posix())
     ]
@@ -509,6 +515,7 @@ def _build_result(
         ],
         findings=[_finding_summary(finding) for finding in relevant_findings],
         hints=_hints(node, relevant_findings),
+        doc_co_changed=pending.doc_co_changed,
     )
 
 
@@ -580,6 +587,7 @@ def _result_to_dict(result: ContextResult) -> dict[str, object]:
         "depended_on_by": [_doc_ref_to_dict(doc) for doc in result.depended_on_by],
         "findings": [_finding_to_dict(finding) for finding in result.findings],
         "hints": result.hints,
+        "doc_co_changed": result.doc_co_changed,
     }
 
 
@@ -625,6 +633,8 @@ def _format_result(result: ContextResult) -> list[str]:
         f"  depends_on: {_format_doc_refs(result.depends_on, result.depends_on_missing)}",
         f"  depended-on-by: {_format_doc_refs(result.depended_on_by, [])}",
     ]
+    if not result.doc_co_changed:
+        lines.append("  co-change: owning doc not updated in this change")
     if result.findings:
         lines.append("  findings:")
         for finding in result.findings:
