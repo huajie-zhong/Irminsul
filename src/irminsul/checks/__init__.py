@@ -7,6 +7,7 @@ and we resolve them here.
 
 from __future__ import annotations
 
+from irminsul.checks.adr_structure import AdrStructureCheck
 from irminsul.checks.base import Check, Finding, Fix, Severity, sort_findings, summarize
 from irminsul.checks.boundary import BoundaryCheck
 from irminsul.checks.claim_anchor import ClaimAnchorCheck
@@ -74,6 +75,7 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     DecisionUpdatesCheck.name: DecisionUpdatesCheck,
     InventoryDriftCheck.name: InventoryDriftCheck,
     ClaimAnchorCheck.name: ClaimAnchorCheck,
+    AdrStructureCheck.name: AdrStructureCheck,
 }
 
 LLM_REGISTRY: dict[str, type] = {
@@ -86,6 +88,7 @@ __all__ = [
     "HARD_REGISTRY",
     "LLM_REGISTRY",
     "SOFT_REGISTRY",
+    "AdrStructureCheck",
     "AgentsManifestCheck",
     "BoundaryCheck",
     "Check",

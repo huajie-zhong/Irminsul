@@ -12,6 +12,10 @@ summary: Rename the glossary check to `glossary-discipline` and enforce explicit
 
 # ADR-0010: Implement RFC-0019 glossary discipline
 
+## Status
+
+Accepted, 2026-05-19.
+
 ## Context
 
 [RFC-0019](../80-evolution/rfcs/0019-glossary-discipline.md) proposed a

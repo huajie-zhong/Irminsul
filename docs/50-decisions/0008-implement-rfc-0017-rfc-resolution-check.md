@@ -10,6 +10,10 @@ summary: Add the `rfc-resolution` soft deterministic check and a `--now` overrid
 
 # ADR-0008: Implement RFC-0017 RFC resolution check
 
+## Status
+
+Accepted, 2026-05-15.
+
 ## Context
 
 [RFC-0017](../80-evolution/rfcs/0017-rfc-resolution-check.md) proposed a

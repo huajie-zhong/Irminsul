@@ -42,6 +42,7 @@ soft_deterministic = [
     "rfc-resolution",
     "decision-updates",
     "inventory-drift",
+    "adr-structure",
 ]
 
 [checks.schema_leak]

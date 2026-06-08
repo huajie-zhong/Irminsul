@@ -50,6 +50,7 @@ SOFT_DETERMINISTIC_CHECKS = (
     "decision-updates",
     "inventory-drift",
     "claim-anchor",
+    "adr-structure",
 )
 SOFT_LLM_CHECKS = ("overlap", "semantic-drift", "scope-appropriateness")
 
