@@ -64,7 +64,7 @@ schema as optional lists and are validated when present — `implements:` by the
 **not** make them required. Two reasons: empty and absent are
 indistinguishable after the schema applies its default, so a presence rule
 would require re-parsing the raw frontmatter for no real signal; and requiring
-them would add empty fields to every existing ADR for no behavioural gain. The
+them would add empty fields to every existing ADR for no behavioral gain. The
 rewritten template emits `implements: []` / `supersedes: []` as scaffolding so
 authors fill them in, but their absence is not a finding.
 
@@ -74,7 +74,8 @@ The required-section set is **not** universally satisfied today, so the
 migration is small but real, not zero. A survey of `docs/50-decisions/`:
 
 - `## Context`, `## Decision`, `## Consequences` — present in every ADR.
-- `## Status` — missing from ADR-0002, 0006, 0008, 0009, and 0010.
+- `## Status` — missing from ADR-0002, ADR-0006, ADR-0008, ADR-0009, and
+  ADR-0010.
 - `## Alternatives Considered` — missing from ADR-0006; ADR-0001 spells it
   lowercase (`## Alternatives considered`), which passes under
   case-insensitive matching but is normalized to the canonical casing for
