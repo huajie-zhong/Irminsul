@@ -44,7 +44,7 @@ class AdrStructureCheck:
                     Finding(
                         check=self.name,
                         category="missing-section",
-                        severity=Severity.warning,
+                        severity=self.default_severity,
                         message=f"ADR is missing a '{display}' section",
                         path=node.path,
                         doc_id=node.id,
