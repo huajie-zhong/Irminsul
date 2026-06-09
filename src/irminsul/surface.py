@@ -36,6 +36,13 @@ def derive_surface(
     return extractor.extract(files, config)
 
 
+def surface_items_to_json(items: list[SurfaceItem]) -> str:
+    payload = [
+        {"identity": item.identity, "display": item.display, "line": item.line} for item in items
+    ]
+    return json.dumps(payload, indent=2)
+
+
 def run_surface(
     repo_root: Path,
     config: IrminsulConfig,
@@ -55,11 +62,7 @@ def run_surface(
 
     items = derive_surface(repo_root, config, kind, source)
     if fmt == "json":
-        payload = [
-            {"identity": item.identity, "display": item.display, "line": item.line}
-            for item in items
-        ]
-        typer.echo(json.dumps(payload, indent=2))
+        typer.echo(surface_items_to_json(items))
     else:
         for item in items:
             typer.echo(item.identity)

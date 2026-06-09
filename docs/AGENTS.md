@@ -67,6 +67,7 @@ automatically once any doc declares one.
 | `init` | [Init scaffolder](20-components/init.md) | explanation | 3 |  |
 | `languages` | [Language profiles](20-components/languages.md) | reference | 3 |  |
 | `llm` | [LLM Client](20-components/llm.md) | explanation | 3 |  |
+| `mcp-server` | [MCP server](20-components/mcp-server.md) | explanation | 3 | Read-only MCP stdio server that lets AI agents query the doc graph natively instead of shelling out to the CLI. |
 | `new-list-regen` | [New / List / Regen / Fix commands](20-components/new-list-regen.md) | explanation | 3 |  |
 | `refs` | [Refs backlink and symbol query](20-components/refs.md) | explanation | 3 |  |
 | `seed` | [Seed command](20-components/seed.md) | explanation | 3 |  |

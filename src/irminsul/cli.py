@@ -921,6 +921,40 @@ def surface_command(
     run_surface(repo_root, config, kind, source, fmt)
 
 
+@app.command("mcp")
+def mcp_command(
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path",
+            help="Root of the codebase to serve. Defaults to current directory.",
+        ),
+    ] = Path("."),
+) -> None:
+    """Serve the doc graph to AI agents over the Model Context Protocol (stdio).
+
+    Read-only: every tool returns the same JSON the CLI prints with
+    `--format json`. Requires the optional `mcp` extra.
+    """
+    import importlib.util
+
+    if importlib.util.find_spec("mcp") is None:
+        typer.echo(
+            typer.style(
+                "The MCP server needs the optional 'mcp' dependency. "
+                "Install it with: pip install 'irminsul[mcp]'",
+                fg="red",
+            ),
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    from irminsul.mcp_server import create_server
+
+    repo_root, _ = _load_repo(path)
+    create_server(repo_root).run()
+
+
 @app.command("anchors")
 def anchors_command(
     re_pin: Annotated[
