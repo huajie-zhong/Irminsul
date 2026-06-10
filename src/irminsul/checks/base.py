@@ -41,6 +41,7 @@ class Fix:
     path: Path
     description: str
     apply: Callable[[str], str]
+    requires_confirm: bool = False
 
 
 @runtime_checkable
