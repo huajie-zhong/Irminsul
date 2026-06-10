@@ -25,6 +25,7 @@ _BAD_FRONTMATTER_FIXTURE = Path(__file__).parent / "fixtures" / "repos" / "bad-f
 _ORPHAN_FIXTURE = Path(__file__).parent / "fixtures" / "repos" / "soft-orphans"
 
 EXPECTED_TOOL_NAMES = {
+    "orient",
     "context_for_path",
     "context_for_topic",
     "context_changed",
@@ -32,6 +33,7 @@ EXPECTED_TOOL_NAMES = {
     "check",
     "list_docs",
     "surface",
+    "anchors",
 }
 
 
@@ -213,6 +215,63 @@ def test_cli_mcp_without_dependency_exits_with_install_hint(
     except ValueError:
         stderr = ""
     assert "irminsul[mcp]" in result.output + stderr
+
+
+# --- orient tool ---
+
+
+def test_orient_json_reports_layout_and_commands() -> None:
+    out = mcp_server.orient_json(_GOOD_FIXTURE, _load_config(_GOOD_FIXTURE))
+    data = json.loads(out)
+    assert data["version"] == 1
+    assert data["doc_totals"]["total"] > 0
+    assert any(hint["command"].startswith("irminsul context") for hint in data["commands"])
+
+
+def test_orient_json_matches_cli_output() -> None:
+    out = mcp_server.orient_json(_GOOD_FIXTURE, _load_config(_GOOD_FIXTURE))
+    result = runner.invoke(app, ["orient", "--format", "json", "--path", str(_GOOD_FIXTURE)])
+    assert result.exit_code == 0, result.output
+    assert json.loads(out) == json.loads(result.output)
+
+
+# --- anchors tool ---
+
+
+def _make_anchor_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "anchors"
+    (repo / "src").mkdir(parents=True)
+    (repo / "irminsul.toml").write_text(
+        'project_name = "anchors"\n[paths]\ndocs_root = "docs"\nsource_roots = ["src"]\n',
+        encoding="utf-8",
+    )
+    (repo / "src" / "mod.py").write_text("def alpha():\n    return 1\n", encoding="utf-8")
+    doc = repo / "docs" / "20-components" / "c.md"
+    doc.parent.mkdir(parents=True)
+    doc.write_text(
+        "---\nid: c\ntitle: C\naudience: explanation\ntier: 3\nstatus: stable\n"
+        "describes: [src/mod.py]\n---\n\n# C\n\nAlpha does a thing.\n"
+        "<!-- anchor: src/mod.py#alpha -->\n",
+        encoding="utf-8",
+    )
+    return repo
+
+
+def test_anchors_json_reports_unpinned_anchor(tmp_path: Path) -> None:
+    repo = _make_anchor_repo(tmp_path)
+    out = mcp_server.anchors_json(repo, _load_config(repo))
+    data = json.loads(out)
+    assert data["version"] == 1
+    assert [f["check"] for f in data["findings"]] == ["claim-anchor"]
+    assert data["summary"] == {"errors": 0, "warnings": 0, "info": 1}
+
+
+def test_anchors_json_matches_cli_output(tmp_path: Path) -> None:
+    repo = _make_anchor_repo(tmp_path)
+    out = mcp_server.anchors_json(repo, _load_config(repo))
+    result = runner.invoke(app, ["anchors", "--format", "json", "--path", str(repo)])
+    assert result.exit_code == 0, result.output
+    assert json.loads(out) == json.loads(result.output)
 
 
 # --- FastMCP wiring ---

@@ -19,10 +19,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from irminsul.checks import HARD_REGISTRY, SOFT_REGISTRY, Check, Finding, sort_findings, summarize
+from irminsul.checks.claim_anchor import ClaimAnchorCheck
 from irminsul.config import IrminsulConfig, find_config, load
 from irminsul.context import build_context_report, context_report_to_json
 from irminsul.docgraph import build_graph
 from irminsul.listing.command import LIST_KINDS, findings_for_kind, findings_to_json
+from irminsul.orient import build_orient_report, orient_report_to_json
 from irminsul.refs import (
     RefsError,
     build_doc_refs_report,
@@ -40,8 +42,14 @@ CHECK_PROFILES = ("hard", "configured")
 SERVER_INSTRUCTIONS = (
     "Query this repository's Irminsul doc graph. Every tool is read-only, "
     "deterministic, and returns the same JSON the irminsul CLI prints with "
-    "--format json."
+    "--format json. Call `orient` first to learn the docs layout, configured "
+    "checks, and which tool to use when."
 )
+
+
+def orient_json(repo_root: Path, config: IrminsulConfig) -> str:
+    """One-shot orientation report (`irminsul orient`), as JSON."""
+    return orient_report_to_json(build_orient_report(repo_root, config))
 
 
 def context_for_path_json(repo_root: Path, config: IrminsulConfig, path: str) -> str:
@@ -134,6 +142,15 @@ def surface_json(
     return surface_items_to_json(derive_surface(repo_root, config, kind, source_glob))
 
 
+def anchors_json(repo_root: Path, config: IrminsulConfig) -> str:
+    """Anchored prose-claim report (`irminsul anchors`), as JSON."""
+    from irminsul.cli import _findings_to_json
+
+    graph = build_graph(repo_root, config)
+    findings = sort_findings(ClaimAnchorCheck().run(graph))
+    return _findings_to_json(findings, summarize(findings))
+
+
 def create_server(repo_root: Path) -> FastMCP:
     """Build the FastMCP stdio server exposing the read-only tool set."""
     from mcp.server.fastmcp import FastMCP
@@ -144,6 +161,11 @@ def create_server(repo_root: Path) -> FastMCP:
         return load(find_config(root))
 
     server = FastMCP("irminsul", instructions=SERVER_INSTRUCTIONS)
+
+    @server.tool()
+    def orient() -> str:
+        """Call FIRST in an unfamiliar repo: returns the docs layout, doc counts by layer and status, entry docs, configured checks, and a command vocabulary."""
+        return orient_json(root, _config())
 
     @server.tool()
     def context_for_path(path: str) -> str:
@@ -179,5 +201,10 @@ def create_server(repo_root: Path) -> FastMCP:
     def surface(kind: str, source_glob: str | None = None) -> str:
         """Call to see what the code actually exposes right now: derives the live 'cli', 'http', 'exports', or 'env-vars' surface from source."""
         return surface_json(root, _config(), kind, source_glob)
+
+    @server.tool()
+    def anchors() -> str:
+        """Call to audit anchored prose claims: flags claims whose pinned code symbol changed since the prose was last verified. Read-only; re-pinning stays a deliberate human CLI action."""
+        return anchors_json(root, _config())
 
     return server
