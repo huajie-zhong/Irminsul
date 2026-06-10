@@ -23,6 +23,7 @@ class FrontmatterCheck:
                     severity=Severity.error,
                     message=f"frontmatter parse error: {failure.error}",
                     path=failure.path,
+                    data=failure.data or {"problem": "parse-error"},
                 )
             )
 
@@ -33,6 +34,7 @@ class FrontmatterCheck:
                     severity=Severity.error,
                     message="missing frontmatter (required for every doc atom)",
                     path=path,
+                    data={"problem": "missing-frontmatter"},
                 )
             )
 
@@ -49,6 +51,12 @@ class FrontmatterCheck:
                         ),
                         path=node.path,
                         doc_id=node.frontmatter.id,
+                        data={
+                            "problem": "id-mismatch",
+                            "field": "id",
+                            "value": node.frontmatter.id,
+                            "expected": expected,
+                        },
                     )
                 )
 
@@ -60,6 +68,12 @@ class FrontmatterCheck:
                     message=(f"duplicate id '{dup_id}' (also defined at {first_path})"),
                     path=conflicting_path,
                     doc_id=dup_id,
+                    data={
+                        "problem": "duplicate-id",
+                        "field": "id",
+                        "value": dup_id,
+                        "other_path": first_path.as_posix(),
+                    },
                 )
             )
 

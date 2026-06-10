@@ -412,24 +412,55 @@ def _print_finding(finding: Finding) -> None:
         typer.echo(typer.style(f"      → {finding.suggestion}", dim=True))
 
 
-def _findings_to_json(findings: list[Finding], counts: dict[Severity, int]) -> str:
+def _compute_fixable(findings: list[Finding], graph: DocGraph) -> list[bool]:
+    """Mark the findings `irminsul fix` would plan a fix for.
+
+    Mirrors the fix command's harvest: each check that implements
+    `fixes(findings, graph)` is asked, per finding, whether that finding alone
+    yields at least one `Fix`. Every implementation filters the findings it is
+    given by check name plus path/doc_id/severity/category, so a singleton
+    list gives an honest per-finding answer.
+    """
+    instances: dict[str, Check | None] = {}
+    out: list[bool] = []
+    for finding in findings:
+        if finding.check not in instances:
+            cls = HARD_REGISTRY.get(finding.check) or SOFT_REGISTRY.get(finding.check)
+            instances[finding.check] = cls() if cls is not None else None
+        instance = instances[finding.check]
+        maybe_fixes = getattr(instance, "fixes", None)
+        out.append(bool(maybe_fixes([finding], graph)) if maybe_fixes is not None else False)
+    return out
+
+
+def _findings_to_json(
+    findings: list[Finding], counts: dict[Severity, int], fixable: list[bool]
+) -> str:
     import json
+
+    def _finding_json(f: Finding, is_fixable: bool) -> dict[str, object]:
+        record: dict[str, object] = {
+            "check": f.check,
+            "severity": f.severity.value,
+            "message": f.message,
+            "path": f.path.as_posix() if f.path else None,
+            "doc_id": f.doc_id,
+            "line": f.line,
+            "suggestion": f.suggestion,
+            "category": f.category,
+            "data": f.data,
+            "fixable": is_fixable,
+        }
+        if is_fixable:
+            record["fix_command"] = f"irminsul fix --check {f.check}"
+        return record
 
     return json.dumps(
         {
             "version": 1,
             "findings": [
-                {
-                    "check": f.check,
-                    "severity": f.severity.value,
-                    "message": f.message,
-                    "path": f.path.as_posix() if f.path else None,
-                    "doc_id": f.doc_id,
-                    "line": f.line,
-                    "suggestion": f.suggestion,
-                    "category": f.category,
-                }
-                for f in findings
+                _finding_json(f, is_fixable)
+                for f, is_fixable in zip(findings, fixable, strict=True)
             ],
             "summary": {
                 "errors": counts[Severity.error],
@@ -688,7 +719,7 @@ def check(
     fail = counts[Severity.error] > 0 or (strict and counts[Severity.warning] > 0)
 
     if fmt == "json":
-        typer.echo(_findings_to_json(findings, counts))
+        typer.echo(_findings_to_json(findings, counts, _compute_fixable(findings, graph)))
     else:
         for finding in findings:
             _print_finding(finding)

@@ -100,7 +100,9 @@ def build_graph(
             if result.error == "missing frontmatter":
                 graph.missing_frontmatter.append(rel_posix)
             else:
-                graph.parse_failures.append(ParseFailure(path=rel_posix, error=result.error))
+                graph.parse_failures.append(
+                    ParseFailure(path=rel_posix, error=result.error, data=result.data)
+                )
             continue
 
         node = DocNode(

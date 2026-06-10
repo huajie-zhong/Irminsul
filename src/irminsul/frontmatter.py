@@ -154,11 +154,14 @@ class ParsedDoc:
 class ParseFailure:
     """A markdown file that exists under docs_root but couldn't be loaded.
 
-    Either the YAML block was malformed or the schema rejected it.
+    Either the YAML block was malformed or the schema rejected it. `data` is a
+    machine-readable decomposition of the first error (always carries a
+    "problem" key) for findings JSON.
     """
 
     path: Path  # repo-relative
     error: str
+    data: dict[str, str] | None = None
 
 
 def _format_validation_error(exc: ValidationError) -> str:
@@ -167,6 +170,18 @@ def _format_validation_error(exc: ValidationError) -> str:
         loc = ".".join(str(x) for x in err["loc"]) or "<root>"
         parts.append(f"{loc}: {err['msg']}")
     return "; ".join(parts)
+
+
+def _validation_error_data(exc: ValidationError) -> dict[str, str]:
+    """Decompose the first validation error into string key/value pairs."""
+    err = exc.errors()[0]
+    field = ".".join(str(x) for x in err["loc"]) or "<root>"
+    if err["type"] == "missing":
+        return {"problem": "missing-field", "field": field}
+    data = {"problem": "invalid-value", "field": field}
+    if "input" in err:
+        data["value"] = str(err["input"])
+    return data
 
 
 def parse_doc(absolute_path: Path, repo_root: Path) -> ParsedDoc | ParseFailure:
@@ -180,7 +195,11 @@ def parse_doc(absolute_path: Path, repo_root: Path) -> ParsedDoc | ParseFailure:
         with absolute_path.open("r", encoding="utf-8") as f:
             post = _pyfm.load(f)
     except Exception as e:
-        return ParseFailure(path=rel, error=f"{type(e).__name__}: {e}")
+        return ParseFailure(
+            path=rel,
+            error=f"{type(e).__name__}: {e}",
+            data={"problem": "parse-error"},
+        )
 
     raw: dict[str, Any] = dict(post.metadata)
     if not raw:
@@ -189,7 +208,11 @@ def parse_doc(absolute_path: Path, repo_root: Path) -> ParsedDoc | ParseFailure:
     try:
         fm = DocFrontmatter.model_validate(raw)
     except ValidationError as e:
-        return ParseFailure(path=rel, error=_format_validation_error(e))
+        return ParseFailure(
+            path=rel,
+            error=_format_validation_error(e),
+            data=_validation_error_data(e),
+        )
 
     return ParsedDoc(path=rel, frontmatter=fm, body=post.content)
 

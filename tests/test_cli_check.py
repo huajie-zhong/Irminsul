@@ -272,3 +272,165 @@ def test_check_diff_aware_mtime_drift_flags_source_without_doc(tmp_path: Path) -
         ],
     )
     assert "sources changed in this diff but the doc was not updated" in result.stdout
+
+
+# --- machine-actionable findings: `data`, `fixable`, `fix_command` ---
+
+
+def _check_json(repo: Path, *args: str) -> dict:
+    import json
+
+    result = runner.invoke(app, ["check", "--format", "json", "--path", str(repo), *args])
+    return json.loads(result.stdout)
+
+
+def test_check_json_all_findings_carry_data_and_fixable_keys(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("bad-frontmatter")
+    payload = _check_json(repo, "--profile", "hard")
+    assert payload["version"] == 1
+    assert payload["findings"]
+    for finding in payload["findings"]:
+        assert "data" in finding
+        assert "fixable" in finding
+        assert isinstance(finding["fixable"], bool)
+        if finding["data"] is not None:
+            assert "problem" in finding["data"]
+            assert all(isinstance(v, str) for v in finding["data"].values())
+
+
+def test_check_json_frontmatter_data_vocabulary(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("bad-frontmatter")
+    payload = _check_json(repo, "--profile", "hard")
+    by_path = {f["path"]: f["data"] for f in payload["findings"] if f["check"] == "frontmatter"}
+
+    assert by_path["docs/20-components/missing-audience.md"] == {
+        "problem": "missing-field",
+        "field": "audience",
+    }
+    bad_tier = by_path["docs/20-components/bad-tier.md"]
+    assert bad_tier["problem"] == "invalid-value"
+    assert bad_tier["field"] == "tier"
+    assert bad_tier["value"] == "99"
+    assert by_path["docs/20-components/no-frontmatter.md"] == {"problem": "missing-frontmatter"}
+    assert by_path["docs/20-components/renamed.md"] == {
+        "problem": "id-mismatch",
+        "field": "id",
+        "value": "not-renamed",
+        "expected": "renamed",
+    }
+
+
+def test_check_json_coverage_data_vocabulary(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("bad-coverage")
+    payload = _check_json(repo, "--profile", "hard")
+    coverage = [f for f in payload["findings"] if f["check"] == "coverage"]
+    assert coverage
+    assert coverage[0]["data"] == {"problem": "missing-tests-entry", "field": "tests"}
+
+    # Declare a tests entry that points nowhere: tests-path-missing.
+    doc = repo / "docs" / "20-components" / "thing.md"
+    doc.write_text(
+        doc.read_text(encoding="utf-8").replace(
+            "describes:", "tests:\n  - tests/test_thing.py\ndescribes:"
+        ),
+        encoding="utf-8",
+    )
+    payload = _check_json(repo, "--profile", "hard")
+    coverage = [f for f in payload["findings"] if f["check"] == "coverage"]
+    assert coverage[0]["data"] == {
+        "problem": "tests-path-missing",
+        "field": "tests",
+        "value": "tests/test_thing.py",
+    }
+
+
+def test_check_json_links_data_vocabulary(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("bad-links")
+    linker = repo / "docs" / "20-components" / "linker.md"
+    linker.write_text(
+        linker.read_text(encoding="utf-8") + "\n- [bad anchor](#missing-section)\n",
+        encoding="utf-8",
+    )
+    payload = _check_json(repo, "--profile", "hard")
+    links = [f for f in payload["findings"] if f["check"] == "links"]
+    data_by_problem: dict[str, list[dict]] = {}
+    for f in links:
+        data_by_problem.setdefault(f["data"]["problem"], []).append(f["data"])
+
+    broken_targets = {d["target"] for d in data_by_problem["broken-link"]}
+    assert "does-not-exist.md" in broken_targets
+    assert "nope.md#section" in broken_targets
+    resolved = {d["resolved"] for d in data_by_problem["broken-link"]}
+    assert "docs/20-components/does-not-exist.md" in resolved
+
+    anchors = {d["anchor"] for d in data_by_problem["unknown-anchor"]}
+    assert "missing-section" in anchors
+
+
+def test_check_json_fixable_true_matches_fix_dry_run_plan(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("soft-supersession")
+    payload = _check_json(repo, "--profile", "configured")
+    supersession = [f for f in payload["findings"] if f["check"] == "supersession"]
+    assert supersession
+    for finding in supersession:
+        assert finding["fixable"] is True
+        assert finding["fix_command"] == "irminsul fix --check supersession"
+
+    # `irminsul fix --dry-run` really does plan these fixes.
+    result = runner.invoke(app, ["fix", "--dry-run", "--path", str(repo)])
+    assert result.exit_code == 0, result.output
+    assert "planned" in result.output
+    assert "status: deprecated" in result.output
+
+
+def test_check_json_fixable_false_without_fix_command(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("bad-frontmatter")
+    payload = _check_json(repo, "--profile", "hard")
+    frontmatter = [f for f in payload["findings"] if f["check"] == "frontmatter"]
+    assert frontmatter
+    for finding in frontmatter:
+        assert finding["fixable"] is False
+        assert "fix_command" not in finding
+
+
+def test_check_json_fixable_false_for_unfixable_finding_of_fixing_check(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    """A check that implements fixes() must not over-claim: supersession
+    errors (unknown doc id) have no automatic fix and stay fixable: false."""
+    repo = fixture_repo("soft-supersession")
+    ghost = repo / "docs" / "20-components" / "ghost-superseder.md"
+    ghost.write_text(
+        "---\n"
+        "id: ghost-superseder\n"
+        "title: Ghost Superseder\n"
+        "audience: explanation\n"
+        "tier: 2\n"
+        "status: stable\n"
+        "supersedes:\n"
+        "  - no-such-doc\n"
+        "---\n\n"
+        "# Ghost Superseder\n\n"
+        "Supersedes a doc that does not exist.\n",
+        encoding="utf-8",
+    )
+    payload = _check_json(repo, "--profile", "configured")
+    errors = [
+        f for f in payload["findings"] if f["check"] == "supersession" and f["severity"] == "error"
+    ]
+    assert errors
+    for finding in errors:
+        assert finding["fixable"] is False
+        assert "fix_command" not in finding
