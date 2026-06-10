@@ -12,6 +12,10 @@ summary: Add `required_updates` and `implements` frontmatter fields, a `decision
 
 # ADR-0009: Implement RFC-0018 decision updates and maintenance queue
 
+## Status
+
+Accepted, 2026-05-15.
+
 ## Context
 
 [RFC-0018](../80-evolution/rfcs/0018-decision-followups-and-maintenance-queue.md) identified

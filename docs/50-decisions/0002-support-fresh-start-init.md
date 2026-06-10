@@ -9,6 +9,10 @@ describes: []
 
 # ADR 0002: Support fresh-start init
 
+## Status
+
+Proposed, 2026-05-09.
+
 ## Context
 
 `irminsul init` currently assumes the common target is an existing codebase. In

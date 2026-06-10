@@ -10,6 +10,10 @@ summary: Add `irminsul seed` and the `foundation-readiness` check, with an opt-i
 
 # ADR-0006: Implement RFC-0015 PIB seed and foundation readiness
 
+## Status
+
+Accepted, 2026-05-14.
+
 ## Context
 
 [RFC-0015](../80-evolution/rfcs/0015-pib-seed-and-foundation-readiness.md)
@@ -41,6 +45,15 @@ interactive fresh-start path of `init` offers an **opt-in** prompt to run seed
 inline, while `init --no-interactive` gains no new prompts and stays fully
 scriptable. `irminsul seed` remains the standalone command for capturing or
 redoing the seed later.
+
+## Alternatives Considered
+
+- **Add seed prompts directly to `init` for every run.** Rejected by RFC-0015
+  over scriptability concerns; reconciled here by making the prompt opt-in on
+  the interactive path only, leaving `init --no-interactive` untouched.
+- **Keep `seed` standalone with no `init` integration.** Rejected: a
+  fresh-start user would miss the cue to capture intent at the one moment it
+  matters most.
 
 ## Consequences
 
