@@ -34,6 +34,9 @@ class Finding:
     line: int | None = None
     suggestion: str | None = None
     category: str | None = None
+    #: Machine-readable decomposition of the finding for agents. When set, it
+    #: always carries a kebab-case "problem" key; all values are strings.
+    data: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
