@@ -15,6 +15,7 @@ Each architectural piece of Irminsul has a dedicated doc here. Frontmatter `desc
 
 - [`cli`](cli.md) — CLI entry point
 - [`config`](config.md) — `irminsul.toml` schema
+- [`orient`](orient.md) — first-call agent orientation report
 - [`context`](context.md) — task-specific agent navigation context
 - [`frontmatter`](frontmatter.md) — per-doc YAML frontmatter parser/validator
 - [`docgraph`](docgraph.md) — in-memory representation of a repo's docs
