@@ -183,7 +183,7 @@ def format_context_plain(report: ContextReport) -> str:
                 ids = ", ".join(doc.id for doc in item.candidates)
                 suffix = f" (candidates: {ids})"
             lines.append(f"  {item.path}: {item.reason}{suffix}")
-        lines.append("  hint: irminsul list undocumented")
+        lines.append("  hint: irminsul list undocumented --all")
 
     return "\n".join(lines)
 

@@ -26,7 +26,7 @@ from irminsul.docgraph import DocGraph, DocNode
 # Files that are usually noise from a doc-coverage standpoint. Keeping the
 # omission warning quiet here trades a tiny risk of missing a legit doc gap
 # against the much larger annoyance of warning on every `__init__.py`.
-_OMISSION_SKIP = GitIgnoreSpec.from_lines(
+OMISSION_SKIP = GitIgnoreSpec.from_lines(
     [
         "__init__.py",
         "__main__.py",
@@ -59,6 +59,26 @@ def specificity(pattern: str) -> tuple[int, int, int]:
     return (literal_segments, depth, -wildcard_chars)
 
 
+def resolve_claims(
+    graph: DocGraph, source_files: list[tuple[Path, str]]
+) -> dict[str, list[tuple[DocNode, str, tuple[int, int, int]]]]:
+    """Map each claimed source display path to its (doc, pattern, specificity) claims.
+
+    This is the single claim-resolution routine shared by the uniqueness check
+    and `irminsul list undocumented` — a file is "claimed" iff it has an entry
+    here.
+    """
+    claims_by_file: dict[str, list[tuple[DocNode, str, tuple[int, int, int]]]] = defaultdict(list)
+    for node in graph.nodes.values():
+        for pattern in node.frontmatter.describes:
+            spec = GitIgnoreSpec.from_lines([pattern])
+            score = specificity(pattern)
+            for _, display in source_files:
+                if spec.match_file(display):
+                    claims_by_file[display].append((node, pattern, score))
+    return claims_by_file
+
+
 class UniquenessCheck:
     name: ClassVar[str] = "uniqueness"
     default_severity: ClassVar[Severity] = Severity.error
@@ -70,17 +90,7 @@ class UniquenessCheck:
         source_files, _missing = walk_source_files(graph.repo_root, graph.config.paths.source_roots)
 
         # claims_by_file: source file -> list of (DocNode, pattern, score).
-        claims_by_file: dict[str, list[tuple[DocNode, str, tuple[int, int, int]]]] = defaultdict(
-            list
-        )
-
-        for node in graph.nodes.values():
-            for pattern in node.frontmatter.describes:
-                spec = GitIgnoreSpec.from_lines([pattern])
-                score = specificity(pattern)
-                for _, display in source_files:
-                    if spec.match_file(display):
-                        claims_by_file[display].append((node, pattern, score))
+        claims_by_file = resolve_claims(graph, source_files)
 
         out: list[Finding] = []
 
@@ -114,7 +124,7 @@ class UniquenessCheck:
                 continue
             if not _is_in_covered_dir(source_file, covered_dirs):
                 continue
-            if _OMISSION_SKIP.match_file(source_file):
+            if OMISSION_SKIP.match_file(source_file):
                 continue
             out.append(
                 Finding(
