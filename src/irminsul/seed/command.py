@@ -359,4 +359,26 @@ def run_seed(
         )
         written.append(rfc_path.relative_to(repo_root))
 
+        index_written = _append_rfc_index_link(rfc_dir / "INDEX.md", rfc_id)
+        if index_written is not None:
+            written.append(index_written.relative_to(repo_root))
+
     return SeedResult(written=written)
+
+
+def _append_rfc_index_link(index_path: Path, rfc_id: str) -> Path | None:
+    """Idempotently list the anchoring RFC in `rfcs/INDEX.md`.
+
+    The scaffolded RFC index is the navigation entry for the rfcs folder; the
+    seeded RFC gets a bullet there so it is reachable from day one. Repos
+    without an RFC index (pre-scaffold adopters) are left untouched.
+    """
+    if not index_path.is_file():
+        return None
+    content = index_path.read_text(encoding="utf-8")
+    if f"{rfc_id}.md" in content:
+        return None
+    bullet = f"- [`{rfc_id}`]({rfc_id}.md) — Initial direction\n"
+    stripped = content.rstrip()
+    _atomic_write(index_path, (stripped + "\n\n" + bullet) if stripped else bullet)
+    return index_path
