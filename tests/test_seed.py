@@ -43,7 +43,9 @@ def _seed_no_interactive(repo: Path, *extra: str) -> object:
 
 
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True)
+    # No capture: a failing git command should print its stderr into the
+    # pytest output rather than vanish.
+    subprocess.run(["git", "-C", str(repo), *args], check=True)
 
 
 def test_seed_with_flags_writes_foundation_and_anchors(tmp_path: Path) -> None:

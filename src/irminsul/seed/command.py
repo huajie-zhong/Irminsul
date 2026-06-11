@@ -378,7 +378,7 @@ def _append_rfc_index_link(index_path: Path, rfc_id: str) -> Path | None:
     content = index_path.read_text(encoding="utf-8")
     if f"{rfc_id}.md" in content:
         return None
-    sep = "" if content.endswith("\n") else "\n"
     bullet = f"- [`{rfc_id}`]({rfc_id}.md) — Initial direction\n"
-    _atomic_write(index_path, content + sep + "\n" + bullet)
+    stripped = content.rstrip()
+    _atomic_write(index_path, (stripped + "\n\n" + bullet) if stripped else bullet)
     return index_path
