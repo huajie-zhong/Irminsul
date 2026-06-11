@@ -73,6 +73,7 @@ automatically once any doc declares one.
 | `orient` | [Agent orientation command](20-components/orient.md) | explanation | 3 | The recommended first call for agents — repo structure, doc totals, entry docs, and the command vocabulary as one stable report. |
 | `refs` | [Refs backlink and symbol query](20-components/refs.md) | explanation | 3 |  |
 | `seed` | [Seed command](20-components/seed.md) | explanation | 3 |  |
+| `status` | [Status command](20-components/status.md) | explanation | 3 | One-glance digest of docs inventory, source-file coverage, and findings. |
 | `surface` | [Surface extraction & on-demand derivation](20-components/surface.md) | explanation | 3 |  |
 
 ### 30-workflows

@@ -1,0 +1,9 @@
+project_name = "brownfield-status"
+
+[paths]
+docs_root = "docs"
+source_roots = ["app"]
+
+[checks]
+hard = ["frontmatter", "globs", "uniqueness", "links", "schema-leak"]
+soft_deterministic = ["orphans"]
