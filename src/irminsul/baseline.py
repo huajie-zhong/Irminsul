@@ -73,6 +73,7 @@ def write_baseline(path: Path, findings: list[Finding]) -> int:
         for check, finding_path, message in sorted(seen)
     ]
     payload = {"version": BASELINE_VERSION, "findings": entries}
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return len(entries)
 
@@ -111,7 +112,15 @@ def load_baseline(path: Path) -> set[str]:
             raise BaselineError(
                 f"baseline {path.name} entry is missing the {e.args[0]!r} field"
             ) from e
-        fingerprints.add(fingerprint(str(check), str(finding_path), str(message)))
+        # A null path in hand-edited JSON must hash like the empty string the
+        # writer uses for pathless findings, not like the string "None".
+        fingerprints.add(
+            fingerprint(
+                str(check) if check is not None else "",
+                str(finding_path) if finding_path is not None else "",
+                str(message) if message is not None else "",
+            )
+        )
     return fingerprints
 
 

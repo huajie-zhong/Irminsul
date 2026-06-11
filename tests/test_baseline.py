@@ -123,3 +123,23 @@ def test_apply_baseline_suppresses_line_moves(tmp_path: Path) -> None:
     assert result.remaining == []
     assert result.suppressed == 1
     assert result.stale == 0
+
+
+def test_write_baseline_creates_parent_directories(tmp_path: Path) -> None:
+    target = tmp_path / "ci" / "nested" / "baseline.json"
+    assert write_baseline(target, [_finding()]) == 1
+    assert target.is_file()
+
+
+def test_load_treats_null_path_as_empty_string(tmp_path: Path) -> None:
+    target = tmp_path / "baseline.json"
+    target.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "findings": [{"check": "globs", "path": None, "message": "repo-wide problem"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert load_baseline(target) == {fingerprint("globs", "", "repo-wide problem")}
