@@ -22,7 +22,7 @@ from irminsul.checks import HARD_REGISTRY, SOFT_REGISTRY, Check, Finding, sort_f
 from irminsul.config import IrminsulConfig, find_config, load
 from irminsul.context import build_context_report, context_report_to_json
 from irminsul.docgraph import build_graph
-from irminsul.listing.command import LIST_KINDS, findings_for_kind, findings_to_json
+from irminsul.listing.command import findings_for_kind, findings_to_json
 from irminsul.refs import (
     RefsError,
     build_doc_refs_report,
@@ -111,9 +111,11 @@ def check_json(repo_root: Path, config: IrminsulConfig, profile: str = "hard") -
 
 
 def list_docs_json(repo_root: Path, config: IrminsulConfig, kind: str) -> str:
-    """Findings behind one `irminsul list` subcommand, as JSON."""
-    if kind not in LIST_KINDS:
-        raise ValueError(f"unknown list kind '{kind}'; expected one of: {', '.join(LIST_KINDS)}")
+    """Findings behind one `irminsul list` subcommand, as JSON.
+
+    Kind validation lives in `findings_for_kind`, which raises ValueError for
+    unknown kinds — no second copy of the check here.
+    """
     return findings_to_json(findings_for_kind(repo_root, config, kind))
 
 
