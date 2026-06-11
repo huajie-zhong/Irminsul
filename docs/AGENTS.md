@@ -68,6 +68,7 @@ automatically once any doc declares one.
 | `languages` | [Language profiles](20-components/languages.md) | reference | 3 |  |
 | `llm` | [LLM Client](20-components/llm.md) | explanation | 3 |  |
 | `new-list-regen` | [New / List / Regen / Fix commands](20-components/new-list-regen.md) | explanation | 3 |  |
+| `orient` | [Agent orientation command](20-components/orient.md) | explanation | 3 | The recommended first call for agents — repo structure, doc totals, entry docs, and the command vocabulary as one stable report. |
 | `refs` | [Refs backlink and symbol query](20-components/refs.md) | explanation | 3 |  |
 | `seed` | [Seed command](20-components/seed.md) | explanation | 3 |  |
 | `surface` | [Surface extraction & on-demand derivation](20-components/surface.md) | explanation | 3 |  |
