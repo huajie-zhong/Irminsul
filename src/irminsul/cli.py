@@ -697,6 +697,37 @@ def check(
     raise typer.Exit(code=1 if fail else 0)
 
 
+@app.command("status")
+def status_command(
+    fmt: Annotated[
+        str,
+        typer.Option("--format", help="Output format: plain or json."),
+    ] = "plain",
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path",
+            help="Root of the codebase to inspect. Defaults to current directory.",
+        ),
+    ] = Path("."),
+) -> None:
+    """Show a one-glance digest of the doc system's health."""
+    from irminsul.status import (
+        build_status_report,
+        format_status_plain,
+        status_report_to_json,
+    )
+
+    if fmt not in ("plain", "json"):
+        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+        raise typer.Exit(code=2)
+
+    repo_root = path.resolve()
+    config = load(find_config(repo_root))
+    report = build_status_report(repo_root, config)
+    typer.echo(status_report_to_json(report) if fmt == "json" else format_status_plain(report))
+
+
 @app.command("context")
 def context_command(
     target: Annotated[

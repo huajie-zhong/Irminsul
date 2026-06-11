@@ -44,6 +44,27 @@ _OMISSION_SKIP = GitIgnoreSpec.from_lines(
 )
 
 
+def resolve_claims(
+    graph: DocGraph,
+    source_files: list[tuple[Path, str]],
+) -> dict[str, list[tuple[DocNode, str, tuple[int, int, int]]]]:
+    """Map each claimed source display path to its (doc, pattern, specificity) claims.
+
+    Only files matched by at least one `describes` pattern appear as keys.
+    Shared by the uniqueness check and the status coverage digest so the two
+    surfaces can never disagree about what "claimed" means.
+    """
+    claims_by_file: dict[str, list[tuple[DocNode, str, tuple[int, int, int]]]] = defaultdict(list)
+    for node in graph.nodes.values():
+        for pattern in node.frontmatter.describes:
+            spec = GitIgnoreSpec.from_lines([pattern])
+            score = specificity(pattern)
+            for _, display in source_files:
+                if spec.match_file(display):
+                    claims_by_file[display].append((node, pattern, score))
+    return dict(claims_by_file)
+
+
 def specificity(pattern: str) -> tuple[int, int, int]:
     """Higher tuple = more specific. Compared lexicographically.
 
@@ -70,17 +91,7 @@ class UniquenessCheck:
         source_files, _missing = walk_source_files(graph.repo_root, graph.config.paths.source_roots)
 
         # claims_by_file: source file -> list of (DocNode, pattern, score).
-        claims_by_file: dict[str, list[tuple[DocNode, str, tuple[int, int, int]]]] = defaultdict(
-            list
-        )
-
-        for node in graph.nodes.values():
-            for pattern in node.frontmatter.describes:
-                spec = GitIgnoreSpec.from_lines([pattern])
-                score = specificity(pattern)
-                for _, display in source_files:
-                    if spec.match_file(display):
-                        claims_by_file[display].append((node, pattern, score))
+        claims_by_file = resolve_claims(graph, source_files)
 
         out: list[Finding] = []
 
