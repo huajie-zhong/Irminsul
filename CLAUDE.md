@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-Irminsul is a Python CLI (`irminsul` / `irm`) plus composite GitHub Action (`action.yml`) that enforces structural invariants on a target codebase's `/docs` tree in CI. There is no server, no hosted state, no LLM in the hard-check path. Every invocation: load `irminsul.toml` → walk `docs_root` → build a `DocGraph` → run registered checks → exit 0/1 (and optionally render an MkDocs Material site).
+Irminsul is a Python CLI (`irminsul` / `irm`) plus composite GitHub Action (`action.yml`) that enforces structural invariants on a target codebase's `/docs` tree in CI. There is no server, no hosted state, and no LLM calls — every check is deterministic. Every invocation: load `irminsul.toml` → walk `docs_root` → build a `DocGraph` → run registered checks → exit 0/1 (and optionally render an MkDocs Material site).
 
 The repo dogfoods itself — `docs/` is the live spec for the doc system the tool enforces, and CI runs `irminsul check --profile=hard` against it.
 
@@ -58,7 +58,6 @@ irminsul render                          # build MkDocs site to ./site
 **Three check registries** (`src/irminsul/checks/__init__.py`). Names in `irminsul.toml` are resolved against these maps; an unknown name prints a yellow note and is skipped (not an error).
 - `HARD_REGISTRY` — `frontmatter`, `globs`, `uniqueness`, `links`, `schema-leak`. Errors from these always block (exit 1) regardless of `--strict`.
 - `SOFT_REGISTRY` — deterministic warnings: `mtime-drift`, `orphans`, `stale-reaper`, `supersession`, `parent-child`, `glossary`, `external-links`. Promoted to errors only with `--strict`.
-- `LLM_REGISTRY` — advisory only: `overlap`, `semantic-drift`, `scope-appropriateness`. Run only with `--profile=advisory`. Cost-budgeted via `LlmClient` (`src/irminsul/llm/client.py`); cache lives at `config.llm.cache_path`.
 
 All checks subclass `Check` and return `list[Finding]` with `(check, severity, path, line, message, suggestion)`. Severity ordering and exit-code logic live in `cli.check`.
 
@@ -66,7 +65,7 @@ All checks subclass `Check` and return `list[Finding]` with `(check, severity, p
 
 **`parent-child` check** infers parent–child relationships from document paths; there is no `children:` frontmatter field.
 
-**Config** (`src/irminsul/config.py`). Pydantic schema for `irminsul.toml`. `find_config()` walks upward from the target path. Source-of-truth fields: `paths.docs_root`, `paths.source_roots`, `checks.hard|soft_deterministic|soft_llm`, `languages.enabled`, `render.target`, `llm.*`.
+**Config** (`src/irminsul/config.py`). Pydantic schema for `irminsul.toml`. `find_config()` walks upward from the target path. Source-of-truth fields: `paths.docs_root`, `paths.source_roots`, `checks.hard|soft_deterministic`, `languages.enabled`.
 
 **Language profiles** (`src/irminsul/languages/`) are pure-data records (source-root candidates + schema-leak regexes) keyed by language name. Adding a language = adding a file here, no check changes.
 

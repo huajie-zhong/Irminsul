@@ -33,6 +33,7 @@ def test_check_rejects_removed_scope() -> None:
     assert result.exit_code != 0
 
 
-def test_check_rejects_removed_llm_flag() -> None:
-    result = runner.invoke(app, ["check", "--llm"])
-    assert result.exit_code != 0
+def test_check_rejects_removed_llm_flags() -> None:
+    for flag_args in (["--llm"], ["--llm-budget", "1.0"]):
+        result = runner.invoke(app, ["check", *flag_args])
+        assert result.exit_code != 0

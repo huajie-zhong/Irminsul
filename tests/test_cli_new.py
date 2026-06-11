@@ -27,12 +27,12 @@ def _make_repo(tmp_path: Path) -> Path:
 
 def test_new_adr_creates_file(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
-    result = runner.invoke(app, ["new", "adr", "Adopt LiteLLM", "--path", str(repo)])
+    result = runner.invoke(app, ["new", "adr", "Adopt Hatchling", "--path", str(repo)])
     assert result.exit_code == 0, result.output
     adr_dir = repo / "docs" / "50-decisions"
     adrs = list(adr_dir.glob("*.md"))
     assert len(adrs) == 1
-    assert "adopt-litellm" in adrs[0].name
+    assert "adopt-hatchling" in adrs[0].name
 
 
 def test_new_adr_passes_frontmatter_check(tmp_path: Path) -> None:

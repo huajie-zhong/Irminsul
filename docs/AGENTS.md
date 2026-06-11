@@ -66,7 +66,6 @@ automatically once any doc declares one.
 | `frontmatter` | [Frontmatter](20-components/frontmatter.md) | explanation | 3 |  |
 | `init` | [Init scaffolder](20-components/init.md) | explanation | 3 |  |
 | `languages` | [Language profiles](20-components/languages.md) | reference | 3 |  |
-| `llm` | [LLM Client](20-components/llm.md) | explanation | 3 |  |
 | `new-list-regen` | [New / List / Regen / Fix commands](20-components/new-list-regen.md) | explanation | 3 |  |
 | `refs` | [Refs backlink and symbol query](20-components/refs.md) | explanation | 3 |  |
 | `seed` | [Seed command](20-components/seed.md) | explanation | 3 |  |
