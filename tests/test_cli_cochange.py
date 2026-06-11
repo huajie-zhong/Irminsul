@@ -203,3 +203,16 @@ def test_diff_and_base_ref_are_mutually_exclusive(tmp_path: Path) -> None:
     )
     assert result.exit_code == 2
     assert "mutually exclusive" in result.output
+
+
+def test_cochange_fires_for_deleted_claimed_file(tmp_path: Path) -> None:
+    repo_root, base = _seed_repo(tmp_path)
+    (repo_root / "app" / "alpha.py").unlink()
+    _commit(repo_root, "delete claimed source")
+    result = runner.invoke(
+        app, ["check", "--diff", base, "--format", "json", "--path", str(repo_root)]
+    )
+    data = json.loads(result.output)
+    cochange = [f for f in data["findings"] if f["check"] == "co-change"]
+    assert len(cochange) == 1
+    assert "app/alpha.py" in cochange[0]["message"]

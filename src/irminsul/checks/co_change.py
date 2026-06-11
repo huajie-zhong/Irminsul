@@ -14,7 +14,6 @@ from __future__ import annotations
 from typing import Final
 
 from irminsul.checks.base import Finding, Severity
-from irminsul.checks.globs import walk_source_files
 from irminsul.checks.uniqueness import most_specific_claims, resolve_claims
 from irminsul.docgraph import DocGraph, DocNode
 
@@ -32,7 +31,10 @@ def run_co_change(graph: DocGraph, changed: frozenset[str]) -> list[Finding]:
     if graph.config is None or graph.repo_root is None:
         return []
 
-    source_files, _missing = walk_source_files(graph.repo_root, graph.config.paths.source_roots)
+    # Resolve claims against the changed set directly rather than walking the
+    # whole source tree: faster on large repos, and a deleted claimed file
+    # (absent from any walk) still triggers enforcement on its owning doc.
+    source_files = [(graph.repo_root / f, f) for f in sorted(changed)]
     claims_by_file = resolve_claims(graph, source_files)
 
     unreflected_by_doc: dict[str, tuple[DocNode, list[str]]] = {}
