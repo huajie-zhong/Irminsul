@@ -766,6 +766,37 @@ def context_command(
     raise typer.Exit(code=1 if context_report_should_fail(report) else 0)
 
 
+@app.command("orient")
+def orient_command(
+    fmt: Annotated[
+        str,
+        typer.Option("--format", help="Output format: plain or json."),
+    ] = "plain",
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path",
+            help="Root of the codebase to inspect. Defaults to current directory.",
+        ),
+    ] = Path("."),
+) -> None:
+    """Orient an agent in this repo: structure, doc totals, entry docs, and commands.
+
+    The recommended first call for agents. Builds the doc graph once and runs
+    no checks, so it is fast; every field is also available as stable JSON via
+    `--format json`.
+    """
+    from irminsul.orient import build_orient_report, format_orient_plain, orient_report_to_json
+
+    if fmt not in ("plain", "json"):
+        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+        raise typer.Exit(code=2)
+
+    repo_root, config = _load_repo(path)
+    report = build_orient_report(repo_root, config)
+    typer.echo(orient_report_to_json(report) if fmt == "json" else format_orient_plain(report))
+
+
 @app.command("refs")
 def refs_command(
     target: Annotated[
@@ -946,6 +977,40 @@ def surface_command(
     run_surface(repo_root, config, kind, source, fmt)
 
 
+@app.command("mcp")
+def mcp_command(
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path",
+            help="Root of the codebase to serve. Defaults to current directory.",
+        ),
+    ] = Path("."),
+) -> None:
+    """Serve the doc graph to AI agents over the Model Context Protocol (stdio).
+
+    Read-only: every tool returns the same JSON the CLI prints with
+    `--format json`. Requires the optional `mcp` extra.
+    """
+    import importlib.util
+
+    if importlib.util.find_spec("mcp") is None:
+        typer.echo(
+            typer.style(
+                "The MCP server needs the optional 'mcp' dependency. "
+                "Install it with: pip install 'irminsul[mcp]'",
+                fg="red",
+            ),
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    from irminsul.mcp_server import create_server
+
+    repo_root, _ = _load_repo(path)
+    create_server(repo_root).run()
+
+
 @app.command("anchors")
 def anchors_command(
     re_pin: Annotated[
@@ -955,6 +1020,10 @@ def anchors_command(
             help="Rewrite anchor hashes to the current code (acknowledge after re-reading).",
         ),
     ] = False,
+    fmt: Annotated[
+        str,
+        typer.Option("--format", help="Output format for the report: plain or json."),
+    ] = "plain",
     path: Annotated[Path, typer.Option("--path")] = Path("."),
 ) -> None:
     """Report or re-pin anchored prose claims.
@@ -964,6 +1033,10 @@ def anchors_command(
     """
     from irminsul.anchors import repin_text
     from irminsul.checks.claim_anchor import ClaimAnchorCheck
+
+    if fmt not in ("plain", "json"):
+        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+        raise typer.Exit(code=2)
 
     repo_root, config = _load_repo(path)
     graph = build_graph(repo_root, config)
@@ -984,6 +1057,9 @@ def anchors_command(
         raise typer.Exit(code=0)
 
     findings = sort_findings(ClaimAnchorCheck().run(graph))
+    if fmt == "json":
+        typer.echo(_findings_to_json(findings, summarize(findings)))
+        return
     for finding in findings:
         _print_finding(finding)
     typer.echo(f"{len(findings)} anchor finding(s)")
