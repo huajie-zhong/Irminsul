@@ -1066,7 +1066,16 @@ def new_component(
 
         # Component docs live at <docs_root>/<layer>/<slug>.md, so the link
         # back to repo root climbs the docs_root depth plus the layer folder.
-        link_prefix = "../" * (len(Path(config.paths.docs_root).parts) + 1)
+        # Resolve relative to repo_root so absolute or dotted docs_root values
+        # still yield the right depth.
+        try:
+            docs_rel = (
+                (repo_root / config.paths.docs_root).resolve().relative_to(repo_root.resolve())
+            )
+            docs_depth = len(docs_rel.parts)
+        except ValueError:
+            docs_depth = len(Path(config.paths.docs_root).parts)
+        link_prefix = "../" * (docs_depth + 1)
         contributing: set[str] = set()
         for kind in ("cli", "http", "env-vars", "exports"):
             seen: set[str] = set()
