@@ -183,3 +183,23 @@ def test_cochange_with_github_format(tmp_path: Path) -> None:
     )
     assert "app/alpha.py" in annotations[0]
     assert "0 errors, 1 warning" in lines[-1]
+
+
+def test_diff_and_base_ref_are_mutually_exclusive(tmp_path: Path) -> None:
+    repo_root, base = _seed_repo(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "check",
+            "--diff",
+            base,
+            "--base-ref",
+            base,
+            "--head-ref",
+            "HEAD",
+            "--path",
+            str(repo_root),
+        ],
+    )
+    assert result.exit_code == 2
+    assert "mutually exclusive" in result.output

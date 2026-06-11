@@ -690,32 +690,29 @@ def check(
     config_path = find_config(repo_root)
     config = load(config_path)
 
+    if diff is not None and base_ref is not None:
+        typer.echo(typer.style("--diff and --base-ref/--head-ref are mutually exclusive", fg="red"))
+        raise typer.Exit(code=2)
+
     co_change_paths: frozenset[str] | None = None
+    co_change_range: tuple[str, str] | None = None
     if diff is not None:
-        co_change_paths = diff_name_only(repo_root, diff, "HEAD")
+        co_change_range = (diff, "HEAD")
+    elif base_ref is not None and head_ref is not None:
+        co_change_range = (base_ref, head_ref)
+    if co_change_range is not None:
+        co_change_paths = diff_name_only(repo_root, *co_change_range)
         if co_change_paths is None:
             typer.echo(
                 typer.style(
-                    f"could not compute `git diff {diff}...HEAD`; "
-                    f"is '{diff}' a valid ref in this repository?",
+                    f"could not compute `git diff {co_change_range[0]}...{co_change_range[1]}`; "
+                    "are both refs valid in this repository?",
                     fg="red",
                 )
             )
             raise typer.Exit(code=2)
 
-    diff_changed: frozenset[str] | None = None
-    if base_ref is not None and head_ref is not None:
-        diff_changed = diff_name_only(repo_root, base_ref, head_ref)
-        if diff_changed is None:
-            typer.echo(
-                typer.style(
-                    f"could not compute diff {base_ref}...{head_ref}; skipping diff-aware checks",
-                    fg="yellow",
-                ),
-                err=True,
-            )
-
-    graph = build_graph(repo_root, config, now=now_date, diff_changed_paths=diff_changed)
+    graph = build_graph(repo_root, config, now=now_date)
 
     findings: list[Finding] = []
     findings.extend(
