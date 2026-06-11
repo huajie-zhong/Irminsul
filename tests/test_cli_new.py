@@ -210,6 +210,36 @@ def test_new_force_overwrites(tmp_path: Path) -> None:
     assert result.exit_code == 0
 
 
+def test_new_component_glob_describes_does_not_false_warn(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    (repo / "src" / "pkg").mkdir(parents=True)
+    (repo / "src" / "pkg" / "a.py").write_text("x = 1\n", encoding="utf-8")
+    result = runner.invoke(
+        app,
+        [
+            "new",
+            "component",
+            "Pkg",
+            "--describes",
+            "src/pkg/**/*.py",
+            "--path",
+            str(repo),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "does not exist" not in result.output
+
+
+def test_new_component_glob_matching_nothing_still_warns(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    result = runner.invoke(
+        app,
+        ["new", "component", "Ghost", "--describes", "src/ghost/**/*.py", "--path", str(repo)],
+    )
+    assert result.exit_code == 0, result.output
+    assert "does not exist" in result.output
+
+
 _TYPER_TOOL = (
     "import typer\n"
     "app = typer.Typer()\n"

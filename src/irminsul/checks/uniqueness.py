@@ -69,13 +69,13 @@ def resolve_claims(
     here.
     """
     claims_by_file: dict[str, list[tuple[DocNode, str, tuple[int, int, int]]]] = defaultdict(list)
+    displays = [display for _, display in source_files]
     for node in graph.nodes.values():
         for pattern in node.frontmatter.describes:
             spec = GitIgnoreSpec.from_lines([pattern])
             score = specificity(pattern)
-            for _, display in source_files:
-                if spec.match_file(display):
-                    claims_by_file[display].append((node, pattern, score))
+            for display in spec.match_files(displays):
+                claims_by_file[display].append((node, pattern, score))
     return claims_by_file
 
 
