@@ -6,6 +6,7 @@ Two scripts in `pyproject.toml` (`irminsul` and `irm`) both bind to `app`.
 from __future__ import annotations
 
 import datetime as _dt
+import glob
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -1017,15 +1018,93 @@ def new_adr(
 @_new_app.command("component")
 def new_component(
     title: Annotated[str, typer.Argument(help="Name of the component.")],
+    describes: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--describes",
+            help="Source path the component claims (repeatable, stored repo-relative).",
+        ),
+    ] = None,
+    tests: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--tests",
+            help="Test path for the component (repeatable, stored repo-relative).",
+        ),
+    ] = None,
+    from_surface: Annotated[
+        bool,
+        typer.Option(
+            "--from-surface",
+            help="Pre-fill a Surface section derived from the --describes paths.",
+        ),
+    ] = False,
     force: Annotated[bool, typer.Option("--force")] = False,
     path: Annotated[Path, typer.Option("--path")] = Path("."),
 ) -> None:
     """Scaffold a new component doc."""
-    from irminsul.new.command import NewSpec, write_new
+    from irminsul.new.command import NewSpec, normalize_claim_path, write_new
 
     repo_root = path.resolve()
     config = load(find_config(repo_root))
-    spec = NewSpec(kind="component", title=title, extra={})
+    describes_rel = [normalize_claim_path(repo_root, value) for value in describes or []]
+    tests_rel = [normalize_claim_path(repo_root, value) for value in tests or []]
+    for rel in [*describes_rel, *tests_rel]:
+        # describes/tests values may be glob patterns; a literal existence
+        # check would false-warn on every wildcard.
+        if not (repo_root / rel).exists() and not glob.glob(str(repo_root / rel), recursive=True):
+            typer.echo(typer.style(f"warning: path does not exist: {rel}", fg="yellow"))
+
+    surface_groups: list[dict[str, object]] = []
+    if from_surface:
+        if not describes_rel:
+            typer.echo(
+                typer.style("--from-surface requires at least one --describes path", fg="red")
+            )
+            raise typer.Exit(code=2)
+        from irminsul.surface import derive_surface
+
+        # Component docs live at <docs_root>/<layer>/<slug>.md, so the link
+        # back to repo root climbs the docs_root depth plus the layer folder.
+        # Resolve relative to repo_root so absolute or dotted docs_root values
+        # still yield the right depth.
+        try:
+            docs_rel = (
+                (repo_root / config.paths.docs_root).resolve().relative_to(repo_root.resolve())
+            )
+            docs_depth = len(docs_rel.parts)
+        except ValueError:
+            docs_depth = len(Path(config.paths.docs_root).parts)
+        link_prefix = "../" * (docs_depth + 1)
+        contributing: set[str] = set()
+        for kind in ("cli", "http", "env-vars", "exports"):
+            seen: set[str] = set()
+            rows: list[dict[str, str]] = []
+            for rel in describes_rel:
+                for item in derive_surface(repo_root, config, kind, rel):
+                    if item.identity in seen:
+                        continue
+                    seen.add(item.identity)
+                    contributing.add(rel)
+                    display = item.display or rel
+                    rows.append(
+                        {
+                            "identity": item.identity,
+                            "display": display,
+                            "link": f"{link_prefix}{display}",
+                        }
+                    )
+            if rows:
+                surface_groups.append({"kind": kind, "rows": rows})
+        for rel in describes_rel:
+            if rel not in contributing:
+                typer.echo(typer.style(f"note: no derivable surface for: {rel}", fg="yellow"))
+
+    spec = NewSpec(
+        kind="component",
+        title=title,
+        extra={"describes": describes_rel, "tests": tests_rel, "surface": surface_groups},
+    )
     try:
         dest = write_new(repo_root, spec, config, force=force)
     except FileExistsError as e:
@@ -1085,12 +1164,25 @@ def list_stale(
 @_list_app.command("undocumented")
 def list_undocumented(
     fmt: Annotated[str, typer.Option("--format")] = "plain",
+    all_files: Annotated[
+        bool,
+        typer.Option(
+            "--all",
+            help=(
+                "List every source file with no doc claim, ignoring the "
+                "covered-directory heuristic, grouped by directory."
+            ),
+        ),
+    ] = False,
     path: Annotated[Path, typer.Option("--path")] = Path("."),
 ) -> None:
-    """List source files in covered directories that no doc claims."""
+    """List source files in covered directories that no doc claims.
+
+    With --all, list every unclaimed source file regardless of coverage.
+    """
     from irminsul.listing.command import list_undocumented as _list_undocumented
 
-    _list_undocumented(path.resolve(), fmt=fmt)
+    _list_undocumented(path.resolve(), fmt=fmt, all_files=all_files)
 
 
 @_list_app.command("lifecycle")

@@ -4,11 +4,21 @@ title: "{{ title }}"
 audience: explanation
 tier: 3
 status: draft
-describes: []
-tests: []
+describes:{% if not describes %} []{% else %}{% for item in describes %}
+  - "{{ item }}"{% endfor %}{% endif %}
+tests:{% if not tests %} []{% else %}{% for item in tests %}
+  - "{{ item }}"{% endfor %}{% endif %}
 ---
 
 # {{ title }}
+{% if surface %}
+## Surface
 
+Derived from the claimed sources at scaffold time.
+{% for group in surface %}
+### {{ group.kind }}
+
+{% for row in group.rows %}- `{{ row.identity }}` — [`{{ row.display }}`]({{ row.link }})
+{% endfor %}{% endfor %}{% endif %}
 ## Scope & Limitations
 <!-- Describe what this component does NOT do. -->
