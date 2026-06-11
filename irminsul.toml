@@ -4,13 +4,6 @@ project_name = "Irminsul"
 docs_root = "docs"
 source_roots = ["src"]
 
-[tiers]
-stable = [
-    "docs/00-foundation/**",
-    "docs/10-architecture/**",
-    "docs/50-decisions/**",
-]
-
 [checks]
 hard = [
     "frontmatter",
