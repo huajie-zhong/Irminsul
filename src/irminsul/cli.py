@@ -1045,9 +1045,7 @@ def new_component(
     for rel in [*describes_rel, *tests_rel]:
         # describes/tests values may be glob patterns; a literal existence
         # check would false-warn on every wildcard.
-        if not (repo_root / rel).exists() and not glob.glob(
-            str(repo_root / rel), recursive=True
-        ):
+        if not (repo_root / rel).exists() and not glob.glob(str(repo_root / rel), recursive=True):
             typer.echo(typer.style(f"warning: path does not exist: {rel}", fg="yellow"))
     spec = NewSpec(
         kind="component",
