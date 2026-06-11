@@ -127,7 +127,11 @@ def last_commit_time_any_repo(path: Path, docs_root: Path) -> GitTime | None:
     if gt.when is not None:
         return gt
     nested_root = git_root_for(path)
-    if nested_root is None or nested_root.resolve() == docs_root.resolve():
+    if (
+        nested_root is None
+        or nested_root == docs_root
+        or nested_root.resolve() == docs_root.resolve()
+    ):
         return gt
     return last_commit_time(nested_root, path)
 
