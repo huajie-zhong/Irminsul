@@ -59,6 +59,7 @@ class Paths(BaseModel):
 
     docs_root: str = "docs"
     source_roots: list[str] = Field(default_factory=lambda: ["src", "app", "lib"])
+    baseline: str = ".irminsul-baseline.json"
 
 
 class Tiers(BaseModel):
