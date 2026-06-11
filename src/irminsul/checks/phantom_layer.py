@@ -1,4 +1,10 @@
-"""PhantomLayerCheck — directories that have only INDEX.md and no content docs."""
+"""PhantomLayerCheck — directories that have only INDEX.md and no content docs.
+
+A directory whose INDEX.md carries `status: draft` is exempt: a draft INDEX
+marks a layer that is deliberately under construction (every freshly
+scaffolded repo starts this way). The warning fires once the INDEX claims to
+be stable while the layer is still hollow.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +13,7 @@ from typing import ClassVar
 
 from irminsul.checks.base import Finding, Severity
 from irminsul.docgraph import DocGraph
+from irminsul.frontmatter import StatusEnum
 
 
 class PhantomLayerCheck:
@@ -27,6 +34,10 @@ class PhantomLayerCheck:
             non_index = [f for f in md_files if f.name != "INDEX.md"]
             if md_files and not non_index:
                 rel = d.relative_to(graph.repo_root).as_posix()
+                index_node = graph.by_path.get(Path(rel) / "INDEX.md")
+                if index_node is not None and index_node.frontmatter.status == StatusEnum.draft:
+                    # Draft INDEX = layer under construction, not navigation rot.
+                    continue
                 out.append(
                     Finding(
                         check=self.name,

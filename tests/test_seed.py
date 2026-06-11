@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -39,6 +40,10 @@ def _fresh_repo(tmp_path: Path) -> Path:
 
 def _seed_no_interactive(repo: Path, *extra: str) -> object:
     return runner.invoke(app, ["seed", "--no-interactive", *_FLAGS, *extra, "--path", str(repo)])
+
+
+def _git(repo: Path, *args: str) -> None:
+    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True)
 
 
 def test_seed_with_flags_writes_foundation_and_anchors(tmp_path: Path) -> None:
@@ -78,6 +83,52 @@ def test_seeded_docs_parse_cleanly(tmp_path: Path) -> None:
     assert graph.parse_failures == []
     assert graph.missing_frontmatter == []
     assert "0001-initial-direction" in graph.nodes
+
+
+def test_seed_lists_anchoring_rfc_in_rfc_index(tmp_path: Path) -> None:
+    repo = _fresh_repo(tmp_path)
+    assert _seed_no_interactive(repo).exit_code == 0
+
+    index = (repo / "docs/80-evolution/rfcs/INDEX.md").read_text(encoding="utf-8")
+    assert index.count("0001-initial-direction.md") == 1
+
+    # Re-appending is idempotent: a second seed pass on the same anchored repo
+    # (via --reseed) must not duplicate the bullet.
+    assert _seed_no_interactive(repo, "--reseed").exit_code == 0
+    index = (repo / "docs/80-evolution/rfcs/INDEX.md").read_text(encoding="utf-8")
+    assert index.count("0001-initial-direction.md") == 1
+
+
+def test_day_one_fresh_seeded_repo_reports_zero_findings(tmp_path: Path) -> None:
+    """The acceptance contract for the scaffold: a freshly initialized and
+    seeded repo must start life with 0 errors and 0 warnings under the
+    configured profile. Day-one warnings teach adopters to ignore warnings."""
+    repo = _fresh_repo(tmp_path)
+    assert _seed_no_interactive(repo).exit_code == 0
+
+    _git(repo, "init")
+    _git(repo, "add", "-A")
+    _git(
+        repo,
+        "-c",
+        "user.name=Day One",
+        "-c",
+        "user.email=day-one@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-m",
+        "Adopt Irminsul",
+    )
+
+    result = runner.invoke(
+        app,
+        ["check", "--profile", "configured", "--format", "json", "--path", str(repo)],
+    )
+    assert result.exit_code == 0, result.output
+    report = json.loads(result.output)
+    assert report["summary"]["errors"] == 0
+    assert report["summary"]["warnings"] == 0, report["findings"]
 
 
 def test_seed_from_json(tmp_path: Path) -> None:
@@ -227,7 +278,8 @@ def test_init_no_interactive_does_not_seed(tmp_path: Path) -> None:
     repo = _fresh_repo(tmp_path)
     principles = (repo / "docs/00-foundation/principles.md").read_text(encoding="utf-8")
     assert "Replace this paragraph with your own principle" in principles
-    assert not (repo / "docs/80-evolution/rfcs").exists()
+    # The scaffold ships the RFC index, but no anchoring RFC was seeded.
+    assert not (repo / "docs/80-evolution/rfcs/0001-initial-direction.md").exists()
 
 
 def test_init_fresh_interactive_offers_seed(tmp_path: Path) -> None:

@@ -36,3 +36,15 @@ def test_finding_has_path(fixture_repo: Callable[[str], Path]) -> None:
     assert len(findings) == 1
     assert findings[0].path is not None
     assert str(findings[0].path).endswith("INDEX.md")
+
+
+def test_draft_index_marks_layer_under_construction(fixture_repo: Callable[[str], Path]) -> None:
+    """A hollow directory whose INDEX.md is `status: draft` is not flagged.
+
+    The fixture has two hollow layers: `30-workflows` (stable INDEX, flagged)
+    and `60-operations` (draft INDEX, exempt).
+    """
+    repo = fixture_repo("bad-phantom")
+    findings = _findings(repo)
+    assert len(findings) == 1
+    assert "60-operations" not in findings[0].message
