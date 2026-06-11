@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import json
+from collections import defaultdict
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import typer
 
 from irminsul.checks.base import Finding, Severity
+from irminsul.checks.globs import walk_source_files
 from irminsul.checks.orphans import OrphansCheck
 from irminsul.checks.stale_reaper import StaleReaperCheck
-from irminsul.checks.uniqueness import UniquenessCheck
+from irminsul.checks.uniqueness import OMISSION_SKIP, UniquenessCheck, resolve_claims
 from irminsul.config import find_config, load
 from irminsul.docgraph import build_graph
 
@@ -26,14 +28,55 @@ def list_stale(repo_root: Path, *, fmt: str) -> None:
     _print(StaleReaperCheck().run(graph), fmt)
 
 
-def list_undocumented(repo_root: Path, *, fmt: str) -> None:
-    graph = build_graph(repo_root, load(find_config(repo_root)))
-    findings = [
-        f
-        for f in UniquenessCheck().run(graph)
-        if f.severity == Severity.warning and "no doc claims it" in f.message
-    ]
-    _print(findings, fmt)
+def list_undocumented(repo_root: Path, *, fmt: str, all_files: bool = False) -> None:
+    config = load(find_config(repo_root))
+    graph = build_graph(repo_root, config)
+    if not all_files:
+        findings = [
+            f
+            for f in UniquenessCheck().run(graph)
+            if f.severity == Severity.warning and "no doc claims it" in f.message
+        ]
+        _print(findings, fmt)
+        return
+
+    source_files, _missing = walk_source_files(repo_root, config.paths.source_roots)
+    claims = resolve_claims(graph, source_files)
+    unclaimed = sorted(
+        display
+        for _, display in source_files
+        if display not in claims and not OMISSION_SKIP.match_file(display)
+    )
+
+    # Group by parent directory; directories with the most undocumented files
+    # first, so a brownfield adopter knows where to start.
+    groups: dict[str, list[str]] = defaultdict(list)
+    for source_file in unclaimed:
+        groups[str(PurePosixPath(source_file).parent)].append(source_file)
+    ordered = sorted(groups.items(), key=lambda item: (-len(item[1]), item[0]))
+
+    if fmt == "json":
+        data = [
+            {
+                "check": "uniqueness",
+                "severity": "warning",
+                "message": f"source file '{source_file}' has no doc claim",
+                "path": source_file,
+                "dir": directory,
+                "doc_id": None,
+            }
+            for directory, files in ordered
+            for source_file in files
+        ]
+        typer.echo(json.dumps(data, indent=2))
+        return
+
+    for directory, files in ordered:
+        typer.echo(f"{directory} ({len(files)} undocumented)")
+        for source_file in files:
+            typer.echo(f"  {source_file}")
+    if not unclaimed:
+        typer.echo("(none)")
 
 
 @dataclass(frozen=True)
