@@ -70,6 +70,7 @@ automatically once any doc declares one.
 | `new-list-regen` | [New / List / Regen / Fix commands](20-components/new-list-regen.md) | explanation | 3 |  |
 | `refs` | [Refs backlink and symbol query](20-components/refs.md) | explanation | 3 |  |
 | `seed` | [Seed command](20-components/seed.md) | explanation | 3 |  |
+| `status` | [Status command](20-components/status.md) | explanation | 3 | One-glance digest of docs inventory, source-file coverage, and findings. |
 | `surface` | [Surface extraction & on-demand derivation](20-components/surface.md) | explanation | 3 |  |
 
 ### 30-workflows
