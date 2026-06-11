@@ -441,6 +441,37 @@ def _findings_to_json(findings: list[Finding], counts: dict[Severity, int]) -> s
     )
 
 
+_GITHUB_COMMAND = {
+    Severity.error: "error",
+    Severity.warning: "warning",
+    Severity.info: "notice",
+}
+
+
+def _escape_github_data(value: str) -> str:
+    """Escape workflow-command message data per the GitHub Actions spec."""
+    return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
+def _escape_github_property(value: str) -> str:
+    """Escape workflow-command property values (data escapes plus ',' and ':')."""
+    return _escape_github_data(value).replace(",", "%2C").replace(":", "%3A")
+
+
+def _github_annotation(finding: Finding) -> str:
+    """One `::error|::warning|::notice` workflow command per finding."""
+    props: list[str] = []
+    if finding.path is not None:
+        props.append(f"file={_escape_github_property(finding.path.as_posix())}")
+    if finding.line is not None:
+        props.append(f"line={finding.line}")
+    props.append("title=" + _escape_github_property(f"irminsul {finding.check}"))
+    data = finding.message
+    if finding.suggestion:
+        data = f"{data} — {finding.suggestion}"
+    return f"::{_GITHUB_COMMAND[finding.severity]} {','.join(props)}::{_escape_github_data(data)}"
+
+
 def _print_summary(counts: dict[Severity, int]) -> None:
     parts: list[str] = [
         f"{counts[Severity.error]} error{'s' if counts[Severity.error] != 1 else ''}",
@@ -590,8 +621,18 @@ def check(
     ] = False,
     fmt: Annotated[
         str,
-        typer.Option("--format", help="Output format: plain or json."),
+        typer.Option("--format", help="Output format: plain, json, or github."),
     ] = "plain",
+    diff: Annotated[
+        str | None,
+        typer.Option(
+            "--diff",
+            help=(
+                "Base git ref for co-change enforcement: warn when source files "
+                "changed in <base>...HEAD without their owning docs."
+            ),
+        ),
+    ] = None,
     path: Annotated[
         Path,
         typer.Option(
@@ -625,8 +666,10 @@ def check(
     ] = None,
 ) -> None:
     """Run the configured checks. Errors exit non-zero."""
-    if fmt not in ("plain", "json"):
-        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+    if fmt not in ("plain", "json", "github"):
+        typer.echo(
+            typer.style(f"unknown --format '{fmt}'; expected plain, json, or github", fg="red")
+        )
         raise typer.Exit(code=2)
 
     if (base_ref is None) != (head_ref is None):
@@ -646,6 +689,19 @@ def check(
     repo_root = path.resolve()
     config_path = find_config(repo_root)
     config = load(config_path)
+
+    co_change_paths: frozenset[str] | None = None
+    if diff is not None:
+        co_change_paths = diff_name_only(repo_root, diff, "HEAD")
+        if co_change_paths is None:
+            typer.echo(
+                typer.style(
+                    f"could not compute `git diff {diff}...HEAD`; "
+                    f"is '{diff}' a valid ref in this repository?",
+                    fg="red",
+                )
+            )
+            raise typer.Exit(code=2)
 
     diff_changed: frozenset[str] | None = None
     if base_ref is not None and head_ref is not None:
@@ -683,12 +739,21 @@ def check(
         )
     )
 
+    if co_change_paths is not None:
+        from irminsul.checks.co_change import run_co_change
+
+        findings.extend(run_co_change(graph, co_change_paths))
+
     findings = sort_findings(findings)
     counts = summarize(findings)
     fail = counts[Severity.error] > 0 or (strict and counts[Severity.warning] > 0)
 
     if fmt == "json":
         typer.echo(_findings_to_json(findings, counts))
+    elif fmt == "github":
+        for finding in findings:
+            typer.echo(_github_annotation(finding))
+        _print_summary(counts)
     else:
         for finding in findings:
             _print_finding(finding)
