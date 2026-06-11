@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from collections import Counter
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from irminsul.config import IrminsulConfig
 from irminsul.docgraph import build_graph
@@ -116,7 +116,7 @@ def build_orient_report(repo_root: Path, config: IrminsulConfig) -> OrientReport
             layer_counts[rel.parts[0]] += 1
 
     entry_docs = [
-        f"{docs_root}/{name}"
+        (PurePosixPath(docs_root) / name).as_posix()
         for name in _ENTRY_DOC_NAMES
         if (repo_root / docs_root / name).is_file()
     ]
