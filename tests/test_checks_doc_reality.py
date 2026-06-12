@@ -18,11 +18,16 @@ from irminsul.docgraph import build_graph
 from irminsul.regen.agents_md import regen_agents_md
 
 
-def _write_config(repo: Path) -> None:
-    (repo / "irminsul.toml").write_text(
-        'project_name = "doc-reality"\n[paths]\ndocs_root = "docs"\nsource_roots = ["src"]\n',
-        encoding="utf-8",
-    )
+def _write_config(repo: Path, *, coverage_rule: bool = False) -> None:
+    base = 'project_name = "doc-reality"\n[paths]\ndocs_root = "docs"\nsource_roots = ["src"]\n'
+    if coverage_rule:
+        base += (
+            "[[checks.terminology_overload.rules]]\n"
+            'term = "coverage"\n'
+            'explicit_phrases = ["source ownership coverage"]\n'
+            'suggestion = "Say source ownership coverage"\n'
+        )
+    (repo / "irminsul.toml").write_text(base, encoding="utf-8")
 
 
 def _write_doc(
@@ -366,7 +371,7 @@ def test_prose_file_reference_flags_unclosed_block_ignore(tmp_path: Path) -> Non
 
 
 def test_terminology_overload_flags_ambiguous_coverage(tmp_path: Path) -> None:
-    _write_config(tmp_path)
+    _write_config(tmp_path, coverage_rule=True)
     _write_doc(
         tmp_path,
         "docs/20-components/widget.md",
@@ -381,7 +386,7 @@ def test_terminology_overload_flags_ambiguous_coverage(tmp_path: Path) -> None:
 
 
 def test_terminology_overload_allows_explicit_coverage(tmp_path: Path) -> None:
-    _write_config(tmp_path)
+    _write_config(tmp_path, coverage_rule=True)
     _write_doc(
         tmp_path,
         "docs/20-components/widget.md",
