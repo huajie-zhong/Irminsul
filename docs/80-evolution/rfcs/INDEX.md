@@ -37,3 +37,4 @@ In-flight proposals. See [`80-evolution`](../INDEX.md) for the RFC lifecycle.
 - [`0024-anchored-prose-claims`](0024-anchored-prose-claims.md) — Anchored prose claims with pinned provenance
 - [`0025-retire-render-subsystem`](0025-retire-render-subsystem.md) — Retire the render and reference-stub subsystem
 - [`0026-retire-tier-1-and-reference-layer`](0026-retire-tier-1-and-reference-layer.md) — Retire Tier 1 and the dedicated reference layer
+- [`0027-self-governance-affordances`](0027-self-governance-affordances.md) — Remind authors to govern derivable surfaces (push, not just pull); extend `liar` to code

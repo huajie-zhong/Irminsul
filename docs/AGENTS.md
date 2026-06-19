@@ -144,6 +144,7 @@ automatically once any doc declares one.
 | `0024-anchored-prose-claims` | [Anchored prose claims (pinned provenance)](80-evolution/rfcs/0024-anchored-prose-claims.md) | explanation | 2 |  |
 | `0025-retire-render-subsystem` | [Retire the render and reference-stub subsystem](80-evolution/rfcs/0025-retire-render-subsystem.md) | explanation | 2 |  |
 | `0026-retire-tier-1-and-reference-layer` | [Retire Tier 1 and the dedicated reference layer](80-evolution/rfcs/0026-retire-tier-1-and-reference-layer.md) | explanation | 2 |  |
+| `0027-self-governance-affordances` | [Self-governance affordances for derivable surfaces](80-evolution/rfcs/0027-self-governance-affordances.md) | explanation | 2 |  |
 | `80-evolution` | [Evolution](80-evolution/INDEX.md) | reference | 4 |  |
 | `patterns` | [Evolution Patterns](80-evolution/patterns.md) | explanation | 2 |  |
 | `rfcs` | [RFCs](80-evolution/rfcs/INDEX.md) | reference | 2 |  |
