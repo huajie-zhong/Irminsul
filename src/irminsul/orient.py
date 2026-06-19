@@ -13,50 +13,13 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
+from irminsul.command_vocabulary import CommandHint, load_vocabulary
 from irminsul.config import IrminsulConfig
 from irminsul.docgraph import build_graph
 
 # Repo-conventional navigation files an agent should read first, in priority
 # order. Only the ones that actually exist on disk are reported.
 _ENTRY_DOC_NAMES = ("AGENTS.md", "README.md", "CONTRIBUTING.md", "GLOSSARY.md")
-
-# Curated command vocabulary teaching an agent the workflow loop. Static by
-# design: the *surface* is derivable (`irminsul surface cli`), but the "when"
-# guidance is intent, which only a human can curate.
-_COMMANDS: tuple[tuple[str, str], ...] = (
-    (
-        "irminsul context --changed",
-        "before and after editing: see which docs own your edits, their tests, and findings",
-    ),
-    (
-        "irminsul context --topic <query>",
-        "find the docs that cover a topic before starting work",
-    ),
-    (
-        "irminsul context <path>",
-        "look up the owning doc, tests, and dependencies for one file",
-    ),
-    (
-        "irminsul refs <doc-or-symbol>",
-        "enumerate inbound references before renaming or moving anything",
-    ),
-    (
-        "irminsul surface <kind> --format json",
-        "derive the current code surface (cli, http, exports, env-vars) instead of trusting prose",
-    ),
-    (
-        "irminsul check --profile=hard --format json",
-        "verify the docs tree before committing; error findings block CI",
-    ),
-    (
-        "irminsul fix",
-        "auto-apply deterministic remediations for fixable findings",
-    ),
-    (
-        "irminsul list undocumented",
-        "find source files in covered directories that no doc claims",
-    ),
-)
 
 
 @dataclass(frozen=True)
@@ -76,12 +39,6 @@ class ChecksSummary:
     hard: list[str]
     soft_deterministic: list[str]
     soft_llm: list[str]
-
-
-@dataclass(frozen=True)
-class CommandHint:
-    command: str
-    when: str
 
 
 @dataclass(frozen=True)
@@ -136,7 +93,7 @@ def build_orient_report(repo_root: Path, config: IrminsulConfig) -> OrientReport
             soft_deterministic=list(config.checks.soft_deterministic),
             soft_llm=list(config.checks.soft_llm),
         ),
-        commands=[CommandHint(command=cmd, when=when) for cmd, when in _COMMANDS],
+        commands=list(load_vocabulary().commands),
     )
 
 

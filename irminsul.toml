@@ -42,6 +42,7 @@ soft_deterministic = [
     "rfc-resolution",
     "decision-updates",
     "inventory-drift",
+    "command-vocabulary",
 ]
 
 [checks.schema_leak]

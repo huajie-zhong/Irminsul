@@ -9,8 +9,10 @@ depends_on:
   - docgraph
 describes:
   - src/irminsul/orient.py
+  - src/irminsul/command_vocabulary.py
 tests:
   - tests/test_cli_orient.py
+  - tests/test_command_vocabulary.py
 summary: The recommended first call for agents — repo structure, doc totals, entry docs, and the command vocabulary as one stable report.
 inventory:
   - kind: cli
@@ -38,4 +40,4 @@ Every agent-facing read command — `orient`, plus the existing `context`, `refs
 
 ## Scope & Limitations
 
-The report is a snapshot of structure, not health: it runs no checks and reports no findings — use the check pipeline for that. The command vocabulary is curated and static; the live command surface is derivable on demand instead (`irminsul surface cli`). Entry docs are detected by filename convention only.
+The report is a snapshot of structure, not health: it runs no checks and reports no findings — use the check pipeline for that. The command vocabulary is curated, not exhaustive: it teaches the edit-verify loop, while the full command surface is derivable on demand (`irminsul surface cli`). It is maintained as a tracked data file — reviewable on its own rather than buried in code — and validated against the live CLI surface by the `command-vocabulary` check, which warns when an entry names a command that no longer exists, when an entry lacks guidance, or when a new top-level command is neither taught nor explicitly omitted. Entry docs are detected by filename convention only.
