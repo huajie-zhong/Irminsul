@@ -18,6 +18,12 @@ inventory:
     source: src/irminsul/cli.py
     items:
       - orient
+      - context
+      - refs
+      - surface
+      - check
+      - fix
+      - list undocumented
 ---
 
 # Agent orientation command
@@ -39,4 +45,4 @@ Every agent-facing read command — `orient`, plus the existing `context`, `refs
 
 ## Scope & Limitations
 
-The report is a snapshot of structure, not health: it runs no checks and reports no findings — use the check pipeline for that. The command vocabulary is curated and static — the full command surface is derivable on demand instead (`irminsul surface cli`) — but its command *identities* are kept honest against that live surface by `tests/test_orient_vocabulary.py`: a renamed or removed command, or a new one that is neither taught nor explicitly omitted, fails the test until the vocabulary is updated. The check is name-based, so it does not catch a command that keeps its name but changes behavior — a stale `when` description is left to human review. Entry docs are detected by filename convention only.
+The report is a snapshot of structure, not health: it runs no checks and reports no findings — use the check pipeline for that. The command vocabulary is curated and static — the full command surface is derivable on demand instead (`irminsul surface cli`) — but its command *identities* are kept honest against that live surface two ways: the `inventory:` block above is governed by the `inventory-drift` check, so a renamed or removed command surfaces in `irminsul check` itself, and `tests/test_orient_vocabulary.py` adds the completeness direction `inventory-drift` deliberately omits — a new command that is neither taught nor explicitly omitted fails CI. Both are name-based, so neither catches a command that keeps its name but changes behavior — a stale `when` description is left to human review. Entry docs are detected by filename convention only.
