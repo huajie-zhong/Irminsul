@@ -38,3 +38,4 @@ In-flight proposals. See [`80-evolution`](../INDEX.md) for the RFC lifecycle.
 - [`0025-retire-render-subsystem`](0025-retire-render-subsystem.md) — Retire the render and reference-stub subsystem
 - [`0026-retire-tier-1-and-reference-layer`](0026-retire-tier-1-and-reference-layer.md) — Retire Tier 1 and the dedicated reference layer
 - [`0027-watched-surfaces`](0027-watched-surfaces.md) — Pin a derivable surface and flag any new/removed/changed item for review; generalizes anchor + inventory-drift
+- [`0028-mcp-tool-surface-governance`](0028-mcp-tool-surface-governance.md) — Govern the MCP tool set as a watched surface so it can't silently drift from the CLI read commands

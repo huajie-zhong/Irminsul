@@ -146,6 +146,7 @@ automatically once any doc declares one.
 | `0025-retire-render-subsystem` | [Retire the render and reference-stub subsystem](80-evolution/rfcs/0025-retire-render-subsystem.md) | explanation | 2 |  |
 | `0026-retire-tier-1-and-reference-layer` | [Retire Tier 1 and the dedicated reference layer](80-evolution/rfcs/0026-retire-tier-1-and-reference-layer.md) | explanation | 2 |  |
 | `0027-watched-surfaces` | [Watched surfaces: pin a derivable surface and flag any change for review](80-evolution/rfcs/0027-watched-surfaces.md) | explanation | 2 |  |
+| `0028-mcp-tool-surface-governance` | [Govern the MCP tool surface as a watched surface](80-evolution/rfcs/0028-mcp-tool-surface-governance.md) | explanation | 2 |  |
 | `80-evolution` | [Evolution](80-evolution/INDEX.md) | reference | 4 |  |
 | `patterns` | [Evolution Patterns](80-evolution/patterns.md) | explanation | 2 |  |
 | `rfcs` | [RFCs](80-evolution/rfcs/INDEX.md) | reference | 2 |  |
