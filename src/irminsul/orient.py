@@ -58,87 +58,9 @@ _COMMANDS: tuple[tuple[str, str], ...] = (
     ),
 )
 
-# Top-level / subcommand identities deliberately *not* taught above — bootstrap,
-# situational, or the orientation command itself. Listing them makes coverage
-# explicit: a genuinely new command surfaces as a drift failure rather than
-# slipping in untaught (see tests/test_orient_vocabulary.py).
-_OMITTED: tuple[str, ...] = (
-    "anchors",
-    "init",
-    "init-docs-only",
-    "list lifecycle",
-    "list orphans",
-    "list stale",
-    "new adr",
-    "new component",
-    "new rfc",
-    "orient",
-    "regen agents-md",
-    "seed",
-)
-
-
-def command_path(display: str) -> str:
-    """The CLI command identity embedded in a vocabulary entry.
-
-    Strips the program token and stops at the first option (``-``) or placeholder
-    (``<``): ``irminsul context --changed`` -> ``context``,
-    ``irminsul list undocumented`` -> ``list undocumented``.
-    """
-    tokens = display.split()
-    if tokens and tokens[0] in ("irminsul", "irm"):
-        tokens = tokens[1:]
-    path: list[str] = []
-    for token in tokens:
-        if token.startswith(("-", "<")):
-            break
-        path.append(token)
-    return " ".join(path)
-
-
-def evaluate_vocabulary(
-    commands: tuple[tuple[str, str], ...],
-    omitted: tuple[str, ...],
-    surface: set[str],
-) -> list[str]:
-    """Compare the curated vocabulary against a live CLI surface (full identities).
-
-    Returns human-readable drift issues; empty means the vocabulary is *accurate*
-    (every taught and omitted command still exists) and *complete* (every command
-    in the surface is either taught or explicitly omitted). Comparison is at full
-    identity granularity, so a new subcommand under an already-taught group is
-    caught. A command that keeps its name but changes behavior is out of scope —
-    no name-based check can see a description go semantically stale.
-    """
-    described: set[str] = set()
-    issues: list[str] = []
-
-    for command, when in commands:
-        path = command_path(command)
-        if not path:
-            issues.append(f"vocabulary entry '{command}' names no command")
-            continue
-        described.add(path)
-        if path not in surface:
-            issues.append(
-                f"vocabulary teaches '{command}' but '{path}' is not a current CLI command"
-            )
-        if not when.strip():
-            issues.append(f"vocabulary entry '{command}' has no guidance")
-
-    for name in omitted:
-        if name not in surface:
-            issues.append(f"omitted command '{name}' is not a current CLI command")
-
-    omitted_set = set(omitted)
-    for identity in sorted(surface):
-        if identity in described or identity in omitted_set:
-            continue
-        issues.append(
-            f"command '{identity}' is neither taught by the vocabulary nor listed as omitted"
-        )
-
-    return issues
+# The command vocabulary's accuracy and completeness is governed by the
+# watched-surface check (RFC 0027) via orient.md's `inventory:` block — every
+# CLI identity must be either taught here or listed under the block's `omit:`.
 
 
 @dataclass(frozen=True)

@@ -1,11 +1,17 @@
-"""InventoryDriftCheck — curated-intent inventory must not name code that is gone.
+"""InventoryDriftCheck — keep a doc's `inventory:` honest against the live surface.
 
 Under "derive, don't materialize" a doc never mirrors a complete code surface; it
 may declare a *curated subset* (`inventory:` frontmatter) of items it deliberately
-calls out. This check verifies each declared item still exists in the code — the
-anti-lie direction only. It never flags items that exist in code but are absent from
-the inventory (that would be the completeness/materialization pressure the principle
-rejects); the on-demand `irminsul surface` query is how you see the full surface.
+calls out. By default this check only verifies each declared item still exists in
+code — the anti-lie direction (RFC 0020). It never demands completeness unless the
+entry opts in.
+
+An entry may opt into being a *watched surface* (RFC 0027), gaining the other two
+directions: with `complete: true` every live identity must be either declared
+(`items`) or deliberately excluded (`omit`), so a *new* surface element is flagged;
+with `fingerprints` each item's AST-normalized code shape is pinned (reusing the
+`irminsul.anchors` hashing behind `claim-anchor`), so a behavior change to a
+still-named item is flagged for re-read and re-pin.
 """
 
 from __future__ import annotations
@@ -14,10 +20,12 @@ from typing import ClassVar
 
 from pathspec import GitIgnoreSpec
 
+from irminsul.anchors import Anchor, resolve
 from irminsul.checks.base import Finding, Severity
 from irminsul.checks.globs import walk_source_files
-from irminsul.docgraph import DocGraph
-from irminsul.inventory import get_extractor
+from irminsul.docgraph import DocGraph, DocNode
+from irminsul.frontmatter import InventoryEntry
+from irminsul.inventory import SurfaceItem, get_extractor
 
 
 class InventoryDriftCheck:
@@ -29,7 +37,7 @@ class InventoryDriftCheck:
             return []
 
         source_files, _ = walk_source_files(graph.repo_root, graph.config.paths.source_roots)
-        cache: dict[tuple[str, tuple[str, ...]], set[str]] = {}
+        cache: dict[tuple[str, tuple[str, ...]], dict[str, SurfaceItem]] = {}
         out: list[Finding] = []
 
         for node in graph.nodes.values():
@@ -69,33 +77,141 @@ class InventoryDriftCheck:
                     continue
 
                 key = (entry.kind, tuple(globs))
-                identities = cache.get(key)
-                if identities is None:
+                by_identity = cache.get(key)
+                if by_identity is None:
                     spec = GitIgnoreSpec.from_lines(globs)
                     matched = [(p, d) for p, d in source_files if spec.match_file(d)]
-                    identities = {
-                        item.identity for item in extractor.extract(matched, graph.config)
+                    by_identity = {
+                        item.identity: item for item in extractor.extract(matched, graph.config)
                     }
-                    cache[key] = identities
+                    cache[key] = by_identity
 
-                for item in entry.items:
-                    if item not in identities:
-                        out.append(
-                            Finding(
-                                check=self.name,
-                                severity=self.default_severity,
-                                message=(
-                                    f"inventory lists {entry.kind} '{item}' but it was "
-                                    "not found in the code it describes"
-                                ),
-                                path=node.path,
-                                doc_id=node.id,
-                                suggestion=(
-                                    "Remove the item, fix its identity, or check the "
-                                    "'source' glob; see `irminsul surface "
-                                    f"{entry.kind}`"
-                                ),
-                            )
+                out.extend(self._check_entry(graph, node, entry, by_identity))
+
+        return out
+
+    def _check_entry(
+        self,
+        graph: DocGraph,
+        node: DocNode,
+        entry: InventoryEntry,
+        by_identity: dict[str, SurfaceItem],
+    ) -> list[Finding]:
+        assert graph.repo_root is not None
+        out: list[Finding] = []
+
+        # Accuracy (default): a declared item must still exist in code.
+        for item in entry.items:
+            if item not in by_identity:
+                out.append(
+                    Finding(
+                        check=self.name,
+                        severity=self.default_severity,
+                        message=(
+                            f"inventory lists {entry.kind} '{item}' but it was "
+                            "not found in the code it describes"
+                        ),
+                        path=node.path,
+                        doc_id=node.id,
+                        suggestion=(
+                            "Remove the item, fix its identity, or check the "
+                            f"'source' glob; see `irminsul surface {entry.kind}`"
+                        ),
+                    )
+                )
+
+        # Completeness (opt-in): every live identity must be declared or omitted.
+        if entry.complete:
+            declared = set(entry.items) | set(entry.omit)
+            for identity in sorted(by_identity):
+                if identity not in declared:
+                    out.append(
+                        Finding(
+                            check=self.name,
+                            severity=self.default_severity,
+                            message=(
+                                f"{entry.kind} '{identity}' exists in code but the "
+                                "watched inventory neither lists nor omits it"
+                            ),
+                            path=node.path,
+                            doc_id=node.id,
+                            suggestion=(
+                                f"Document it in 'items', or add it to 'omit'; see "
+                                f"`irminsul surface {entry.kind}`"
+                            ),
                         )
+                    )
+
+        # An omit entry that no longer names anything live is stale.
+        for omitted in entry.omit:
+            if omitted not in by_identity:
+                out.append(
+                    Finding(
+                        check=self.name,
+                        severity=self.default_severity,
+                        message=(
+                            f"inventory omits {entry.kind} '{omitted}' but it is not "
+                            "in the live surface"
+                        ),
+                        path=node.path,
+                        doc_id=node.id,
+                        suggestion="Remove it from 'omit'",
+                    )
+                )
+
+        # Freshness (opt-in): a pinned item whose code shape changed must be re-read.
+        for identity, pinned in entry.fingerprints.items():
+            live = by_identity.get(identity)
+            if live is None:
+                continue  # covered by the accuracy/completeness directions above
+            if live.symbol is None:
+                out.append(
+                    Finding(
+                        check=self.name,
+                        severity=Severity.info,
+                        message=(
+                            f"{entry.kind} '{identity}' cannot be fingerprinted "
+                            "(no resolvable code symbol)"
+                        ),
+                        path=node.path,
+                        doc_id=node.id,
+                        suggestion="Remove its fingerprint, or use a kind that resolves symbols",
+                    )
+                )
+                continue
+            sym_path, _, sym_name = live.symbol.partition("#")
+            resolution = resolve(
+                graph.repo_root,
+                Anchor(line=0, raw="", path=sym_path, symbol=sym_name or None, pinned=pinned),
+            )
+            if resolution.status != "ok" or resolution.current is None:
+                out.append(
+                    Finding(
+                        check=self.name,
+                        severity=Severity.info,
+                        message=(
+                            f"{entry.kind} '{identity}' fingerprint could not be "
+                            f"resolved ({resolution.status})"
+                        ),
+                        path=node.path,
+                        doc_id=node.id,
+                        suggestion="Check the source path, or remove its fingerprint",
+                    )
+                )
+                continue
+            if resolution.current != pinned:
+                out.append(
+                    Finding(
+                        check=self.name,
+                        severity=self.default_severity,
+                        message=(
+                            f"{entry.kind} '{identity}' changed since its fingerprint "
+                            "was pinned; re-read its docs and re-pin"
+                        ),
+                        path=node.path,
+                        doc_id=node.id,
+                        suggestion="Re-read the item's docs, then run `irminsul anchors --re-pin`",
+                    )
+                )
 
         return out
