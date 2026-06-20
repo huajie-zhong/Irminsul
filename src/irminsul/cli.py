@@ -1042,18 +1042,32 @@ def anchors_command(
     graph = build_graph(repo_root, config)
 
     if re_pin:
-        written = 0
+        from irminsul.checks.globs import walk_source_files
+        from irminsul.inventory.fingerprint import repin_node
+
+        source_files, _ = walk_source_files(repo_root, config.paths.source_roots)
+        anchors_written = 0
+        surfaces_written = 0
         for node in graph.nodes.values():
             abs_path = repo_root / node.path
             try:
                 text = abs_path.read_text(encoding="utf-8")
             except OSError:
                 continue
-            new_text, changed = repin_text(repo_root, text)
-            if changed:
-                abs_path.write_text(new_text, encoding="utf-8")
-                written += changed
-        typer.echo(typer.style(f"re-pinned {written} anchor(s)", fg="green"))
+            text, anchor_changed = repin_text(repo_root, text)
+            text, surface_changed = repin_node(
+                repo_root, config, source_files, node.frontmatter, text
+            )
+            if anchor_changed or surface_changed:
+                abs_path.write_text(text, encoding="utf-8")
+            anchors_written += anchor_changed
+            surfaces_written += surface_changed
+        typer.echo(
+            typer.style(
+                f"re-pinned {anchors_written} anchor(s), {surfaces_written} surface fingerprint(s)",
+                fg="green",
+            )
+        )
         raise typer.Exit(code=0)
 
     findings = sort_findings(ClaimAnchorCheck().run(graph))

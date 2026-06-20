@@ -11,19 +11,31 @@ describes:
   - src/irminsul/orient.py
 tests:
   - tests/test_cli_orient.py
-  - tests/test_orient_vocabulary.py
 summary: The recommended first call for agents — repo structure, doc totals, entry docs, and the command vocabulary as one stable report.
 inventory:
   - kind: cli
     source: src/irminsul/cli.py
+    complete: true
     items:
-      - orient
       - context
       - refs
       - surface
       - check
       - fix
       - list undocumented
+    omit:
+      - anchors
+      - init
+      - init-docs-only
+      - list lifecycle
+      - list orphans
+      - list stale
+      - new adr
+      - new component
+      - new rfc
+      - orient
+      - regen agents-md
+      - seed
 ---
 
 # Agent orientation command
@@ -45,4 +57,4 @@ Every agent-facing read command — `orient`, plus the existing `context`, `refs
 
 ## Scope & Limitations
 
-The report is a snapshot of structure, not health: it runs no checks and reports no findings — use the check pipeline for that. The command vocabulary is curated and static — the full command surface is derivable on demand instead (`irminsul surface cli`) — but its command *identities* are kept honest against that live surface two ways: the `inventory:` block above is governed by the `inventory-drift` check, so a renamed or removed command surfaces in `irminsul check` itself, and `tests/test_orient_vocabulary.py` adds the completeness direction `inventory-drift` deliberately omits — a new command that is neither taught nor explicitly omitted fails CI. Both are name-based, so neither catches a command that keeps its name but changes behavior — a stale `when` description is left to human review. Entry docs are detected by filename convention only.
+The report is a snapshot of structure, not health: it runs no checks and reports no findings — use the check pipeline for that. The command vocabulary is curated and static — the full command surface is derivable on demand instead (`irminsul surface cli`) — but its command *identities* are kept honest against that live surface by the `inventory:` block above, which opts into being a watched surface (`complete: true`): the `inventory-drift` check flags a renamed or removed taught command, a new command that is neither taught (`items`) nor explicitly excluded (`omit`), and a stale `omit` entry — all in `irminsul check` itself. The check is name-based, so it does not catch a command that keeps its name but changes behavior — a stale `when` description is left to human review (or an opt-in `fingerprints` pin). Entry docs are detected by filename convention only.
