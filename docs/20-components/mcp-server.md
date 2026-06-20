@@ -20,6 +20,21 @@ describes:
   - src/irminsul/mcp_server.py
 tests:
   - tests/test_mcp_server.py
+inventory:
+  - kind: mcp
+    source: src/irminsul/mcp_server.py
+    complete: true
+    items:
+      - anchors
+      - check
+      - context_changed
+      - context_for_path
+      - context_for_topic
+      - list_docs
+      - orient
+      - refs
+      - surface
+    omit: []
 ---
 
 # MCP server
@@ -66,3 +81,5 @@ Any other MCP client, via the generic `mcpServers` shape:
 ## Scope & Limitations
 
 Read-only by design: agents that want to mutate the tree (scaffold docs, apply fixes, re-pin anchors) must run the CLI commands directly. Only stdio transport is supported — there is no HTTP/SSE listener, matching the no-server, no-hosted-state principle. LLM-backed advisory checks are excluded even if configured, so an MCP call can never spend API budget.
+
+The tool set above is a [watched surface](../80-evolution/rfcs/0028-mcp-tool-surface-governance.md): the `inventory:` block in this doc's frontmatter opts into completeness (`complete: true`), so the `inventory-drift` check keeps the declared tools honest against the live `@server.tool()` registrations — a tool added, removed, or renamed in `mcp_server.py` is flagged until the list is updated or the tool is added to `omit`. Governance is name-based and internal: it checks the doc's list against the registered tools, not parity with the CLI read commands.

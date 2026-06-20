@@ -54,7 +54,7 @@ def run_surface(
         typer.echo(
             typer.style(
                 f"no extractor for kind '{kind}' "
-                "(built-in: cli, http, exports, env-vars; or declare a generic rule)",
+                "(built-in: cli, http, exports, env-vars, mcp; or declare a generic rule)",
                 fg="red",
             )
         )

@@ -3,9 +3,11 @@ id: 0028-mcp-tool-surface-governance
 title: "Govern the MCP tool surface as a watched surface"
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: accepted
+resolved_by: docs/50-decisions/0015-govern-mcp-tool-surface.md
+required_updates: []
 ---
 
 # RFC 0028: Govern the MCP tool surface as a watched surface
@@ -23,8 +25,8 @@ governing the MCP tool set with the [watched-surface](0027-watched-surfaces.md)
 mechanism so that a new, removed, or renamed tool is flagged for review the same
 way `orient`'s command vocabulary already is.
 
-This is a proposal only. PR #32 ships the (currently ungoverned) `orient`/`anchors`
-MCP tools; implementing this governance is deliberately deferred.
+PR #32 shipped the (initially ungoverned) `orient`/`anchors` MCP tools; this RFC's
+governance was implemented on the follow-up — see [Resolution](#resolution).
 
 ## Motivation
 
@@ -87,12 +89,28 @@ rather than watching one in isolation.
 - **Do nothing** — accept that the MCP tool list is small and hand-reviewed. Cheap
   today, but it is precisely the kind of enumeration that drifts as the CLI grows.
 
-## Unresolved Questions
+## Resolution
 
-- **(a) vs (b)** — dedicated `mcp` extractor, or a generic-regex rule?
-- **Internal consistency vs. CLI parity** — govern one surface, or relate the MCP
-  tool set to the CLI read-command surface?
-- **Freshness** — do RFC 0027 `fingerprints` apply to tools (flag when a tool's
-  underlying query changes), or is completeness (new/removed/renamed) enough?
-- **Sequencing** — does this depend on RFC 0027 Phase 2 (freshness) landing first,
-  or can the completeness-only form ship independently?
+Accepted and implemented; see [`ADR-0015`](../../50-decisions/0015-govern-mcp-tool-surface.md).
+The open questions resolved as:
+
+- **(a) vs (b)** — a **dedicated `mcp` extractor** (`src/irminsul/inventory/mcp.py`,
+  registered in `EXTRACTOR_REGISTRY`). A generic-regex rule is line-oriented and cannot
+  tie a `@server.tool()` decorator to the `def` on the next line, so (b) is unworkable
+  for this surface.
+- **Internal consistency vs. CLI parity** — **internal consistency**: a watched
+  `inventory:` block (`kind: mcp`, `complete: true`) in `mcp-server.md` keeps the
+  declared tool list honest against the registered `@server.tool()` functions. CLI
+  parity would require relating two surfaces — new check machinery beyond the
+  watched-surface primitive — and was deferred.
+- **Freshness** — completeness (new/removed/renamed) is enough; no `fingerprints` are
+  pinned by default. The extractor sets each item's `symbol`, so freshness can be
+  opted into later without code changes.
+- **Sequencing** — moot: RFC 0027 Phase 2 already landed (PR #47), so the full
+  watched-surface mechanism was available; this shipped as a single extractor plus the
+  dogfood block.
+
+Because MCP tool identities are Python function names that shadow CLI command names
+(`check`, `refs`, `surface`, …) which docs legitimately backtick-quote, the `mcp`
+kind is excluded from the `liar` prose heuristic; the surface is governed directly by
+the `inventory:` block instead.

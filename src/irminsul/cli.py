@@ -956,7 +956,7 @@ def surface_command(
     kind: Annotated[
         str,
         typer.Argument(
-            help="Surface kind: cli, http, exports, env-vars (or a configured generic kind)."
+            help="Surface kind: cli, http, exports, env-vars, mcp (or a configured generic kind)."
         ),
     ],
     source: Annotated[

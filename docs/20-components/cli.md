@@ -36,6 +36,7 @@ inventory:
       - fix
       - surface
       - anchors
+      - mcp
       - new adr
       - new component
       - new rfc
