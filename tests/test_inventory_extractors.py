@@ -64,6 +64,24 @@ export default function () {}
 ENV_PY = "import os\nx = os.environ['A_VAR']\ny = os.getenv('B_VAR')\n"
 ENV_TS = "const a = process.env.C_VAR;\nconst b = process.env['D_VAR'];\n"
 
+MCP_SRC = """\
+def create_server(repo_root):
+    server = FastMCP("x")
+
+    @server.tool()
+    def orient() -> str:
+        return ""
+
+    @server.tool()
+    def context_for_path(path: str) -> str:
+        return ""
+
+    def _helper() -> str:
+        return ""
+
+    return server
+"""
+
 
 def _files(tmp_path: Path, name: str, content: str) -> list[tuple[Path, str]]:
     p = tmp_path / name
@@ -132,6 +150,15 @@ def test_http_extractor_keyword_path(tmp_path: Path) -> None:
     src = 'from fastapi import FastAPI\n\napp = FastAPI()\n\n\n@app.get(path="/kw")\ndef h():\n    pass\n'
     ids = _identities(get_extractor("http", cfg), _files(tmp_path, "kw.py", src), cfg)
     assert ids == {"GET /kw"}
+
+
+def test_mcp_extractor_finds_tool_functions(tmp_path: Path) -> None:
+    cfg = IrminsulConfig()
+    ext = get_extractor("mcp", cfg)
+    assert ext is not None
+    ids = _identities(ext, _files(tmp_path, "mcp_server.py", MCP_SRC), cfg)
+    # decorated tools only; the undecorated _helper and create_server are excluded
+    assert ids == {"orient", "context_for_path"}
 
 
 def test_unknown_kind_has_no_extractor() -> None:

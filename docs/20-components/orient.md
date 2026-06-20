@@ -30,6 +30,7 @@ inventory:
       - list lifecycle
       - list orphans
       - list stale
+      - mcp
       - new adr
       - new component
       - new rfc

@@ -59,7 +59,7 @@ class InventoryDriftCheck:
                             severity=Severity.info,
                             message=(
                                 f"inventory kind '{entry.kind}' has no extractor "
-                                "(built-in: cli, http, exports, env-vars; or a generic rule)"
+                                "(built-in: cli, http, exports, env-vars, mcp; or a generic rule)"
                             ),
                             path=node.path,
                             doc_id=node.id,

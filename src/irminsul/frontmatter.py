@@ -79,7 +79,7 @@ class Claim(BaseModel):
 class InventoryEntry(BaseModel):
     """A curated *subset* of a code surface a doc deliberately calls out.
 
-    `kind` selects the extractor (cli/http/exports/env-vars, or a generic kind);
+    `kind` selects the extractor (cli/http/exports/env-vars/mcp, or a generic kind);
     `source` is an optional glob pointing at the code that defines the surface
     (defaults to the doc's `describes`); `items` are the identities the doc claims
     exist. The check verifies each item still exists in code — it never demands the

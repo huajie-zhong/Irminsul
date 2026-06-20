@@ -139,7 +139,7 @@ def surface_json(
     if get_extractor(kind, config) is None:
         raise ValueError(
             f"no extractor for kind '{kind}' "
-            "(built-in: cli, http, exports, env-vars; or declare a generic rule)"
+            "(built-in: cli, http, exports, env-vars, mcp; or declare a generic rule)"
         )
     return surface_items_to_json(derive_surface(repo_root, config, kind, source_glob))
 
