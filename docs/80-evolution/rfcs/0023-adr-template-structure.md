@@ -12,109 +12,120 @@ rfc_state: draft
 
 ## Summary
 
-Standardize the ADR shape: required frontmatter fields, required body
-sections, and a new hard check `adr-structure` that enforces the shape. This
-closes the loop that RFC-0017 (`resolved_by` lifecycle) and RFC-0018
-(`implements` required updates) silently depend on.
+Standardize the ADR shape so the lifecycle checks that already lean on it have
+something real to verify. Two parts: (1) rewrite the ADR template
+(`src/irminsul/new/templates/adr.md.j2`) so new ADRs are structurally complete
+by default, and (2) add a **soft deterministic** check `adr-structure` that
+verifies every ADR carries the required body sections. The check ships soft (a
+warning in `SOFT_REGISTRY`), matching every comparable lifecycle check;
+promotion to a hard gate is deferred under the RFC-0008 warning policy and is
+out of scope here.
 
 ## Motivation
 
-RFC-0017 promotes `resolved_by` to a first-class lifecycle field that must
-point at an ADR with a back-link. RFC-0018 introduces `implements` on ADRs as
-the source-of-truth direction for decision back-links. Both expectations
-assume ADRs have a consistent shape. Today's reality:
+RFC-0017 promotes `resolved_by` to a lifecycle field whose human-readable
+meaning lives in the ADR's `## Status` line (the acceptance date and the
+resolved-RFC link). RFC-0018 treats `implements:` on ADRs as the
+source-of-truth decision back-link. Both assume ADRs share a shape. Today:
 
-- `src/irminsul/new/templates/adr.md.j2` is a barebones template.
-- Existing ADRs under `docs/50-decisions/` (ADR-0001, ADR-0002) vary in
-  structure.
-- Nothing enforces required sections.
-
-Lifecycle checks from RFC-0017 and RFC-0018 can pass on syntactically valid
-but operationally empty ADRs. An accepted RFC could be `resolved_by` an ADR
-that has no `## Decision` section, and nothing would notice.
+- The ADR template (`src/irminsul/new/templates/adr.md.j2`) is barebones:
+  `## Context`, `## Decision`, `## Consequences` only — no `## Status`, no
+  `## Alternatives Considered`.
+- The decision docs under `docs/50-decisions/` vary. Only three sections
+  (`## Context`, `## Decision`, `## Consequences`) appear in every ADR.
+- Nothing enforces section presence, so an accepted RFC can be `resolved_by`
+  an ADR that has no `## Decision` section and nothing notices.
 
 ## Detailed Design
 
-### Required frontmatter
-
-Add these fields to the ADR template and require them via the new check:
-
-```yaml
-implements: ["<rfc-id-or-empty-list>"]
-supersedes: ["<adr-id-or-empty-list>"]
-```
-
-- `implements` is the source-of-truth link to RFCs the ADR implements; the
-  inverse is auto-derived (per RFC-0018). It is already a real, checked field
-  (`decision_updates`).
-- `supersedes` lists prior ADRs this one replaces, in keeping with the
-  supersession check.
-
-Empty lists are valid for ADRs that do not implement an RFC or supersede a
-prior ADR. The decision date is **not** a separate frontmatter field: ADRs
-record it in the `## Status` line ("Accepted, YYYY-MM-DD."), matching the
-convention every existing ADR follows.
-
 ### Required body sections
 
-Enforced by a new hard check `adr-structure`. The required set matches the
-convention every current ADR (0001–0014) already follows, so no existing ADR
-needs restructuring:
+The new check `adr-structure` requires these sections on every doc with
+`audience: adr`:
 
-- `## Status` — the current state and its date, plus the resolved RFC link when
-  applicable ("Accepted, 2026-05-30. Resolves …").
-- `## Context` — the situation that prompted the decision, including the RFC
-  link when applicable.
-- `## Decision` — the concrete choice, written in active voice ("We will
-  ..."). Avoid hedging.
+- `## Status` — the current state and its date, plus the resolved-RFC link
+  when applicable ("Accepted, 2026-05-30. Resolves …"). This is the line
+  RFC-0017's lifecycle reads.
+- `## Context` — the situation that prompted the decision.
+- `## Decision` — the concrete choice, in active voice.
 - `## Alternatives Considered` — the options weighed and why they were rejected.
-- `## Consequences` — positive, negative, and follow-on work. Follow-on work
-  here is the natural seed for `required_updates:` per RFC-0018.
+- `## Consequences` — positive, negative, and follow-on work; the natural seed
+  for `required_updates:` per RFC-0018.
 
-### Backward fit
+Heading matching is case-insensitive, so an existing `## Alternatives
+considered` passes without an edit. The check scopes itself to `audience: adr`
+and therefore ignores `docs/50-decisions/INDEX.md` (`audience: reference`).
 
-The required sections were chosen to match what all 14 existing ADRs
-(0001–0014) already use, so the migration is small: only ADR-0001 (which has
-just a `## Status` line) needs the remaining sections backfilled, and any ADR
-missing `implements`/`supersedes` gets the empty-list fields added. The new
-check ships soft for one release before being promoted to hard, matching the
-warning-policy rollout pattern from RFC-0008.
+### Frontmatter: validate-when-present, not required
+
+`implements:` and `supersedes:` already exist in the canonical frontmatter
+schema as optional lists and are validated when present — `implements:` by the
+`decision-updates` check, `supersedes:` by `supersession`. This RFC does
+**not** make them required. Two reasons: empty and absent are
+indistinguishable after the schema applies its default, so a presence rule
+would require re-parsing the raw frontmatter for no real signal; and requiring
+them would add empty fields to every existing ADR for no behavioral gain. The
+rewritten template emits `implements: []` / `supersedes: []` as scaffolding so
+authors fill them in, but their absence is not a finding.
+
+### Backward fit (the real survey)
+
+The required-section set is **not** universally satisfied today, so the
+migration is small but real, not zero. A survey of `docs/50-decisions/`:
+
+- `## Context`, `## Decision`, `## Consequences` — present in every ADR.
+- `## Status` — missing from ADR-0002, ADR-0006, ADR-0008, ADR-0009, and
+  ADR-0010.
+- `## Alternatives Considered` — missing from ADR-0006; ADR-0001 spells it
+  lowercase (`## Alternatives considered`), which passes under
+  case-insensitive matching but is normalized to the canonical casing for
+  tidiness.
+
+The implementing PR adds the missing `## Status` sections to those five ADRs
+and the missing `## Alternatives Considered` to ADR-0006. Because the check
+ships soft, this backfill does not gate `--profile=hard`; it is done so the
+dogfooded repo is exemplary and `--profile=configured` stays clean.
 
 ### Template update
 
-`src/irminsul/new/templates/adr.md.j2` is rewritten to emit the required
-sections and frontmatter fields. New ADRs created via `irminsul new adr` are
-structurally compliant by default.
+`src/irminsul/new/templates/adr.md.j2` is rewritten to emit `## Status`,
+`## Context`, `## Decision`, `## Alternatives Considered`, and
+`## Consequences`, plus `implements: []` / `supersedes: []` frontmatter
+scaffolding. New ADRs created via `irminsul new adr` are structurally
+compliant by default.
 
 ## Relationship to Existing RFCs
 
-- Closes the loop RFC-0017 depends on: accepted RFCs link to ADRs, and ADRs
-  carry the structure to make the link meaningful.
-- Makes RFC-0018's `implements:` field required on ADRs that resolve an RFC.
-- Reuses the supersession field convention.
+- Gives RFC-0017's `resolved_by` / `## Status` link and RFC-0018's
+  `implements:` back-link a guaranteed place to live.
+- Reuses the existing `supersedes` / `implements` fields rather than inventing
+  new ones.
+- Defers the heading-as-hard-gate to a later promotion under the RFC-0008
+  warning policy.
 
 ## Drawbacks
 
-Required sections add some authoring weight. The fixup migration for
-existing ADRs is one-time. Beyond migration, the template handles new ADRs
-automatically.
-
-The check cannot prove that the `## Decision` section says anything useful;
-it can only prove the section exists. Semantic quality remains a reviewer
-judgment.
+Required sections add minor authoring weight, absorbed by the template for new
+ADRs. The check proves a section exists, not that it says anything useful —
+semantic quality remains a reviewer judgment.
 
 ## Alternatives
 
-- Keep ADR shape as convention without a check. Rejected because RFC-0017
-  and RFC-0018 cannot rely on conventions alone.
-- Move ADR shape rules into the existing `FrontmatterCheck`. Rejected
-  because section-presence is a body-level rule and FrontmatterCheck stays
-  focused on frontmatter.
-- Use a generic "required sections" check across all doc kinds. Rejected
-  because section requirements are kind-specific and a generic check would
-  spread its config across many docs.
+- **Ship as a hard check immediately.** Rejected: every comparable lifecycle
+  check (`rfc-resolution`, `decision-updates`, `inventory-drift`) ships soft
+  first, and `HARD_REGISTRY` is a deliberately small stable core. Soft-first
+  matches the RFC-0008 rollout.
+- **Require `implements:` / `supersedes:` presence.** Rejected: no signal over
+  validate-when-present, and it churns every ADR (see above).
+- **Keep ADR shape as convention without a check.** Rejected: RFC-0017 and
+  RFC-0018 cannot lean on convention alone.
+- **Fold section rules into `FrontmatterCheck`.** Rejected: section presence is
+  a body-level rule and FrontmatterCheck stays focused on frontmatter.
+- **A generic "required sections" check across all doc kinds.** Rejected:
+  section requirements are kind-specific, and a generic check would spread its
+  config across many docs.
 
-## Unresolved Questions
+## Status
 
-- Should the soft-to-hard promotion wait a fixed release count, or gate on the
-  existing ADRs all passing first?
+- Proposed. Lands as one PR: the `adr-structure` soft check, the template
+  rewrite, and the ADR backfill described above.

@@ -12,16 +12,26 @@ not pass judgement on the substance of a decision.
 from __future__ import annotations
 
 import datetime as _dt
+from collections.abc import Callable
 from pathlib import Path, PurePosixPath
 from typing import ClassVar
 
 from irminsul import clock
-from irminsul.checks.base import Finding, Severity
+from irminsul.checks.base import Finding, Fix, Severity
 from irminsul.docgraph import DocGraph, DocNode
 from irminsul.docgraph_index import Heading
 from irminsul.frontmatter import RfcStateEnum, StatusEnum
+from irminsul.frontmatter_edit import set_value
 
 _IN_FLIGHT = frozenset({RfcStateEnum.draft, RfcStateEnum.open, RfcStateEnum.fcp})
+
+# Terminal states and the scaffolding section a resolved RFC of that state must
+# carry. The fix inserts the first listed heading; the check accepts any.
+_TERMINAL_SECTIONS: dict[RfcStateEnum, tuple[str, ...]] = {
+    RfcStateEnum.accepted: ("Resolution",),
+    RfcStateEnum.rejected: ("Rejection Rationale", "Resolution"),
+    RfcStateEnum.withdrawn: ("Withdrawal Rationale", "Resolution"),
+}
 
 
 class RfcResolutionCheck:
@@ -52,6 +62,59 @@ class RfcResolutionCheck:
                 out.extend(self._check_withdrawn(node, headings))
             elif state in _IN_FLIGHT:
                 out.extend(self._check_in_flight(node, today))
+
+        return out
+
+    def fixes(self, findings: list[Finding], graph: DocGraph) -> list[Fix]:
+        """Align a resolved RFC's metadata scaffolding (RFC 0017).
+
+        For an RFC already in a terminal `rfc_state`, set `status: stable` and
+        insert the missing scaffolding section as a stub. Touches load-bearing
+        metadata, so it requires `--confirm`. Gated on this check's findings.
+        """
+        flagged = {
+            finding.doc_id
+            for finding in findings
+            if finding.check == self.name and finding.doc_id is not None
+        }
+        if not flagged:
+            return []
+
+        docs_root = graph.config.paths.docs_root.strip("/\\") if graph.config else "docs"
+        rfc_prefix = f"{docs_root}/80-evolution/rfcs/" if docs_root else "80-evolution/rfcs/"
+
+        out: list[Fix] = []
+        for node in graph.nodes.values():
+            if node.id not in flagged:
+                continue
+            if not node.path.as_posix().startswith(rfc_prefix):
+                continue
+            state = node.frontmatter.rfc_state
+            sections = _TERMINAL_SECTIONS.get(state) if state is not None else None
+            if sections is None:
+                continue
+
+            if node.frontmatter.status != StatusEnum.stable:
+                out.append(
+                    Fix(
+                        path=node.path,
+                        description=f"set status: stable in {node.path.as_posix()}",
+                        apply=_status_setter(StatusEnum.stable.value),
+                        requires_confirm=True,
+                    )
+                )
+
+            headings = graph.headings.get(node.id, [])
+            if not any(_has_heading(headings, _slug(title)) for title in sections):
+                title = sections[0]
+                out.append(
+                    Fix(
+                        path=node.path,
+                        description=f"insert '## {title}' stub in {node.path.as_posix()}",
+                        apply=_section_adder(title),
+                        requires_confirm=True,
+                    )
+                )
 
         return out
 
@@ -256,6 +319,40 @@ class RfcResolutionCheck:
 
 def _has_heading(headings: list[Heading], slug: str) -> bool:
     return any(h.slug == slug for h in headings)
+
+
+def _slug(title: str) -> str:
+    from irminsul.docgraph_index import slugify
+
+    return slugify(title)
+
+
+def _status_setter(value: str) -> Callable[[str], str]:
+    def apply(text: str) -> str:
+        return set_value(text, "status", value)
+
+    return apply
+
+
+def _section_adder(title: str) -> Callable[[str], str]:
+    def apply(text: str) -> str:
+        return _append_section(text, title)
+
+    return apply
+
+
+def _append_section(text: str, title: str) -> str:
+    """Append a stub `## {title}` section, idempotent on the rendered heading."""
+    stub = (
+        f"## {title}\n\n<!-- TODO: record the decision rationale and link the decision doc. -->\n"
+    )
+    if text.endswith("\n\n"):
+        sep = ""
+    elif text.endswith("\n"):
+        sep = "\n"
+    else:
+        sep = "\n\n"
+    return f"{text}{sep}{stub}"
 
 
 def _section_empty(body: str, headings: list[Heading], slug: str) -> bool:
