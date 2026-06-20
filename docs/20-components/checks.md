@@ -44,6 +44,8 @@ Soft deterministic checks warn rather than block. For example, `foundation-readi
 
 Checks are registered in `HARD_REGISTRY`, `SOFT_REGISTRY`, and `LLM_REGISTRY` keyed by name. The CLI selects checks with `--profile`: `hard` runs configured hard checks, `configured` adds configured soft deterministic checks, `advisory` adds configured LLM checks, and `all-available` runs every implemented deterministic check regardless of config.
 
+In JSON output (`--format json`) every finding carries two machine-actionable fields for agents. `data` is a structured decomposition of the finding — always with a kebab-case `problem` key and string values — or `null` where no decomposition exists; the `frontmatter`, `coverage`, and `links` checks populate it. `fixable` is `true` exactly when `irminsul fix` would plan a remediation for that finding, in which case the finding also carries a ready-to-run `fix_command`.
+
 ## Scope & Limitations
 
 Checks do not apply fixes — findings are advisory output only; call `irminsul fix` to remediate. They do not evaluate prose quality or writing style. They do not modify source files or docs.
