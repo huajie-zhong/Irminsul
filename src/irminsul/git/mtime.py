@@ -109,15 +109,31 @@ def last_commit_time_any_repo(path: Path, docs_root: Path) -> GitTime | None:
     Returns None when path is outside docs_root and no .git is found — caller
     should emit an error Finding. Returns _NO_TIME when git exists but path has
     no commits (same as same-repo behaviour).
+
+    A path *inside* docs_root may still belong to a nested repository — e.g. a
+    private docs repo that the outer (public) code repo gitignores. When the
+    outer repo has no history for such a path, the nearest enclosing `.git` is
+    consulted before giving up.
     """
     try:
         path.relative_to(docs_root)
-        return last_commit_time(docs_root, path)
     except ValueError:
         root = git_root_for(path)
         if root is None:
             return None
         return last_commit_time(root, path)
+
+    gt = last_commit_time(docs_root, path)
+    if gt.when is not None:
+        return gt
+    nested_root = git_root_for(path)
+    if (
+        nested_root is None
+        or nested_root == docs_root
+        or nested_root.resolve() == docs_root.resolve()
+    ):
+        return gt
+    return last_commit_time(nested_root, path)
 
 
 def diff_name_only(repo_root: Path, base_ref: str, head_ref: str) -> frozenset[str] | None:
