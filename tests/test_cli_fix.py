@@ -88,6 +88,64 @@ def test_fix_supersession_writes_frontmatter(fixture_repo: Callable[[str], Path]
     assert "superseded_by: new-system" in text
 
 
+def test_fix_holds_confirm_required_fixes_without_confirm(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("soft-rfc-resolution")
+    rfc = repo / "docs" / "80-evolution" / "rfcs" / "0002-accepted-bad-status.md"
+    before = rfc.read_text(encoding="utf-8")
+
+    result = runner.invoke(app, ["fix", "--profile", "configured", "--path", str(repo)])
+
+    assert result.exit_code == 0, result.output
+    assert "held" in result.output
+    assert "--confirm" in result.output
+    assert rfc.read_text(encoding="utf-8") == before
+
+
+def test_fix_confirm_applies_irreversible_fixes(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("soft-rfc-resolution")
+    rfc = repo / "docs" / "80-evolution" / "rfcs" / "0002-accepted-bad-status.md"
+
+    result = runner.invoke(
+        app, ["fix", "--profile", "configured", "--confirm", "--path", str(repo)]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "status: stable" in rfc.read_text(encoding="utf-8")
+
+
+def test_fix_check_selector_applies_named_check(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("soft-supersession")
+    old_doc = repo / "docs" / "20-components" / "old-system.md"
+
+    result = runner.invoke(app, ["fix", "--check", "supersession", "--path", str(repo)])
+
+    assert result.exit_code == 0, result.output
+    assert "status: deprecated" in old_doc.read_text(encoding="utf-8")
+
+
+def test_fix_check_selector_inactive_name_is_noop(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("soft-supersession")
+    old_doc = repo / "docs" / "20-components" / "old-system.md"
+    before = old_doc.read_text(encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["fix", "--check", "rfc-resolution", "--profile", "configured", "--path", str(repo)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "not active" in result.output
+    assert old_doc.read_text(encoding="utf-8") == before
+
+
 def test_fix_supersession_handles_crlf_and_closing_delimiter_at_eof(
     fixture_repo: Callable[[str], Path],
 ) -> None:

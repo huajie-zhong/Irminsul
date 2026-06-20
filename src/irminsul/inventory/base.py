@@ -25,12 +25,15 @@ class SurfaceItem:
 
     `identity` is the diff key (e.g. ``"regen agents-md"``, ``"GET /api/check"``,
     a symbol name, or an env-var name). `display`/`line` are best-effort provenance
-    for human-facing output and are never compared.
+    for human-facing output and are never compared. `symbol` is an optional
+    ``path#qualname`` ref the anchor hasher can resolve (RFC 0027 fingerprints);
+    extractors that cannot point at a defining code symbol leave it ``None``.
     """
 
     identity: str
     display: str | None = None
     line: int | None = None
+    symbol: str | None = None
 
 
 @runtime_checkable

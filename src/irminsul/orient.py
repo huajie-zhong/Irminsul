@@ -58,6 +58,10 @@ _COMMANDS: tuple[tuple[str, str], ...] = (
     ),
 )
 
+# The command vocabulary's accuracy and completeness is governed by the
+# watched-surface check (RFC 0027) via orient.md's `inventory:` block — every
+# CLI identity must be either taught here or listed under the block's `omit:`.
+
 
 @dataclass(frozen=True)
 class LayerSummary:

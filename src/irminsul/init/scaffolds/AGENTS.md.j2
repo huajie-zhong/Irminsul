@@ -1,0 +1,31 @@
+# AGENTS.md — agent entry point for {{ project_name }}
+
+This repository's documentation lives in `docs/` and is managed by
+[Irminsul](https://github.com/huajie-zhong/irminsul). The docs tree is a
+machine-verified contract between humans and coding agents: structural
+invariants (ownership, links, frontmatter, coverage) are enforced in CI, so
+what the docs claim about the code is checked, not hoped.
+
+**Start at [`docs/AGENTS.md`](docs/AGENTS.md)** — the navigation manifest with
+the full documentation tree, the doc-system rules, and the editing protocol.
+
+## The agent loop
+
+1. Before editing, run `irminsul context --changed` to find the docs that own
+   the files you are about to touch, plus their tests and dependencies.
+2. Make the change. Keep doc updates **in the same commit** as the code they
+   describe.
+3. After editing, run `irminsul context --changed` again to confirm ownership
+   and surface any findings your edit introduced.
+4. Run `irminsul fix` to apply deterministic remediations for mechanical
+   findings.
+5. Run `irminsul check --profile=hard` before committing; it must exit 0.
+
+`context`, `check`, and friends support `--format json` for machine-readable
+output.
+
+## Harness notes
+
+Claude Code, Cursor, and Codex read a root `AGENTS.md` natively or can be
+pointed at it. If this repo also has a `CLAUDE.md`, reference this file from
+it with `@AGENTS.md`.

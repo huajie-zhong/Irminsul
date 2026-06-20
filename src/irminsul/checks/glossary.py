@@ -9,21 +9,26 @@ sensitivity. Bare glossary headings remain valid and still power the older
 from __future__ import annotations
 
 import ast
+import posixpath
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import ClassVar
 
 from markdown_it import MarkdownIt
 
-from irminsul.checks.base import Finding, Severity
+from irminsul.checks.base import Finding, Fix, Severity
 from irminsul.docgraph import DocGraph, DocNode
 from irminsul.docgraph_index import slugify
+from irminsul.frontmatter_edit import split_frontmatter
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$", re.MULTILINE)
 _KNOWN_METADATA_KEYS = frozenset({"match", "forbidden_synonyms", "case_sensitive"})
 _FENCE_RE = re.compile(r"(?ms)^ {0,3}(```|~~~).*?^ {0,3}\1\s*$")
 _INLINE_CODE_RE = re.compile(r"`[^`\n]+`")
+_LINK_RE = re.compile(r"!?\[[^\]\n]*\]\([^)\n]*\)")
+_HEADING_LINE_RE = re.compile(r"(?m)^#{1,6}[^\n]*$")
 
 
 @dataclass(frozen=True)
@@ -229,6 +234,53 @@ def _masked_body(body: str) -> str:
     return masked
 
 
+def _masked_for_link(body: str) -> str:
+    """Mask code, headings, and existing links so auto-linking never nests.
+
+    Headings are masked so the fix targets a prose occurrence rather than
+    wrapping a section title in a link.
+    """
+    masked = _masked_body(body)
+    for pattern in (_HEADING_LINE_RE, _LINK_RE):
+        masked = pattern.sub(lambda match: _blank_preserve_newlines(match.group(0)), masked)
+    return masked
+
+
+def _earliest_match(
+    masked: str, terms: tuple[str, ...], *, case_sensitive: bool
+) -> tuple[int, int] | None:
+    best: tuple[int, int] | None = None
+    for term in terms:
+        m = _term_pattern(term, case_sensitive=case_sensitive).search(masked)
+        if m is not None and (best is None or m.start() < best[0]):
+            best = (m.start(), m.end())
+    return best
+
+
+def _autolink_apply(
+    terms: tuple[str, ...], *, case_sensitive: bool, link: str
+) -> Callable[[str], str]:
+    """Wrap the first unlinked occurrence of any term with the glossary link.
+
+    Idempotent: once wrapped, the term sits inside a link that masking blanks,
+    so a re-run finds no bare occurrence and returns the text unchanged.
+    """
+
+    def apply(text: str) -> str:
+        try:
+            _raw, body = split_frontmatter(text)
+        except ValueError:
+            return text
+        span = _earliest_match(_masked_for_link(body), terms, case_sensitive=case_sensitive)
+        if span is None:
+            return text
+        base = len(text) - len(body)
+        start, end = base + span[0], base + span[1]
+        return f"{text[:start]}[{text[start:end]}]({link}){text[end:]}"
+
+    return apply
+
+
 def _blank_preserve_newlines(text: str) -> str:
     return re.sub(r"[^\n]", " ", text)
 
@@ -406,6 +458,72 @@ class GlossaryDisciplineCheck:
                     )
                 )
 
+        return out
+
+    def fixes(self, findings: list[Finding], graph: DocGraph) -> list[Fix]:
+        """Wrap the first use of a glossary term with its anchor link (RFC 0019).
+
+        Edits prose, so it requires `--confirm`. Gated on the info-level
+        unlinked-term findings already emitted for a node.
+        """
+        if graph.config is None or graph.repo_root is None:
+            return []
+        flagged_paths = {
+            finding.path
+            for finding in findings
+            if finding.check == self.name and finding.severity == Severity.info
+        }
+        if not flagged_paths:
+            return []
+
+        glossary_rel = Path(graph.config.checks.glossary_discipline.glossary_path)
+        glossary_abs = graph.repo_root / glossary_rel
+        if not glossary_abs.is_file():
+            return []
+        try:
+            glossary_text = glossary_abs.read_text(encoding="utf-8")
+        except OSError:
+            return []
+
+        entries, _anti, _issues = _parse_glossary_entries(glossary_text)
+        glossary_posix = glossary_rel.as_posix()
+        md = MarkdownIt("commonmark")
+
+        out: list[Fix] = []
+        for entry in entries:
+            if not entry.has_metadata:
+                continue
+            anchor = slugify(entry.term)
+            for node in graph.nodes.values():
+                if node.path not in flagged_paths or node.path.as_posix() == glossary_posix:
+                    continue
+                if anchor in _linked_glossary_anchors(node, glossary_rel, md):
+                    continue
+                if (
+                    _earliest_match(
+                        _masked_for_link(node.body),
+                        entry.match_terms,
+                        case_sensitive=entry.case_sensitive,
+                    )
+                    is None
+                ):
+                    continue
+                rel = posixpath.relpath(glossary_posix, node.path.parent.as_posix())
+                out.append(
+                    Fix(
+                        path=node.path,
+                        description=(
+                            f"link first use of '{entry.term}' to {glossary_posix}#{anchor} "
+                            f"in {node.path.as_posix()}"
+                        ),
+                        apply=_autolink_apply(
+                            entry.match_terms,
+                            case_sensitive=entry.case_sensitive,
+                            link=f"{rel}#{anchor}",
+                        ),
+                        requires_confirm=True,
+                    )
+                )
         return out
 
     def _forbidden_synonym_findings(

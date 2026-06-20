@@ -6,8 +6,10 @@ tier: 3
 status: stable
 describes:
   - src/irminsul/frontmatter.py
+  - src/irminsul/frontmatter_edit.py
 tests:
   - tests/test_frontmatter.py
+  - tests/test_frontmatter_edit.py
 ---
 
 # Frontmatter
@@ -19,6 +21,8 @@ Every doc atom carries a YAML frontmatter block matching Appendix B of the [Doc 
 `parse_doc()` returns either a `ParsedDoc` (success) or a `ParseFailure` (YAML error or schema rejection). Callers decide how to surface failures — the [DocGraph](docgraph.md) collects them and the [frontmatter check](checks.md) translates them to findings.
 
 `expected_id_for(path)` codifies the filename rule: folder index docs take their parent folder's name; everything else uses the filename stem.
+
+The write side lives in `src/irminsul/frontmatter_edit.py`: round-trip helpers (`set_value`, `add_to_list`, `remove_inventory_item`) that the deterministic [fix](new-list-regen.md) actions share so every rewrite re-emits keys in canonical order, leaves the body untouched, and is idempotent.
 
 ## Scope & Limitations
 
