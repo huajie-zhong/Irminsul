@@ -225,7 +225,7 @@ def test_check_base_ref_requires_head_ref(fixture_repo: Callable[[str], Path]) -
     assert "must be provided together" in result.stdout
 
 
-def test_check_diff_aware_mtime_drift_flags_source_without_doc(tmp_path: Path) -> None:
+def test_check_base_head_refs_alias_unified_co_change(tmp_path: Path) -> None:
     from git import Repo
 
     repo_root = tmp_path / "repo"
@@ -271,4 +271,7 @@ def test_check_diff_aware_mtime_drift_flags_source_without_doc(tmp_path: Path) -
             str(repo_root),
         ],
     )
-    assert "sources changed in this diff but the doc was not updated" in result.stdout
+    # --base-ref/--head-ref is the two-flag spelling of --diff: the unified
+    # co-change signal fires instead of the old mtime-drift diff finding.
+    assert "co-change" in result.stdout
+    assert "changed in the diff but the doc did not" in result.stdout

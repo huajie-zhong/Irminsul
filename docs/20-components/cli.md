@@ -53,7 +53,7 @@ The Typer app that backs both the `irminsul` and `irm` console scripts. The exac
 Common command paths:
 
 - `irminsul init` — scaffold a new codebase. Delegates to [`init`](init.md).
-- `irminsul check` — build the [DocGraph](docgraph.md) and run checks selected by `--profile`. Exits 1 on any error finding.
+- `irminsul check` — build the [DocGraph](docgraph.md) and run checks selected by `--profile`. Exits 1 on any error finding. `--diff <base>` adds [co-change](checks.md) enforcement: a warning for every owning doc whose claimed source files changed in `<base>...HEAD` without it; an unresolvable base ref exits 2.
 - `irminsul context` — build the [DocGraph](docgraph.md) and delegate task-specific navigation lookup to [`context`](context.md).
 
 Findings print one per line, sorted by severity then path. Severity colors are red (error), yellow (warning), cyan (info). Paths are POSIX-normalized so output is stable across platforms.
