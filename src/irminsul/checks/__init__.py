@@ -19,6 +19,7 @@ from irminsul.checks.doc_reality import (
     ProseFileReferenceCheck,
     TerminologyOverloadCheck,
 )
+from irminsul.checks.doc_refs import DocRefsCheck
 from irminsul.checks.env_check import EnvCheck
 from irminsul.checks.external_links import ExternalLinksCheck
 from irminsul.checks.foundation_readiness import FoundationReadinessCheck
@@ -74,6 +75,7 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     DecisionUpdatesCheck.name: DecisionUpdatesCheck,
     InventoryDriftCheck.name: InventoryDriftCheck,
     ClaimAnchorCheck.name: ClaimAnchorCheck,
+    DocRefsCheck.name: DocRefsCheck,
 }
 
 LLM_REGISTRY: dict[str, type] = {
@@ -94,6 +96,7 @@ __all__ = [
     "CoverageCheck",
     "DecisionUpdatesCheck",
     "DependencyCheck",
+    "DocRefsCheck",
     "EnvCheck",
     "Finding",
     "Fix",
