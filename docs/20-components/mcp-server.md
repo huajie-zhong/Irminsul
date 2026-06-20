@@ -6,12 +6,14 @@ tier: 3
 status: stable
 summary: Read-only MCP stdio server that lets AI agents query the doc graph natively instead of shelling out to the CLI.
 depends_on:
+  - anchors
   - checks
   - cli
   - config
   - context
   - docgraph
   - new-list-regen
+  - orient
   - refs
   - surface
 describes:
@@ -28,11 +30,13 @@ The server is strictly read-only: no tool writes files, and there is no MCP path
 
 ## Exposed tools
 
+- `orient()` — the recommended first call in an unfamiliar repo: docs layout, doc counts, entry docs, configured checks, and the command vocabulary (see [orient](orient.md)).
 - `context_for_path(path)` / `context_for_topic(query)` / `context_changed()` — the three input modes of `irminsul context`: ownership, tests, dependencies, and relevant findings for a file, a topic, or the current git changes.
 - `refs(target)` — backlinks for a doc id or path; if the target is not a doc, it falls back to symbol owner/reference lookup (the `--symbol` mode).
 - `check(profile)` — runs the registered deterministic checks; only `hard` and `configured` are accepted, so LLM checks never run over MCP.
 - `list_docs(kind)` — `orphans`, `stale`, `undocumented`, or `lifecycle`.
 - `surface(kind, source_glob)` — derives a live code surface (`cli`, `http`, `exports`, `env-vars`, or a configured generic kind).
+- `anchors()` — the [anchored prose claims](anchors.md) report. Read-only: re-pinning an anchor remains a deliberate human acknowledgement through the CLI, never an MCP call.
 
 ## Wiring it into an agent
 
