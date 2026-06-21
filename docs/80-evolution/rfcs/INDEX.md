@@ -3,7 +3,7 @@ id: rfcs
 title: RFCs
 audience: reference
 tier: 2
-status: draft
+status: stable
 describes: []
 ---
 

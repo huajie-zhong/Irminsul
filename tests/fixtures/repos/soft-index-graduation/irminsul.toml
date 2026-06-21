@@ -1,0 +1,8 @@
+project_name = "soft-index-graduation"
+
+[paths]
+docs_root = "docs"
+source_roots = []
+
+[checks]
+soft_deterministic = ["index-graduation"]
