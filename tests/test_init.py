@@ -20,6 +20,8 @@ def test_init_no_interactive_creates_expected_tree(tmp_path: Path) -> None:
 
     expected = [
         "irminsul.toml",
+        "AGENTS.md",
+        "docs/AGENTS.md",
         "docs/README.md",
         "docs/GLOSSARY.md",
         "docs/CONTRIBUTING.md",
@@ -263,6 +265,65 @@ def test_init_does_not_overwrite_without_force(tmp_path: Path) -> None:
     assert result.exit_code == 0
 
     assert custom.read_text() == "# my custom principles\n"
+
+
+def test_init_creates_agent_manifests(tmp_path: Path) -> None:
+    target = tmp_path / "demo"
+    target.mkdir()
+    (target / "src").mkdir()  # code signal
+
+    result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
+    assert result.exit_code == 0, result.stdout
+
+    docs_manifest = (target / "docs" / "AGENTS.md").read_text(encoding="utf-8")
+    assert "<!-- agents-manifest:generated-start -->" in docs_manifest
+    assert "<!-- agents-manifest:generated-end -->" in docs_manifest
+
+    root_manifest = (target / "AGENTS.md").read_text(encoding="utf-8")
+    assert "docs/AGENTS.md" in root_manifest
+    assert "irminsul context --changed" in root_manifest
+    assert "irminsul check --profile=hard" in root_manifest
+
+    assert "AGENTS.md" in result.stdout
+
+
+def test_init_fresh_creates_agent_manifests(tmp_path: Path) -> None:
+    target = tmp_path / "demo"
+    result = runner.invoke(app, ["init", "--fresh", "--no-interactive", "--path", str(target)])
+    assert result.exit_code == 0, result.stdout
+
+    docs_manifest = (target / "docs" / "AGENTS.md").read_text(encoding="utf-8")
+    assert "<!-- agents-manifest:generated-start -->" in docs_manifest
+    assert (target / "AGENTS.md").is_file()
+
+
+def test_init_does_not_clobber_existing_root_agents_md(tmp_path: Path) -> None:
+    target = tmp_path / "demo"
+    target.mkdir()
+    (target / "src").mkdir()  # code signal
+    custom = target / "AGENTS.md"
+    custom.write_text("# my hand-written agent notes\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
+    assert result.exit_code == 0, result.stdout
+
+    assert custom.read_text(encoding="utf-8") == "# my hand-written agent notes\n"
+    assert "already exists at the repo root" in result.stdout
+
+
+def test_init_does_not_clobber_existing_docs_agents_md(tmp_path: Path) -> None:
+    target = tmp_path / "demo"
+    target.mkdir()
+    (target / "src").mkdir()  # code signal
+    docs_dir = target / "docs"
+    docs_dir.mkdir()
+    custom = docs_dir / "AGENTS.md"
+    custom.write_text("# my curated manifest\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
+    assert result.exit_code == 0, result.stdout
+
+    assert custom.read_text(encoding="utf-8") == "# my curated manifest\n"
 
 
 def test_init_force_overwrites_existing_files(tmp_path: Path) -> None:

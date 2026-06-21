@@ -6,12 +6,15 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+import typer
 from typer.testing import CliRunner
 
 from irminsul.checks.foundation_readiness import FoundationReadinessCheck
 from irminsul.cli import app
 from irminsul.config import find_config, load
 from irminsul.docgraph import build_graph
+from irminsul.seed.command import gather_answers_from_flags
 
 runner = CliRunner()
 
@@ -224,6 +227,30 @@ def test_seed_missing_required_flags_errors(tmp_path: Path) -> None:
     except ValueError:
         pass
     assert "--idea" in message
+
+
+def test_gather_answers_from_flags_names_every_missing_flag(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Direct unit coverage of the flag-mode validation: it must raise a clean
+    # exit (not an AssertionError) and name each missing flag, including
+    # empty-string values.
+    with pytest.raises(typer.Exit) as excinfo:
+        gather_answers_from_flags(
+            project_name="proj",
+            principle="Keep it simple",
+            idea=None,
+            belief=None,
+            first_user="",
+            non_goals=None,
+            direction_risks=None,
+        )
+    assert excinfo.value.exit_code == 2
+    out = capsys.readouterr().out
+    assert "--idea" in out
+    assert "--belief" in out
+    assert "--first-user" in out
+    assert "--principle" not in out
 
 
 def test_seed_refuses_edited_foundation(tmp_path: Path) -> None:

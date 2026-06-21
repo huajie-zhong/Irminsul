@@ -99,6 +99,25 @@ def test_init_docs_only_github_spec(tmp_path: Path) -> None:
     assert "/public-code/" in gi
 
 
+def test_init_docs_only_creates_agent_manifests(tmp_path: Path) -> None:
+    repo = _make_empty_dir(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "init-docs-only",
+            "--code-repo",
+            "acme/public-code",
+            "--no-interactive",
+            "--path",
+            str(repo),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    docs_manifest = (repo / "docs" / "AGENTS.md").read_text(encoding="utf-8")
+    assert "<!-- agents-manifest:generated-start -->" in docs_manifest
+    assert (repo / "AGENTS.md").is_file()
+
+
 def test_init_docs_only_source_roots_in_toml(tmp_path: Path) -> None:
     repo = _make_empty_dir(tmp_path)
     runner.invoke(

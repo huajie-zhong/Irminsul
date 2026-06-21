@@ -79,11 +79,18 @@ class Claim(BaseModel):
 class InventoryEntry(BaseModel):
     """A curated *subset* of a code surface a doc deliberately calls out.
 
-    `kind` selects the extractor (cli/http/exports/env-vars, or a generic kind);
+    `kind` selects the extractor (cli/http/exports/env-vars/mcp, or a generic kind);
     `source` is an optional glob pointing at the code that defines the surface
     (defaults to the doc's `describes`); `items` are the identities the doc claims
     exist. The check verifies each item still exists in code — it never demands the
     list be complete.
+
+    Opt-in *watched surface* fields (RFC 0027) extend this to both other directions
+    without changing the accuracy-only default: `complete: true` asks the check to
+    flag any live identity that is neither in `items` nor `omit` (completeness);
+    `omit` lists identities deliberately excluded; `fingerprints` pins each item's
+    AST-normalized code shape (identity → hash) so a behavior change to a still-named
+    item is flagged for re-read and re-pin (freshness).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -91,6 +98,9 @@ class InventoryEntry(BaseModel):
     kind: str = Field(min_length=1)
     source: str | None = None
     items: list[str] = Field(default_factory=list)
+    complete: bool = False
+    omit: list[str] = Field(default_factory=list)
+    fingerprints: dict[str, str] = Field(default_factory=dict)
 
 
 class DocFrontmatter(BaseModel):
