@@ -30,7 +30,7 @@ Doc-author UX commands for creating, finding, regenerating, and remediating docu
 
 Scaffolds a new doc atom from a Jinja template under `src/irminsul/new/templates/`. ADRs go to `docs/50-decisions/<NNNN>-<slug>.md` (auto-numbered from the highest existing prefix); components to `docs/20-components/<slug>.md`; RFCs to `docs/80-evolution/rfcs/<NNNN>-<slug>.md`. Every generated doc has valid frontmatter that immediately passes `FrontmatterCheck`.
 
-The `component` kind accepts repeatable `--describes` and `--tests` options that populate the scaffolded frontmatter lists instead of leaving them empty, so a new component doc can claim its sources in one command. Values are stored repo-relative in POSIX form; a value that does not exist on disk prints a yellow warning but is still written, since the file may be about to be created.
+The `component` kind accepts repeatable `--describes` and `--tests` options that populate the scaffolded frontmatter lists instead of leaving them empty, so a new component doc can claim its sources in one command. Values are stored repo-relative in POSIX form; a value that does not exist on disk prints a yellow warning but is still written, since the file may be about to be created. With `--from-surface`, the scaffolded body gains a `## Surface` section derived from the claimed paths at scaffold time (CLI commands, HTTP endpoints, env vars, TS exports — whichever extractors find anything); paths with nothing derivable get a note and no section.
 
 ## `irminsul list {orphans,stale,undocumented}`
 

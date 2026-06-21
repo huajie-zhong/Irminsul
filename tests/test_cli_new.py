@@ -238,3 +238,118 @@ def test_new_component_glob_matching_nothing_still_warns(tmp_path: Path) -> None
     )
     assert result.exit_code == 0, result.output
     assert "does not exist" in result.output
+
+
+_TYPER_TOOL = (
+    "import typer\n"
+    "app = typer.Typer()\n"
+    "\n"
+    '@app.command("ingest")\n'
+    "def ingest() -> None:\n"
+    "    pass\n"
+    "\n"
+    "@app.command()\n"
+    "def export_all() -> None:\n"
+    "    pass\n"
+)
+
+
+def _make_repo_with_cli_tool(tmp_path: Path) -> Path:
+    repo = tmp_path / "r"
+    repo.mkdir()
+    (repo / "irminsul.toml").write_text(
+        'project_name = "r"\n[paths]\ndocs_root = "docs"\nsource_roots = ["src"]\n',
+        encoding="utf-8",
+    )
+    (repo / "docs").mkdir()
+    (repo / "src").mkdir()
+    (repo / "src" / "tool.py").write_text(_TYPER_TOOL, encoding="utf-8")
+    return repo
+
+
+def test_new_component_from_surface_prefills_surface_section(tmp_path: Path) -> None:
+    repo = _make_repo_with_cli_tool(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "new",
+            "component",
+            "Tool",
+            "--describes",
+            "src/tool.py",
+            "--from-surface",
+            "--path",
+            str(repo),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    body = (repo / "docs" / "20-components" / "tool.md").read_text(encoding="utf-8")
+    assert "## Surface" in body
+    assert "### cli" in body
+    assert "`ingest`" in body
+    assert "`export-all`" in body  # implicit typer naming, underscores to dashes
+    assert "[`src/tool.py`](../../src/tool.py)" in body
+    # the Surface section sits above Scope & Limitations
+    assert body.index("## Surface") < body.index("## Scope & Limitations")
+
+
+def test_new_component_without_from_surface_has_no_surface_section(tmp_path: Path) -> None:
+    repo = _make_repo_with_cli_tool(tmp_path)
+    result = runner.invoke(
+        app,
+        ["new", "component", "Tool", "--describes", "src/tool.py", "--path", str(repo)],
+    )
+    assert result.exit_code == 0, result.output
+    body = (repo / "docs" / "20-components" / "tool.md").read_text(encoding="utf-8")
+    assert "## Surface" not in body
+
+
+def test_new_component_from_surface_requires_describes(tmp_path: Path) -> None:
+    repo = _make_repo_with_cli_tool(tmp_path)
+    result = runner.invoke(app, ["new", "component", "Tool", "--from-surface", "--path", str(repo)])
+    assert result.exit_code == 2
+    assert "--describes" in result.output
+
+
+def test_new_component_from_surface_degrades_for_plain_modules(tmp_path: Path) -> None:
+    repo = _make_repo_with_cli_tool(tmp_path)
+    (repo / "src" / "plain.py").write_text("def helper() -> int:\n    return 1\n", encoding="utf-8")
+    result = runner.invoke(
+        app,
+        [
+            "new",
+            "component",
+            "Plain",
+            "--describes",
+            "src/plain.py",
+            "--from-surface",
+            "--path",
+            str(repo),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "no derivable surface" in result.output
+    body = (repo / "docs" / "20-components" / "plain.md").read_text(encoding="utf-8")
+    assert "## Surface" not in body
+
+
+def test_new_component_from_surface_doc_passes_checks(tmp_path: Path) -> None:
+    repo = _make_repo_with_cli_tool(tmp_path)
+    runner.invoke(
+        app,
+        [
+            "new",
+            "component",
+            "Tool",
+            "--describes",
+            "src/tool.py",
+            "--from-surface",
+            "--path",
+            str(repo),
+        ],
+    )
+    config = load(find_config(repo))
+    graph = build_graph(repo, config)
+    for check in (FrontmatterCheck(), GlobsCheck(), UniquenessCheck()):
+        errors = [f for f in check.run(graph) if f.severity.value == "error"]
+        assert errors == [], (check, errors)

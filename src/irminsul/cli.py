@@ -1194,6 +1194,13 @@ def new_component(
             help="Test path for the component (repeatable, stored repo-relative).",
         ),
     ] = None,
+    from_surface: Annotated[
+        bool,
+        typer.Option(
+            "--from-surface",
+            help="Pre-fill a Surface section derived from the --describes paths.",
+        ),
+    ] = False,
     force: Annotated[bool, typer.Option("--force")] = False,
     path: Annotated[Path, typer.Option("--path")] = Path("."),
 ) -> None:
@@ -1209,10 +1216,56 @@ def new_component(
         # check would false-warn on every wildcard.
         if not (repo_root / rel).exists() and not glob.glob(str(repo_root / rel), recursive=True):
             typer.echo(typer.style(f"warning: path does not exist: {rel}", fg="yellow"))
+
+    surface_groups: list[dict[str, object]] = []
+    if from_surface:
+        if not describes_rel:
+            typer.echo(
+                typer.style("--from-surface requires at least one --describes path", fg="red")
+            )
+            raise typer.Exit(code=2)
+        from irminsul.surface import derive_surface
+
+        # Component docs live at <docs_root>/<layer>/<slug>.md, so the link
+        # back to repo root climbs the docs_root depth plus the layer folder.
+        # Resolve relative to repo_root so absolute or dotted docs_root values
+        # still yield the right depth.
+        try:
+            docs_rel = (
+                (repo_root / config.paths.docs_root).resolve().relative_to(repo_root.resolve())
+            )
+            docs_depth = len(docs_rel.parts)
+        except ValueError:
+            docs_depth = len(Path(config.paths.docs_root).parts)
+        link_prefix = "../" * (docs_depth + 1)
+        contributing: set[str] = set()
+        for kind in ("cli", "http", "env-vars", "exports"):
+            seen: set[str] = set()
+            rows: list[dict[str, str]] = []
+            for rel in describes_rel:
+                for item in derive_surface(repo_root, config, kind, rel):
+                    if item.identity in seen:
+                        continue
+                    seen.add(item.identity)
+                    contributing.add(rel)
+                    display = item.display or rel
+                    rows.append(
+                        {
+                            "identity": item.identity,
+                            "display": display,
+                            "link": f"{link_prefix}{display}",
+                        }
+                    )
+            if rows:
+                surface_groups.append({"kind": kind, "rows": rows})
+        for rel in describes_rel:
+            if rel not in contributing:
+                typer.echo(typer.style(f"note: no derivable surface for: {rel}", fg="yellow"))
+
     spec = NewSpec(
         kind="component",
         title=title,
-        extra={"describes": describes_rel, "tests": tests_rel},
+        extra={"describes": describes_rel, "tests": tests_rel, "surface": surface_groups},
     )
     try:
         dest = write_new(repo_root, spec, config, force=force)

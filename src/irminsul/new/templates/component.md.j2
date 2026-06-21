@@ -11,6 +11,14 @@ tests:{% if not tests %} []{% else %}{% for item in tests %}
 ---
 
 # {{ title }}
+{% if surface %}
+## Surface
 
+Derived from the claimed sources at scaffold time.
+{% for group in surface %}
+### {{ group.kind }}
+
+{% for row in group.rows %}- `{{ row.identity }}` — [`{{ row.display }}`]({{ row.link }})
+{% endfor %}{% endfor %}{% endif %}
 ## Scope & Limitations
 <!-- Describe what this component does NOT do. -->
