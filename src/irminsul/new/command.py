@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as _dt
 import re
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
 from jinja2 import Environment, FileSystemLoader
@@ -60,6 +60,23 @@ def resolve_destination(repo_root: Path, spec: NewSpec, config: IrminsulConfig) 
 
 def resolve_id(destination: Path) -> str:
     return destination.stem
+
+
+def normalize_claim_path(repo_root: Path, raw: str) -> str:
+    """Normalize a user-supplied claim path to repo-relative POSIX form.
+
+    Accepts forward- or back-slashed relative paths and absolute paths inside
+    the repo. The path is not required to exist — callers decide whether to
+    warn about that.
+    """
+    candidate = Path(raw)
+    if candidate.is_absolute():
+        try:
+            rel = candidate.resolve().relative_to(repo_root.resolve())
+        except ValueError:
+            rel = candidate
+        return PurePosixPath(*rel.parts).as_posix()
+    return PurePosixPath(raw.replace("\\", "/")).as_posix()
 
 
 def write_new(

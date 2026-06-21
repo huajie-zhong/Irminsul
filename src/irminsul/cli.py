@@ -6,6 +6,7 @@ Two scripts in `pyproject.toml` (`irminsul` and `irm`) both bind to `app`.
 from __future__ import annotations
 
 import datetime as _dt
+import glob
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -1179,15 +1180,40 @@ def new_adr(
 @_new_app.command("component")
 def new_component(
     title: Annotated[str, typer.Argument(help="Name of the component.")],
+    describes: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--describes",
+            help="Source path the component claims (repeatable, stored repo-relative).",
+        ),
+    ] = None,
+    tests: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--tests",
+            help="Test path for the component (repeatable, stored repo-relative).",
+        ),
+    ] = None,
     force: Annotated[bool, typer.Option("--force")] = False,
     path: Annotated[Path, typer.Option("--path")] = Path("."),
 ) -> None:
     """Scaffold a new component doc."""
-    from irminsul.new.command import NewSpec, write_new
+    from irminsul.new.command import NewSpec, normalize_claim_path, write_new
 
     repo_root = path.resolve()
     config = load(find_config(repo_root))
-    spec = NewSpec(kind="component", title=title, extra={})
+    describes_rel = [normalize_claim_path(repo_root, value) for value in describes or []]
+    tests_rel = [normalize_claim_path(repo_root, value) for value in tests or []]
+    for rel in [*describes_rel, *tests_rel]:
+        # describes/tests values may be glob patterns; a literal existence
+        # check would false-warn on every wildcard.
+        if not (repo_root / rel).exists() and not glob.glob(str(repo_root / rel), recursive=True):
+            typer.echo(typer.style(f"warning: path does not exist: {rel}", fg="yellow"))
+    spec = NewSpec(
+        kind="component",
+        title=title,
+        extra={"describes": describes_rel, "tests": tests_rel},
+    )
     try:
         dest = write_new(repo_root, spec, config, force=force)
     except FileExistsError as e:
@@ -1247,12 +1273,25 @@ def list_stale(
 @_list_app.command("undocumented")
 def list_undocumented(
     fmt: Annotated[str, typer.Option("--format")] = "plain",
+    all_files: Annotated[
+        bool,
+        typer.Option(
+            "--all",
+            help=(
+                "List every source file with no doc claim, ignoring the "
+                "covered-directory heuristic, grouped by directory."
+            ),
+        ),
+    ] = False,
     path: Annotated[Path, typer.Option("--path")] = Path("."),
 ) -> None:
-    """List source files in covered directories that no doc claims."""
+    """List source files in covered directories that no doc claims.
+
+    With --all, list every unclaimed source file regardless of coverage.
+    """
     from irminsul.listing.command import list_undocumented as _list_undocumented
 
-    _list_undocumented(path.resolve(), fmt=fmt)
+    _list_undocumented(path.resolve(), fmt=fmt, all_files=all_files)
 
 
 @_list_app.command("lifecycle")

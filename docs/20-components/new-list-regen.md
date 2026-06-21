@@ -30,9 +30,13 @@ Doc-author UX commands for creating, finding, regenerating, and remediating docu
 
 Scaffolds a new doc atom from a Jinja template under `src/irminsul/new/templates/`. ADRs go to `docs/50-decisions/<NNNN>-<slug>.md` (auto-numbered from the highest existing prefix); components to `docs/20-components/<slug>.md`; RFCs to `docs/80-evolution/rfcs/<NNNN>-<slug>.md`. Every generated doc has valid frontmatter that immediately passes `FrontmatterCheck`.
 
+The `component` kind accepts repeatable `--describes` and `--tests` options that populate the scaffolded frontmatter lists instead of leaving them empty, so a new component doc can claim its sources in one command. Values are stored repo-relative in POSIX form; a value that does not exist on disk prints a yellow warning but is still written, since the file may be about to be created.
+
 ## `irminsul list {orphans,stale,undocumented}`
 
 Thin wrappers over existing soft checks: `orphans` delegates to `OrphansCheck`, `stale` to `StaleReaperCheck`, `undocumented` to `UniquenessCheck` (filtering to omission warnings). Output is plain text by default; `--format json` emits a JSON array.
+
+By default `undocumented` only reports files in covered directories — directories where at least one file is already claimed. The `--all` flag drops that heuristic and lists every source file with no doc claim, grouped by directory with per-directory counts, directories sorted by undocumented count descending; this is the brownfield on-ramp for repos with little or no existing coverage. In JSON mode each `--all` entry carries the file `path` and its parent `dir`.
 
 ## `irminsul fix`
 

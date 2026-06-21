@@ -4,8 +4,10 @@ title: "{{ title }}"
 audience: explanation
 tier: 3
 status: draft
-describes: []
-tests: []
+describes:{% if not describes %} []{% else %}{% for item in describes %}
+  - "{{ item }}"{% endfor %}{% endif %}
+tests:{% if not tests %} []{% else %}{% for item in tests %}
+  - "{{ item }}"{% endfor %}{% endif %}
 ---
 
 # {{ title }}
