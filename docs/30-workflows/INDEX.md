@@ -3,7 +3,7 @@ id: 30-workflows
 title: Workflows
 audience: explanation
 tier: 3
-status: draft
+status: stable
 describes: []
 tests:
   - tests/

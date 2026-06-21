@@ -24,6 +24,8 @@ import typer
 from jinja2 import Environment, FileSystemLoader
 
 from irminsul.config import IrminsulConfig
+from irminsul.frontmatter import StatusEnum
+from irminsul.frontmatter_edit import set_value
 from irminsul.init.placeholders import SCAFFOLD_PLACEHOLDER_PHRASES
 from irminsul.new.command import _next_number, _slugify
 
@@ -365,18 +367,26 @@ def run_seed(
 
 
 def _append_rfc_index_link(index_path: Path, rfc_id: str) -> Path | None:
-    """Idempotently list the anchoring RFC in `rfcs/INDEX.md`.
+    """Idempotently list the anchoring RFC in `rfcs/INDEX.md` and graduate it.
 
-    The scaffolded RFC index is the navigation entry for the rfcs folder; the
-    seeded RFC gets a bullet there so it is reachable from day one. Repos
-    without an RFC index (pre-scaffold adopters) are left untouched.
+    The scaffolded RFC index is the navigation entry for the rfcs folder and
+    ships `status: draft` (a hollow, under-construction layer). The seeded RFC
+    gets a bullet there so it is reachable from day one, and — since the layer
+    now has content — the index also graduates to `status: stable`. Without
+    that, `index-graduation` would immediately flag a populated layer whose
+    INDEX still claims draft. Repos without an RFC index (pre-scaffold
+    adopters) are left untouched. Both edits are idempotent on reseed.
     """
     if not index_path.is_file():
         return None
     content = index_path.read_text(encoding="utf-8")
-    if f"{rfc_id}.md" in content:
+    updated = content
+    if f"{rfc_id}.md" not in updated:
+        bullet = f"- [`{rfc_id}`]({rfc_id}.md) — Initial direction\n"
+        stripped = updated.rstrip()
+        updated = (stripped + "\n\n" + bullet) if stripped else bullet
+    updated = set_value(updated, "status", StatusEnum.stable.value)
+    if updated == content:
         return None
-    bullet = f"- [`{rfc_id}`]({rfc_id}.md) — Initial direction\n"
-    stripped = content.rstrip()
-    _atomic_write(index_path, (stripped + "\n\n" + bullet) if stripped else bullet)
+    _atomic_write(index_path, updated)
     return index_path

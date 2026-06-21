@@ -26,6 +26,7 @@ from irminsul.checks.foundation_readiness import FoundationReadinessCheck
 from irminsul.checks.frontmatter import FrontmatterCheck
 from irminsul.checks.globs import GlobsCheck
 from irminsul.checks.glossary import GlossaryDisciplineCheck
+from irminsul.checks.index_graduation import IndexGraduationCheck
 from irminsul.checks.inventory_drift import InventoryDriftCheck
 from irminsul.checks.liar import LiarCheck
 from irminsul.checks.links import LinksCheck
@@ -67,6 +68,7 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     RealityCheck.name: RealityCheck,
     BoundaryCheck.name: BoundaryCheck,
     PhantomLayerCheck.name: PhantomLayerCheck,
+    IndexGraduationCheck.name: IndexGraduationCheck,
     EnvCheck.name: EnvCheck,
     DependencyCheck.name: DependencyCheck,
     TerminologyOverloadCheck.name: TerminologyOverloadCheck,

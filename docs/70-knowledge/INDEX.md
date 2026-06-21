@@ -3,7 +3,7 @@ id: 70-knowledge
 title: Knowledge
 audience: reference
 tier: 3
-status: draft
+status: stable
 describes: []
 tests:
   - tests/
