@@ -26,6 +26,7 @@ Each architectural piece of Irminsul has a dedicated doc here. Frontmatter `desc
 - [`llm`](llm.md) — LLM client (budget tracking, disk cache, LiteLLM wrapper)
 - [`new-list-regen`](new-list-regen.md) — `new`, `list`, `fix`, and `regen agents-md` commands
 - [`mcp-server`](mcp-server.md) — read-only MCP stdio server for AI agents
+- [`status`](status.md) — one-glance digest of doc-system health
 
 ## Scope & Limitations
 
