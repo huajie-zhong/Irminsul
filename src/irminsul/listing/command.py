@@ -14,32 +14,61 @@ from irminsul.checks.globs import walk_source_files
 from irminsul.checks.orphans import OrphansCheck
 from irminsul.checks.stale_reaper import StaleReaperCheck
 from irminsul.checks.uniqueness import OMISSION_SKIP, UniquenessCheck, resolve_claims
-from irminsul.config import find_config, load
+from irminsul.config import IrminsulConfig, find_config, load
 from irminsul.docgraph import build_graph
 
-
-def list_orphans(repo_root: Path, *, fmt: str) -> None:
-    graph = build_graph(repo_root, load(find_config(repo_root)))
-    _print(OrphansCheck().run(graph), fmt)
+LIST_KINDS = ("orphans", "stale", "undocumented", "lifecycle")
 
 
-def list_stale(repo_root: Path, *, fmt: str) -> None:
-    graph = build_graph(repo_root, load(find_config(repo_root)))
-    _print(StaleReaperCheck().run(graph), fmt)
-
-
-def list_undocumented(repo_root: Path, *, fmt: str, all_files: bool = False) -> None:
-    config = load(find_config(repo_root))
+def findings_for_kind(repo_root: Path, config: IrminsulConfig, kind: str) -> list[Finding]:
+    """Collect the findings behind one `irminsul list` subcommand."""
     graph = build_graph(repo_root, config)
-    if not all_files:
-        findings = [
+    if kind == "orphans":
+        return OrphansCheck().run(graph)
+    if kind == "stale":
+        return StaleReaperCheck().run(graph)
+    if kind == "undocumented":
+        return [
             f
             for f in UniquenessCheck().run(graph)
             if f.severity == Severity.warning and "no doc claims it" in f.message
         ]
-        _print(findings, fmt)
+    if kind == "lifecycle":
+        from irminsul.checks.decision_updates import DecisionUpdatesCheck
+
+        return DecisionUpdatesCheck().run(graph)
+    raise ValueError(f"unknown list kind '{kind}'; expected one of: {', '.join(LIST_KINDS)}")
+
+
+def findings_to_json(findings: list[Finding]) -> str:
+    data = [
+        {
+            "check": f.check,
+            "severity": f.severity.value,
+            "message": f.message,
+            "path": f.path.as_posix() if f.path else None,
+            "doc_id": f.doc_id,
+        }
+        for f in findings
+    ]
+    return json.dumps(data, indent=2)
+
+
+def list_orphans(repo_root: Path, *, fmt: str) -> None:
+    _print(findings_for_kind(repo_root, load(find_config(repo_root)), "orphans"), fmt)
+
+
+def list_stale(repo_root: Path, *, fmt: str) -> None:
+    _print(findings_for_kind(repo_root, load(find_config(repo_root)), "stale"), fmt)
+
+
+def list_undocumented(repo_root: Path, *, fmt: str, all_files: bool = False) -> None:
+    config = load(find_config(repo_root))
+    if not all_files:
+        _print(findings_for_kind(repo_root, config, "undocumented"), fmt)
         return
 
+    graph = build_graph(repo_root, config)
     source_files, _missing = walk_source_files(repo_root, config.paths.source_roots)
     claims = resolve_claims(graph, source_files)
     unclaimed = sorted(
@@ -138,10 +167,7 @@ def _to_queue_item(f: Finding) -> _QueueItem:
 
 
 def list_lifecycle(repo_root: Path, *, fmt: str, queue: bool) -> None:
-    from irminsul.checks.decision_updates import DecisionUpdatesCheck
-
-    graph = build_graph(repo_root, load(find_config(repo_root)))
-    findings = DecisionUpdatesCheck().run(graph)
+    findings = findings_for_kind(repo_root, load(find_config(repo_root)), "lifecycle")
 
     if not queue:
         _print(findings, fmt)
@@ -176,17 +202,7 @@ def list_lifecycle(repo_root: Path, *, fmt: str, queue: bool) -> None:
 
 def _print(findings: list[Finding], fmt: str) -> None:
     if fmt == "json":
-        data = [
-            {
-                "check": f.check,
-                "severity": f.severity.value,
-                "message": f.message,
-                "path": f.path.as_posix() if f.path else None,
-                "doc_id": f.doc_id,
-            }
-            for f in findings
-        ]
-        typer.echo(json.dumps(data, indent=2))
+        typer.echo(findings_to_json(findings))
     else:
         for f in findings:
             loc = f.path.as_posix() if f.path else "<repo>"

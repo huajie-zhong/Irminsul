@@ -23,10 +23,28 @@ tests:
 inventory:
   - kind: cli
     source: src/irminsul/cli.py
+    complete: true
     items:
       - init
       - check
       - context
+    omit:
+      - init-docs-only
+      - seed
+      - orient
+      - refs
+      - fix
+      - surface
+      - anchors
+      - mcp
+      - new adr
+      - new component
+      - new rfc
+      - list orphans
+      - list stale
+      - list undocumented
+      - list lifecycle
+      - regen agents-md
 ---
 
 # CLI

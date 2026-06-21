@@ -118,7 +118,7 @@ def gather_answers_from_flags(
         )
         if not value
     ]
-    if missing:
+    if missing or principle is None or idea is None or belief is None or first_user is None:
         typer.echo(
             typer.style(
                 "Error: "
@@ -130,8 +130,6 @@ def gather_answers_from_flags(
             )
         )
         raise typer.Exit(code=2)
-    assert principle is not None and idea is not None
-    assert belief is not None and first_user is not None
     return SeedAnswers(
         principle=principle,
         idea=idea,

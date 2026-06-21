@@ -413,33 +413,37 @@ def _print_finding(finding: Finding) -> None:
         typer.echo(typer.style(f"      → {finding.suggestion}", dim=True))
 
 
-def _findings_to_json(findings: list[Finding], counts: dict[Severity, int]) -> str:
+def _findings_to_json(
+    findings: list[Finding],
+    counts: dict[Severity, int],
+    baseline: dict[str, object] | None = None,
+) -> str:
     import json
 
-    return json.dumps(
-        {
-            "version": 1,
-            "findings": [
-                {
-                    "check": f.check,
-                    "severity": f.severity.value,
-                    "message": f.message,
-                    "path": f.path.as_posix() if f.path else None,
-                    "doc_id": f.doc_id,
-                    "line": f.line,
-                    "suggestion": f.suggestion,
-                    "category": f.category,
-                }
-                for f in findings
-            ],
-            "summary": {
-                "errors": counts[Severity.error],
-                "warnings": counts[Severity.warning],
-                "info": counts[Severity.info],
-            },
+    payload: dict[str, object] = {
+        "version": 1,
+        "findings": [
+            {
+                "check": f.check,
+                "severity": f.severity.value,
+                "message": f.message,
+                "path": f.path.as_posix() if f.path else None,
+                "doc_id": f.doc_id,
+                "line": f.line,
+                "suggestion": f.suggestion,
+                "category": f.category,
+            }
+            for f in findings
+        ],
+        "summary": {
+            "errors": counts[Severity.error],
+            "warnings": counts[Severity.warning],
+            "info": counts[Severity.info],
         },
-        indent=2,
-    )
+    }
+    if baseline is not None:
+        payload["baseline"] = baseline
+    return json.dumps(payload, indent=2)
 
 
 def _print_summary(counts: dict[Severity, int]) -> None:
@@ -624,6 +628,20 @@ def check(
             help="Head git ref for diff-aware checks. Use together with --base-ref.",
         ),
     ] = None,
+    update_baseline: Annotated[
+        bool,
+        typer.Option(
+            "--update-baseline",
+            help=(
+                "Write the current error/warning findings to the baseline file "
+                "and exit 0. Subsequent runs suppress exactly these findings."
+            ),
+        ),
+    ] = False,
+    no_baseline: Annotated[
+        bool,
+        typer.Option("--no-baseline", help="Ignore an existing baseline file for this run."),
+    ] = False,
 ) -> None:
     """Run the configured checks. Errors exit non-zero."""
     if fmt not in ("plain", "json"):
@@ -632,6 +650,12 @@ def check(
 
     if (base_ref is None) != (head_ref is None):
         typer.echo(typer.style("--base-ref and --head-ref must be provided together", fg="red"))
+        raise typer.Exit(code=2)
+
+    if update_baseline and no_baseline:
+        typer.echo(
+            typer.style("--update-baseline and --no-baseline are mutually exclusive", fg="red")
+        )
         raise typer.Exit(code=2)
 
     now_date: _dt.date | None = None
@@ -685,14 +709,62 @@ def check(
     )
 
     findings = sort_findings(findings)
+
+    from irminsul.baseline import BaselineError, apply_baseline, load_baseline, write_baseline
+
+    baseline_file = repo_root / config.paths.baseline
+    if update_baseline:
+        count = write_baseline(baseline_file, findings)
+        typer.echo(
+            typer.style(
+                f"baseline: wrote {count} finding(s) to {config.paths.baseline}", fg="green"
+            )
+        )
+        raise typer.Exit(code=0)
+
+    baseline_status: dict[str, object] = {
+        "applied": False,
+        "path": None,
+        "suppressed": 0,
+        "stale": 0,
+    }
+    if not no_baseline and baseline_file.is_file():
+        try:
+            fingerprints = load_baseline(baseline_file)
+        except BaselineError as e:
+            typer.echo(typer.style(str(e), fg="red"))
+            raise typer.Exit(code=2) from None
+        application = apply_baseline(findings, fingerprints)
+        findings = application.remaining
+        baseline_status = {
+            "applied": True,
+            "path": config.paths.baseline,
+            "suppressed": application.suppressed,
+            "stale": application.stale,
+        }
+
     counts = summarize(findings)
     fail = counts[Severity.error] > 0 or (strict and counts[Severity.warning] > 0)
 
     if fmt == "json":
-        typer.echo(_findings_to_json(findings, counts))
+        typer.echo(_findings_to_json(findings, counts, baseline=baseline_status))
     else:
         for finding in findings:
             _print_finding(finding)
+        if baseline_status["applied"]:
+            stale = baseline_status["stale"]
+            stale_note = (
+                f" ({stale} stale entr{'y' if stale == 1 else 'ies'};"
+                " run --update-baseline to ratchet down)"
+                if isinstance(stale, int) and stale > 0
+                else ""
+            )
+            typer.echo(
+                typer.style(
+                    f"baseline: {baseline_status['suppressed']} finding(s) suppressed{stale_note}",
+                    fg="cyan",
+                )
+            )
         _print_summary(counts)
 
     raise typer.Exit(code=1 if fail else 0)
@@ -765,6 +837,37 @@ def context_command(
         typer.echo(format_context_plain(report))
 
     raise typer.Exit(code=1 if context_report_should_fail(report) else 0)
+
+
+@app.command("orient")
+def orient_command(
+    fmt: Annotated[
+        str,
+        typer.Option("--format", help="Output format: plain or json."),
+    ] = "plain",
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path",
+            help="Root of the codebase to inspect. Defaults to current directory.",
+        ),
+    ] = Path("."),
+) -> None:
+    """Orient an agent in this repo: structure, doc totals, entry docs, and commands.
+
+    The recommended first call for agents. Builds the doc graph once and runs
+    no checks, so it is fast; every field is also available as stable JSON via
+    `--format json`.
+    """
+    from irminsul.orient import build_orient_report, format_orient_plain, orient_report_to_json
+
+    if fmt not in ("plain", "json"):
+        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+        raise typer.Exit(code=2)
+
+    repo_root, config = _load_repo(path)
+    report = build_orient_report(repo_root, config)
+    typer.echo(orient_report_to_json(report) if fmt == "json" else format_orient_plain(report))
 
 
 @app.command("refs")
@@ -926,7 +1029,7 @@ def surface_command(
     kind: Annotated[
         str,
         typer.Argument(
-            help="Surface kind: cli, http, exports, env-vars (or a configured generic kind)."
+            help="Surface kind: cli, http, exports, env-vars, mcp (or a configured generic kind)."
         ),
     ],
     source: Annotated[
@@ -947,6 +1050,40 @@ def surface_command(
     run_surface(repo_root, config, kind, source, fmt)
 
 
+@app.command("mcp")
+def mcp_command(
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path",
+            help="Root of the codebase to serve. Defaults to current directory.",
+        ),
+    ] = Path("."),
+) -> None:
+    """Serve the doc graph to AI agents over the Model Context Protocol (stdio).
+
+    Read-only: every tool returns the same JSON the CLI prints with
+    `--format json`. Requires the optional `mcp` extra.
+    """
+    import importlib.util
+
+    if importlib.util.find_spec("mcp") is None:
+        typer.echo(
+            typer.style(
+                "The MCP server needs the optional 'mcp' dependency. "
+                "Install it with: pip install 'irminsul[mcp]'",
+                fg="red",
+            ),
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    from irminsul.mcp_server import create_server
+
+    repo_root, _ = _load_repo(path)
+    create_server(repo_root).run()
+
+
 @app.command("anchors")
 def anchors_command(
     re_pin: Annotated[
@@ -956,6 +1093,10 @@ def anchors_command(
             help="Rewrite anchor hashes to the current code (acknowledge after re-reading).",
         ),
     ] = False,
+    fmt: Annotated[
+        str,
+        typer.Option("--format", help="Output format for the report: plain or json."),
+    ] = "plain",
     path: Annotated[Path, typer.Option("--path")] = Path("."),
 ) -> None:
     """Report or re-pin anchored prose claims.
@@ -966,25 +1107,46 @@ def anchors_command(
     from irminsul.anchors import repin_text
     from irminsul.checks.claim_anchor import ClaimAnchorCheck
 
+    if fmt not in ("plain", "json"):
+        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+        raise typer.Exit(code=2)
+
     repo_root, config = _load_repo(path)
     graph = build_graph(repo_root, config)
 
     if re_pin:
-        written = 0
+        from irminsul.checks.globs import walk_source_files
+        from irminsul.inventory.fingerprint import repin_node
+
+        source_files, _ = walk_source_files(repo_root, config.paths.source_roots)
+        anchors_written = 0
+        surfaces_written = 0
         for node in graph.nodes.values():
             abs_path = repo_root / node.path
             try:
                 text = abs_path.read_text(encoding="utf-8")
             except OSError:
                 continue
-            new_text, changed = repin_text(repo_root, text)
-            if changed:
-                abs_path.write_text(new_text, encoding="utf-8")
-                written += changed
-        typer.echo(typer.style(f"re-pinned {written} anchor(s)", fg="green"))
+            text, anchor_changed = repin_text(repo_root, text)
+            text, surface_changed = repin_node(
+                repo_root, config, source_files, node.frontmatter, text
+            )
+            if anchor_changed or surface_changed:
+                abs_path.write_text(text, encoding="utf-8")
+            anchors_written += anchor_changed
+            surfaces_written += surface_changed
+        typer.echo(
+            typer.style(
+                f"re-pinned {anchors_written} anchor(s), {surfaces_written} surface fingerprint(s)",
+                fg="green",
+            )
+        )
         raise typer.Exit(code=0)
 
     findings = sort_findings(ClaimAnchorCheck().run(graph))
+    if fmt == "json":
+        typer.echo(_findings_to_json(findings, summarize(findings)))
+        return
     for finding in findings:
         _print_finding(finding)
     typer.echo(f"{len(findings)} anchor finding(s)")

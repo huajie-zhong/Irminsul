@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-Irminsul is a Python CLI (`irminsul` / `irm`) plus composite GitHub Action (`action.yml`) that enforces structural invariants on a target codebase's `/docs` tree in CI. There is no server, no hosted state, no LLM in the hard-check path. Every invocation: load `irminsul.toml` → walk `docs_root` → build a `DocGraph` → run registered checks → exit 0/1 (and optionally render an MkDocs Material site).
+Irminsul is a Python CLI (`irminsul` / `irm`) plus composite GitHub Action (`action.yml`) that enforces structural invariants on a target codebase's `/docs` tree in CI. There is no server, no hosted state, no LLM in the hard-check path. Every invocation: load `irminsul.toml` → walk `docs_root` → build a `DocGraph` → run registered checks → exit 0/1.
 
 The repo dogfoods itself — `docs/` is the live spec for the doc system the tool enforces, and CI runs `irminsul check --profile=hard` against it.
 
@@ -13,7 +13,7 @@ The repo dogfoods itself — `docs/` is the live spec for the doc system the too
 Editable install with dev tooling (Python 3.12+ required):
 
 ```bash
-pip install -e ".[dev]"      # ruff, mypy, pytest, pre-commit, mkdocs
+pip install -e ".[dev]"      # ruff, mypy, pytest, pytest-cov, pre-commit
 ```
 
 ```powershell
@@ -46,18 +46,19 @@ irminsul context --changed                 # ownership, tests, deps, and finding
 irminsul list orphans                    # docs with no inbound refs
 irminsul list stale                      # deprecated docs past stale threshold
 irminsul list undocumented               # source files in covered dirs with no doc claim
-irminsul render                          # build MkDocs site to ./site
+irminsul list lifecycle                  # unfinished decision update work
+irminsul regen agents-md                 # rebuild the docs/AGENTS.md manifest
 ```
 
 `pyproject.toml` sets `filterwarnings = ["error"]` for pytest — any warning fails the test. Don't suppress; fix the source.
 
 ## Architecture (the parts you need to read multiple files to understand)
 
-**The single data structure: `DocGraph`** (`src/irminsul/docgraph.py`). Built once per CLI invocation by `build_graph(repo_root, config)`. Walks `docs_root`, parses every `*.md` (skipping the `EXEMPT_TOPLEVEL_NAMES` set: `README.md`, `GLOSSARY.md`, `CONTRIBUTING.md`), validates frontmatter, and exposes nodes by id and by repo-relative POSIX path. Every check consumes a `DocGraph`; nothing else. If you're adding behavior, ask first whether it belongs *on the graph* or *in a check*.
+**The single data structure: `DocGraph`** (`src/irminsul/docgraph.py`). Built once per CLI invocation by `build_graph(repo_root, config)`. Walks `docs_root`, parses every `*.md` (skipping the `EXEMPT_TOPLEVEL_NAMES` set: `README.md`, `GLOSSARY.md`, `CONTRIBUTING.md`, `AGENTS.md`), validates frontmatter, and exposes nodes by id and by repo-relative POSIX path. Every check consumes a `DocGraph`; nothing else. If you're adding behavior, ask first whether it belongs *on the graph* or *in a check*.
 
 **Three check registries** (`src/irminsul/checks/__init__.py`). Names in `irminsul.toml` are resolved against these maps; an unknown name prints a yellow note and is skipped (not an error).
-- `HARD_REGISTRY` — `frontmatter`, `globs`, `uniqueness`, `links`, `schema-leak`. Errors from these always block (exit 1) regardless of `--strict`.
-- `SOFT_REGISTRY` — deterministic warnings: `mtime-drift`, `orphans`, `stale-reaper`, `supersession`, `parent-child`, `glossary`, `external-links`. Promoted to errors only with `--strict`.
+- `HARD_REGISTRY` — 9 checks: `frontmatter`, `globs`, `uniqueness`, `links`, `schema-leak`, `coverage`, `liar`, `prose-file-reference`, `agents-manifest`. Errors from these always block (exit 1) regardless of `--strict`.
+- `SOFT_REGISTRY` — 19 deterministic warnings: `mtime-drift`, `orphans`, `stale-reaper`, `supersession`, `parent-child`, `glossary-discipline`, `external-links`, `rfc-resolution`, `reality`, `claim-anchor`, … (full list in `checks/__init__.py`). Promoted to errors only with `--strict`.
 - `LLM_REGISTRY` — advisory only: `overlap`, `semantic-drift`, `scope-appropriateness`. Run only with `--profile=advisory`. Cost-budgeted via `LlmClient` (`src/irminsul/llm/client.py`); cache lives at `config.llm.cache_path`.
 
 All checks subclass `Check` and return `list[Finding]` with `(check, severity, path, line, message, suggestion)`. Severity ordering and exit-code logic live in `cli.check`.
@@ -66,15 +67,13 @@ All checks subclass `Check` and return `list[Finding]` with `(check, severity, p
 
 **`parent-child` check** infers parent–child relationships from document paths; there is no `children:` frontmatter field.
 
-**Config** (`src/irminsul/config.py`). Pydantic schema for `irminsul.toml`. `find_config()` walks upward from the target path. Source-of-truth fields: `paths.docs_root`, `paths.source_roots`, `checks.hard|soft_deterministic|soft_llm`, `languages.enabled`, `render.target`, `llm.*`.
+**Config** (`src/irminsul/config.py`). Pydantic schema for `irminsul.toml`. `find_config()` walks upward from the target path. Source-of-truth fields: `paths.docs_root`, `paths.source_roots`, `checks.hard|soft_deterministic|soft_llm`, `languages.enabled`, `llm.*`.
 
 **Language profiles** (`src/irminsul/languages/`) are pure-data records (source-root candidates + schema-leak regexes) keyed by language name. Adding a language = adding a file here, no check changes.
 
-**Renderer** (`src/irminsul/render/`) is a `Protocol` with one impl (`mkdocs.py`). `render.target = "none"` short-circuits.
-
 **Init scaffolder** (`src/irminsul/init/`) walks Jinja2 templates under `init/scaffolds/` and `init/workflows/` to bootstrap a new repo. Two modes: `init` (single-repo, the common case) and `init-docs-only` (Topology A: docs repo + sibling code repo cloned as gitignored subfolder). `detect_code_signals()` decides which to suggest.
 
-**`context`, `new`, `regen`, and `list`**. `irminsul context <path>|--topic <query>|--changed` (`src/irminsul/context.py`) returns ownership, tests, dependencies, relevant deterministic findings, and next command hints. `irminsul new {adr,component,rfc}` writes templated atoms from `src/irminsul/new/templates/`. `irminsul regen {python,typescript,docs-surfaces,all}` regenerates deterministic artifacts from `src/irminsul/regen/`; TypeScript confirms local TypeDoc is available. `irminsul list {orphans,stale,undocumented}` (`src/irminsul/listing/command.py`) wraps three checks with custom filtering; each subcommand supports `--format plain|json`.
+**`context`, `refs`, `new`, `regen`, and `list`**. `irminsul context <path>|--topic <query>|--changed` (`src/irminsul/context.py`) returns ownership, tests, dependencies, relevant deterministic findings, and next command hints. `irminsul refs <doc-id|path>|--symbol <query>` (`src/irminsul/refs.py`) reports doc backlinks (strong `depends_on` plus weak markdown links) or symbol owners/references. `irminsul new {adr,component,rfc}` writes templated atoms from `src/irminsul/new/templates/`. `irminsul regen agents-md` (`src/irminsul/regen/agents_md.py`) is the only regen target — it rebuilds the `docs/AGENTS.md` navigation manifest. `irminsul list {orphans,stale,undocumented,lifecycle}` (`src/irminsul/listing/command.py`) wraps checks with custom filtering; each subcommand supports `--format plain|json`. The CLI also ships `seed` (PIB capture into the foundation layer), `surface` (derive cli/http/exports/env-var surfaces on demand), `anchors` (report or re-pin anchored prose claims), and `fix` (deterministic remediations).
 
 **The composite Action** (`action.yml`) is a thin shell wrapper: `pip install irminsul[==version]` → `irminsul check --profile=…`. Don't add logic here; add it to the CLI and let the Action call it.
 
@@ -90,4 +89,4 @@ CI matrix: ubuntu/macos/windows × Python 3.12/3.13. Code that touches paths mus
 
 ## Versioning and release
 
-Version is driven by `hatch-vcs` from git tags; the wheel writes `src/irminsul/_version.py` at build time. Don't hand-edit version strings. Release flow lives in `.github/workflows/release.yml` (pre-builds the wheel, idempotent PyPI publish, optional Homebrew tap gated on a repo var).
+Version is driven by `hatch-vcs` from git tags; the wheel writes `src/irminsul/_version.py` at build time. Don't hand-edit version strings. Release flow lives in `.github/workflows/release.yml` (builds wheel + sdist, idempotent PyPI publish, ghcr.io Docker image, and a Homebrew tap dispatch that needs the `HOMEBREW_TAP_TOKEN` secret).
