@@ -150,6 +150,12 @@ automatically once any doc declares one.
 | `0026-retire-tier-1-and-reference-layer` | [Retire Tier 1 and the dedicated reference layer](80-evolution/rfcs/0026-retire-tier-1-and-reference-layer.md) | explanation | 2 |  |
 | `0027-watched-surfaces` | [Watched surfaces: pin a derivable surface and flag any change for review](80-evolution/rfcs/0027-watched-surfaces.md) | explanation | 2 |  |
 | `0028-mcp-tool-surface-governance` | [Govern the MCP tool surface as a watched surface](80-evolution/rfcs/0028-mcp-tool-surface-governance.md) | explanation | 2 |  |
+| `0029-bound-change-loop` | [Bound changes: turn the RFC into a code-bound proposal-to-verification loop](80-evolution/rfcs/0029-bound-change-loop.md) | explanation | 2 |  |
+| `0030-rfc-requirements-and-scenarios` | [Requirements and scenarios in the RFC, with provenance](80-evolution/rfcs/0030-rfc-requirements-and-scenarios.md) | explanation | 2 |  |
+| `0031-change-tasks-and-apply` | [Change tasks and the apply loop](80-evolution/rfcs/0031-change-tasks-and-apply.md) | explanation | 2 |  |
+| `0032-accept-time-anchoring` | [Accept-time anchoring: archive that anchors, not just tidies](80-evolution/rfcs/0032-accept-time-anchoring.md) | explanation | 2 |  |
+| `0033-derived-layered-impact` | [Derived layered impact: the change ripple as a query, not metadata](80-evolution/rfcs/0033-derived-layered-impact.md) | explanation | 2 |  |
+| `0034-base-truth-gate-and-mcp-loop` | [Base-truth gate and the MCP loop surface](80-evolution/rfcs/0034-base-truth-gate-and-mcp-loop.md) | explanation | 2 |  |
 | `80-evolution` | [Evolution](80-evolution/INDEX.md) | reference | 4 |  |
 | `patterns` | [Evolution Patterns](80-evolution/patterns.md) | explanation | 2 |  |
 | `rfcs` | [RFCs](80-evolution/rfcs/INDEX.md) | reference | 2 |  |
