@@ -79,7 +79,7 @@ new tools are added to `mcp-server.md`'s watched `inventory:` block so
 [`0028`](0028-mcp-tool-surface-governance.md)'s mechanism flags any drift between the
 tool set and the CLI — the loop surface governs itself.
 
-### Relationship to OpenSpec
+### Relationship to spec-driven tools
 
 This is parity on distribution and a lead on iteration safety. Distribution: one MCP
 surface vs. 25+ generated adapter files — same reach, less surface. Iteration safety:

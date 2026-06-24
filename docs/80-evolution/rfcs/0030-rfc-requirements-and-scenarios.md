@@ -88,7 +88,7 @@ symbol here — that pinning is the job of accept-time anchoring (0032). At this
 iteration the check only verifies the provenance *kind* is present and internally
 plausible (an `adr` provenance resolves, a `citation` is a real link).
 
-### Relationship to OpenSpec
+### Relationship to spec-driven tools
 
 This is the deliberate parity step. A spec tool's requirement (`### Requirement` +
 `#### Scenario`) and its grammar validator are reproduced here almost verbatim —

@@ -15,7 +15,7 @@ rfc_state: draft
 This is the umbrella RFC for a stack (0029–0034) that grows irminsul's existing
 RFC/ADR machinery into a complete development *loop*: **propose → implement →
 accept → verify → propose-from-truth**. The loop is the same shape spec-driven
-tools such as OpenSpec offer (propose / apply / archive), with one structural
+tools offer (propose / apply / archive), with one structural
 difference that is the whole point — every step is **bound to code** and stays
 bound, so the next iteration always departs from a verified base instead of a
 prose document that has silently rotted.
@@ -112,12 +112,13 @@ advisory nudge, not an error, in this iteration.
 Severity is `warning`, promotable to error under `--strict`, consistent with the
 rest of the soft-deterministic set.
 
-### Relationship to OpenSpec
+### Relationship to spec-driven tools
 
-OpenSpec's proposal is prose with no hook into code; its `validate` checks the
-spec's *internal grammar* only. This stack matches the propose/apply/archive
-ergonomics (0030–0032) but adds the binding OpenSpec structurally cannot: the
-proposal names code it must own, and the engine proves it. The naming convention
+A spec-driven tool's proposal is prose with no hook into code; its validator
+checks the spec's *internal grammar* only. This stack matches the
+propose/apply/archive ergonomics (0030–0032) but adds the binding such tools
+structurally cannot: the proposal names code it must own, and the engine proves
+it. The naming convention
 above (`propose`, the loop verbs) is intentionally familiar; the difference is
 enforcement, not vocabulary.
 
@@ -133,7 +134,7 @@ enforcement, not vocabulary.
 
 ## Alternatives
 
-- **A parallel `changes/` + `specs/` tree** (the OpenSpec shape) — rejected: it
+- **A parallel `changes/` + `specs/` tree** (the spec-driven-tool shape) — rejected: it
   duplicates the 9-layer model, splits intent from the doc graph, and reintroduces
   an unbound canonical spec that rots.
 - **Declare globs/surfaces in the RFC** (the naive footprint) — rejected: violates

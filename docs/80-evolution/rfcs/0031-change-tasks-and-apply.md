@@ -66,7 +66,7 @@ not a command that writes code; it is the context surface above plus the
 an agent to locate context, implement, and run checks. This RFC adds the change-task
 view to that loop; it does not add an autonomous executor.
 
-### Relationship to OpenSpec
+### Relationship to spec-driven tools
 
 This reaches apply-step parity: a checklist the agent works through, with progress
 visible. The difference is that progress is *derived from the diff against bound

@@ -66,7 +66,7 @@ graph. Every later run of coverage, `claim-anchor`, and co-change
 ([`0021-code-doc-cochange`](0021-code-doc-cochange.md)) now watches the folded
 requirement. The proposal is gone; its guarantee is permanent.
 
-### Relationship to OpenSpec
+### Relationship to spec-driven tools
 
 This is the divergence point. Where a spec tool's archive produces a tidy but
 unverified canonical spec, accept-time anchoring produces a fully-connected,
