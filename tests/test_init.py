@@ -55,6 +55,15 @@ def test_init_scaffold_config_includes_only_useful_default_knobs(tmp_path: Path)
     assert "enabled = false" in toml
     assert "[checks.parent_child]" in toml
     assert "[checks.stale_reaper]" in toml
+    # No dogfood leakage: nothing about Irminsul's own internals, and no
+    # config tables that nothing in the tool consumes. Parsed assertions so
+    # comments and formatting can't fool the test either way.
+    import tomllib
+
+    parsed = tomllib.loads(toml)
+    assert "CoverageCheck" not in toml
+    assert "tiers" not in parsed
+    assert "rules" not in parsed.get("checks", {}).get("terminology_overload", {})
 
 
 def test_init_fresh_no_interactive_creates_source_root(tmp_path: Path) -> None:

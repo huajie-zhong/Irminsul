@@ -120,28 +120,9 @@ class TerminologyRule(BaseModel):
 class TerminologyOverloadSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    rules: list[TerminologyRule] = Field(
-        default_factory=lambda: [
-            TerminologyRule(
-                term="coverage",
-                explicit_phrases=[
-                    "source ownership coverage",
-                    "source-file coverage",
-                    "source file",
-                    "source files",
-                    "source paths",
-                    "coveragecheck",
-                    "`coverage`",
-                    "tests:",
-                    "`tests:`",
-                ],
-                suggestion=(
-                    "Clarify whether this means source ownership coverage "
-                    "or the `CoverageCheck` tests: rule"
-                ),
-            )
-        ]
-    )
+    # No default rules: which terms are overloaded is project-specific. This
+    # repo declares its own `coverage` rule in its irminsul.toml.
+    rules: list[TerminologyRule] = Field(default_factory=list)
 
 
 class GenericInventoryRule(BaseModel):
