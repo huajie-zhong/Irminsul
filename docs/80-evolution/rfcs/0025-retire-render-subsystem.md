@@ -6,6 +6,7 @@ tier: 2
 status: stable
 describes: []
 rfc_state: accepted
+affects: [cli, new-list-regen]
 resolved_by: docs/50-decisions/0013-retire-render-subsystem.md
 required_updates: []
 ---

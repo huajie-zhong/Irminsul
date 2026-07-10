@@ -6,6 +6,7 @@ tier: 2
 status: stable
 describes: []
 rfc_state: accepted
+affects: [checks]
 resolved_by: docs/50-decisions/0008-implement-rfc-0017-rfc-resolution-check.md
 required_updates: []
 ---

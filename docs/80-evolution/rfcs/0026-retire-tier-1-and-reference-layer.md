@@ -6,6 +6,7 @@ tier: 2
 status: stable
 describes: []
 rfc_state: accepted
+affects: [frontmatter, checks]
 resolved_by: docs/50-decisions/0014-retire-tier-1-and-reference-layer.md
 required_updates: []
 ---

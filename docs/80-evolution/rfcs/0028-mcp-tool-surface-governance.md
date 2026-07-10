@@ -6,6 +6,7 @@ tier: 2
 status: stable
 describes: []
 rfc_state: accepted
+affects: [mcp-server, surface]
 resolved_by: docs/50-decisions/0015-govern-mcp-tool-surface.md
 required_updates: []
 ---

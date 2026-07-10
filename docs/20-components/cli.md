@@ -5,6 +5,7 @@ audience: explanation
 tier: 3
 status: stable
 depends_on:
+  - change
   - checks
   - config
   - context
@@ -37,6 +38,9 @@ inventory:
       - surface
       - anchors
       - mcp
+      - change status
+      - change verify
+      - change transition
       - new adr
       - new component
       - new rfc

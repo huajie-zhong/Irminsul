@@ -18,7 +18,15 @@ from irminsul.docgraph import DocGraph, DocNode
 from irminsul.frontmatter import ClaimStateEnum, RfcStateEnum
 from irminsul.frontmatter_edit import add_to_list
 
-_RESOLVED_STATES = frozenset({RfcStateEnum.accepted, RfcStateEnum.rejected, RfcStateEnum.withdrawn})
+_RESOLVED_STATES = frozenset(
+    {
+        RfcStateEnum.accepted,
+        RfcStateEnum.implemented,
+        RfcStateEnum.rejected,
+        RfcStateEnum.withdrawn,
+    }
+)
+_UPDATE_TRACKED_STATES = frozenset({RfcStateEnum.accepted, RfcStateEnum.implemented})
 _RFC_PATH_RE = re.compile(r"80-evolution/rfcs/[^/\s)]+\.md")
 
 
@@ -46,7 +54,7 @@ class DecisionUpdatesCheck:
 
         for node in graph.nodes.values():
             is_rfc = node.path.as_posix().startswith(rfc_prefix)
-            if is_rfc and node.frontmatter.rfc_state == RfcStateEnum.accepted:
+            if is_rfc and node.frontmatter.rfc_state in _UPDATE_TRACKED_STATES:
                 out.extend(self._check_accepted_rfc(graph, node))
             out.extend(self._check_implements(graph, node))
             out.extend(self._check_planned_claims(graph, node, docs_root))
@@ -56,6 +64,8 @@ class DecisionUpdatesCheck:
     def _check_accepted_rfc(self, graph: DocGraph, node: DocNode) -> list[Finding]:
         out: list[Finding] = []
         required_updates = node.frontmatter.required_updates
+        state = node.frontmatter.rfc_state
+        state_label = state.value if state else "accepted"
 
         if required_updates is None:
             out.append(
@@ -64,7 +74,7 @@ class DecisionUpdatesCheck:
                     category="no-required-updates-field",
                     severity=Severity.warning,
                     message=(
-                        "accepted RFC has no `required_updates` field; "
+                        f"{state_label} RFC has no `required_updates` field; "
                         "add `required_updates: []` if no downstream docs need updating"
                     ),
                     path=node.path,
@@ -88,8 +98,8 @@ class DecisionUpdatesCheck:
                         category="missing-required-update-path",
                         severity=Severity.warning,
                         message=(
-                            f"required update path '{entry.path}' listed on accepted RFC "
-                            f"does not exist in the graph"
+                            f"required update path '{entry.path}' listed on {state_label} "
+                            f"RFC does not exist in the graph"
                         ),
                         path=node.path,
                         doc_id=node.id,
@@ -137,7 +147,7 @@ class DecisionUpdatesCheck:
         out: list[Fix] = []
         for node in graph.nodes.values():
             is_rfc = node.path.as_posix().startswith(rfc_prefix)
-            if not (is_rfc and node.frontmatter.rfc_state == RfcStateEnum.accepted):
+            if not (is_rfc and node.frontmatter.rfc_state in _UPDATE_TRACKED_STATES):
                 continue
             for entry in node.frontmatter.required_updates or []:
                 target = graph.by_path.get(Path(PurePosixPath(entry.path)))

@@ -10,6 +10,7 @@ import pytest
 from typer.testing import CliRunner
 
 import irminsul.context as context_module
+import irminsul.git.changes as changes_module
 from irminsul.cli import app
 
 runner = CliRunner()
@@ -271,7 +272,7 @@ def test_git_changed_paths_parses_nul_porcelain_special_paths(tmp_path: Path, mo
             " M src/tab\tfile.py\0?? src/back\\slash.py\0R  src/new name.py\0src/old name.py\0"
         )
 
-    monkeypatch.setattr(context_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(changes_module.subprocess, "run", fake_run)
 
     assert context_module._git_changed_paths(tmp_path) == [
         "src/back\\slash.py",
@@ -296,7 +297,7 @@ def test_git_changed_paths_strips_worktree_prefix(tmp_path: Path, monkeypatch) -
             " M other-project/outside.py\0"
         )
 
-    monkeypatch.setattr(context_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(changes_module.subprocess, "run", fake_run)
 
     assert context_module._git_changed_paths(tmp_path) == [
         "src/mylib/core.py",
@@ -308,7 +309,7 @@ def test_git_changed_paths_reports_missing_git(tmp_path: Path, monkeypatch) -> N
     def fake_run(args, **kwargs):
         raise FileNotFoundError("git")
 
-    monkeypatch.setattr(context_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(changes_module.subprocess, "run", fake_run)
 
     with pytest.raises(context_module.ContextError, match="git command not found"):
         context_module._git_changed_paths(tmp_path)

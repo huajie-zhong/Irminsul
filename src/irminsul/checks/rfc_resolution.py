@@ -20,16 +20,15 @@ from irminsul import clock
 from irminsul.checks.base import Finding, Fix, Severity
 from irminsul.docgraph import DocGraph, DocNode
 from irminsul.docgraph_index import Heading
-from irminsul.frontmatter import RfcStateEnum, StatusEnum
+from irminsul.frontmatter import RFC_STATE_ALIASES, RfcStateEnum, StatusEnum, canonical_rfc_state
 from irminsul.frontmatter_edit import set_value
-
-_IN_FLIGHT = frozenset({RfcStateEnum.draft, RfcStateEnum.open, RfcStateEnum.fcp})
 
 # Terminal states and the scaffolding section a resolved RFC of that state must
 # carry. The fix inserts the first listed heading; the check accepts any.
 _TERMINAL_SECTIONS: dict[RfcStateEnum, tuple[str, ...]] = {
     RfcStateEnum.accepted: ("Resolution",),
-    RfcStateEnum.rejected: ("Rejection Rationale", "Resolution"),
+    RfcStateEnum.implemented: ("Resolution",),
+    RfcStateEnum.rejected: ("Rejection Rationale", "Resolution", "Withdrawal Rationale"),
     RfcStateEnum.withdrawn: ("Withdrawal Rationale", "Resolution"),
 }
 
@@ -54,16 +53,34 @@ class RfcResolutionCheck:
 
             headings = graph.headings.get(node.id, [])
 
-            if state == RfcStateEnum.accepted:
+            if state in RFC_STATE_ALIASES:
+                out.append(self._deprecated_state_finding(node, state))
+
+            if state in (RfcStateEnum.accepted, RfcStateEnum.implemented):
                 out.extend(self._check_accepted(graph, node, headings))
             elif state == RfcStateEnum.rejected:
                 out.extend(self._check_rejected(node, headings))
             elif state == RfcStateEnum.withdrawn:
                 out.extend(self._check_withdrawn(node, headings))
-            elif state in _IN_FLIGHT:
+            elif canonical_rfc_state(state) == RfcStateEnum.draft:
                 out.extend(self._check_in_flight(node, today))
 
         return out
+
+    def _deprecated_state_finding(self, node: DocNode, state: RfcStateEnum) -> Finding:
+        canonical = canonical_rfc_state(state)
+        return Finding(
+            check=self.name,
+            category="deprecated-rfc-state",
+            severity=Severity.warning,
+            message=(
+                f"rfc_state '{state.value}' is deprecated (RFC 0029); "
+                f"the canonical state is '{canonical.value}'"
+            ),
+            path=node.path,
+            doc_id=node.id,
+            suggestion=f"set rfc_state: {canonical.value} (irminsul fix --confirm can do this)",
+        )
 
     def fixes(self, findings: list[Finding], graph: DocGraph) -> list[Fix]:
         """Align a resolved RFC's metadata scaffolding (RFC 0017).
@@ -90,6 +107,21 @@ class RfcResolutionCheck:
             if not node.path.as_posix().startswith(rfc_prefix):
                 continue
             state = node.frontmatter.rfc_state
+
+            if state in RFC_STATE_ALIASES:
+                canonical = canonical_rfc_state(state)
+                out.append(
+                    Fix(
+                        path=node.path,
+                        description=(
+                            f"set rfc_state: {canonical.value} (deprecated alias "
+                            f"'{state.value}') in {node.path.as_posix()}"
+                        ),
+                        apply=_rfc_state_setter(canonical.value),
+                        requires_confirm=True,
+                    )
+                )
+
             sections = _TERMINAL_SECTIONS.get(state) if state is not None else None
             if sections is None:
                 continue
@@ -123,6 +155,7 @@ class RfcResolutionCheck:
     ) -> list[Finding]:
         out: list[Finding] = []
         fm = node.frontmatter
+        state_label = fm.rfc_state.value if fm.rfc_state else "accepted"
 
         if fm.status != StatusEnum.stable:
             out.append(
@@ -130,7 +163,7 @@ class RfcResolutionCheck:
                     check=self.name,
                     severity=Severity.warning,
                     message=(
-                        f"RFC is rfc_state: accepted but status is "
+                        f"RFC is rfc_state: {state_label} but status is "
                         f"'{fm.status.value}'; expected 'stable'"
                     ),
                     path=node.path,
@@ -185,7 +218,7 @@ class RfcResolutionCheck:
                 Finding(
                     check=self.name,
                     severity=Severity.warning,
-                    message="accepted RFC is missing a '## Resolution' section",
+                    message=f"{state_label} RFC is missing a '## Resolution' section",
                     path=node.path,
                     doc_id=node.id,
                     suggestion=(
@@ -202,7 +235,9 @@ class RfcResolutionCheck:
                 Finding(
                     check=self.name,
                     severity=Severity.warning,
-                    message=("accepted RFC retains an empty '## Unresolved Questions' section"),
+                    message=(
+                        f"{state_label} RFC retains an empty '## Unresolved Questions' section"
+                    ),
                     path=node.path,
                     doc_id=node.id,
                     suggestion=("remove the section or list explicit required update work"),
@@ -227,8 +262,12 @@ class RfcResolutionCheck:
                     suggestion="set status: stable once the rejection rationale is recorded",
                 )
             )
+        # `withdrawal-rationale` stays accepted for RFCs canonicalized from the
+        # deprecated `withdrawn` state (RFC 0029 deprecation window).
         if not (
-            _has_heading(headings, "resolution") or _has_heading(headings, "rejection-rationale")
+            _has_heading(headings, "resolution")
+            or _has_heading(headings, "rejection-rationale")
+            or _has_heading(headings, "withdrawal-rationale")
         ):
             out.append(
                 Finding(
@@ -330,6 +369,13 @@ def _slug(title: str) -> str:
 def _status_setter(value: str) -> Callable[[str], str]:
     def apply(text: str) -> str:
         return set_value(text, "status", value)
+
+    return apply
+
+
+def _rfc_state_setter(value: str) -> Callable[[str], str]:
+    def apply(text: str) -> str:
+        return set_value(text, "rfc_state", value)
 
     return apply
 

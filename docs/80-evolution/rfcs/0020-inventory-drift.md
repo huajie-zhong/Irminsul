@@ -6,6 +6,7 @@ tier: 2
 status: stable
 describes: []
 rfc_state: accepted
+affects: [checks, surface]
 resolved_by: docs/50-decisions/0011-derive-dont-materialize.md
 required_updates: []
 ---

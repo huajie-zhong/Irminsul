@@ -6,6 +6,7 @@ tier: 2
 status: stable
 describes: []
 rfc_state: accepted
+affects: [seed, checks]
 resolved_by: docs/50-decisions/0006-implement-rfc-0015-pib-seed-and-foundation-readiness.md
 required_updates: []
 ---
