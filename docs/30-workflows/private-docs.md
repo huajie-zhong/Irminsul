@@ -55,8 +55,5 @@ applies to `context --changed` and to diff-aware `check` runs using
 cross-repository gate. Review each repository's change set separately and use
 mtime drift as the cross-repository signal.
 
-The optional `advisory` profile sends selected private prose and source text to
-the configured external LLM provider. Use only deterministic profiles unless
-that disclosure is explicitly approved. Publishing any part of a private docs
-tree is a manual decision; nothing here automates partial disclosure of
-individual docs.
+Publishing any part of a private docs tree is a manual decision; nothing here
+automates partial disclosure of individual docs.

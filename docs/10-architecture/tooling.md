@@ -23,7 +23,6 @@ Concrete recommendations for external tools. None of these are load-bearing — 
 - **Pre-commit:** the `pre-commit` framework, with hooks pinned by hash.
 - **CI:** GitHub Actions, with `Danger.js` for PR-time policy enforcement.
 - **Spell/grammar:** `cspell` with a project dictionary that the glossary feeds.
-- **LLM judge:** any cheap model with structured output. Treat as advisory, never blocking.
 
 ## Packaging the System for Reuse
 
@@ -40,7 +39,6 @@ The doc system itself — validators, drift detectors, renderer config, ADR temp
 | ADR / RFC templates | Actual ADRs and RFCs |
 | GitHub Actions workflow definitions | `irminsul.toml` config |
 | Pre-commit hook definitions | Repo-specific overrides |
-| LLM judge prompts | The codebase's source code |
 
 ### Why Co-Location of Docs Is Non-Negotiable
 
