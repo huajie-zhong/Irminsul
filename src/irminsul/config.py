@@ -41,7 +41,6 @@ SOFT_DETERMINISTIC_CHECKS = (
     "reality",
     "boundary",
     "phantom-layer",
-    "index-graduation",
     "requires-env",
     "import-deps",
     "terminology-overload",

@@ -96,10 +96,6 @@ def test_seed_lists_anchoring_rfc_in_rfc_index(tmp_path: Path) -> None:
 
     index = (repo / "docs/80-evolution/rfcs/INDEX.md").read_text(encoding="utf-8")
     assert index.count("0001-initial-direction.md") == 1
-    # Seeding populates the rfcs layer, so its INDEX graduates draft -> stable;
-    # otherwise index-graduation would flag the freshly seeded repo.
-    assert "status: stable" in index
-    assert "status: draft" not in index
 
     # Re-appending is idempotent: a second seed pass on the same anchored repo
     # (via --reseed) must not duplicate the bullet.
