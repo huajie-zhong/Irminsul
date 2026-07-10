@@ -1364,6 +1364,118 @@ def change_transition(
     raise typer.Exit(code=0)
 
 
+@_change_app.command("finalize")
+def change_finalize(
+    change_id: Annotated[str, typer.Argument(help="RFC id, number, or repo-relative path.")],
+    anchor: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--anchor",
+            help=(
+                "Confirmed requirement binding: <requirement-id>=<path>[#<symbol>]. "
+                "Repeatable; code and test anchors may both be given."
+            ),
+        ),
+    ] = None,
+    owner: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--owner",
+            help="Explicit owner choice: <requirement-id>=<component id>. Repeatable.",
+        ),
+    ] = None,
+    base_ref: Annotated[
+        str | None,
+        typer.Option("--base-ref", help="Base git ref covering the implementation range."),
+    ] = None,
+    confirm: Annotated[
+        bool,
+        typer.Option("--confirm", help="Apply the plan. Without it, only the dry-run prints."),
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Print the planned writes without touching files."),
+    ] = False,
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Verify, promote confirmed claims, and transition accepted -> implemented atomically.
+
+    Prints a dry-run plan by default. `--confirm` asserts the caller reviewed the
+    semantic clues; it cannot override mechanical blockers. Component-doc writes
+    are applied before the RFC transition, so a failed write never leaves an
+    implemented RFC without its promoted claims.
+    """
+    from irminsul.change.finalize import parse_binding_flags, plan_finalize
+    from irminsul.change.report import ChangeError
+    from irminsul.fix import apply_fixes
+
+    repo_root, config = _load_repo(path)
+    graph = build_graph(repo_root, config)
+    try:
+        bindings = parse_binding_flags(anchor or [], "--anchor")
+        owners = parse_binding_flags(owner or [], "--owner")
+        plan = plan_finalize(
+            graph,
+            config,
+            repo_root,
+            change_id,
+            bindings=bindings,
+            owners=owners,
+            base_ref=base_ref,
+        )
+    except ChangeError as exc:
+        typer.echo(typer.style(str(exc), fg="red"))
+        raise typer.Exit(code=exc.code) from exc
+
+    typer.echo(f"{plan.change}: {plan.current_state} -> implemented")
+    if plan.blockers:
+        for blocker in plan.blockers:
+            typer.echo(typer.style(f"  blocker [{blocker.code}]: {blocker.message}", fg="red"))
+            if blocker.suggestion:
+                typer.echo(typer.style(f"    -> {blocker.suggestion}", dim=True))
+        raise typer.Exit(code=1)
+
+    for note in plan.notes:
+        typer.echo(typer.style(f"  note: {note}", fg="yellow"))
+    for promotion in plan.promotions:
+        if not promotion.already_promoted:
+            typer.echo(
+                f"  promote {promotion.global_id} -> {promotion.owner_path.as_posix()} "
+                f"({len(promotion.anchors)} anchor(s))"
+            )
+
+    plan_only = dry_run or not confirm
+    component_result = apply_fixes(
+        repo_root, list(plan.component_fixes), dry_run=plan_only, confirm=True
+    )
+    for planned in component_result.planned:
+        typer.echo(f"  {planned.path.as_posix()}: {planned.description}")
+    if component_result.errors:
+        for error in component_result.errors:
+            typer.echo(typer.style(error, fg="red"))
+        typer.echo(
+            typer.style("aborted before the lifecycle transition; rfc_state unchanged", fg="red")
+        )
+        raise typer.Exit(code=1)
+
+    rfc_result = apply_fixes(repo_root, list(plan.rfc_fixes), dry_run=plan_only, confirm=True)
+    for planned in rfc_result.planned:
+        typer.echo(f"  {planned.path.as_posix()}: {planned.description}")
+    if rfc_result.errors:
+        for error in rfc_result.errors:
+            typer.echo(typer.style(error, fg="red"))
+        raise typer.Exit(code=1)
+
+    total_planned = len(component_result.planned) + len(rfc_result.planned)
+    total_written = len(component_result.written) + len(rfc_result.written)
+    if plan_only:
+        suffix = "" if confirm else "; re-run with --confirm to apply"
+        typer.echo(typer.style(f"planned {total_planned} write(s){suffix}", fg="green"))
+    else:
+        typer.echo(typer.style(f"updated {total_written} file(s)", fg="green"))
+    raise typer.Exit(code=0)
+
+
 _new_app = typer.Typer(name="new", help="Scaffold a new doc atom.", no_args_is_help=True)
 app.add_typer(_new_app)
 

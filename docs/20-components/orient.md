@@ -25,6 +25,7 @@ inventory:
       - list undocumented
     omit:
       - anchors
+      - change finalize
       - change status
       - change transition
       - change verify

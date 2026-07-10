@@ -141,6 +141,9 @@ class Requirement:
     line: int
     req_id: str | None
     provenance: str | None
+    text: str
+    """The requirement prose outside scenarios — the behavioral invariant that
+    finalization promotes into the owning component doc (RFC 0032)."""
     has_behavior_keyword: bool
     """Whether the requirement text (outside scenarios) contains SHALL or MUST."""
     scenarios: tuple[Scenario, ...]
@@ -179,12 +182,14 @@ class _RequirementDraft:
         self.scenarios: list[Scenario] = []
 
     def build(self) -> Requirement:
+        text = "\n".join(self.text_lines).strip()
         return Requirement(
             title=self.title,
             line=self.line,
             req_id=self.req_id,
             provenance=self.provenance,
-            has_behavior_keyword=bool(_BEHAVIOR_RE.search("\n".join(self.text_lines))),
+            text=text,
+            has_behavior_keyword=bool(_BEHAVIOR_RE.search(text)),
             scenarios=tuple(self.scenarios),
         )
 
