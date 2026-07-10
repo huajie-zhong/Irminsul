@@ -111,9 +111,9 @@ def last_commit_time_any_repo(path: Path, docs_root: Path) -> GitTime | None:
     no commits (same as same-repo behaviour).
 
     A path *inside* docs_root may still belong to a nested repository — e.g. a
-    private docs repo that the outer (public) code repo gitignores. When the
-    outer repo has no history for such a path, the nearest enclosing `.git` is
-    consulted before giving up.
+    private docs repo that the outer (public) code repo gitignores. The nearest
+    enclosing `.git` is authoritative so stale history from a former outer-repo
+    location cannot override the nested repository.
     """
     try:
         path.relative_to(docs_root)
@@ -123,16 +123,13 @@ def last_commit_time_any_repo(path: Path, docs_root: Path) -> GitTime | None:
             return None
         return last_commit_time(root, path)
 
-    gt = last_commit_time(docs_root, path)
-    if gt.when is not None:
-        return gt
     nested_root = git_root_for(path)
     if (
         nested_root is None
         or nested_root == docs_root
         or nested_root.resolve() == docs_root.resolve()
     ):
-        return gt
+        return last_commit_time(docs_root, path)
     return last_commit_time(nested_root, path)
 
 

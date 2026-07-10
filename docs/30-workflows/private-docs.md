@@ -47,8 +47,16 @@ private git repository, gitignored by the outer repo (`/docs/` in the outer
 
 ## Scope & Limitations
 
-In Topology B, `irminsul context --changed` diffs the outer repo only, so
-edits inside the nested docs repo do not appear in its change set — review
-docs-side changes from within the docs repo instead. Publishing any part of a
-private docs tree is a manual decision; nothing here automates partial
-disclosure of individual docs.
+Git diff-based views inspect only the repository where Irminsul was invoked.
+In Topology A they cannot see changes committed inside the nested code repo; in
+Topology B they cannot see edits committed inside the nested docs repo. This
+applies to `context --changed` and to diff-aware `check` runs using
+`--base-ref`/`--head-ref`, so do not use strict co-change enforcement as a
+cross-repository gate. Review each repository's change set separately and use
+mtime drift as the cross-repository signal.
+
+The optional `advisory` profile sends selected private prose and source text to
+the configured external LLM provider. Use only deterministic profiles unless
+that disclosure is explicitly approved. Publishing any part of a private docs
+tree is a manual decision; nothing here automates partial disclosure of
+individual docs.

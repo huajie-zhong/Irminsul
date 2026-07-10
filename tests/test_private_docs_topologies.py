@@ -24,6 +24,7 @@ from typer.testing import CliRunner
 from irminsul.cli import app
 from irminsul.config import find_config, load
 from irminsul.docgraph import build_graph
+from irminsul.git.mtime import last_commit_time_any_repo
 
 runner = CliRunner()
 
@@ -157,6 +158,17 @@ def test_topology_a_claims_resolve_into_the_gitignored_code_repo(tmp_path: Path)
     assert "owner: core" in result.output
 
 
+def test_topology_a_mtime_uses_nested_code_history(tmp_path: Path) -> None:
+    repo_root = _build_topology_a(tmp_path)
+    code_repo = Repo(repo_root / "code")
+    expected_sha = code_repo.head.commit.hexsha
+    code_repo.close()
+
+    git_time = last_commit_time_any_repo(repo_root / "code" / "src" / "core.py", repo_root)
+    assert git_time is not None
+    assert git_time.sha == expected_sha
+
+
 def test_topology_b_checks_pass_with_nested_private_docs_repo(tmp_path: Path) -> None:
     repo_root = _build_topology_b(tmp_path)
     result = runner.invoke(app, ["check", "--profile", "configured", "--path", str(repo_root)])
@@ -184,6 +196,46 @@ def test_topology_b_mtime_drift_crosses_the_nested_repo_boundary(tmp_path: Path)
     findings = [f for f in MtimeDriftCheck().run(graph) if "drift" in f.message]
     assert len(findings) == 1
     assert findings[0].doc_id == "core"
+
+
+def test_topology_b_nested_history_wins_after_outer_repo_migration(tmp_path: Path) -> None:
+    repo_root = tmp_path / "migrated-public-repo"
+    outer_repo = _init_repo(repo_root)
+    components = repo_root / "docs" / "20-components"
+    components.mkdir(parents=True)
+    doc = components / "core.md"
+    doc.write_text(_DOC.format(claim="src/core.py"), encoding="utf-8")
+    (components / "INDEX.md").write_text(_INDEX, encoding="utf-8")
+    _commit_all(
+        outer_repo,
+        "docs were once public",
+        when=_dt.datetime(2025, 1, 1, tzinfo=_dt.UTC),
+    )
+
+    (repo_root / ".gitignore").write_text("/docs/\n", encoding="utf-8")
+    outer_repo.index.add([".gitignore"])
+    outer_repo.git.rm("-r", "--cached", "docs")
+    outer_repo.index.commit(
+        "move docs to private history",
+        author_date=_dt.datetime(2025, 2, 1, tzinfo=_dt.UTC),
+        commit_date=_dt.datetime(2025, 2, 1, tzinfo=_dt.UTC),
+    )
+    outer_sha = outer_repo.head.commit.hexsha
+    outer_repo.close()
+
+    nested_repo = _init_repo(repo_root / "docs")
+    _commit_all(
+        nested_repo,
+        "private docs history",
+        when=_dt.datetime(2024, 1, 1, tzinfo=_dt.UTC),
+    )
+    nested_sha = nested_repo.head.commit.hexsha
+    nested_repo.close()
+
+    git_time = last_commit_time_any_repo(doc, repo_root)
+    assert git_time is not None
+    assert git_time.sha == nested_sha
+    assert git_time.sha != outer_sha
 
 
 def test_topology_b_doc_edits_invisible_to_outer_diff_is_a_known_limit(
