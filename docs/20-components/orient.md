@@ -26,6 +26,7 @@ inventory:
     omit:
       - anchors
       - change finalize
+      - change impact
       - change status
       - change transition
       - change verify
