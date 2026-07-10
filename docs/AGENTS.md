@@ -82,6 +82,7 @@ automatically once any doc declares one.
 |----|-----|----------|------|---------|
 | `30-workflows` | [Workflows](30-workflows/INDEX.md) | explanation | 3 |  |
 | `check-pipeline` | [Check Pipeline](30-workflows/check-pipeline.md) | explanation | 3 |  |
+| `private-docs` | [Private docs for a public code repo](30-workflows/private-docs.md) | explanation | 3 |  |
 
 ### 50-decisions
 
