@@ -64,6 +64,10 @@ class Paths(BaseModel):
 
 
 class Tiers(BaseModel):
+    """Deprecated: nothing consumes `[tiers]`; accepted only so existing
+    configs that still carry the table keep loading. Doc stability is driven
+    by per-doc frontmatter (`tier:`), not by config globs."""
+
     model_config = ConfigDict(extra="forbid")
 
     stable: list[str] = Field(
