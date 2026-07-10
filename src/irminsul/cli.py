@@ -1209,7 +1209,9 @@ def anchors_command(
 
     findings = sort_findings(ClaimAnchorCheck().run(graph))
     if fmt == "json":
-        typer.echo(_findings_to_json(findings, summarize(findings), _compute_fixable(findings, graph)))
+        typer.echo(
+            _findings_to_json(findings, summarize(findings), _compute_fixable(findings, graph))
+        )
         return
     for finding in findings:
         _print_finding(finding)
