@@ -25,6 +25,7 @@ tests:
   - tests/test_checks_reality.py
   - tests/test_checks_boundary.py
   - tests/test_checks_doc_reality.py
+  - tests/test_checks_doc_refs.py
 ---
 
 # Checks
@@ -40,7 +41,7 @@ Checks consume a [DocGraph](docgraph.md) and return `Finding` records with sever
 | `schema-leak` | No type/schema definitions inside `docs/20-components/` (they live in code, not docs) | error |
 | `prose-file-reference` | Local `.md` references in prose must be real links or explicitly ignored | error |
 
-Soft deterministic checks warn rather than block. For example, `foundation-readiness` warns when a `00-foundation/` or `10-architecture/` doc still contains literal scaffold placeholder phrases — a signal the project never ran [`irminsul seed`](seed.md) to capture real intent.
+Soft deterministic checks warn rather than block. For example, `foundation-readiness` warns when a `00-foundation/` or `10-architecture/` doc still contains literal scaffold placeholder phrases — a signal the project never ran [`irminsul seed`](seed.md) to capture real intent. Another, `doc-refs`, warns when a `depends_on` entry names a doc id that doesn't exist in the graph — a dangling edge would otherwise silently weaken orphan detection and the other consumers of strong dependencies; the [refs query](refs.md) helps locate the intended doc.
 
 One enforcement lives outside the registries: `co-change`. It needs a changed-file set from git, so it runs only when the [CLI](cli.md) is given `--diff <base>` (or the equivalent two-flag spelling `--base-ref`/`--head-ref`; the two forms are mutually exclusive). It is the only diff-precise signal — `mtime-drift` no longer carries one. Each source file changed in `<base>...HEAD` is resolved to its most-specific owning docs through the same `describes` glob logic as `uniqueness`; when none of a file's owning docs changed in the same diff, each owning doc gets one warning listing its changed-but-unreflected files. `--strict` promotes the warning to an error, like the soft deterministic set.
 

@@ -26,7 +26,7 @@ from irminsul.docgraph import DocGraph, DocNode
 # Files that are usually noise from a doc-coverage standpoint. Keeping the
 # omission warning quiet here trades a tiny risk of missing a legit doc gap
 # against the much larger annoyance of warning on every `__init__.py`.
-_OMISSION_SKIP = GitIgnoreSpec.from_lines(
+OMISSION_SKIP = GitIgnoreSpec.from_lines(
     [
         "__init__.py",
         "__main__.py",
@@ -64,21 +64,21 @@ Claim = tuple[DocNode, str, tuple[int, int, int]]
 
 
 def resolve_claims(graph: DocGraph, source_files: list[tuple[Path, str]]) -> dict[str, list[Claim]]:
-    """Map each source file's display path to every doc claim that matches it.
+    """Map each claimed source display path to its (doc, pattern, specificity) claims.
 
-    This is the single `describes` resolution used by uniqueness and by the
-    co-change enforcement — keep them on the same logic so "who owns this
-    file?" has exactly one answer.
+    This is the single claim-resolution routine shared by the uniqueness check,
+    `irminsul list undocumented`, and the co-change enforcement — "who owns
+    this file?" has exactly one answer.
     """
     claims_by_file: dict[str, list[Claim]] = defaultdict(list)
+    displays = [display for _, display in source_files]
     for node in graph.nodes.values():
         for pattern in node.frontmatter.describes:
             spec = GitIgnoreSpec.from_lines([pattern])
             score = specificity(pattern)
-            for _, display in source_files:
-                if spec.match_file(display):
-                    claims_by_file[display].append((node, pattern, score))
-    return dict(claims_by_file)
+            for display in spec.match_files(displays):
+                claims_by_file[display].append((node, pattern, score))
+    return claims_by_file
 
 
 def most_specific_claims(claims: list[Claim]) -> list[Claim]:
@@ -97,6 +97,10 @@ class UniquenessCheck:
 
         source_files, _missing = walk_source_files(graph.repo_root, graph.config.paths.source_roots)
 
+<<<<<<< HEAD
+=======
+        # claims_by_file: source file -> list of (DocNode, pattern, score).
+>>>>>>> origin/main
         claims_by_file = resolve_claims(graph, source_files)
 
         out: list[Finding] = []
@@ -130,7 +134,7 @@ class UniquenessCheck:
                 continue
             if not _is_in_covered_dir(source_file, covered_dirs):
                 continue
-            if _OMISSION_SKIP.match_file(source_file):
+            if OMISSION_SKIP.match_file(source_file):
                 continue
             out.append(
                 Finding(

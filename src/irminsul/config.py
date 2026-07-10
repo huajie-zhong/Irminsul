@@ -50,6 +50,7 @@ SOFT_DETERMINISTIC_CHECKS = (
     "decision-updates",
     "inventory-drift",
     "claim-anchor",
+    "doc-refs",
 )
 SOFT_LLM_CHECKS = ("overlap", "semantic-drift", "scope-appropriateness")
 
@@ -59,9 +60,14 @@ class Paths(BaseModel):
 
     docs_root: str = "docs"
     source_roots: list[str] = Field(default_factory=lambda: ["src", "app", "lib"])
+    baseline: str = ".irminsul-baseline.json"
 
 
 class Tiers(BaseModel):
+    """Deprecated: nothing consumes `[tiers]`; accepted only so existing
+    configs that still carry the table keep loading. Doc stability is driven
+    by per-doc frontmatter (`tier:`), not by config globs."""
+
     model_config = ConfigDict(extra="forbid")
 
     stable: list[str] = Field(
@@ -118,28 +124,9 @@ class TerminologyRule(BaseModel):
 class TerminologyOverloadSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    rules: list[TerminologyRule] = Field(
-        default_factory=lambda: [
-            TerminologyRule(
-                term="coverage",
-                explicit_phrases=[
-                    "source ownership coverage",
-                    "source-file coverage",
-                    "source file",
-                    "source files",
-                    "source paths",
-                    "coveragecheck",
-                    "`coverage`",
-                    "tests:",
-                    "`tests:`",
-                ],
-                suggestion=(
-                    "Clarify whether this means source ownership coverage "
-                    "or the `CoverageCheck` tests: rule"
-                ),
-            )
-        ]
-    )
+    # No default rules: which terms are overloaded is project-specific. This
+    # repo declares its own `coverage` rule in its irminsul.toml.
+    rules: list[TerminologyRule] = Field(default_factory=list)
 
 
 class GenericInventoryRule(BaseModel):

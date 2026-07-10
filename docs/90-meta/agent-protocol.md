@@ -10,6 +10,7 @@ inventory:
   - kind: cli
     source: src/irminsul/cli.py
     items:
+      - orient
       - context
       - check
       - regen agents-md
@@ -26,10 +27,12 @@ just this one. Follow each step in order; do not skip ahead.
 
 ## Work order
 
-0. **Read the manifest first.** Read [`AGENTS.md`](../AGENTS.md) before any
-   other step. The manifest names the layers and tiers, the Three Laws, and
-   this protocol. If the manifest is missing or its generated section is stale,
-   run `irminsul regen agents-md` and proceed.
+0. **Orient first.** Run `irminsul orient` (or `irminsul orient --format json`)
+   to load the repo's structure, doc totals, entry docs, and command
+   vocabulary, then read [`AGENTS.md`](../AGENTS.md) before any other step.
+   The manifest names the layers and tiers, the Three Laws, and this protocol.
+   If the manifest is missing or its generated section is stale, run
+   `irminsul regen agents-md` and proceed.
 
 1. **Locate context before editing.** Run `irminsul context <target>`,
    `irminsul context --topic <query>`, or `irminsul context --changed` to

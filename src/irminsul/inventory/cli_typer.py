@@ -55,8 +55,8 @@ class CliTyperExtractor:
         apps: dict[str, str | None] = {}
         # parent var -> list of (child var, group name)
         edges: dict[str, list[tuple[str, str]]] = {}
-        # (app var, command name, display, line)
-        commands: list[tuple[str, str, str, int]] = []
+        # (app var, command name, defining function name, display, line)
+        commands: list[tuple[str, str, str, str, int]] = []
 
         for abs_path, display in source_files:
             if PurePosixPath(display).suffix != ".py":
@@ -74,10 +74,17 @@ class CliTyperExtractor:
         prefixes = self._resolve_prefixes(apps, edges)
 
         items: list[SurfaceItem] = []
-        for app_var, cmd, display, line in commands:
+        for app_var, cmd, func_name, display, line in commands:
             prefix = prefixes.get(app_var, [])
             identity = " ".join([*prefix, cmd])
-            items.append(SurfaceItem(identity=identity, display=display, line=line))
+            items.append(
+                SurfaceItem(
+                    identity=identity,
+                    display=display,
+                    line=line,
+                    symbol=f"{display}#{func_name}",
+                )
+            )
         return dedupe(items)
 
     def _scan_module(
@@ -86,7 +93,7 @@ class CliTyperExtractor:
         display: str,
         apps: dict[str, str | None],
         edges: dict[str, list[tuple[str, str]]],
-        commands: list[tuple[str, str, str, int]],
+        commands: list[tuple[str, str, str, str, int]],
     ) -> None:
         for node in ast.walk(tree):
             # Typer() construction: X = typer.Typer(name=...)
@@ -119,7 +126,7 @@ class CliTyperExtractor:
                         continue
                     app_var, explicit = parsed
                     name = _command_name(explicit, node.name)
-                    commands.append((app_var, name, display, node.lineno))
+                    commands.append((app_var, name, node.name, display, node.lineno))
 
     def _resolve_prefixes(
         self,

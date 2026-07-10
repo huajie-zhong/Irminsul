@@ -14,12 +14,14 @@ from irminsul.inventory.env_vars import EnvVarsExtractor
 from irminsul.inventory.exports_ts import TypeScriptExportsExtractor
 from irminsul.inventory.generic_regex import GenericRegexExtractor
 from irminsul.inventory.http_fastapi import FastapiHttpExtractor
+from irminsul.inventory.mcp import McpToolExtractor
 
 EXTRACTOR_REGISTRY: dict[str, Extractor] = {
     CliTyperExtractor.kind: CliTyperExtractor(),
     FastapiHttpExtractor.kind: FastapiHttpExtractor(),
     TypeScriptExportsExtractor.kind: TypeScriptExportsExtractor(),
     EnvVarsExtractor.kind: EnvVarsExtractor(),
+    McpToolExtractor.kind: McpToolExtractor(),
 }
 
 KNOWN_KINDS = tuple(EXTRACTOR_REGISTRY)
@@ -40,6 +42,7 @@ __all__ = [
     "Extractor",
     "FastapiHttpExtractor",
     "GenericRegexExtractor",
+    "McpToolExtractor",
     "SurfaceItem",
     "TypeScriptExportsExtractor",
     "get_extractor",

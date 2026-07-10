@@ -16,7 +16,9 @@ from typing import Any
 import typer
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
+from irminsul.config import find_config, load
 from irminsul.init.detector import detect_languages, detect_source_roots
+from irminsul.regen.agents_md import manifest_rel_path, regen_agents_md
 
 _GITHUB_USER_PLACEHOLDER = "huajie-zhong"
 
@@ -269,6 +271,44 @@ def write_scaffold(target_root: Path, answers: InitAnswers, *, force: bool = Fal
     return written
 
 
+def generate_agents_manifest(target_root: Path, *, force: bool = False) -> list[Path]:
+    """Generate `docs/AGENTS.md` from the freshly scaffolded tree.
+
+    Reuses the `irminsul regen agents-md` machinery: a missing manifest is
+    scaffolded in full; a pre-existing manifest is never clobbered — without
+    `force` it is left untouched, and with `force` only the marked generated
+    section is rewritten (curated sections survive regeneration).
+    """
+    config = load(find_config(target_root))
+    rel_path = manifest_rel_path(config)
+    if (target_root / rel_path).exists() and not force:
+        return []
+    regen_agents_md(target_root, config)
+    return [rel_path]
+
+
+def _scaffold_with_agent_wiring(
+    target_root: Path, answers: InitAnswers, *, force: bool
+) -> list[Path]:
+    """Render the scaffold, then wire the repo for agent harnesses.
+
+    Writes `docs/AGENTS.md` (the navigation manifest) via the regen machinery.
+    The root `AGENTS.md` pointer is part of the scaffold templates; if one
+    already exists it is skipped (with a note) unless `force` is given.
+    """
+    root_manifest_preexisting = (target_root / "AGENTS.md").exists()
+    written = write_scaffold(target_root, answers, force=force)
+    written.extend(generate_agents_manifest(target_root, force=force))
+    if root_manifest_preexisting and not force:
+        typer.echo(
+            typer.style(
+                "note: AGENTS.md already exists at the repo root; leaving it untouched.",
+                fg="yellow",
+            )
+        )
+    return written
+
+
 def print_next_steps(answers: InitAnswers, written: list[Path]) -> None:
     typer.echo()
     typer.echo(typer.style("Created:", fg="green", bold=True))
@@ -279,19 +319,23 @@ def print_next_steps(answers: InitAnswers, written: list[Path]) -> None:
     typer.echo("  1. Edit docs/00-foundation/principles.md")
     typer.echo("  2. Edit docs/10-architecture/overview.md")
     typer.echo("  3. Add CODEOWNERS coverage for /docs (project-specific; not auto-generated).")
-    typer.echo("  4. git add . && git commit -m 'Adopt Irminsul'")
-    typer.echo("  5. Push — CI enforces from PR #1.")
+    typer.echo(
+        "  4. Point your coding agent at AGENTS.md (repo root) — "
+        "it routes to docs/AGENTS.md and the agent loop."
+    )
+    typer.echo("  5. git add . && git commit -m 'Adopt Irminsul'")
+    typer.echo("  6. Push — CI enforces from PR #1.")
 
 
 def run_init(target_root: Path, *, interactive: bool, force: bool = False) -> None:
     answers = gather_answers(repo_root=target_root, interactive=interactive)
-    written = write_scaffold(target_root, answers, force=force)
+    written = _scaffold_with_agent_wiring(target_root, answers, force=force)
     print_next_steps(answers, written)
 
 
 def run_init_fresh(target_root: Path, *, interactive: bool, force: bool = False) -> None:
     answers = gather_answers_fresh(repo_root=target_root, interactive=interactive)
-    written = write_scaffold(target_root, answers, force=force)
+    written = _scaffold_with_agent_wiring(target_root, answers, force=force)
     for root in answers.source_roots:
         (target_root / root).mkdir(parents=True, exist_ok=True)
     print_next_steps(answers, written)
@@ -307,7 +351,7 @@ def run_init_docs_only(
     answers = gather_answers_docs_only(
         repo_root=target_root, interactive=interactive, code_repo=code_repo
     )
-    written = write_scaffold(target_root, answers, force=force)
+    written = _scaffold_with_agent_wiring(target_root, answers, force=force)
     if answers.code_subfolder:
         update_gitignore(target_root, answers.code_subfolder)
     _print_docs_only_next_steps(answers, written)
@@ -323,7 +367,7 @@ def run_init_fresh_docs_only(
     answers = gather_answers_fresh_docs_only(
         repo_root=target_root, interactive=interactive, code_repo=code_repo
     )
-    written = write_scaffold(target_root, answers, force=force)
+    written = _scaffold_with_agent_wiring(target_root, answers, force=force)
     if answers.code_subfolder:
         update_gitignore(target_root, answers.code_subfolder)
     _print_docs_only_next_steps(answers, written)
@@ -345,5 +389,9 @@ def _print_docs_only_next_steps(answers: InitAnswers, written: list[Path]) -> No
         typer.echo(f"  1. Clone or place the code repo at ./{answers.code_subfolder}/")
     typer.echo("  2. Edit docs/00-foundation/principles.md")
     typer.echo("  3. Edit docs/10-architecture/overview.md")
-    typer.echo("  4. git add . && git commit -m 'Adopt Irminsul (docs-only)'")
-    typer.echo("  5. Push — CI enforces from PR #1.")
+    typer.echo(
+        "  4. Point your coding agent at AGENTS.md (repo root) — "
+        "it routes to docs/AGENTS.md and the agent loop."
+    )
+    typer.echo("  5. git add . && git commit -m 'Adopt Irminsul (docs-only)'")
+    typer.echo("  6. Push — CI enforces from PR #1.")
