@@ -39,9 +39,9 @@ In-flight proposals. See [`80-evolution`](../INDEX.md) for the RFC lifecycle.
 - [`0026-retire-tier-1-and-reference-layer`](0026-retire-tier-1-and-reference-layer.md) — Retire Tier 1 and the dedicated reference layer
 - [`0027-watched-surfaces`](0027-watched-surfaces.md) — Pin a derivable surface and flag any new/removed/changed item for review; generalizes anchor + inventory-drift
 - [`0028-mcp-tool-surface-governance`](0028-mcp-tool-surface-governance.md) — Govern the MCP tool set as a watched surface so it can't silently drift from the CLI read commands
-- [`0029-bound-change-loop`](0029-bound-change-loop.md) — Umbrella: turn the RFC into a code-bound propose→implement→accept→verify loop under a derive-don't-declare law
-- [`0030-rfc-requirements-and-scenarios`](0030-rfc-requirements-and-scenarios.md) — EARS-style requirements and scenarios in the RFC body, each with provenance
-- [`0031-change-tasks-and-apply`](0031-change-tasks-and-apply.md) — Change tasks checklist and the apply loop with derived progress
-- [`0032-accept-time-anchoring`](0032-accept-time-anchoring.md) — Accept folds requirements into owning component docs as anchored claims
-- [`0033-derived-layered-impact`](0033-derived-layered-impact.md) — The foundation→architecture→component change ripple as a derived query, never stored
-- [`0034-base-truth-gate-and-mcp-loop`](0034-base-truth-gate-and-mcp-loop.md) — Base-truth gate before proposing, plus the loop verbs as a governed MCP surface
+- [`0029-bound-change-loop`](0029-bound-change-loop.md) — Umbrella: a four-state, code-bound RFC lifecycle with mechanical evidence and semantic-review clues
+- [`0030-rfc-requirements-and-scenarios`](0030-rfc-requirements-and-scenarios.md) — Proportional behavioral requirements and scenarios as stable review contracts
+- [`0031-change-tasks-and-apply`](0031-change-tasks-and-apply.md) — Static implementation tasks with derived repository evidence, not fabricated completion
+- [`0032-implementation-finalization-and-anchoring`](0032-implementation-finalization-and-anchoring.md) — Verified finalization promotes confirmed requirements into anchored component claims
+- [`0033-derived-layered-impact`](0033-derived-layered-impact.md) — Derived layered impact and grounded semantic-review routes
+- [`0034-binding-readiness-and-agent-lifecycle`](0034-binding-readiness-and-agent-lifecycle.md) — Lifecycle readiness reports and a governed read-only agent surface

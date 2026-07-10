@@ -1,6 +1,6 @@
 ---
 id: 0030-rfc-requirements-and-scenarios
-title: "Requirements and scenarios in the RFC, with provenance"
+title: "Requirements and scenarios as review contracts"
 audience: explanation
 tier: 2
 status: draft
@@ -8,119 +8,160 @@ describes: []
 rfc_state: draft
 ---
 
-# RFC 0030: Requirements and scenarios in the RFC
+# RFC 0030: Requirements and scenarios as review contracts
 
 ## Summary
 
-Iteration 2 of the [bound-change loop](0029-bound-change-loop.md). Give a change a
-structured **requirements** section in the RFC *body* (not frontmatter), each
-requirement an EARS-style statement (`SHALL`/`MUST`) with at least one
-`#### Scenario:` block, and each carrying **provenance** (code / ADR / citation)
-per Principle 2 ([`principles.md`](../../00-foundation/principles.md)). A
-deterministic grammar check validates the structure — reaching parity with the
-internal-consistency guarantee spec-driven tools provide — while provenance keeps
-each requirement *bound*, which those tools do not.
+Add structured requirements and scenarios to behavior-changing RFCs. The
+structure gives deterministic checks stable units to validate and gives agents
+precise semantic-review targets; it does not claim that grammar can prove the
+implementation correct.
+
+Requirements are proportional rather than universal. An RFC that changes
+observable behavior records requirements and scenarios. A refactor, documentation
+change, or internal maintenance proposal may explicitly state that it has no new
+behavioral requirements instead of inventing artificial ones.
+
+Each requirement has a stable local id and an evidence obligation. At proposal
+time, `Provenance: code` means "finalization must bind this requirement to code";
+it is not evidence that the not-yet-written implementation already exists.
 
 ## Motivation
 
-Iteration 1 binds a change at the component level. Real proposals promise specific
-*behaviors*, and behaviors are the unit reviewers and agents actually reason about.
-Spec-driven tools already model this well: a requirement is a SHALL statement with
-named scenarios, and a validator enforces that shape. irminsul should match that
-authoring rigor — agents produce far better implementations from a scenario list
-than from a paragraph — but without inheriting the unbound-spec rot: a requirement
-must trace to evidence, not float.
+Component binding from [0029](0029-bound-change-loop.md) can establish where a
+change was intended to land. It cannot express what the implementation must do.
+Without stable behavioral promises, an agent can inspect changed files but has no
+precise contract against which to review them, and implementation finalization has
+nothing specific to promote into the owning component docs.
 
-Requirements also become the anchor targets for iteration 4
-([`0032`](0032-accept-time-anchoring.md)), where they fold into the owning
-component doc as pinned claims. So this RFC defines the artifact that later gets
-bound; here it only has to exist and be well-formed.
+The value is therefore not the SHALL vocabulary itself. The value is a small,
+parseable contract that connects:
+
+`intent -> requirement -> scenario -> implementation evidence -> anchored claim`.
 
 ## Detailed Design
 
 ### Body shape
 
-Requirements live in a `## Requirements` section of the RFC body, mirroring the
-markdown-body placement spec tools use (keeping frontmatter lean per the
-derive-don't-declare law of [`0029`](0029-bound-change-loop.md)):
+Behavior-changing RFCs use a `## Requirements` section:
 
 ```markdown
 ## Requirements
 
 ### Requirement: SSO login
-Users SHALL be able to authenticate via SSO.
+ID: sso-login
 Provenance: code
 
+Users SHALL be able to authenticate through their company identity provider.
+
 #### Scenario: Valid SSO assertion
-- **WHEN** the IdP returns a valid assertion
+- **WHEN** the identity provider returns a valid assertion
 - **THEN** a session is established
+
+#### Scenario: Expired SSO assertion
+- **WHEN** the identity provider returns an expired assertion
+- **THEN** authentication is rejected
 ```
 
-### Grammar check (parity)
+`ID` is unique within the RFC and stable across wording changes. Its globally
+addressable identity is `<rfc-id>#<requirement-id>`, for example
+`0035-sso-login#sso-login`. Tasks in 0031 and promoted claims in 0032 use this id;
+they do not match mutable heading text.
 
-A soft-deterministic check, `requirement-grammar`, validates each requirement in a
-change RFC:
+An RFC with no new behavioral contract writes an explicit disposition:
 
-- a `### Requirement:` block has SHALL/MUST text and **at least one**
-  `#### Scenario:` block;
-- scenarios use level-4 headers (not bare bullet lists);
-- requirement names are unique within the RFC.
+```markdown
+## Requirements
 
-These mirror the structural rules a spec validator enforces, so a change RFC is
-held to the same internal-consistency bar.
+No new behavioral requirements: this refactor preserves the existing contract.
+```
 
-### Provenance (the binding)
+This is reviewable intent, not an empty section or silent omission.
 
-Each requirement declares `Provenance: code | adr | citation`, reusing the
-structured-claim provenance model of
-[`0010-structured-claim-provenance`](0010-structured-claim-provenance.md):
+### Evidence obligations
 
-- `code` — the requirement is satisfied by source; it becomes anchorable to that
-  source in 0032 via the [`anchors`](../../20-components/anchors.md) mechanism.
-- `adr` — the requirement records a decision; it must resolve to an ADR (the same
-  linkage [`0017-rfc-resolution-check`](0017-rfc-resolution-check.md) already
-  validates for the RFC itself).
-- `citation` — an external authority; an external link the
-  `external-links` check can reach.
+`Provenance` reuses the project's three evidence classes:
 
-A requirement with `Provenance: code` is *not yet* required to name the exact
-symbol here — that pinning is the job of accept-time anchoring (0032). At this
-iteration the check only verifies the provenance *kind* is present and internally
-plausible (an `adr` provenance resolves, a `citation` is a real link).
+- `code` - the requirement is expected to become an anchored code claim during
+  implementation finalization;
+- `adr` - the requirement is a decision constraint and must resolve through the
+  RFC's ADR relationship;
+- `citation` - the requirement comes from an external authority and must contain a
+  resolvable link.
 
-### Relationship to spec-driven tools
+Before implementation, a code provenance is reported as `planned/unbound`. After
+the RFC becomes `implemented`, the corresponding canonical claim must have a
+confirmed code anchor or an explicit disposition explaining why code is not the
+right evidence. This keeps provenance honest across the lifecycle.
 
-This is the deliberate parity step. A spec tool's requirement (`### Requirement` +
-`#### Scenario`) and its grammar validator are reproduced here almost verbatim —
-the format is good and worth adopting. The single addition is the `Provenance:`
-line, which is what later lets the requirement be *bound* to code rather than left
-as a durable-but-unverified spec entry.
+### Deterministic grammar check
+
+A soft-deterministic `requirement-grammar` check parses the RFC body and validates:
+
+- requirement ids are present, syntactically valid, and unique within the RFC;
+- every requirement contains SHALL or MUST behavior text;
+- every requirement has at least one named scenario;
+- every scenario contains a WHEN and THEN;
+- provenance is one of the supported evidence classes;
+- task and promoted-claim references resolve to a requirement id;
+- an explicit no-new-behavior disposition is not mixed with requirement blocks.
+
+Malformed draft RFCs produce warnings. `change transition ... accepted` treats
+grammar findings as blockers because acceptance freezes the contract to implement.
+
+Body-section parsing is new shared capability. It belongs in the graph's markdown
+index rather than in ad hoc check regexes so requirement ids, task links, headings,
+and source lines have one parser and one representation.
+
+### Semantic-review clues
+
+Grammar cannot determine whether a requirement is useful, complete, feasible, or
+implemented. `change status` and `change verify` therefore emit clues for agent or
+human review, including:
+
+- a requirement has no negative or failure scenario;
+- requirement wording is broader than the declared affected components;
+- no related source or test changed;
+- a scenario has implementation evidence but no test evidence;
+- two requirements appear to make competing promises.
+
+Deterministic clues are grounded in observable absence or mismatch. Optional LLM
+advisory checks may interpret the requirement and code, but their conclusion never
+enters the hard profile or silently changes lifecycle state.
+
+### Proportional adoption
+
+The transition check does not require behavior blocks merely because
+`affects` is non-empty. Instead, it requires either one or more well-formed
+requirements or the explicit no-new-behavior disposition. The reviewer decides
+whether that disposition is credible; Irminsul makes the decision visible.
 
 ## Drawbacks
 
-- **Author effort.** Scenarios are more work than a paragraph; mitigated because
-  agents, the primary consumers, both write and benefit from them.
-- **Grammar strictness.** Like any structural validator, `requirement-grammar` will
-  reject loosely-written requirements; that is the intended pressure.
-- **Provenance ahead of anchoring.** Declaring `Provenance: code` before 0032 lands
-  is a promise the engine cannot yet fully verify; until then it is checked only
-  for presence and kind.
+- **Authoring cost.** Behavioral changes require concrete scenarios before
+  implementation; this is intentional design pressure but should not burden
+  maintenance-only RFCs.
+- **New parser surface.** Structured body sections become a first-class DocGraph
+  concept and require line-accurate tests.
+- **False confidence.** A green grammar check proves structure only. The command
+  output must keep mechanical readiness and semantic review visibly separate.
+- **Stable ids.** Requirement ids add a small amount of authored identity, but are
+  necessary for tasks, promotion, and supersession to survive heading edits.
 
 ## Alternatives
 
-- **Requirements in frontmatter** — rejected: bloats metadata and fights the
-  lean-frontmatter law of 0029; body prose is the right home and matches spec-tool
-  convention.
-- **No provenance, grammar only** — rejected: that is exactly the unbound spec that
-  rots; provenance is the differentiator.
-- **A separate `requirements/` file per change** — rejected: re-introduces a
-  parallel tree; the RFC body is sufficient and keeps one home per change.
+- **Requirements in frontmatter.** Rejected because multiline behavioral intent
+  belongs in prose and would make canonical metadata difficult to review.
+- **Free-form acceptance criteria.** Easier to write, but tasks and finalization
+  cannot reference stable units and deterministic structure checks become brittle.
+- **Require scenarios for every RFC.** Rejected because it creates ceremony and
+  synthetic contracts for refactors and documentation-only changes.
+- **Treat code provenance as current proof at proposal time.** Rejected because the
+  implementation may not exist; it is an evidence obligation until finalization.
 
 ## Unresolved Questions
 
-- Whether `requirement-grammar` is a distinct check or an extension of an existing
-  one.
-- Exact provenance syntax (`Provenance:` line vs. a structured claim block reusing
-  0010's machinery directly).
-- Whether scenario keywords (`WHEN`/`THEN`/`AND`) are enforced or merely
-  conventional.
+- Exact requirement-id syntax and whether ids may be reused by a superseding RFC.
+- Whether GIVEN is supported as an optional scenario keyword.
+- Whether the explicit no-new-behavior disposition needs a structured marker or a
+  canonical sentence recognized by the parser.

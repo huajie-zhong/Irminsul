@@ -1,6 +1,6 @@
 ---
 id: 0033-derived-layered-impact
-title: "Derived layered impact: the change ripple as a query, not metadata"
+title: "Derived change impact and semantic-review clues"
 audience: explanation
 tier: 2
 status: draft
@@ -8,97 +8,139 @@ describes: []
 rfc_state: draft
 ---
 
-# RFC 0033: Derived layered impact
+# RFC 0033: Derived change impact and semantic-review clues
 
 ## Summary
 
-The deep-binding step of the [bound-change loop](0029-bound-change-loop.md). A
-change rarely touches one component in isolation — it may ripple up to the
-foundation (does it revise a principle?), through architecture (does it add a
-component or move the hierarchy?), down to workflows, and across the glossary. This
-RFC makes that ripple a **derived view** — `irminsul change impact <id>`, computed
-from the diff and the [`DocGraph`](../../20-components/docgraph.md) — and routes each
-affected layer to the check that already governs it. Per the derive-don't-declare law
-of [`0029`](0029-bound-change-loop.md), the impact is *never stored* in the RFC; it
-is recomputed each run, fresh by construction.
+Add `irminsul change impact <id>` as a derived view over the diff and
+[`DocGraph`](../../20-components/docgraph.md). It tells reviewers and agents where
+a change reached, which existing checks govern those areas, and which semantic
+questions remain. Impact is recomputed on demand and never stored as an RFC
+footprint.
+
+The command is useful at three points: feasibility review while an RFC is draft,
+implementation orientation after acceptance, and scope reconciliation before
+finalization. It is an evidence and routing surface, not a second enforcement
+engine.
 
 ## Motivation
 
-A spec tool situates a change in a flat `specs/` folder. irminsul situates docs in a
-9-layer typed graph, which means a change can be bound to *all* of it — but only if
-the binding is derived rather than declared. The risk, raised during design, is
-exactly duplication: writing the touched components, surfaces, and architecture
-deltas into the RFC would copy facts that already live in the component
-`describes:`, the derived `surface`, and the layer structure. The resolution is to
-make impact a query over existing data, so the loop gains layer-wide reach with zero
-new home for any fact.
+A component-level `affects` declaration states intended scope, but significant
+changes can also alter architecture, public surfaces, workflows, terminology, and
+foundation assumptions. Reviewers currently have to invoke several commands and
+reconstruct that ripple themselves.
+
+The layered graph is specifically well suited to providing those clues. A compact
+impact report answers:
+
+- How broad should the review be?
+- Which docs and checks should the agent inspect next?
+- Did the implementation expand beyond the accepted plan?
+- Which observations are mechanical, and which require semantic judgment?
 
 ## Detailed Design
 
-### The derived view
+### Inputs and phases
 
-`irminsul change impact <id>` reports, for a change RFC, the ripple across layers —
-all computed, none stored:
+`irminsul change impact <id> [--base-ref REF]` supports two evidence levels:
 
-- **Foundation (00).** From the change's `direction: revises` flag (the one
-  non-derivable judgment) plus whether the diff touches code a foundation principle
-  constrains: surface the principles in play. A `revises` change with no foundation
-  doc edit is flagged.
-- **Architecture (10).** Detect a new `20-components/*.md` or a moved doc from the
-  diff and the parent-child inference
-  ([`0004-remove-children-field`](0004-remove-children-field.md)); flag when an
-  architecture-altering change leaves `component-hierarchy` / `overview` unupdated,
-  reusing the index-graduation and phantom-layer logic.
-- **Components (20).** The diff→owner derivation of
-  [`0021-code-doc-cochange`](0021-code-doc-cochange.md): which component docs own the
-  changed code.
-- **Surfaces.** `irminsul surface` ([`surface`](../../20-components/surface.md)):
-  which cli/http/exports/env-var identities the change added or removed, governed by
-  the watched-surface mechanism
-  ([`0027-watched-surfaces`](0027-watched-surfaces.md)).
-- **Workflows (30) & glossary.** Touched workflow docs from ownership; new terms the
-  change's prose introduces, checked by `glossary-discipline`
-  ([`0019-glossary-discipline`](0019-glossary-discipline.md)).
+- **plan impact** - available without a diff; uses `affects`, `direction`,
+  requirements, dependencies, and graph links to identify intended review areas;
+- **observed impact** - available with a working-tree or base-ref diff; adds actual
+  owners, changed docs, test evidence, and surface deltas.
 
-### Routing, not new enforcement
+The output states which level it used. A missing baseline never renders as an empty
+observed impact.
 
-The view does not invent checks. Each layer's drift is already caught by an existing
-check; impact is the lens that *gathers* those findings for one change and presents
-the ripple. The only genuinely new signal is the foundation `direction` consistency
-nudge, which needs the human's `revises` judgment because direction is not derivable.
+### Derived observations by layer
 
-### Impact altitude (the throttle)
+The report gathers only facts existing machinery can support:
 
-Most changes are component-level and surface a one-line impact. A change pays for
-depth only where it actually reaches: a typo fix shows components and nothing else; a
-direction pivot shows the full foundation→architecture ripple. The tier/layer
-gradient ([`tiers`](../../10-architecture/tiers.md),
-[`layers`](../../10-architecture/layers.md)) is the throttle — depth is available and
-typed, never mandatory.
+- **Foundation (00).** `direction: revises` creates a foundation-review clue and
+  lists foundation docs linked from the RFC. Irminsul does not infer which
+  principle code semantically violates.
+- **Architecture (10).** New, removed, or moved component docs; parent-child
+  changes; architecture docs changed in the diff; and existing hierarchy or
+  phantom-layer findings.
+- **Components (20).** Declared affected components, diff-derived owners, scope
+  divergence, unowned source, related tests, and component findings.
+- **Workflows (30).** Workflow docs linked to or dependent on affected components,
+  plus workflow docs actually changed. A link is a review route, not proof that the
+  workflow behavior changed.
+- **Decisions (50).** The RFC's ADR, unresolved required updates, and decision
+  backlinks.
+- **Evolution (80).** Superseded or related RFCs and claims that may need promotion
+  or retirement.
+- **Surfaces.** Added, removed, or changed CLI, HTTP, export, environment-variable,
+  and configured inventory identities from the existing surface extractors.
+- **Glossary.** Existing glossary-discipline findings and candidate terms from the
+  RFC or changed docs; agents decide whether a candidate is truly a domain term.
+
+Every observation includes its source: declared RFC field, diff path, graph edge,
+surface extractor, or finding id.
+
+### Review clues, not semantic findings
+
+The report converts mechanical observations into grounded questions:
+
+```text
+Observed: CLI surface added `login --sso` under component `auth`.
+Review: Does the accepted RFC describe this public behavior and its failure cases?
+
+Observed: `billing` changed but is absent from `affects`.
+Review: Is this an intended scope expansion or an accidental side effect?
+
+Observed: direction is `revises`; no foundation doc changed.
+Review: Does the implementation revise a project principle, and if so which one?
+```
+
+These clues are included in CLI JSON and MCP output for an agent to inspect. An
+optional advisory LLM check may answer or refine them, but its result remains
+advisory. Deterministic checks only enforce the underlying structural facts.
+
+### Integration with the lifecycle
+
+Impact is not a fifth disconnected report:
+
+- `change status` includes a terse impact summary and next review routes;
+- `change verify` includes full observed impact and scope-divergence clues;
+- `change finalize` blocks only on mechanical impact problems such as unowned code
+  or unreconciled touched-but-undeclared components;
+- `context --change` links to the same report instead of reproducing its logic.
+
+### Impact altitude
+
+Output defaults to the highest layer with actual evidence plus the components and
+surfaces involved. A component-only change remains compact. `--all-layers` includes
+empty sections for automation or exhaustive review.
 
 ## Drawbacks
 
-- **Derivation cost.** Walking the diff against the whole graph per change is more
-  work than reading stored metadata; acceptable because it runs on demand, not in the
-  hard path by default.
-- **Foundation heuristic.** The `direction` consistency check leans on a human flag
-  plus coarse code-touch heuristics; it nudges, it does not prove.
-- **Presentation surface.** A multi-layer report risks noise; impact altitude and
-  default-to-component keep it terse.
+- **Git baseline dependency.** Observed impact needs an explicit or discoverable
+  change range; plan impact is necessarily less precise.
+- **Graph-edge limits.** A linked workflow is a candidate review route, not proof
+  of behavioral impact.
+- **Agent review cost.** Broad changes may produce many clues; source attribution
+  and impact altitude are required to keep the report actionable.
+- **Extractor coverage.** Public surfaces without configured extractors remain
+  invisible until the project adds one.
 
 ## Alternatives
 
-- **Store the layered `impact:` block in the RFC** — the original design, rejected:
-  duplicates `describes:`, `surface`, and the layer structure; violates
-  derive-don't-materialize and Law 1.
-- **A single flat "affected files" list** — rejected: throws away the layer typing
-  that is irminsul's advantage over a flat spec tree.
-- **No layered view** — leaves the loop bound only at the component level; workable,
-  but forfeits the cross-layer consistency that distinguishes the model.
+- **Store an `impact:` block on the RFC.** Rejected because owners, surfaces, and
+  changed paths are derivable and would immediately become stale metadata.
+- **Report only affected files.** Rejected because it loses graph ownership,
+  lifecycle, and layer-specific review routes.
+- **Make every clue a check finding.** Rejected because questions such as whether a
+  principle changed are semantic; the tool should expose evidence without
+  pretending to know the answer.
+- **Run impact only at finalization.** Rejected because draft feasibility and
+  accepted implementation orientation are two of its highest-value uses.
 
 ## Unresolved Questions
 
-- Whether `change impact` is its own subcommand or a mode of `context`.
-- How precise the foundation `direction` consistency check can be without an LLM,
-  given the hard path is deterministic.
-- Output format and whether impact joins `irminsul status` as a digest line.
+- Configuration of default impact altitude and maximum clue count.
+- Whether candidate glossary terms come from a deterministic tokenizer or only
+  existing glossary findings in the first iteration.
+- How to represent source attribution compactly in plain output while preserving
+  complete JSON evidence.

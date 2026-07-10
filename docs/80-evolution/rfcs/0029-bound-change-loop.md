@@ -1,6 +1,6 @@
 ---
 id: 0029-bound-change-loop
-title: "Bound changes: turn the RFC into a code-bound proposal-to-verification loop"
+title: "Bound changes: a code-bound RFC lifecycle"
 audience: explanation
 tier: 2
 status: draft
@@ -8,157 +8,206 @@ describes: []
 rfc_state: draft
 ---
 
-# RFC 0029: Bound changes — the proposal-to-verification loop
+# RFC 0029: Bound changes - a code-bound RFC lifecycle
 
 ## Summary
 
-This is the umbrella RFC for a stack (0029–0034) that grows irminsul's existing
-RFC/ADR machinery into a complete development *loop*: **propose → implement →
-accept → verify → propose-from-truth**. The loop is the same shape spec-driven
-tools offer (propose / apply / archive), with one structural
-difference that is the whole point — every step is **bound to code** and stays
-bound, so the next iteration always departs from a verified base instead of a
-prose document that has silently rotted.
+Turn the existing RFC into the forward artifact for significant change: a
+potential roadmap item that can be proposed, accepted for implementation,
+verified against repository evidence, and finally recorded as implemented. The
+loop is **draft -> accepted -> implemented**, with **rejected** as the alternate
+terminal outcome.
 
-The governing law of the stack, and the reason it is not just a re-skin of an
-existing tool, is **derive, don't declare** — the change-loop application of the
-project's own *derive, don't materialize* principle
-([`principles.md`](../../00-foundation/principles.md)). An RFC declares only what
-code cannot produce; every binding fact (which code, which surface, which owning
-component, which backlink) is *derived* from the diff and the
-[`DocGraph`](../../20-components/docgraph.md), never copied into the RFC.
+The stack follows two linked rules:
 
-This RFC defines the shared model and lands **iteration 1**: the minimal closed
-loop — an RFC that names the components it affects, and a check that fails when an
-accepted RFC's affected code has no doc coverage. The later RFCs add requirements
-(0030), tasks (0031), accept-time anchoring (0032), the derived layered-impact
-view (0033), and the base-truth gate plus MCP loop surface (0034).
+1. **Derive what is mechanically knowable.** Changed files, owning components,
+   surfaces, backlinks, check findings, and anchor hashes come from the diff and
+   the [`DocGraph`](../../20-components/docgraph.md); they are not copied into the
+   RFC.
+2. **Expose evidence for semantic judgment.** Intent, behavioral requirements,
+   whether an implementation satisfies them, and the correct requirement-to-code
+   relationship are not mechanically derivable. Irminsul supplies structured
+   evidence and review clues to an agent or human, but never turns that judgment
+   into a hard deterministic claim.
+
+This sharpens the existing Harness Principle and the rule that build correctness
+must not depend on LLM judgment
+([`principles.md`](../../00-foundation/principles.md)). Mechanical checks remain
+the gate; semantic review remains advisory and explicit.
+
+This RFC defines the shared lifecycle, command surface, and iteration 1 binding.
+Later RFCs add requirements (0030), implementation tasks and evidence (0031),
+implementation finalization (0032), derived impact and review clues (0033), and
+binding readiness plus agent access (0034).
 
 ## Motivation
 
-irminsul already detects rot *after the fact* (mtime-drift, staleness) and, with
-[`0021-code-doc-cochange`](0021-code-doc-cochange.md), at the PR gate. What it does
-not have is a *forward* artifact that records, at proposal time, the binding a
-change is promising to honor — so that "did this change land correctly?" becomes a
-deterministic check rather than a review judgment.
+Irminsul can scaffold an RFC, validate its terminal metadata, list unfinished
+decision updates, and apply generic fixes. It cannot currently answer the change
+questions an agent needs:
 
-Spec-driven tools occupy exactly this forward slot, but their specs are born
-unbound: a proposal is prose, merged into a canonical spec tree, and never
-reconciled against the implementation again. Each new proposal then plans on a base
-nobody verified. The faster the loop runs, the more iteration N+1 compounds
-iteration N's drift. That missing beat — *confirm the base is still true before
-stepping forward* — is precisely the gap irminsul's check engine already fills for
-docs. This stack connects the forward artifact (the RFC) to that engine so the
-two halves become one loop.
+- Which RFCs are accepted but not implemented?
+- What mechanical evidence exists for this RFC's implementation?
+- What still needs semantic review?
+- Is this RFC mechanically ready to become `implemented`?
+- Which lifecycle transition is valid, and what must change atomically with it?
+
+The current lifecycle also ends at decision resolution. `draft`, `open`, and
+`fcp` describe proposal-process ceremony, while `accepted` is treated as terminal;
+there is no state for delivered work. For Irminsul's issue-like RFC model, the
+important distinction is simpler: proposed, approved, delivered, or declined.
 
 ## Detailed Design
 
-### The change artifact is the RFC (no new tree)
+### The RFC is the change artifact
 
-A "change" is not a new directory or schema; it is the existing RFC under
-`docs/80-evolution/rfcs/`, with a small amount of non-derivable intent and a
-lifecycle (`rfc_state`) that already exists
-([`0017-rfc-resolution-check`](0017-rfc-resolution-check.md)). Nothing about the
-9-layer structure changes. This keeps the loop inside irminsul's own model instead
-of importing a parallel `changes/` + `specs/` split.
+A change remains the RFC under `docs/80-evolution/rfcs/`; no parallel change or
+specification tree is added. The RFC owns non-derivable intent, requirements, and
+implementation tasks. Component docs remain the canonical home for live claims
+after implementation.
 
-### The derive-don't-declare law
+### Four-state lifecycle
 
-Every fact a change could record falls into the two buckets of
-[`principles.md`](../../00-foundation/principles.md):
+The canonical lifecycle becomes:
 
-1. **Derivable** — which components the change touches, which globs, which
-   surfaces it added, the backlinks. These are **never written into the RFC**.
-   They are computed on demand from the diff and the graph (see below).
-2. **Non-derivable** — the *intent* (why), the *requirements* (behavior promised,
-   added in 0030), and the *direction* flag (does this revise a foundation
-   principle? — a human judgment). Only these are authored.
+| State | Meaning | Allowed next states |
+|---|---|---|
+| `draft` | Potential roadmap item; may be incomplete or under discussion. | `accepted`, `rejected` |
+| `accepted` | Human-approved for implementation; implementation may not have started. | `implemented`, `rejected` |
+| `implemented` | Implementation was mechanically verified, semantically reviewed, and finalized. | none; later change uses supersession |
+| `rejected` | The project will not implement this proposal; rationale is recorded. | none |
 
-The consequence is a deliberately tiny frontmatter. The naive "footprint" — globs,
-surfaces, component lists — would duplicate the component doc's `describes:` and the
-derived `irminsul surface` output, creating a second home for one fact (a Law 1
-violation, [`laws.md`](../../00-foundation/laws.md)) and a committed cache that goes
-stale. The law forbids it.
+`open` and `fcp` collapse into `draft`; projects that need discussion stages can
+use review workflow outside the canonical RFC state. `withdrawn` collapses into
+`rejected`, with the rationale recording whether the author withdrew it or the
+project declined it.
 
-### What the human writes (iteration 1)
+Acceptance is a human decision, not a conclusion Irminsul derives. Implementation
+readiness is a report, not another authored state. Only successful finalization may
+write `rfc_state: implemented`.
+
+Migration is mechanical because this repository currently uses none of the states
+being collapsed:
+
+- `open` and `fcp` -> `draft`;
+- `withdrawn` -> `rejected`;
+- existing `accepted` RFCs remain accepted until `change verify` confirms whether
+  they qualify for `implemented`; an opt-in fix may migrate those whose Resolution
+  already names shipped code and tests.
+
+For compatibility with repositories already using the old enum, the parser accepts
+`open`, `fcp`, and `withdrawn` for one deprecation window and emits a fixable
+lifecycle warning. Checks treat `open`/`fcp` as draft and `withdrawn` as rejected
+during that window; the next breaking release removes the aliases from
+`RfcStateEnum`.
+
+The frontmatter schema requires `resolved_by` for both `accepted` and
+`implemented`. `rfc-resolution`, `decision-updates`, the RFC template, and
+`list lifecycle` migrate together so no command observes a half-updated lifecycle.
+
+### Lifecycle commands
+
+Add an `irminsul change` command group:
+
+- `change status <id>` - read-only lifecycle, requirements, task evidence,
+  findings, and valid-next-action report;
+- `change verify <id> [--base-ref REF]` - read-only implementation evidence and
+  semantic-review clues, with machine-readable output;
+- `change transition <id> accepted|rejected --confirm` - validate and apply a
+  human-authorized decision transition atomically;
+- `change finalize <id> --confirm` - run verification, promote confirmed claims,
+  and transition `accepted -> implemented` atomically;
+- `change impact <id> [--base-ref REF]` - the derived layered view from 0033.
+
+`irminsul new rfc` remains the creation command. `change transition` and
+`change finalize` support `--dry-run` and reuse the confirmation and idempotency
+contract of [`fix`](../../20-components/cli.md). An agent may run every read
+command freely; it runs a write command only after the user has authorized the
+decision represented by that transition.
+
+### Mechanical evidence and semantic-review clues
+
+Every change report separates three categories:
+
+- **Mechanical blockers** - invalid lifecycle transition, malformed requirement,
+  unresolved component id, hard-check error, missing required update, stale
+  anchor, or missing diff baseline.
+- **Evidence** - changed files and owners, tests and docs touched, task-to-
+  requirement links, surface deltas, check findings, and anchor candidates.
+- **Semantic-review clues** - questions an agent or human must answer, such as
+  whether a scenario is actually implemented, whether an edge case is missing, or
+  which changed symbol is the correct evidence for a requirement.
+
+The deterministic result may say `mechanically_ready: true`; it must not say the
+behavior is correct. Agent-facing JSON includes the evidence references behind
+each clue so an agent can inspect the relevant code rather than rediscover scope.
+
+### What the author declares
+
+The RFC body already owns intent through Summary and Motivation, so no duplicate
+`intent:` frontmatter field is added. Two small fields carry judgments code cannot
+produce:
 
 ```yaml
-# frontmatter additions — all optional, all non-derivable
-intent: "Enterprise users need SSO login."
-affects: [auth]          # owning component IDs this change targets (pointers, not globs)
-direction: extends       # extends | revises (only when foundation is touched)
+affects: [auth]       # component ids this proposal intends to change
+direction: extends   # extends | revises; required only for foundation impact
 ```
 
-`affects` lists **component doc ids**, not paths or globs — a pointer to where the
-binding facts already live, not a copy of them.
+`affects` is optional while the RFC is `draft`. It is required and explicit for
+`accepted` and `implemented` RFCs; `affects: []` means the proposal intentionally
+changes no owned source. This prevents silent opt-out while keeping early ideas
+cheap to write.
 
-### What is derived (iteration 1 check)
+### Iteration 1: change binding
 
-A new soft-deterministic check, `change-binding`, runs against an accepted RFC
-(`rfc_state: accepted`) that declares `affects`. Its primary signal is **binding
-divergence**: the components the change *actually* touched, derived from the diff,
-versus the components it *declared*. Touched components come from the same
-`resolve_claims` ownership logic (`src/irminsul/checks/uniqueness.py`) that
-[`coverage`](../../20-components/checks.md) and the `context --changed` co-change
-fold ([`0021-code-doc-cochange`](0021-code-doc-cochange.md)) already use, so
-"which components did this change really touch" is a derivation, never a second
-declaration. The check flags either side of the gap:
+A soft-deterministic `change-binding` check validates field shape and, when a diff
+baseline is available, compares declared intent with the derived footprint. The
+footprint uses `resolve_claims` ownership, the same primitive used by coverage and
+`context --changed`:
 
-- **Declared-but-untouched** — `affects: [auth]` while the diff changed no code
-  `auth` owns: the pointer is aspirational, not bound.
-- **Touched-but-undeclared** — the diff changed code owned by `billing`, but
-  `billing` is absent from `affects`: an unbound side effect slipped in.
+- **declared but untouched** - a planned component has no implementation evidence;
+- **touched but undeclared** - the implementation has an unplanned component side
+  effect;
+- **unowned change** - changed source has no component claim, delegated to
+  `coverage` as a blocker.
 
-This divergence is the net-new guarantee, and it is genuinely new: no existing
-check compares a change's *declared intent* against its *derived footprint*. The
-coverage and ref checks already prove a component owns real source and that an
-id resolves, so `change-binding` does **not** re-litigate those — it only adds the
-declared-vs-derived comparison and a cheap shape guard on the new keys
-(`affects` is a list of existing component ids; `direction` is `extends|revises`),
-since the lean frontmatter is `extra="allow"` and would otherwise swallow a typo
-(`affect:`) silently.
+The first two are review clues by default, because a valid implementation may
+legitimately differ from its initial plan. Under `change finalize`, every
+touched-but-undeclared component must be reconciled by updating `affects` or
+recording a reviewed exception. Irminsul does not silently rewrite the plan.
 
-Severity is `warning`, promotable to error under `--strict`, consistent with the
-rest of the soft-deterministic set.
-
-### Relationship to spec-driven tools
-
-A spec-driven tool's proposal is prose with no hook into code; its validator
-checks the spec's *internal grammar* only. This stack matches the
-propose/apply/archive ergonomics (0030–0032) but adds the binding such tools
-structurally cannot: the proposal names code it must own, and the engine proves
-it. The naming convention
-above (`propose`, the loop verbs) is intentionally familiar; the difference is
-enforcement, not vocabulary.
+Diff selection is explicit and never guesses a clean result: use `--base-ref`, a
+CI-provided base SHA, or the local staged/unstaged set. If none is available, the
+report returns `baseline: unknown` and cannot be mechanically ready for
+finalization.
 
 ## Drawbacks
 
-- **A new lifecycle expectation.** Authors who never set `affects` get today's
-  behavior unchanged, but the loop's value only appears once changes opt in.
-- **Soft-by-default.** Iteration 1 warns rather than blocks; the divergence signal
-  is real value at warning severity (it names unbound side effects today), but the
-  *enforced* binding arrives with accept-time anchoring (0032) and the base-truth
-  gate (0034).
-- **Component-granularity only.** Iteration 1 binds at the component level; finer
-  requirement-level binding waits for 0030/0032.
+- **Lifecycle migration.** Existing checks and templates must migrate from six
+  decision-process states to four delivery states.
+- **Accepted RFC backlog.** `accepted` becomes an active queue rather than a
+  terminal record, so repositories must decide which historical accepted RFCs are
+  actually implemented.
+- **Semantic boundary.** Evidence packets make agent review better and cheaper,
+  but they cannot make semantic conclusions deterministic.
+- **Git context.** Change binding needs a diff baseline; multi-PR changes must pass
+  an explicit base rather than receiving a false clean result.
 
 ## Alternatives
 
-- **A parallel `changes/` + `specs/` tree** (the spec-driven-tool shape) — rejected: it
-  duplicates the 9-layer model, splits intent from the doc graph, and reintroduces
-  an unbound canonical spec that rots.
-- **Declare globs/surfaces in the RFC** (the naive footprint) — rejected: violates
-  derive-don't-materialize and Law 1; the facts already have a home.
-- **Do nothing / keep RFCs as pure prose** — the status quo; leaves the forward
-  step disconnected from the verification engine, which is the entire gap.
+- **Keep decision and delivery as separate enums.** More expressive, but creates a
+  state-product with combinations such as accepted-but-abandoned and
+  rejected-but-implemented. Four issue-like states match the intended workflow.
+- **Keep `open` and `fcp`.** Rejected because Irminsul does not implement the
+  governance process those states imply and no repository RFC currently uses them.
+- **Derive semantic completion.** Rejected: code ownership and changed files are
+  evidence, not proof that behavior satisfies a requirement.
+- **Store globs, surfaces, or changed files on the RFC.** Rejected as committed
+  caches of facts already derivable from code and the graph.
 
 ## Unresolved Questions
 
-- Check name: `change-binding` vs. folding into an existing check.
-- Whether `affects` should accept layer ids (e.g. a whole component group) or only
-  leaf component ids.
-- The exact divergence policy: whether touched-but-undeclared and
-  declared-but-untouched carry the same severity, and whether either tightens to an
-  error once 0032 lands.
-- CLI ergonomics for authoring (`irminsul new rfc --affects …` vs. interactive),
-  deferred to the per-iteration RFCs.
+- Whether an accepted RFC may transition to rejected after implementation work has
+  started, or whether that needs a distinct `abandoned` rationale category.
+- Configuration of the default diff baseline for long-running and multi-PR work.
+- Exact JSON schema shared by CLI and MCP change reports.
