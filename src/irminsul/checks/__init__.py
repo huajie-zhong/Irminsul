@@ -36,6 +36,7 @@ from irminsul.checks.overlap import OverlapCheck
 from irminsul.checks.parent_child import ParentChildCheck
 from irminsul.checks.phantom_layer import PhantomLayerCheck
 from irminsul.checks.reality import RealityCheck
+from irminsul.checks.requirement_grammar import RequirementGrammarCheck
 from irminsul.checks.rfc_resolution import RfcResolutionCheck
 from irminsul.checks.schema_leak import SchemaLeakCheck
 from irminsul.checks.scope_appropriateness import ScopeAppropriatenessCheck
@@ -78,6 +79,7 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     ClaimAnchorCheck.name: ClaimAnchorCheck,
     DocRefsCheck.name: DocRefsCheck,
     ChangeBindingCheck.name: ChangeBindingCheck,
+    RequirementGrammarCheck.name: RequirementGrammarCheck,
 }
 
 LLM_REGISTRY: dict[str, type] = {
@@ -111,6 +113,7 @@ __all__ = [
     "PhantomLayerCheck",
     "ProseFileReferenceCheck",
     "RealityCheck",
+    "RequirementGrammarCheck",
     "RfcResolutionCheck",
     "ScopeAppropriatenessCheck",
     "SemanticDriftCheck",

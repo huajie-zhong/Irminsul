@@ -22,6 +22,8 @@ Every doc atom carries a YAML frontmatter block matching Appendix B of the [Doc 
 
 `expected_id_for(path)` codifies the filename rule: folder index docs take their parent folder's name; everything else uses the filename stem.
 
+The RFC lifecycle fields live here too ([RFC 0029](../80-evolution/rfcs/0029-bound-change-loop.md)): `rfc_state` has four canonical values (`draft`, `accepted`, `implemented`, `rejected`) plus deprecated aliases (`open`, `fcp`, `withdrawn`) that `canonical_rfc_state()` resolves during the deprecation window; `RFC_STATE_TRANSITIONS` is the single table of legal next states. `resolved_by` is required for both `accepted` and `implemented`. `affects` declares the component ids a proposal intends to change (`[]` means intentionally none) and `direction` marks foundation impact as `extends` or `revises`.
+
 The write side lives in `src/irminsul/frontmatter_edit.py`: round-trip helpers (`set_value`, `add_to_list`, `remove_inventory_item`) that the deterministic [fix](new-list-regen.md) actions share so every rewrite re-emits keys in canonical order, leaves the body untouched, and is idempotent.
 
 ## Scope & Limitations

@@ -32,6 +32,8 @@ Paths stored on `DocNode` are repo-relative and POSIX-normalized so they're stab
 
 `build_graph` accepts an optional `now` kwarg that's stored on `DocGraph.now` and read by date-sensitive checks (`stale-reaper`, `rfc-resolution`) through the `clock.today(graph.now)` helper. The `--now YYYY-MM-DD` flag on `irminsul check` threads through to here; without it the system date is used.
 
+Structured body sections are a graph concern, not a per-check regex ([RFC 0030](../80-evolution/rfcs/0030-rfc-requirements-and-scenarios.md)): `graph.requirements` holds the parsed `## Requirements` section (requirement blocks with stable ids, provenance, and WHEN/THEN scenarios, or the explicit no-new-behavior disposition) for every doc that has one, so the grammar check, transitions, and change reports share one line-accurate parser. Fenced code blocks are skipped, so a doc can quote the grammar without declaring requirements.
+
 ## Scope & Limitations
 
 DocGraph does not check link targets — that is the `links` check's job. It does not parse source code or infer semantics from code structure. The graph is read-only once built; no check is allowed to mutate it.

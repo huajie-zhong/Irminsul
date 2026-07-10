@@ -21,7 +21,7 @@ from irminsul.frontmatter import (
 )
 
 if TYPE_CHECKING:
-    from irminsul.docgraph_index import Heading
+    from irminsul.docgraph_index import Heading, RequirementsSection
     from irminsul.git.mtime import GitTime
 
 # Top-level docs that aren't doc atoms — `README.md`, the glossary, contributor
@@ -55,6 +55,9 @@ class DocGraph:
     inbound_strong: dict[str, set[str]] = field(default_factory=dict)
     inbound_weak: dict[str, set[str]] = field(default_factory=dict)
     headings: dict[str, list[Heading]] = field(default_factory=dict)
+    requirements: dict[str, RequirementsSection] = field(default_factory=dict)
+    """Parsed `## Requirements` sections keyed by doc id (RFC 0030); only docs
+    that have the section appear here."""
     git_times: dict[Path, GitTime] = field(default_factory=dict)
     now: _dt.date | None = None
     diff_changed_paths: frozenset[str] | None = None
@@ -124,11 +127,13 @@ def build_graph(
         build_headings,
         build_inbound_strong,
         build_inbound_weak,
+        build_requirements,
     )
 
     parser = MarkdownIt("commonmark")
     graph.inbound_strong = build_inbound_strong(graph.nodes)
     graph.inbound_weak = build_inbound_weak(graph.nodes, graph.by_path, parser)
     graph.headings = build_headings(graph.nodes, parser)
+    graph.requirements = build_requirements(graph.nodes)
 
     return graph

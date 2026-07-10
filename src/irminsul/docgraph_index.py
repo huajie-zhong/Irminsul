@@ -1,7 +1,6 @@
 """Lazy indexes layered on top of `DocGraph`.
 
-Three indexes are built once at the end of `build_graph` and used by Sprint 2
-checks:
+Indexes are built once at the end of `build_graph`:
 
 - `inbound_strong` — for each doc id, the set of doc ids whose `depends_on`,
   `implements`, or implicit `resolved_by` relationship points at it. Used by
@@ -10,6 +9,10 @@ checks:
   markdown link resolving to that doc. Used by orphans.
 - `headings` — for each doc id, the ordered list of headings in its body. Used
   by anchor validation.
+- `requirements` — for each doc with a `## Requirements` section, the parsed
+  requirement/scenario structure (RFC 0030). One parser, one representation:
+  the grammar check, transitions, and change reports all consume this index
+  instead of running their own regexes over the body.
 
 Builders are pure: they take only the inputs they read and return new dicts.
 `docgraph.build_graph` calls them; checks consume the populated fields.
@@ -115,6 +118,189 @@ def build_inbound_weak(
                     continue
                 inbound.setdefault(target_id, set()).add(src_id)
     return inbound
+
+
+@dataclass(frozen=True)
+class Scenario:
+    """A `#### Scenario:` block inside a requirement (RFC 0030)."""
+
+    name: str
+    line: int
+    has_when: bool
+    has_then: bool
+
+
+@dataclass(frozen=True)
+class Requirement:
+    """A `### Requirement:` block inside a `## Requirements` section."""
+
+    title: str
+    line: int
+    req_id: str | None
+    provenance: str | None
+    has_behavior_keyword: bool
+    """Whether the requirement text (outside scenarios) contains SHALL or MUST."""
+    scenarios: tuple[Scenario, ...]
+
+
+@dataclass(frozen=True)
+class RequirementsSection:
+    """The parsed `## Requirements` section of one doc."""
+
+    line: int
+    disposition: str | None
+    """The explicit no-new-behavior sentence, when the section declares one."""
+    requirements: tuple[Requirement, ...]
+
+
+class _ScenarioDraft:
+    def __init__(self, name: str, line: int) -> None:
+        self.name = name
+        self.line = line
+        self.has_when = False
+        self.has_then = False
+
+    def build(self) -> Scenario:
+        return Scenario(
+            name=self.name, line=self.line, has_when=self.has_when, has_then=self.has_then
+        )
+
+
+class _RequirementDraft:
+    def __init__(self, title: str, line: int) -> None:
+        self.title = title
+        self.line = line
+        self.req_id: str | None = None
+        self.provenance: str | None = None
+        self.text_lines: list[str] = []
+        self.scenarios: list[Scenario] = []
+
+    def build(self) -> Requirement:
+        return Requirement(
+            title=self.title,
+            line=self.line,
+            req_id=self.req_id,
+            provenance=self.provenance,
+            has_behavior_keyword=bool(_BEHAVIOR_RE.search("\n".join(self.text_lines))),
+            scenarios=tuple(self.scenarios),
+        )
+
+
+_H2_RE = re.compile(r"^##\s+(?P<title>.+?)\s*$")
+_REQUIREMENT_RE = re.compile(r"^###\s+Requirement:\s*(?P<title>.+?)\s*$")
+_SCENARIO_RE = re.compile(r"^####\s+Scenario:\s*(?P<name>.+?)\s*$")
+_ID_LINE_RE = re.compile(r"^ID:\s*(?P<id>\S+)\s*$")
+_PROVENANCE_LINE_RE = re.compile(r"^Provenance:\s*(?P<value>\S+)\s*$")
+_BEHAVIOR_RE = re.compile(r"\b(SHALL|MUST)\b")
+_DISPOSITION_RE = re.compile(r"^no new behavioral requirements\b", re.IGNORECASE)
+_REQ_FENCE_RE = re.compile(r"^\s*(```|~~~)")
+
+
+def parse_requirements(body: str) -> RequirementsSection | None:
+    """Parse the `## Requirements` section of a doc body, if present.
+
+    Line-based and fence-aware: fenced code blocks never contribute headings,
+    ids, or keywords, so an RFC can *quote* requirement grammar without
+    declaring requirements.
+    """
+    section_line: int | None = None
+    disposition: str | None = None
+    requirements: list[Requirement] = []
+
+    current_req: _RequirementDraft | None = None
+    current_scenario: _ScenarioDraft | None = None
+
+    def close_scenario() -> None:
+        nonlocal current_scenario
+        if current_scenario is not None and current_req is not None:
+            current_req.scenarios.append(current_scenario.build())
+        current_scenario = None
+
+    def close_requirement() -> None:
+        nonlocal current_req
+        close_scenario()
+        if current_req is not None:
+            requirements.append(current_req.build())
+        current_req = None
+
+    in_fence = False
+    in_section = False
+    for lineno, line in enumerate(body.splitlines(), start=1):
+        if _REQ_FENCE_RE.match(line):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+
+        h2 = _H2_RE.match(line)
+        if h2 is not None:
+            if in_section:
+                close_requirement()
+                in_section = False
+            if slugify(h2.group("title")) == "requirements":
+                in_section = True
+                section_line = lineno
+            continue
+        if not in_section:
+            continue
+
+        req_match = _REQUIREMENT_RE.match(line)
+        if req_match is not None:
+            close_requirement()
+            current_req = _RequirementDraft(req_match.group("title"), lineno)
+            continue
+
+        scenario_match = _SCENARIO_RE.match(line)
+        if scenario_match is not None:
+            close_scenario()
+            current_scenario = _ScenarioDraft(scenario_match.group("name"), lineno)
+            continue
+
+        if current_scenario is not None:
+            plain = line.replace("*", "")
+            if re.search(r"\bWHEN\b", plain):
+                current_scenario.has_when = True
+            if re.search(r"\bTHEN\b", plain):
+                current_scenario.has_then = True
+            continue
+
+        if current_req is not None:
+            id_match = _ID_LINE_RE.match(line)
+            if id_match is not None and current_req.req_id is None:
+                current_req.req_id = id_match.group("id")
+                continue
+            provenance_match = _PROVENANCE_LINE_RE.match(line)
+            if provenance_match is not None and current_req.provenance is None:
+                current_req.provenance = provenance_match.group("value")
+                continue
+            current_req.text_lines.append(line)
+            continue
+
+        if disposition is None and _DISPOSITION_RE.match(line.strip()):
+            disposition = line.strip()
+
+    if in_section:
+        close_requirement()
+
+    if section_line is None:
+        return None
+    return RequirementsSection(
+        line=section_line,
+        disposition=disposition,
+        requirements=tuple(requirements),
+    )
+
+
+def build_requirements(nodes: dict[str, DocNode]) -> dict[str, RequirementsSection]:
+    """Parse the `## Requirements` section of every doc that has one."""
+    out: dict[str, RequirementsSection] = {}
+    for doc_id, node in nodes.items():
+        if "## Requirements" not in node.body and "## requirements" not in node.body:
+            continue
+        section = parse_requirements(node.body)
+        if section is not None:
+            out[doc_id] = section
+    return out
 
 
 def build_headings(
