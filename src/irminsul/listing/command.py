@@ -166,15 +166,46 @@ def _to_queue_item(f: Finding) -> _QueueItem:
     )
 
 
+def _accepted_backlog_items(repo_root: Path, config: IrminsulConfig) -> list[_QueueItem]:
+    """Accepted-but-not-implemented RFCs and their next mechanical action
+    (RFC 0034). Ordering is deterministic document order; priority metadata is
+    deliberately out of scope."""
+    from irminsul.frontmatter import RfcStateEnum, canonical_rfc_state
+
+    graph = build_graph(repo_root, config)
+    docs_root = (config.paths.docs_root or "docs").replace("\\", "/").strip("/")
+    rfc_prefix = f"{docs_root}/80-evolution/rfcs/"
+
+    out: list[_QueueItem] = []
+    for node in graph.nodes.values():
+        if not node.path.as_posix().startswith(rfc_prefix):
+            continue
+        state = node.frontmatter.rfc_state
+        if state is None or canonical_rfc_state(state) != RfcStateEnum.accepted:
+            continue
+        out.append(
+            _QueueItem(
+                priority=6,
+                kind="implement",
+                target_path=node.path.as_posix(),
+                related_id=node.id,
+                reason="accepted RFC is not yet implemented",
+                suggested_command=f"irminsul change status {node.id}",
+            )
+        )
+    return out
+
+
 def list_lifecycle(repo_root: Path, *, fmt: str, queue: bool) -> None:
-    findings = findings_for_kind(repo_root, load(find_config(repo_root)), "lifecycle")
+    config = load(find_config(repo_root))
+    findings = findings_for_kind(repo_root, config, "lifecycle")
 
     if not queue:
         _print(findings, fmt)
         return
 
     items = sorted(
-        [_to_queue_item(f) for f in findings],
+        [_to_queue_item(f) for f in findings] + _accepted_backlog_items(repo_root, config),
         key=lambda i: (i.priority, i.target_path),
     )
     if fmt == "json":

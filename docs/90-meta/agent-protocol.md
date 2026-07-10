@@ -14,6 +14,11 @@ inventory:
       - context
       - check
       - regen agents-md
+      - list lifecycle
+      - change status
+      - change verify
+      - change transition
+      - change finalize
 ---
 
 # Agent lifecycle protocol
@@ -48,7 +53,19 @@ just this one. Follow each step in order; do not skip ahead.
    or update an RFC.
 
 4. **Resolve accepted RFCs with an ADR.** When an RFC is accepted, create or
-   update an ADR and link the RFC to that decision record.
+   update an ADR and link the RFC to that decision record. The decision itself
+   is human-authorized: apply it with
+   `irminsul change transition <id> accepted --confirm` only after the user has
+   approved it.
+
+4a. **Work the bound-change loop for accepted RFCs.** Discover accepted work
+   with `irminsul list lifecycle --queue`, orient with
+   `irminsul change status <id>`, implement, then run
+   `irminsul change verify <id>` and resolve its mechanical blockers and
+   semantic-review clues. When the report is mechanically ready and the user
+   has authorized completion, run `irminsul change finalize <id> --confirm`
+   with the reviewed `--anchor` bindings — finalization is the only path to
+   `rfc_state: implemented`.
 
 5. **Keep component docs honest.** When code is added or moved, create or
    update component docs with up-to-date `describes` mappings and tests

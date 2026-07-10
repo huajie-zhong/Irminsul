@@ -92,6 +92,9 @@ class ChangeReport:
     evidence: tuple[EvidenceItem, ...] = ()
     semantic_review: tuple[ReviewClue, ...] = ()
     mechanically_ready_for: str = "none"  # accepted | implemented | none
+    repository_debt: tuple[tuple[str, int], ...] = ()
+    """(check, warning count) for configured findings unrelated to this change —
+    visible without gating the transition (RFC 0034)."""
     next_actions: tuple[str, ...] = ()
     extra: dict[str, object] = field(default_factory=dict)
     """Escape hatch for later RFCs (requirements, tasks, impact) to extend the
@@ -228,6 +231,18 @@ def build_change_report(
                 )
             )
 
+    if canonical == RfcStateEnum.accepted and not any(
+        h.slug == "resolution" for h in graph.headings.get(node.id, [])
+    ):
+        blockers.append(
+            Blocker(
+                code="missing-resolution-section",
+                message="finalization needs a '## Resolution' section on the RFC",
+                path=node.path.as_posix(),
+                suggestion="record the outcome and link the decision doc",
+            )
+        )
+
     hard_errors = _hard_errors(graph, config)
     for finding in hard_errors:
         blockers.append(
@@ -336,6 +351,16 @@ def build_change_report(
             )
         )
 
+    if canonical == RfcStateEnum.accepted:
+        blockers.extend(_decision_update_blockers(graph, node))
+        blockers.extend(_stale_anchor_blockers(graph, node, affects))
+
+    scoped_findings, repository_debt = _partition_configured_findings(
+        graph, config, node, affects, baseline, canonical
+    )
+    if scoped_findings:
+        extra["scoped_findings"] = scoped_findings
+
     mechanically_ready_for = "none"
     if canonical == RfcStateEnum.draft and not blockers and affects is not None:
         mechanically_ready_for = "accepted"
@@ -359,7 +384,13 @@ def build_change_report(
         else:
             next_actions.append(f"irminsul change transition {node.id} accepted --confirm")
     elif canonical == RfcStateEnum.accepted:
-        next_actions.append(f"irminsul change verify {node.id} --base-ref <ref>")
+        if mechanically_ready_for == "implemented":
+            next_actions.append(
+                f"irminsul change finalize {node.id} "
+                "--anchor <req>=<path>#<symbol> --confirm (after semantic review)"
+            )
+        else:
+            next_actions.append(f"irminsul change verify {node.id} --base-ref <ref>")
         next_actions.append(f"irminsul change impact {node.id}")
 
     return ChangeReport(
@@ -384,9 +415,124 @@ def build_change_report(
         evidence=tuple(evidence),
         semantic_review=tuple(clues),
         mechanically_ready_for=mechanically_ready_for,
+        repository_debt=repository_debt,
         next_actions=tuple(next_actions),
         extra=extra,
     )
+
+
+def _decision_update_blockers(graph: DocGraph, node: DocNode) -> list[Blocker]:
+    """This RFC's unresolved required updates block finalization readiness.
+
+    Runs the check directly (like `plan_finalize`) so the gate does not depend
+    on which soft checks a project enables.
+    """
+    from irminsul.checks.decision_updates import DecisionUpdatesCheck
+
+    out: list[Blocker] = []
+    for finding in DecisionUpdatesCheck().run(graph):
+        relates = finding.doc_id == node.id or f"'{node.id}'" in finding.message
+        if relates and finding.category in (
+            "no-required-updates-field",
+            "missing-required-update-path",
+            "missing-backlink",
+        ):
+            out.append(
+                Blocker(
+                    code=f"decision-updates:{finding.category}",
+                    message=finding.message,
+                    path=finding.path.as_posix() if finding.path else None,
+                    suggestion=finding.suggestion,
+                )
+            )
+    return out
+
+
+def _stale_anchor_blockers(
+    graph: DocGraph, node: DocNode, affects: tuple[str, ...] | None
+) -> list[Blocker]:
+    """Anchors in the affected scope must be fresh before finalization (RFC 0034)."""
+    from irminsul.checks.claim_anchor import ClaimAnchorCheck
+
+    scope = {node.path.as_posix()}
+    for component in affects or ():
+        owner = graph.nodes.get(component)
+        if owner is not None:
+            scope.add(owner.path.as_posix())
+
+    out: list[Blocker] = []
+    for finding in ClaimAnchorCheck().run(graph):
+        finding_path = finding.path.as_posix() if finding.path else None
+        if finding.severity == Severity.warning and finding_path in scope:
+            out.append(
+                Blocker(
+                    code="stale-anchor",
+                    message=finding.message,
+                    path=finding_path,
+                    suggestion=finding.suggestion,
+                )
+            )
+    return out
+
+
+def _partition_configured_findings(
+    graph: DocGraph,
+    config: IrminsulConfig,
+    node: DocNode,
+    affects: tuple[str, ...] | None,
+    baseline: ChangeBaseline,
+    canonical: RfcStateEnum,
+) -> tuple[list[dict[str, object]], tuple[tuple[str, int], ...]]:
+    """Split configured soft warnings into change-scoped findings and
+    repository debt (RFC 0034). Findings already promoted to blockers by the
+    direct decision-updates and stale-anchor passes are skipped here so they
+    are not double-reported; everything unrelated to this change stays visible
+    without gating the transition."""
+    from collections import Counter
+
+    from irminsul.checks import SOFT_REGISTRY
+
+    findings: list[Finding] = []
+    for name in config.checks.soft_deterministic:
+        cls = SOFT_REGISTRY.get(name)
+        if cls is not None:
+            findings.extend(cls().run(graph))
+
+    scope_paths = {node.path.as_posix()}
+    for component in affects or ():
+        owner = graph.nodes.get(component)
+        if owner is not None:
+            scope_paths.add(owner.path.as_posix())
+    if baseline.changed_paths is not None:
+        scope_paths.update(baseline.changed_paths)
+
+    scoped: list[dict[str, object]] = []
+    debt: Counter[str] = Counter()
+    for finding in sort_findings(findings):
+        if finding.severity != Severity.warning:
+            continue
+        finding_path = finding.path.as_posix() if finding.path else None
+        relates_to_rfc = finding.doc_id == node.id or f"'{node.id}'" in finding.message
+        in_scope = finding_path in scope_paths or finding.doc_id == node.id
+
+        if canonical == RfcStateEnum.accepted:
+            if finding.check == "decision-updates" and relates_to_rfc:
+                continue
+            if finding.check == "claim-anchor" and in_scope:
+                continue
+        if in_scope:
+            scoped.append(
+                {
+                    "check": finding.check,
+                    "message": finding.message,
+                    "path": finding_path,
+                    "suggestion": finding.suggestion,
+                }
+            )
+        else:
+            debt[finding.check] += 1
+
+    return scoped, tuple(sorted(debt.items()))
 
 
 def _task_evidence(
@@ -553,6 +699,9 @@ def change_report_to_json(report: ChangeReport) -> str:
             {"question": c.question, "evidence": list(c.evidence)} for c in report.semantic_review
         ],
         "mechanically_ready_for": report.mechanically_ready_for,
+        "repository_debt": [
+            {"check": check, "warnings": count} for check, count in report.repository_debt
+        ],
         "next_actions": list(report.next_actions),
     }
     payload.update(report.extra)
@@ -621,6 +770,9 @@ def format_change_verify_plain(report: ChangeReport) -> str:
     impact_line = _impact_summary_line(report)
     if impact_line is not None:
         lines.append(impact_line)
+    if report.repository_debt:
+        debt = ", ".join(f"{check} {count}" for check, count in report.repository_debt)
+        lines.append(f"  repository debt (unrelated): {debt}")
     if report.next_actions:
         lines.append("  next:")
         lines.extend(f"    {action}" for action in report.next_actions)

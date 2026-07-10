@@ -1647,14 +1647,43 @@ def new_component(
 @_new_app.command("rfc")
 def new_rfc(
     title: Annotated[str, typer.Argument(help="Title of the RFC.")],
-    force: Annotated[bool, typer.Option("--force")] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Overwrite an existing file and scaffold despite hard-check blockers.",
+        ),
+    ] = False,
     path: Annotated[Path, typer.Option("--path")] = Path("."),
 ) -> None:
-    """Scaffold a new RFC."""
+    """Scaffold a new RFC.
+
+    Runs the repository binding-readiness summary first (RFC 0034): hard-check
+    errors block drafting because the base graph is structurally invalid, while
+    drift clues and unrelated warnings are reported without preventing a new
+    idea from being recorded.
+    """
+    from irminsul.change.readiness import (
+        build_binding_readiness_report,
+        format_binding_readiness_plain,
+    )
     from irminsul.new.command import NewSpec, write_new
 
     repo_root = path.resolve()
     config = load(find_config(repo_root))
+
+    readiness = build_binding_readiness_report(repo_root, config)
+    if not readiness.ready or readiness.clues or readiness.repository_debt:
+        typer.echo(format_binding_readiness_plain(readiness))
+    if not readiness.ready and not force:
+        typer.echo(
+            typer.style(
+                "hard checks fail; fix the graph before drafting (or pass --force)",
+                fg="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
     spec = NewSpec(kind="rfc", title=title, extra={})
     try:
         dest = write_new(repo_root, spec, config, force=force)

@@ -153,6 +153,47 @@ def anchors_json(repo_root: Path, config: IrminsulConfig) -> str:
     return _findings_to_json(findings, summarize(findings))
 
 
+def change_status_json(repo_root: Path, config: IrminsulConfig, change: str) -> str:
+    """Change lifecycle report (`irminsul change status`), as JSON."""
+    from irminsul.change.report import build_change_report, change_report_to_json
+
+    return change_report_to_json(build_change_report(repo_root, config, change))
+
+
+def change_verify_json(
+    repo_root: Path,
+    config: IrminsulConfig,
+    change: str,
+    base_ref: str | None = None,
+) -> str:
+    """Full readiness report (`irminsul change verify`), as JSON."""
+    from irminsul.change.report import build_change_report, change_report_to_json
+
+    return change_report_to_json(build_change_report(repo_root, config, change, base_ref=base_ref))
+
+
+def change_impact_json(
+    repo_root: Path,
+    config: IrminsulConfig,
+    change: str,
+    base_ref: str | None = None,
+) -> str:
+    """Layered impact report (`irminsul change impact`), as JSON."""
+    from irminsul.change.impact import build_impact_report, impact_report_to_json
+
+    return impact_report_to_json(build_impact_report(repo_root, config, change, base_ref=base_ref))
+
+
+def binding_readiness_json(repo_root: Path, config: IrminsulConfig) -> str:
+    """Repository binding-readiness summary (RFC 0034), as JSON."""
+    from irminsul.change.readiness import (
+        binding_readiness_to_json,
+        build_binding_readiness_report,
+    )
+
+    return binding_readiness_to_json(build_binding_readiness_report(repo_root, config))
+
+
 def create_server(repo_root: Path) -> FastMCP:
     """Build the FastMCP stdio server exposing the read-only tool set."""
     from mcp.server.fastmcp import FastMCP
@@ -208,5 +249,25 @@ def create_server(repo_root: Path) -> FastMCP:
     def anchors() -> str:
         """Call to audit anchored prose claims: flags claims whose pinned code symbol changed since the prose was last verified. Read-only; re-pinning stays a deliberate human CLI action."""
         return anchors_json(root, _config())
+
+    @server.tool()
+    def change_status(change: str) -> str:
+        """Call to orient on one RFC: lifecycle state, declared scope, task evidence, blockers, and valid next transitions. Lifecycle writes stay confirmed CLI actions (`irminsul change transition/finalize`)."""
+        return change_status_json(root, _config(), change)
+
+    @server.tool()
+    def change_verify(change: str, base_ref: str | None = None) -> str:
+        """Call before proposing acceptance or finalization: full mechanical-readiness report with blockers, evidence, and semantic-review clues. Inspect the evidence paths, then ask the user to run the confirmed CLI transition."""
+        return change_verify_json(root, _config(), change, base_ref)
+
+    @server.tool()
+    def change_impact(change: str, base_ref: str | None = None) -> str:
+        """Call to see where a change reached, layer by layer, with review routes. Plan-level without a diff; pass base_ref for observed impact."""
+        return change_impact_json(root, _config(), change, base_ref)
+
+    @server.tool()
+    def binding_readiness() -> str:
+        """Call before drafting a new RFC: hard-check blockers, drift clues (stale anchors, lifecycle debt), and unrelated repository debt. Blockers mean the graph cannot be trusted for new bindings."""
+        return binding_readiness_json(root, _config())
 
     return server

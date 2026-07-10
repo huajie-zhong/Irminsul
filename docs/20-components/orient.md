@@ -23,16 +23,16 @@ inventory:
       - check
       - fix
       - list undocumented
+      - list lifecycle
+      - change status
     omit:
       - anchors
       - change finalize
       - change impact
-      - change status
       - change transition
       - change verify
       - init
       - init-docs-only
-      - list lifecycle
       - list orphans
       - list stale
       - mcp
