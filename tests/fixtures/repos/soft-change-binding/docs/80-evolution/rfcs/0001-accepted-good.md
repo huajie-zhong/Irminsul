@@ -31,6 +31,12 @@ Users SHALL be able to authenticate through their company identity provider.
 - **WHEN** the identity provider returns an expired assertion
 - **THEN** authentication is rejected
 
+## Tasks
+
+- `T1` Wire the identity-provider client. (req: sso-login)
+- `T2` Add expired-assertion coverage. (req: sso-login)
+- `T3` Refresh the auth component doc. (component: auth)
+
 ## Resolution
 
 Approved for implementation; see

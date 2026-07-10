@@ -23,6 +23,7 @@ The command supports exactly one input mode:
 - `irminsul context <path>` for a source or doc path
 - `irminsul context --topic <query>` for deterministic substring search over doc id, title, path, `describes`, and `tests`
 - `irminsul context --changed` for staged, unstaged, and untracked git files
+- `irminsul context --change <rfc-id>` as an alias for the [change lifecycle](change.md) status report, so an agent oriented around one RFC gets the same evidence view without switching command groups
 
 Each result reports the owning doc, matching source claims, first declared entrypoint, tests, `depends_on`, docs that depend on it, relevant deterministic findings, and next command hints. `--profile configured|all-available` controls deterministic finding breadth only; LLM checks are not part of context lookup.
 

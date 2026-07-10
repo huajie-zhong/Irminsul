@@ -46,3 +46,9 @@ The system MUST do the other thing.
 #### Scenario: Good too
 - **WHEN** x happens
 - **THEN** z follows
+
+## Tasks
+
+- `T1` Implement the thing. (req: dup-a)
+- `T1` Implement it again. (req: ghost-req)
+- `T2` Touch a component nobody declared. (component: billing)

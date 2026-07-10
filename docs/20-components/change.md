@@ -43,6 +43,10 @@ Two linked rules shape every report:
 
 Behavior-changing RFCs carry a `## Requirements` section ([RFC 0030](../80-evolution/rfcs/0030-rfc-requirements-and-scenarios.md)): requirement blocks with a stable local id, an evidence obligation (`Provenance: code|adr|citation`), SHALL/MUST behavior text, and named WHEN/THEN scenarios. A maintenance RFC instead writes the explicit sentence `No new behavioral requirements: ...` — reviewable intent, not silent omission. Reports surface each requirement with its globally addressable id `<rfc-id>#<requirement-id>`; a `Provenance: code` requirement stays an unbound evidence obligation until finalization binds it to an anchored claim. Grammar findings are warnings while drafting and blockers at `change transition ... accepted`.
 
+## Tasks and implementation evidence
+
+An RFC records its accepted implementation plan as a static `## Tasks` list ([RFC 0031](../80-evolution/rfcs/0031-change-tasks-and-apply.md)): ordinary list items with stable ids that reference a requirement id or a declared affected component — never assignees, deadlines, or status fields. `change status` and `change verify` (and `irminsul context --change <id>`) gather the mechanical evidence around each task: changed source owned by the referenced components, changed tests named by their component docs, and a review clue when evidence is absent. Counts are named precisely (`2/3 tasks with source evidence`), never rendered as percent complete: changed files are evidence, not proof that a free-text task is done. Irminsul does not implement tasks — the agent inspects the evidence, edits, and re-runs the report.
+
 ## Diff baseline
 
 Evidence needs a comparison range, and the resolver never guesses a clean result: an explicit `--base-ref`, a CI-provided base ref (`IRMINSUL_BASE_REF` or `GITHUB_BASE_REF`), or the local staged/unstaged/untracked set — in that order. When none is available the baseline is reported as `unknown`, which can never be mechanically ready for finalization.

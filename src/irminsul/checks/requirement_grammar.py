@@ -19,6 +19,7 @@ from typing import ClassVar
 from irminsul.checks.base import Finding, Severity
 from irminsul.docgraph import DocGraph, DocNode
 from irminsul.docgraph_index import RequirementsSection
+from irminsul.docgraph_index import Task as TaskType
 
 # Evidence classes shared with claim provenance (RFC 0010 / RFC 0030).
 PROVENANCE_CLASSES = ("code", "adr", "citation")
@@ -163,6 +164,76 @@ def requirement_grammar_findings(
     return out
 
 
+def task_grammar_findings(
+    node: DocNode,
+    tasks: tuple[TaskType, ...],
+    section: RequirementsSection | None,
+    *,
+    check_name: str,
+) -> list[Finding]:
+    """Grammar findings for one doc's `## Tasks` section (RFC 0031).
+
+    Task ids must be unique within the RFC; a `(req: ...)` reference must
+    resolve to a requirement id declared in the same RFC and a
+    `(component: ...)` reference to a declared affected component.
+    """
+    out: list[Finding] = []
+
+    def finding(category: str, message: str, line: int, suggestion: str) -> Finding:
+        return Finding(
+            check=check_name,
+            category=category,
+            severity=Severity.warning,
+            message=message,
+            path=node.path,
+            doc_id=node.id,
+            line=line,
+            suggestion=suggestion,
+        )
+
+    requirement_ids = {
+        req.req_id for req in (section.requirements if section else ()) if req.req_id
+    }
+    declared_components = set(node.frontmatter.affects or [])
+
+    seen: dict[str, int] = {}
+    for task in tasks:
+        if task.task_id in seen:
+            out.append(
+                finding(
+                    "task-duplicate-id",
+                    f"task id '{task.task_id}' is already used at line {seen[task.task_id]}",
+                    task.line,
+                    "task ids must be unique within the RFC",
+                )
+            )
+        else:
+            seen[task.task_id] = task.line
+
+        if task.req_ref is not None and task.req_ref not in requirement_ids:
+            out.append(
+                finding(
+                    "task-unresolved-req",
+                    f"task '{task.task_id}' references requirement '{task.req_ref}' "
+                    "which is not declared in this RFC",
+                    task.line,
+                    "use a requirement id from the `## Requirements` section",
+                )
+            )
+        if task.component_ref is not None and task.component_ref not in declared_components:
+            out.append(
+                finding(
+                    "task-unresolved-component",
+                    f"task '{task.task_id}' references component '{task.component_ref}' "
+                    "which is not declared in `affects`",
+                    task.line,
+                    "reference a component id listed in the RFC's `affects`",
+                )
+            )
+
+    return out
+
+
 class RequirementGrammarCheck:
     name: ClassVar[str] = "requirement-grammar"
     default_severity: ClassVar[Severity] = Severity.warning
@@ -172,11 +243,19 @@ class RequirementGrammarCheck:
         rfc_prefix = f"{docs_root}/80-evolution/rfcs/" if docs_root else "80-evolution/rfcs/"
 
         out: list[Finding] = []
-        for doc_id, section in graph.requirements.items():
-            node = graph.nodes.get(doc_id)
-            if node is None or not node.path.as_posix().startswith(rfc_prefix):
-                continue
-            if node.frontmatter.rfc_state is None:
-                continue
-            out.extend(requirement_grammar_findings(node, section, check_name=self.name))
+        rfc_ids = {
+            doc_id
+            for doc_id in (*graph.requirements, *graph.tasks)
+            if (node := graph.nodes.get(doc_id)) is not None
+            and node.path.as_posix().startswith(rfc_prefix)
+            and node.frontmatter.rfc_state is not None
+        }
+        for doc_id in sorted(rfc_ids):
+            node = graph.nodes[doc_id]
+            section = graph.requirements.get(doc_id)
+            if section is not None:
+                out.extend(requirement_grammar_findings(node, section, check_name=self.name))
+            tasks = graph.tasks.get(doc_id)
+            if tasks is not None:
+                out.extend(task_grammar_findings(node, tasks, section, check_name=self.name))
         return out

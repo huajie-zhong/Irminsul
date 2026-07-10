@@ -13,6 +13,9 @@ Indexes are built once at the end of `build_graph`:
   requirement/scenario structure (RFC 0030). One parser, one representation:
   the grammar check, transitions, and change reports all consume this index
   instead of running their own regexes over the body.
+- `tasks` — for each doc with a `## Tasks` section, the static implementation
+  task list (RFC 0031): ordinary list items with stable ids and requirement or
+  component references, never mutable status records.
 
 Builders are pure: they take only the inputs they read and return new dicts.
 `docgraph.build_graph` calls them; checks consume the populated fields.
@@ -289,6 +292,81 @@ def parse_requirements(body: str) -> RequirementsSection | None:
         disposition=disposition,
         requirements=tuple(requirements),
     )
+
+
+@dataclass(frozen=True)
+class Task:
+    """One `## Tasks` list item (RFC 0031): `` - `T1` text (req: id) ``."""
+
+    task_id: str
+    line: int
+    text: str
+    req_ref: str | None
+    component_ref: str | None
+
+
+_TASK_ITEM_RE = re.compile(
+    r"^-\s+`(?P<id>[^`]+)`\s+(?P<text>.*?)"
+    r"(?:\s*\((?:req:\s*(?P<req>[^)]+?)|component:\s*(?P<comp>[^)]+?))\s*\))?\s*$"
+)
+
+
+def parse_tasks(body: str) -> tuple[Task, ...] | None:
+    """Parse the `## Tasks` section of a doc body, if present.
+
+    Returns None when the doc has no section; an empty tuple means the section
+    exists but declares no parseable task items.
+    """
+    section_found = False
+    tasks: list[Task] = []
+
+    in_fence = False
+    in_section = False
+    for lineno, line in enumerate(body.splitlines(), start=1):
+        if _REQ_FENCE_RE.match(line):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+
+        h2 = _H2_RE.match(line)
+        if h2 is not None:
+            in_section = slugify(h2.group("title")) == "tasks"
+            section_found = section_found or in_section
+            continue
+        if not in_section:
+            continue
+
+        item = _TASK_ITEM_RE.match(line)
+        if item is None:
+            continue
+        req = item.group("req")
+        comp = item.group("comp")
+        tasks.append(
+            Task(
+                task_id=item.group("id").strip(),
+                line=lineno,
+                text=item.group("text").strip(),
+                req_ref=req.strip() if req else None,
+                component_ref=comp.strip() if comp else None,
+            )
+        )
+
+    if not section_found:
+        return None
+    return tuple(tasks)
+
+
+def build_tasks(nodes: dict[str, DocNode]) -> dict[str, tuple[Task, ...]]:
+    """Parse the `## Tasks` section of every doc that has one."""
+    out: dict[str, tuple[Task, ...]] = {}
+    for doc_id, node in nodes.items():
+        if "## Tasks" not in node.body and "## tasks" not in node.body:
+            continue
+        tasks = parse_tasks(node.body)
+        if tasks is not None:
+            out[doc_id] = tasks
+    return out
 
 
 def build_requirements(nodes: dict[str, DocNode]) -> dict[str, RequirementsSection]:

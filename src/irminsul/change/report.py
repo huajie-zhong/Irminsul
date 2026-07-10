@@ -19,6 +19,7 @@ from irminsul.change.footprint import Footprint, touched_components
 from irminsul.checks import HARD_REGISTRY, Finding, Severity, sort_findings
 from irminsul.config import IrminsulConfig
 from irminsul.docgraph import DocGraph, DocNode, build_graph
+from irminsul.docgraph_index import Task as TaskType
 from irminsul.frontmatter import (
     RFC_STATE_TRANSITIONS,
     RfcStateEnum,
@@ -273,6 +274,10 @@ def build_change_report(
                     )
                 )
 
+    tasks = graph.tasks.get(node.id)
+    if tasks is not None:
+        extra["tasks"] = _task_evidence(node, tasks, affects, footprint, clues)
+
     declared_untouched: tuple[str, ...] = ()
     touched_undeclared: tuple[str, ...] = ()
     if footprint is not None:
@@ -378,6 +383,75 @@ def build_change_report(
     )
 
 
+def _task_evidence(
+    node: DocNode,
+    tasks: tuple[TaskType, ...],
+    affects: tuple[str, ...] | None,
+    footprint: Footprint | None,
+    clues: list[ReviewClue],
+) -> dict[str, object]:
+    """Per-task mechanical evidence (RFC 0031): evidence labels, never
+    completion labels. Several tasks may share one requirement and therefore
+    the same changed files — semantics stay with the reviewer."""
+    declared = tuple(affects or ())
+    items: list[dict[str, object]] = []
+    tasks_with_source = 0
+    tasks_with_test = 0
+
+    for task in tasks:
+        related = (task.component_ref,) if task.component_ref else declared
+        source_evidence: list[str] = []
+        test_evidence: list[str] = []
+        if footprint is not None:
+            for component in related:
+                source_evidence.extend(footprint.touched.get(component, ()))
+                test_evidence.extend(footprint.changed_tests.get(component, ()))
+        source_evidence = sorted(set(source_evidence))
+        test_evidence = sorted(set(test_evidence))
+        tasks_with_source += bool(source_evidence)
+        tasks_with_test += bool(test_evidence)
+
+        review_clue: str | None = None
+        if footprint is not None:
+            if not source_evidence:
+                review_clue = (
+                    "no changed source is associated with this task's "
+                    f"{'component' if task.component_ref else 'requirement'}"
+                )
+            elif not test_evidence:
+                review_clue = "inspect implementation and add or identify scenario coverage"
+            else:
+                review_clue = "confirm the changed tests assert this task's scenario"
+        if review_clue is not None:
+            clues.append(
+                ReviewClue(
+                    question=f"task '{task.task_id}': {review_clue}",
+                    evidence=tuple(source_evidence + test_evidence) or (node.path.as_posix(),),
+                )
+            )
+
+        items.append(
+            {
+                "id": task.task_id,
+                "text": task.text,
+                "req": task.req_ref,
+                "component": task.component_ref,
+                "source_evidence": source_evidence,
+                "test_evidence": test_evidence,
+                "review_clue": review_clue,
+            }
+        )
+
+    return {
+        "items": items,
+        "summary": {
+            "total": len(tasks),
+            "with_source_evidence": tasks_with_source,
+            "with_test_evidence": tasks_with_test,
+        },
+    }
+
+
 def requirement_blockers(graph: DocGraph, node: DocNode) -> list[Blocker]:
     """Requirement-contract blockers shared by reports and transitions (RFC 0030).
 
@@ -405,6 +479,13 @@ def requirement_blockers(graph: DocGraph, node: DocNode) -> list[Blocker]:
         ]
 
     findings = requirement_grammar_findings(node, section, check_name=RequirementGrammarCheck.name)
+    tasks = graph.tasks.get(node.id)
+    if tasks is not None:
+        from irminsul.checks.requirement_grammar import task_grammar_findings
+
+        findings.extend(
+            task_grammar_findings(node, tasks, section, check_name=RequirementGrammarCheck.name)
+        )
     return [
         Blocker(
             code=f"requirement-grammar:{finding.category}",
@@ -485,6 +566,9 @@ def format_change_status_plain(report: ChangeReport) -> str:
         lines.append("  blockers:")
         lines.extend(f"    [{b.code}] {b.message}" for b in report.blockers)
     lines.append(f"  mechanically ready for: {report.mechanically_ready_for}")
+    summary = _task_summary(report)
+    if summary is not None:
+        lines.append(f"  tasks: {summary}")
     if report.evidence:
         lines.append(f"  evidence: {len(report.evidence)} item(s); run `change verify` for detail")
     if report.next_actions:
@@ -501,6 +585,7 @@ def format_change_verify_plain(report: ChangeReport) -> str:
         f"  baseline: {_baseline_line(report.baseline)}",
     ]
     lines.extend(_requirements_lines(report))
+    lines.extend(_tasks_lines(report))
     if report.blockers:
         lines.append("  blockers:")
         for b in report.blockers:
@@ -528,6 +613,47 @@ def format_change_verify_plain(report: ChangeReport) -> str:
         lines.append("  next:")
         lines.extend(f"    {action}" for action in report.next_actions)
     return "\n".join(lines)
+
+
+def _task_summary(report: ChangeReport) -> str | None:
+    payload = report.extra.get("tasks")
+    if not isinstance(payload, dict):
+        return None
+    summary = payload.get("summary")
+    if not isinstance(summary, dict):
+        return None
+    total = summary.get("total")
+    return (
+        f"{summary.get('with_source_evidence')}/{total} with source evidence, "
+        f"{summary.get('with_test_evidence')}/{total} with test evidence"
+    )
+
+
+def _tasks_lines(report: ChangeReport) -> list[str]:
+    payload = report.extra.get("tasks")
+    if not isinstance(payload, dict):
+        return []
+    items = payload.get("items")
+    if not isinstance(items, list):
+        return []
+    summary = _task_summary(report)
+    lines = [f"  tasks: {summary}" if summary else "  tasks:"]
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        ref = ""
+        if item.get("req"):
+            ref = f" (req: {item['req']})"
+        elif item.get("component"):
+            ref = f" (component: {item['component']})"
+        lines.append(f"    {item.get('id')} {item.get('text')}{ref}")
+        source = item.get("source_evidence") or []
+        tests = item.get("test_evidence") or []
+        lines.append(f"      source evidence: {', '.join(source) if source else 'none'}")
+        lines.append(f"      test evidence:   {', '.join(tests) if tests else 'none'}")
+        if item.get("review_clue"):
+            lines.append(f"      review clue:     {item['review_clue']}")
+    return lines
 
 
 def _requirements_lines(report: ChangeReport) -> list[str]:

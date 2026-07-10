@@ -209,6 +209,39 @@ def test_report_single_scenario_clue(repo: Path) -> None:
     assert any("failure scenario" in clue.question for clue in report.semantic_review)
 
 
+def test_report_task_evidence(repo: Path) -> None:
+    _git_init(repo)
+    (repo / "app" / "auth" / "sso.py").write_text("x = 1\n", encoding="utf-8")
+    (repo / "tests" / "test_auth.py").write_text(
+        "def test_login() -> None:\n    assert 1\n", encoding="utf-8"
+    )
+
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+    payload = report.extra["tasks"]
+    assert isinstance(payload, dict)
+    items = payload["items"]
+    assert [item["id"] for item in items] == ["T1", "T2", "T3"]
+    t1 = items[0]
+    assert t1["req"] == "sso-login"
+    assert "app/auth/sso.py" in t1["source_evidence"]
+    assert "tests/test_auth.py" in t1["test_evidence"]
+    assert payload["summary"] == {
+        "total": 3,
+        "with_source_evidence": 3,
+        "with_test_evidence": 3,
+    }
+
+
+def test_report_task_without_evidence_gets_clue(repo: Path) -> None:
+    _git_init(repo)
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+    payload = report.extra["tasks"]
+    assert isinstance(payload, dict)
+    assert payload["summary"]["with_source_evidence"] == 0
+    assert all(item["review_clue"] for item in payload["items"])
+    assert any("task 'T1'" in clue.question for clue in report.semantic_review)
+
+
 def test_report_json_round_trips(repo: Path) -> None:
     _git_init(repo)
     report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
