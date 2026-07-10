@@ -97,10 +97,6 @@ class UniquenessCheck:
 
         source_files, _missing = walk_source_files(graph.repo_root, graph.config.paths.source_roots)
 
-<<<<<<< HEAD
-=======
-        # claims_by_file: source file -> list of (DocNode, pattern, score).
->>>>>>> origin/main
         claims_by_file = resolve_claims(graph, source_files)
 
         out: list[Finding] = []
