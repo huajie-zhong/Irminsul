@@ -95,19 +95,28 @@ binding facts already live, not a copy of them.
 ### What is derived (iteration 1 check)
 
 A new soft-deterministic check, `change-binding`, runs against an accepted RFC
-(`rfc_state: accepted`) that declares `affects`. For each named component it
-derives that component's `describes:` globs from the graph and asks: does the
-component own real source? An accepted change that claims to affect a component
-whose code is uncovered, or names a component id that does not exist, is flagged.
-This is the minimal "born bound" guarantee: an accepted proposal cannot point at a
-binding that is not actually wired to code.
-
-The change's *touched* components — independent of what it declared — are derived
-from the diff using the same `resolve_claims` / `most_specific_claims` ownership
-logic [`0021-code-doc-cochange`](0021-code-doc-cochange.md) already uses, so
+(`rfc_state: accepted`) that declares `affects`. Its primary signal is **binding
+divergence**: the components the change *actually* touched, derived from the diff,
+versus the components it *declared*. Touched components come from the same
+`resolve_claims` ownership logic (`src/irminsul/checks/uniqueness.py`) that
+[`coverage`](../../20-components/checks.md) and the `context --changed` co-change
+fold ([`0021-code-doc-cochange`](0021-code-doc-cochange.md)) already use, so
 "which components did this change really touch" is a derivation, never a second
-declaration. A divergence between declared `affects` and derived-touched is an
-advisory nudge, not an error, in this iteration.
+declaration. The check flags either side of the gap:
+
+- **Declared-but-untouched** — `affects: [auth]` while the diff changed no code
+  `auth` owns: the pointer is aspirational, not bound.
+- **Touched-but-undeclared** — the diff changed code owned by `billing`, but
+  `billing` is absent from `affects`: an unbound side effect slipped in.
+
+This divergence is the net-new guarantee, and it is genuinely new: no existing
+check compares a change's *declared intent* against its *derived footprint*. The
+coverage and ref checks already prove a component owns real source and that an
+id resolves, so `change-binding` does **not** re-litigate those — it only adds the
+declared-vs-derived comparison and a cheap shape guard on the new keys
+(`affects` is a list of existing component ids; `direction` is `extends|revises`),
+since the lean frontmatter is `extra="allow"` and would otherwise swallow a typo
+(`affect:`) silently.
 
 Severity is `warning`, promotable to error under `--strict`, consistent with the
 rest of the soft-deterministic set.
@@ -126,9 +135,10 @@ enforcement, not vocabulary.
 
 - **A new lifecycle expectation.** Authors who never set `affects` get today's
   behavior unchanged, but the loop's value only appears once changes opt in.
-- **Soft-by-default.** Iteration 1 warns rather than blocks, so the binding is
-  advisory until a project chooses `--strict`; the harder guarantees arrive with
-  accept-time anchoring (0032) and the base-truth gate (0034).
+- **Soft-by-default.** Iteration 1 warns rather than blocks; the divergence signal
+  is real value at warning severity (it names unbound side effects today), but the
+  *enforced* binding arrives with accept-time anchoring (0032) and the base-truth
+  gate (0034).
 - **Component-granularity only.** Iteration 1 binds at the component level; finer
   requirement-level binding waits for 0030/0032.
 
@@ -147,7 +157,8 @@ enforcement, not vocabulary.
 - Check name: `change-binding` vs. folding into an existing check.
 - Whether `affects` should accept layer ids (e.g. a whole component group) or only
   leaf component ids.
-- The exact divergence policy (declared `affects` vs. derived-touched) — advisory
-  now; could tighten once 0032 lands.
+- The exact divergence policy: whether touched-but-undeclared and
+  declared-but-untouched carry the same severity, and whether either tightens to an
+  error once 0032 lands.
 - CLI ergonomics for authoring (`irminsul new rfc --affects …` vs. interactive),
   deferred to the per-iteration RFCs.
