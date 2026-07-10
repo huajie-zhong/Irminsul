@@ -4,13 +4,6 @@ project_name = "{{ project_name }}"
 docs_root = "docs"
 source_roots = {{ source_roots | tojson }}
 
-[tiers]
-stable = [
-    "docs/00-foundation/**",
-    "docs/10-architecture/**",
-    "docs/50-decisions/**",
-]
-
 [checks]
 hard = [
     "frontmatter",
@@ -38,6 +31,7 @@ soft_deterministic = [
     "terminology-overload",
     "claim-provenance",
     "inventory-drift",
+    "doc-refs",
 ]
 
 [checks.schema_leak]
@@ -58,20 +52,8 @@ glossary_path = "docs/GLOSSARY.md"
 [checks.parent_child]
 length_warning_lines = 300
 
-[[checks.terminology_overload.rules]]
-term = "coverage"
-explicit_phrases = [
-    "source ownership coverage",
-    "source-file coverage",
-    "source file",
-    "source files",
-    "source paths",
-    "coveragecheck",
-    "`coverage`",
-    "tests:",
-    "`tests:`",
-]
-suggestion = "Clarify whether this means source ownership coverage or the `CoverageCheck` tests: rule"
+# terminology-overload ships with no rules; add [[checks.terminology_overload.rules]]
+# entries for terms that mean different things in different parts of your project.
 
 [overrides]
 mtime_drift_days = 30

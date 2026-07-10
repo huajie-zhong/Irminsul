@@ -371,6 +371,25 @@ def test_context_no_topic_matches_returns_empty_json(tmp_path: Path) -> None:
     assert data["unmatched"] == []
 
 
+def test_context_unmatched_hint_points_at_list_undocumented_all() -> None:
+    report = context_module.ContextReport(
+        version=1,
+        mode="changed",
+        results=[],
+        unmatched=[
+            context_module.UnmatchedPath(
+                path="src/mylib/new.py",
+                reason="no owning doc found",
+                candidates=[],
+            )
+        ],
+    )
+
+    plain = context_module.format_context_plain(report)
+
+    assert "hint: irminsul list undocumented --all" in plain
+
+
 def test_context_changed_flags_doc_not_co_changed(tmp_path: Path) -> None:
     repo = _make_context_repo(tmp_path)
     _git(repo, "init")

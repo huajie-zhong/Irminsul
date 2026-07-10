@@ -40,6 +40,14 @@ _FENCE_RE = re.compile(r"^\s*(```|~~~)")
 _BACKTICK_RE = re.compile(r"`([^`]+)`")
 _SCANNED_AUDIENCES = {AudienceEnum.explanation, AudienceEnum.reference}
 
+# Kinds whose identities are not user-facing prose literals and so must not drive
+# the liar heuristic. `mcp` tool identities are Python function names that shadow
+# CLI command names (`check`, `refs`, `surface`, ...), which docs legitimately
+# backtick-quote as commands — scanning prose for them is all false positives.
+# The MCP surface is governed directly by mcp-server.md's watched inventory block
+# (RFC 0028), so liar adds nothing here.
+_NON_PROSE_KINDS = {"mcp"}
+
 
 def _matches(kind: str, span: str, identity: str) -> bool:
     if kind == "cli":
@@ -59,6 +67,8 @@ class LiarCheck:
         source_files, _ = walk_source_files(graph.repo_root, graph.config.paths.source_roots)
         surfaces: dict[str, set[str]] = {}
         for kind in KNOWN_KINDS:
+            if kind in _NON_PROSE_KINDS:
+                continue
             extractor = get_extractor(kind, graph.config)
             if extractor is None:
                 continue

@@ -22,7 +22,7 @@ def test_defaults_are_valid() -> None:
     assert "src" in cfg.paths.source_roots
     assert set(cfg.checks.hard) == set(HARD_CHECKS)
     assert set(cfg.checks.soft_deterministic) == set(SOFT_DETERMINISTIC_CHECKS)
-    assert cfg.checks.terminology_overload.rules[0].term == "coverage"
+    assert cfg.checks.terminology_overload.rules == []
     assert cfg.llm.provider == "anthropic"
 
 

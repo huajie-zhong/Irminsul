@@ -136,6 +136,42 @@ def test_tutorial_audience_exempt(tmp_path: Path) -> None:
     assert [f for f in _run(repo) if f.doc_id == "tour"] == []
 
 
+_MCP_SRC = """\
+def create_server(root):
+    server = FastMCP("x")
+
+    @server.tool()
+    def alpha() -> str:
+        return ""
+
+    @server.tool()
+    def beta() -> str:
+        return ""
+
+    @server.tool()
+    def gamma() -> str:
+        return ""
+
+    return server
+"""
+
+
+def test_mcp_kind_excluded_from_prose_scan(tmp_path: Path) -> None:
+    # MCP tool identities are function names that shadow CLI commands; docs bare-
+    # backtick them legitimately. The mcp kind must not drive liar (RFC 0028).
+    repo = _repo(tmp_path)
+    (repo / "src" / "mcp_server.py").write_text(_MCP_SRC, encoding="utf-8")
+    _doc(
+        repo,
+        "docs/20-components/widget.md",
+        doc_id="widget",
+        body="The tools are `alpha`, `beta`, and `gamma`.",
+    )
+    findings = [f for f in _run(repo) if f.doc_id == "widget"]
+    assert all("mcp" not in f.message for f in findings)
+    assert findings == []
+
+
 def test_good_fixture_has_no_liar_findings(
     fixture_repo: Callable[[str], Path],
 ) -> None:
