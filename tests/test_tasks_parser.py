@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from irminsul.docgraph_index import parse_tasks
 
 _BODY = """# RFC
@@ -45,6 +47,20 @@ def test_section_bounded_by_next_h2() -> None:
 def test_fenced_examples_are_ignored() -> None:
     body = "# RFC\n\n```markdown\n## Tasks\n\n- `T1` Quoted. (req: x)\n```\n"
     assert parse_tasks(body) is None
+
+
+def test_uppercase_tasks_heading_indexed() -> None:
+    from irminsul.docgraph import DocNode
+    from irminsul.docgraph_index import build_tasks
+    from irminsul.frontmatter import DocFrontmatter
+
+    body = "# RFC\n\n## TASKS\n\n- `T1` Shout the task. (req: x)\n"
+    fm = DocFrontmatter.model_validate(
+        {"id": "x", "title": "X", "audience": "explanation", "tier": 2, "status": "draft"}
+    )
+    node = DocNode(id="x", path=Path("docs/x.md"), frontmatter=fm, body=body)
+    tasks = build_tasks({"x": node})
+    assert [t.task_id for t in tasks["x"]] == ["T1"]
 
 
 def test_items_without_backtick_id_are_skipped() -> None:

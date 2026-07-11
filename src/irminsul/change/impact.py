@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from irminsul.change.footprint import Footprint, touched_components
 from irminsul.change.report import (
@@ -110,11 +110,6 @@ def _outbound_weak(graph: DocGraph, node: DocNode) -> set[str]:
     return {target for target, sources in graph.inbound_weak.items() if node.id in sources}
 
 
-def _docs_in_layer(graph: DocGraph, docs_root: str, layer_dir: str) -> list[DocNode]:
-    prefix = f"{docs_root}/{layer_dir}/"
-    return [n for n in graph.nodes.values() if n.path.as_posix().startswith(prefix)]
-
-
 def _plan_impact(
     graph: DocGraph,
     node: DocNode,
@@ -203,7 +198,7 @@ def _plan_impact(
             Observation(observation=f"resolved by {fm.resolved_by}", source="rfc:resolved_by")
         )
     for entry in fm.required_updates or []:
-        exists = graph.by_path.get(Path(PurePosixPath(entry.path))) is not None
+        exists = graph.by_path.get(Path(entry.path.replace("\\", "/"))) is not None
         layers["decisions"].append(
             Observation(
                 observation=(
@@ -337,10 +332,25 @@ def _surface_items_in_changed_files(
     kind: str,
     changed: set[str],
 ) -> list[str]:
-    from irminsul.surface import derive_surface
+    """Surface identities defined in the changed files only.
 
-    items = derive_surface(repo_root, config, kind, None)
-    return sorted({item.identity for item in items if item.display in changed})
+    Feeds the extractor just the changed source files instead of deriving the
+    whole repository surface per kind — impact stays cheap on large codebases.
+    """
+    from irminsul.checks.globs import walk_source_files
+    from irminsul.inventory import get_extractor
+
+    extractor = get_extractor(kind, config)
+    if extractor is None:
+        return []
+
+    files, _missing = walk_source_files(repo_root, config.paths.source_roots)
+    changed_files = [(abs_path, display) for abs_path, display in files if display in changed]
+    if not changed_files:
+        return []
+
+    items = extractor.extract(changed_files, config)
+    return sorted({item.identity for item in items})
 
 
 def _glossary_findings_for_paths(graph: DocGraph, paths: set[str]) -> list[tuple[str, str]]:

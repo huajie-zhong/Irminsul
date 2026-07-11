@@ -111,10 +111,11 @@ def find_rfc_node(graph: DocGraph, config: IrminsulConfig, change: str) -> DocNo
         normalized = change.replace("\\", "/")
         node = graph.by_path.get(Path(normalized))
     if node is None and change.isdigit():
+        padded = change.zfill(4)
         matches = [
             candidate
             for candidate in graph.nodes.values()
-            if candidate.id.startswith(f"{change}-")
+            if candidate.id.startswith(f"{padded}-")
             and candidate.path.as_posix().startswith(rfc_prefix)
         ]
         if len(matches) > 1:
@@ -270,7 +271,8 @@ def build_change_report(
                     "scenarios": len(req.scenarios),
                     "binding": (
                         "planned/unbound"
-                        if req.provenance == "code" and canonical != RfcStateEnum.implemented
+                        if req.provenance == "code"
+                        and canonical in (RfcStateEnum.draft, RfcStateEnum.accepted)
                         else None
                     ),
                 }
