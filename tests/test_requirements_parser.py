@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from irminsul.docgraph_index import parse_requirements
 
 _GOOD = """# RFC
@@ -104,6 +106,38 @@ def test_missing_when_then_detected() -> None:
     [req] = section.requirements
     [scenario] = req.scenarios
     assert scenario.has_when and not scenario.has_then
+
+
+def test_underscore_emphasis_keywords_count() -> None:
+    body = (
+        "# RFC\n\n## Requirements\n\n"
+        "### Requirement: Emphasised\nID: emphasised\nProvenance: code\n\n"
+        "It _SHALL_ work.\n\n"
+        "#### Scenario: Emphasised too\n- _WHEN_ something happens\n- _THEN_ it works\n"
+    )
+    section = parse_requirements(body)
+    assert section is not None
+    [req] = section.requirements
+    assert req.has_behavior_keyword
+    [scenario] = req.scenarios
+    assert scenario.has_when and scenario.has_then
+
+
+def test_uppercase_section_heading_is_parsed() -> None:
+    from irminsul.docgraph import DocNode
+    from irminsul.docgraph_index import build_requirements
+    from irminsul.frontmatter import DocFrontmatter
+
+    body = "# RFC\n\n## REQUIREMENTS\n\nNo new behavioral requirements: nothing changes.\n"
+    section = parse_requirements(body)
+    assert section is not None
+    assert section.disposition is not None
+
+    fm = DocFrontmatter.model_validate(
+        {"id": "x", "title": "X", "audience": "explanation", "tier": 2, "status": "draft"}
+    )
+    node = DocNode(id="x", path=Path("docs/x.md"), frontmatter=fm, body=body)
+    assert "x" in build_requirements({"x": node})
 
 
 def test_lowercase_keywords_do_not_count() -> None:

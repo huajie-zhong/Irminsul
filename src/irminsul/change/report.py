@@ -255,7 +255,8 @@ def build_change_report(
                     "scenarios": len(req.scenarios),
                     "binding": (
                         "planned/unbound"
-                        if req.provenance == "code" and canonical != RfcStateEnum.implemented
+                        if req.provenance == "code"
+                        and canonical in (RfcStateEnum.draft, RfcStateEnum.accepted)
                         else None
                     ),
                 }

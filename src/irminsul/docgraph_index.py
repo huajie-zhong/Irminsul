@@ -191,9 +191,14 @@ _REQUIREMENT_RE = re.compile(r"^###\s+Requirement:\s*(?P<title>.+?)\s*$")
 _SCENARIO_RE = re.compile(r"^####\s+Scenario:\s*(?P<name>.+?)\s*$")
 _ID_LINE_RE = re.compile(r"^ID:\s*(?P<id>\S+)\s*$")
 _PROVENANCE_LINE_RE = re.compile(r"^Provenance:\s*(?P<value>\S+)\s*$")
-_BEHAVIOR_RE = re.compile(r"\b(SHALL|MUST)\b")
+# `\b` treats `_` as a word character, so `_SHALL_` (underscore emphasis)
+# would not match; the lookarounds exclude alphanumerics only.
+_BEHAVIOR_RE = re.compile(r"(?<![A-Za-z0-9])(SHALL|MUST)(?![A-Za-z0-9])")
+_WHEN_RE = re.compile(r"(?<![A-Za-z0-9])WHEN(?![A-Za-z0-9])")
+_THEN_RE = re.compile(r"(?<![A-Za-z0-9])THEN(?![A-Za-z0-9])")
 _DISPOSITION_RE = re.compile(r"^no new behavioral requirements\b", re.IGNORECASE)
 _REQ_FENCE_RE = re.compile(r"^\s*(```|~~~)")
+_REQUIREMENTS_HINT_RE = re.compile(r"^##\s+requirements\b", re.IGNORECASE | re.MULTILINE)
 
 
 def parse_requirements(body: str) -> RequirementsSection | None:
@@ -258,9 +263,9 @@ def parse_requirements(body: str) -> RequirementsSection | None:
 
         if current_scenario is not None:
             plain = line.replace("*", "")
-            if re.search(r"\bWHEN\b", plain):
+            if _WHEN_RE.search(plain):
                 current_scenario.has_when = True
-            if re.search(r"\bTHEN\b", plain):
+            if _THEN_RE.search(plain):
                 current_scenario.has_then = True
             continue
 
@@ -295,7 +300,7 @@ def build_requirements(nodes: dict[str, DocNode]) -> dict[str, RequirementsSecti
     """Parse the `## Requirements` section of every doc that has one."""
     out: dict[str, RequirementsSection] = {}
     for doc_id, node in nodes.items():
-        if "## Requirements" not in node.body and "## requirements" not in node.body:
+        if not _REQUIREMENTS_HINT_RE.search(node.body):
             continue
         section = parse_requirements(node.body)
         if section is not None:
