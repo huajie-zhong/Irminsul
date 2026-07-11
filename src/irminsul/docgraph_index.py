@@ -310,6 +310,7 @@ class Task:
     component_ref: str | None
 
 
+_TASKS_HINT_RE = re.compile(r"^##\s+tasks\b", re.IGNORECASE | re.MULTILINE)
 _TASK_ITEM_RE = re.compile(
     r"^-\s+`(?P<id>[^`]+)`\s+(?P<text>.*?)"
     r"(?:\s*\((?:req:\s*(?P<req>[^)]+?)|component:\s*(?P<comp>[^)]+?))\s*\))?\s*$"
@@ -366,7 +367,7 @@ def build_tasks(nodes: dict[str, DocNode]) -> dict[str, tuple[Task, ...]]:
     """Parse the `## Tasks` section of every doc that has one."""
     out: dict[str, tuple[Task, ...]] = {}
     for doc_id, node in nodes.items():
-        if "## Tasks" not in node.body and "## tasks" not in node.body:
+        if not _TASKS_HINT_RE.search(node.body):
             continue
         tasks = parse_tasks(node.body)
         if tasks is not None:
