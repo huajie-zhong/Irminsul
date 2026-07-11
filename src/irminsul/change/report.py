@@ -511,7 +511,9 @@ def _partition_configured_findings(
     scoped: list[dict[str, object]] = []
     debt: Counter[str] = Counter()
     for finding in sort_findings(findings):
-        if finding.severity != Severity.warning:
+        # A soft check can emit errors too (e.g. mtime-drift on a missing
+        # cross-repo .git); only info-level noise is dropped.
+        if finding.severity not in (Severity.warning, Severity.error):
             continue
         finding_path = finding.path.as_posix() if finding.path else None
         relates_to_rfc = finding.doc_id == node.id or f"'{node.id}'" in finding.message
