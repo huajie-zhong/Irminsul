@@ -56,6 +56,12 @@ def test_find_rfc_node_by_number(repo: Path) -> None:
     assert find_rfc_node(graph, config, "0004").id == "0004-draft-ready"
 
 
+def test_find_rfc_node_by_unpadded_number(repo: Path) -> None:
+    config = load(find_config(repo))
+    graph = build_graph(repo, config)
+    assert find_rfc_node(graph, config, "4").id == "0004-draft-ready"
+
+
 def test_find_rfc_node_by_path(repo: Path) -> None:
     config = load(find_config(repo))
     graph = build_graph(repo, config)
