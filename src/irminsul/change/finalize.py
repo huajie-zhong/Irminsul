@@ -10,9 +10,10 @@ behavior — tests, agents, and humans still judge semantic satisfaction.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from irminsul.anchors import Anchor, resolve
 from irminsul.change.footprint import touched_components
@@ -383,7 +384,21 @@ def _choose_owner(
     rfc_path: str,
 ) -> str | None:
     if owner_choices:
-        choice = owner_choices[0]
+        distinct = sorted(set(owner_choices))
+        if len(distinct) > 1:
+            blockers.append(
+                Blocker(
+                    code="conflicting-owner",
+                    message=(
+                        f"conflicting --owner values for requirement '{req_id}': "
+                        f"{', '.join(distinct)}"
+                    ),
+                    path=rfc_path,
+                    suggestion="pass exactly one owner per requirement",
+                )
+            )
+            return None
+        choice = distinct[0]
         if choice not in declared:
             blockers.append(
                 Blocker(
@@ -436,10 +451,7 @@ def _first_paragraph(text: str) -> str:
 
 
 def _rfc_link(owner_path: Path, rfc_path: Path) -> str:
-    owner_dir = PurePosixPath(owner_path.as_posix()).parent
-    target = PurePosixPath(rfc_path.as_posix())
-    up = len(owner_dir.parts)
-    return "/".join([".." for _ in range(up - 1)] + list(target.parts[1:]))
+    return os.path.relpath(rfc_path, owner_path.parent).replace("\\", "/")
 
 
 def _promotion_fix(node: DocNode, promotion: Promotion) -> Fix:

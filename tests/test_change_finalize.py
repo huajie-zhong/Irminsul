@@ -99,6 +99,30 @@ def test_finalize_unknown_requirement_binding_blocks(repo: Path) -> None:
     assert any(b.code == "unknown-requirement" for b in plan.blockers)
 
 
+def test_finalize_conflicting_owner_choices_block(repo: Path) -> None:
+    graph, config = _graph(repo)
+    plan = plan_finalize(
+        graph,
+        config,
+        repo,
+        _RFC,
+        bindings=_BINDINGS,
+        owners={"sso-login": ["auth", "billing"]},
+        env={},
+    )
+    assert any(b.code == "conflicting-owner" for b in plan.blockers)
+
+
+def test_finalize_rfc_link_is_relative(repo: Path) -> None:
+    graph, config = _graph(repo)
+    plan = plan_finalize(graph, config, repo, _RFC, bindings=_BINDINGS, env={})
+    assert plan.blockers == ()
+    component_result = apply_fixes(repo, list(plan.component_fixes), dry_run=False, confirm=True)
+    assert component_result.errors == []
+    owner_text = (repo / "docs" / "20-components" / "auth.md").read_text(encoding="utf-8")
+    assert "[RFC](../80-evolution/rfcs/0001-accepted-good.md)" in owner_text
+
+
 def test_finalize_draft_rfc_blocks(repo: Path) -> None:
     graph, config = _graph(repo)
     plan = plan_finalize(graph, config, repo, "0004-draft-ready", env={})

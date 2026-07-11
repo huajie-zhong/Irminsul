@@ -239,8 +239,12 @@ class RequirementGrammarCheck:
     default_severity: ClassVar[Severity] = Severity.warning
 
     def run(self, graph: DocGraph) -> list[Finding]:
-        docs_root = graph.config.paths.docs_root.strip("/\\") if graph.config else "docs"
-        rfc_prefix = f"{docs_root}/80-evolution/rfcs/" if docs_root else "80-evolution/rfcs/"
+        docs_root = (
+            (graph.config.paths.docs_root or "docs").replace("\\", "/").strip("/") or "docs"
+            if graph.config
+            else "docs"
+        )
+        rfc_prefix = f"{docs_root}/80-evolution/rfcs/"
 
         out: list[Finding] = []
         rfc_ids = {
