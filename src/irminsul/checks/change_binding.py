@@ -30,7 +30,7 @@ class ChangeBindingCheck:
         if graph.config is None or graph.repo_root is None:
             return []
 
-        docs_root = graph.config.paths.docs_root.strip("/\\") or "docs"
+        docs_root = (graph.config.paths.docs_root or "docs").replace("\\", "/").strip("/") or "docs"
         rfc_prefix = f"{docs_root}/80-evolution/rfcs/"
 
         rfcs = [
