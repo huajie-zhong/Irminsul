@@ -27,7 +27,7 @@ from irminsul.checks import (
 )
 from irminsul.config import IrminsulConfig, find_config, load
 from irminsul.docgraph import DocGraph, build_graph
-from irminsul.git.mtime import diff_name_only
+from irminsul.git.mtime import diff_name_only, has_history
 from irminsul.init.command import (
     detect_code_signals,
     run_init,
@@ -507,6 +507,19 @@ def _llm_check_names(profile: Profile, config: IrminsulConfig) -> list[str]:
     return list(config.checks.soft_llm)
 
 
+def _diff_failure_reason(repo_root: Path, co_change_range: tuple[str, str]) -> str:
+    base, head = co_change_range
+    if not has_history(repo_root):
+        return (
+            f"no git repository with commit history found at {repo_root}; "
+            "co-change needs one to diff against"
+        )
+    return (
+        f"could not compute `git diff {base}...{head}`; "
+        "at least one ref could not be resolved in this repository"
+    )
+
+
 def _run_registered_checks(
     check_names: list[str],
     registry: dict[str, type[Check]],
@@ -719,6 +732,16 @@ def check(
         typer.echo(typer.style("--diff and --base-ref/--head-ref are mutually exclusive", fg="red"))
         raise typer.Exit(code=2)
 
+    for flag, value in (("--diff", diff), ("--base-ref", base_ref), ("--head-ref", head_ref)):
+        if value is not None and not value.strip():
+            typer.echo(
+                typer.style(
+                    f"{flag} was given an empty value; pass a git ref or omit the flag",
+                    fg="red",
+                )
+            )
+            raise typer.Exit(code=2)
+
     co_change_paths: frozenset[str] | None = None
     co_change_range: tuple[str, str] | None = None
     if diff is not None:
@@ -728,14 +751,17 @@ def check(
     if co_change_range is not None:
         co_change_paths = diff_name_only(repo_root, *co_change_range)
         if co_change_paths is None:
+            reason = _diff_failure_reason(repo_root, co_change_range)
+            # --diff is an explicit opt-in gate: failing to compute its diff means
+            # the gate would silently pass, so exit. --base-ref/--head-ref predate
+            # it and degrade gracefully so a shallow clone still reports findings.
+            if diff is not None:
+                typer.echo(typer.style(reason, fg="red"))
+                raise typer.Exit(code=2)
             typer.echo(
-                typer.style(
-                    f"could not compute `git diff {co_change_range[0]}...{co_change_range[1]}`; "
-                    "are both refs valid in this repository?",
-                    fg="red",
-                )
+                typer.style(f"{reason}; skipping diff-aware checks", fg="yellow"),
+                err=True,
             )
-            raise typer.Exit(code=2)
 
     graph = build_graph(repo_root, config, now=now_date)
 

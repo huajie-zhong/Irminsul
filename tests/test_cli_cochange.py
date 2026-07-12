@@ -137,6 +137,37 @@ def test_cochange_invalid_base_ref_exits_2(tmp_path: Path) -> None:
     assert "not-a-ref" in result.stdout
 
 
+def test_cochange_empty_diff_ref_exits_2(tmp_path: Path) -> None:
+    """`--diff ""` must not silently disable the gate.
+
+    A workflow templating `--diff ${{ github.base_ref }}` interpolates to the
+    empty string on a `push` event; git resolves `...HEAD` as `HEAD...HEAD` and
+    reports no changed files, so the gate would pass vacuously.
+    """
+    repo_root, _base = _seed_repo(tmp_path)
+    (repo_root / "app" / "alpha.py").write_text("a = 2\n", encoding="utf-8")
+    _commit(repo_root, "change source only")
+
+    for blank in ("", "   "):
+        result = runner.invoke(app, ["check", "--diff", blank, "--path", str(repo_root)])
+        assert result.exit_code == 2
+        assert "--diff" in result.output
+        assert "empty value" in result.output
+
+
+def test_cochange_no_git_repository_message_distinguishes_from_bad_ref(tmp_path: Path) -> None:
+    repo_root, _base = _seed_repo(tmp_path)
+    # An irminsul root that is not itself a git root: refs are fine, git is not.
+    nested = repo_root / "nested"
+    (nested / "docs").mkdir(parents=True)
+    (nested / "irminsul.toml").write_text(_TOML, encoding="utf-8")
+
+    result = runner.invoke(app, ["check", "--diff", "HEAD", "--path", str(nested)])
+    assert result.exit_code == 2
+    assert "no git repository with commit history found" in result.output
+    assert "could not be resolved" not in result.output
+
+
 def test_cochange_strict_promotes_to_exit_1(tmp_path: Path) -> None:
     repo_root, base = _seed_repo(tmp_path)
     (repo_root / "app" / "alpha.py").write_text("a = 2\n", encoding="utf-8")

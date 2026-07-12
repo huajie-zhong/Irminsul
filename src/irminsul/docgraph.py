@@ -57,9 +57,6 @@ class DocGraph:
     headings: dict[str, list[Heading]] = field(default_factory=dict)
     git_times: dict[Path, GitTime] = field(default_factory=dict)
     now: _dt.date | None = None
-    """Repo-relative POSIX paths changed in a base...head range, when `check`
-    was given `--base-ref`/`--head-ref`. None means no diff was requested;
-    diff-aware checks fall back to their non-diff behaviour."""
 
 
 def _to_repo_relative(absolute: Path, repo_root: Path) -> Path:

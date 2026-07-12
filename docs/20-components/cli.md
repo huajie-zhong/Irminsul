@@ -54,8 +54,10 @@ The Typer app that backs both the `irminsul` and `irm` console scripts. The exac
 Common command paths:
 
 - `irminsul init` — scaffold a new codebase. Delegates to [`init`](init.md).
-- `irminsul check` — build the [DocGraph](docgraph.md) and run checks selected by `--profile`. Exits 1 on any error finding. `--diff <base>` adds [co-change](checks.md) enforcement: a warning for every owning doc whose claimed source files changed in `<base>...HEAD` without it; an unresolvable base ref exits 2.
+- `irminsul check` — build the [DocGraph](docgraph.md) and run checks selected by `--profile`. Exits 1 on any error finding. `--diff <base>` adds [co-change](checks.md) enforcement: a warning for every owning doc whose claimed source files changed in `<base>...HEAD` without it.
 - `irminsul context` — build the [DocGraph](docgraph.md) and delegate task-specific navigation lookup to [`context`](context.md).
+
+Co-change accepts two spellings, and they fail differently on purpose. `--diff <base>` is an explicit opt-in gate: an unresolvable base ref exits 2 rather than passing silently, because a gate that cannot compute its diff is a gate that never fires. `--base-ref`/`--head-ref` predate it and degrade gracefully: an unresolvable ref (a shallow CI clone that never fetched the base sha, a tarball checkout with no history) prints a yellow warning on stderr and the run continues, reporting the rest of the findings normally. An empty value for any of the three is a malformed invocation and exits 2 either way.
 
 Findings print one per line, sorted by severity then path. Severity colors are red (error), yellow (warning), cyan (info). Paths are POSIX-normalized so output is stable across platforms.
 
