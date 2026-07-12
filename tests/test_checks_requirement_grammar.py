@@ -77,6 +77,36 @@ def test_mixed_disposition_flagged(repo: Path) -> None:
     assert "mixed-disposition" in _categories(findings, "0006-draft-mixed")
 
 
+def test_disposition_after_requirements_flagged(repo: Path) -> None:
+    findings = _findings(repo)
+    assert _categories(findings, "0010-draft-late-disposition") == ["mixed-disposition"]
+
+
+def test_quoted_grammar_declares_nothing(repo: Path) -> None:
+    config = load(find_config(repo))
+    graph = build_graph(repo, config)
+    section = graph.requirements["0008-draft-quoting"]
+    assert section.requirements == ()
+    assert section.disposition is not None
+    assert _categories(RequirementGrammarCheck().run(graph), "0008-draft-quoting") == []
+
+
+def test_unbalanced_fence_does_not_swallow_the_section(repo: Path) -> None:
+    config = load(find_config(repo))
+    graph = build_graph(repo, config)
+    section = graph.requirements["0009-draft-tilde-fence"]
+    assert [r.req_id for r in section.requirements] == ["session-timeout"]
+    assert _categories(RequirementGrammarCheck().run(graph), "0009-draft-tilde-fence") == []
+
+
+def test_h1_closes_the_section(repo: Path) -> None:
+    config = load(find_config(repo))
+    graph = build_graph(repo, config)
+    section = graph.requirements["0011-draft-appendix"]
+    assert [r.req_id for r in section.requirements] == ["rate-limit"]
+    assert _categories(RequirementGrammarCheck().run(graph), "0011-draft-appendix") == []
+
+
 def test_findings_carry_lines(repo: Path) -> None:
     findings = _findings(repo)
     assert all(f.line is not None for f in findings if f.doc_id == "0005-draft-bad-grammar")

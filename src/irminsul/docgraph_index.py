@@ -186,7 +186,7 @@ class _RequirementDraft:
         )
 
 
-_H2_RE = re.compile(r"^##\s+(?P<title>.+?)\s*$")
+_SECTION_HEADING_RE = re.compile(r"^(?P<hashes>#{1,2})\s+(?P<title>.+?)\s*$")
 _REQUIREMENT_RE = re.compile(r"^###\s+Requirement:\s*(?P<title>.+?)\s*$")
 _SCENARIO_RE = re.compile(r"^####\s+Scenario:\s*(?P<name>.+?)\s*$")
 _ID_LINE_RE = re.compile(r"^ID:\s*(?P<id>\S+)\s*$")
@@ -197,8 +197,85 @@ _BEHAVIOR_RE = re.compile(r"(?<![A-Za-z0-9])(SHALL|MUST)(?![A-Za-z0-9])")
 _WHEN_RE = re.compile(r"(?<![A-Za-z0-9])WHEN(?![A-Za-z0-9])")
 _THEN_RE = re.compile(r"(?<![A-Za-z0-9])THEN(?![A-Za-z0-9])")
 _DISPOSITION_RE = re.compile(r"^no new behavioral requirements\b", re.IGNORECASE)
-_REQ_FENCE_RE = re.compile(r"^\s*(```|~~~)")
+_FENCE_RE = re.compile(r"^\s*(?P<marker>`{3,}|~{3,})(?P<info>.*)$")
 _REQUIREMENTS_HINT_RE = re.compile(r"^##\s+requirements\b", re.IGNORECASE | re.MULTILINE)
+
+
+class FenceTracker:
+    """CommonMark fenced-code-block state, fed one body line at a time.
+
+    A fence closes only on the same character, at least as long as the opening
+    marker, and without an info string. So a ````-fenced quote may contain ```
+    blocks verbatim, and a stray ``` inside a ~~~ block is content rather than
+    a toggle.
+    """
+
+    __slots__ = ("_char", "_length")
+
+    def __init__(self) -> None:
+        self._char: str | None = None
+        self._length = 0
+
+    @property
+    def inside(self) -> bool:
+        return self._char is not None
+
+    def consume(self, line: str) -> bool:
+        """Feed one line; True when it is fence syntax or fenced content."""
+        match = _FENCE_RE.match(line)
+        if match is None:
+            return self.inside
+
+        marker = match.group("marker")
+        info = match.group("info")
+        if self._char is None:
+            if marker[0] == "`" and "`" in info:
+                return False
+            self._char = marker[0]
+            self._length = len(marker)
+        elif marker[0] == self._char and len(marker) >= self._length and not info.strip():
+            self._char = None
+            self._length = 0
+        return True
+
+
+@dataclass(frozen=True)
+class SectionBody:
+    """The content lines of a `## <slug>` section, with fenced blocks removed."""
+
+    line: int
+    lines: tuple[tuple[int, str], ...]
+    """`(line number, text)` for every non-fenced line under the heading."""
+
+
+def extract_section(body: str, slug: str) -> SectionBody | None:
+    """Collect the lines belonging to the `## <slug>` section of a doc body.
+
+    Any heading of level 1 or 2 closes the section, and fenced code blocks are
+    dropped, so quoted grammar never contributes headings, ids, or keywords.
+    """
+    fence = FenceTracker()
+    section_line: int | None = None
+    lines: list[tuple[int, str]] = []
+    in_section = False
+
+    for lineno, line in enumerate(body.splitlines(), start=1):
+        if fence.consume(line):
+            continue
+        heading = _SECTION_HEADING_RE.match(line)
+        if heading is not None:
+            in_section = (
+                len(heading.group("hashes")) == 2 and slugify(heading.group("title")) == slug
+            )
+            if in_section and section_line is None:
+                section_line = lineno
+            continue
+        if in_section:
+            lines.append((lineno, line))
+
+    if section_line is None:
+        return None
+    return SectionBody(line=section_line, lines=tuple(lines))
 
 
 def parse_requirements(body: str) -> RequirementsSection | None:
@@ -208,7 +285,10 @@ def parse_requirements(body: str) -> RequirementsSection | None:
     ids, or keywords, so an RFC can *quote* requirement grammar without
     declaring requirements.
     """
-    section_line: int | None = None
+    section = extract_section(body, "requirements")
+    if section is None:
+        return None
+
     disposition: str | None = None
     requirements: list[Requirement] = []
 
@@ -228,27 +308,7 @@ def parse_requirements(body: str) -> RequirementsSection | None:
             requirements.append(current_req.build())
         current_req = None
 
-    in_fence = False
-    in_section = False
-    for lineno, line in enumerate(body.splitlines(), start=1):
-        if _REQ_FENCE_RE.match(line):
-            in_fence = not in_fence
-            continue
-        if in_fence:
-            continue
-
-        h2 = _H2_RE.match(line)
-        if h2 is not None:
-            if in_section:
-                close_requirement()
-                in_section = False
-            if slugify(h2.group("title")) == "requirements":
-                in_section = True
-                section_line = lineno
-            continue
-        if not in_section:
-            continue
-
+    for lineno, line in section.lines:
         req_match = _REQUIREMENT_RE.match(line)
         if req_match is not None:
             close_requirement()
@@ -259,6 +319,12 @@ def parse_requirements(body: str) -> RequirementsSection | None:
         if scenario_match is not None:
             close_scenario()
             current_scenario = _ScenarioDraft(scenario_match.group("name"), lineno)
+            continue
+
+        # Checked before the requirement/scenario branches consume the line: a
+        # disposition appended after the blocks is the contradiction to report.
+        if disposition is None and _DISPOSITION_RE.match(line.strip()):
+            disposition = line.strip()
             continue
 
         if current_scenario is not None:
@@ -279,18 +345,11 @@ def parse_requirements(body: str) -> RequirementsSection | None:
                 current_req.provenance = provenance_match.group("value")
                 continue
             current_req.text_lines.append(line)
-            continue
 
-        if disposition is None and _DISPOSITION_RE.match(line.strip()):
-            disposition = line.strip()
+    close_requirement()
 
-    if in_section:
-        close_requirement()
-
-    if section_line is None:
-        return None
     return RequirementsSection(
-        line=section_line,
+        line=section.line,
         disposition=disposition,
         requirements=tuple(requirements),
     )
