@@ -18,12 +18,20 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from irminsul.checks import HARD_REGISTRY, SOFT_REGISTRY, Check, Finding, sort_findings, summarize
+from irminsul.checks import (
+    HARD_REGISTRY,
+    SOFT_REGISTRY,
+    Check,
+    Finding,
+    fix_commands,
+    sort_findings,
+    summarize,
+)
 from irminsul.checks.claim_anchor import ClaimAnchorCheck
 from irminsul.config import IrminsulConfig, find_config, load
 from irminsul.context import build_context_report, context_report_to_json
 from irminsul.docgraph import build_graph
-from irminsul.listing.command import findings_for_kind, findings_to_json
+from irminsul.listing.command import findings_and_graph_for_kind, findings_to_json
 from irminsul.orient import build_orient_report, orient_report_to_json
 from irminsul.refs import (
     RefsError,
@@ -100,7 +108,6 @@ def check_json(repo_root: Path, config: IrminsulConfig, profile: str = "hard") -
     # rather than duplicating the logic here.
     from irminsul.cli import (
         Profile,
-        _compute_fixable,
         _findings_to_json,
         _hard_check_names,
         _soft_check_names,
@@ -121,16 +128,18 @@ def check_json(repo_root: Path, config: IrminsulConfig, profile: str = "hard") -
         findings.extend(cls().run(graph))
 
     findings = sort_findings(findings)
-    return _findings_to_json(findings, summarize(findings), _compute_fixable(findings, graph))
+    commands = fix_commands(findings, graph, profile=profile)
+    return _findings_to_json(findings, summarize(findings), commands)
 
 
 def list_docs_json(repo_root: Path, config: IrminsulConfig, kind: str) -> str:
     """Findings behind one `irminsul list` subcommand, as JSON.
 
-    Kind validation lives in `findings_for_kind`, which raises ValueError for
-    unknown kinds — no second copy of the check here.
+    Kind validation lives in `findings_and_graph_for_kind`, which raises
+    ValueError for unknown kinds — no second copy of the check here.
     """
-    return findings_to_json(findings_for_kind(repo_root, config, kind))
+    findings, graph = findings_and_graph_for_kind(repo_root, config, kind)
+    return findings_to_json(findings, graph)
 
 
 def surface_json(
@@ -152,11 +161,12 @@ def surface_json(
 
 def anchors_json(repo_root: Path, config: IrminsulConfig) -> str:
     """Anchored prose-claim report (`irminsul anchors`), as JSON."""
-    from irminsul.cli import _compute_fixable, _findings_to_json
+    from irminsul.cli import _findings_to_json
 
     graph = build_graph(repo_root, config)
     findings = sort_findings(ClaimAnchorCheck().run(graph))
-    return _findings_to_json(findings, summarize(findings), _compute_fixable(findings, graph))
+    commands = fix_commands(findings, graph, profile="all-available")
+    return _findings_to_json(findings, summarize(findings), commands)
 
 
 def create_server(repo_root: Path) -> FastMCP:

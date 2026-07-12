@@ -73,3 +73,56 @@ def summarize(findings: list[Finding]) -> dict[Severity, int]:
     for f in findings:
         counts[f.severity] += 1
     return counts
+
+
+def fix_commands(findings: list[Finding], graph: DocGraph, *, profile: str) -> list[str | None]:
+    """The `irminsul fix` invocation that remediates each finding, or None.
+
+    Mirrors the fix command's harvest: every check implementing
+    `fixes(findings, graph)` is asked, per finding, whether that finding alone
+    yields at least one `Fix`. The command repeats the profile the finding was
+    produced under, because `fix --check` only selects checks that are active
+    under its own profile, and appends `--confirm` when a harvested fix would
+    otherwise be held back.
+    """
+    from irminsul.checks import HARD_REGISTRY, SOFT_REGISTRY
+
+    instances: dict[str, Check | None] = {}
+    out: list[str | None] = []
+    for finding in findings:
+        if finding.check not in instances:
+            cls = HARD_REGISTRY.get(finding.check) or SOFT_REGISTRY.get(finding.check)
+            instances[finding.check] = cls() if cls is not None else None
+        instance = instances[finding.check]
+        maybe_fixes = getattr(instance, "fixes", None)
+        harvested: list[Fix] = maybe_fixes([finding], graph) if maybe_fixes is not None else []
+        if not harvested:
+            out.append(None)
+            continue
+        command = f"irminsul fix --profile {profile} --check {finding.check}"
+        if any(fix.requires_confirm for fix in harvested):
+            command += " --confirm"
+        out.append(command)
+    return out
+
+
+def finding_records(findings: list[Finding], commands: list[str | None]) -> list[dict[str, object]]:
+    """The JSON shape of a finding, shared by every findings-emitting surface."""
+    records: list[dict[str, object]] = []
+    for finding, command in zip(findings, commands, strict=True):
+        record: dict[str, object] = {
+            "check": finding.check,
+            "severity": finding.severity.value,
+            "message": finding.message,
+            "path": finding.path.as_posix() if finding.path else None,
+            "doc_id": finding.doc_id,
+            "line": finding.line,
+            "suggestion": finding.suggestion,
+            "category": finding.category,
+            "data": finding.data,
+            "fixable": command is not None,
+        }
+        if command is not None:
+            record["fix_command"] = command
+        records.append(record)
+    return records

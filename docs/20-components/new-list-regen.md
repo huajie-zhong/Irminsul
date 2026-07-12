@@ -34,7 +34,7 @@ The `component` kind accepts repeatable `--describes` and `--tests` options that
 
 ## `irminsul list {orphans,stale,undocumented}`
 
-Thin wrappers over existing soft checks: `orphans` delegates to `OrphansCheck`, `stale` to `StaleReaperCheck`, `undocumented` to `UniquenessCheck` (filtering to omission warnings). Output is plain text by default; `--format json` emits a JSON array.
+Thin wrappers over existing soft checks: `orphans` delegates to `OrphansCheck`, `stale` to `StaleReaperCheck`, `undocumented` to `UniquenessCheck` (filtering to omission warnings), `lifecycle` to `DecisionUpdatesCheck`. Output is plain text by default; `--format json` emits a JSON array of the same finding records [`irminsul check --format json`](checks.md) produces — including `data` and `fixable`/`fix_command`. That sharing is deliberate: `lifecycle` wraps a check that *does* implement fixes, so a separate serializer here would be the one findings surface that hides fixability from agents.
 
 By default `undocumented` only reports files in covered directories — directories where at least one file is already claimed. The `--all` flag drops that heuristic and lists every source file with no doc claim, grouped by directory with per-directory counts, directories sorted by undocumented count descending; this is the brownfield on-ramp for repos with little or no existing coverage. In JSON mode each `--all` entry carries the file `path` and its parent `dir`.
 
