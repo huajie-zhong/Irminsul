@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 from irminsul.checks.base import Finding, Severity
+from irminsul.config import docs_root_prefix
 from irminsul.docgraph import DocGraph, DocNode
 from irminsul.frontmatter import RfcStateEnum, canonical_rfc_state
 
@@ -30,8 +31,7 @@ class ChangeBindingCheck:
         if graph.config is None or graph.repo_root is None:
             return []
 
-        docs_root = (graph.config.paths.docs_root or "docs").replace("\\", "/").strip("/") or "docs"
-        rfc_prefix = f"{docs_root}/80-evolution/rfcs/"
+        rfc_prefix = f"{docs_root_prefix(graph.config)}/80-evolution/rfcs/"
 
         rfcs = [
             node

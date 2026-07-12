@@ -88,6 +88,18 @@ def plan_transition(
         )
 
     effective_resolved_by = resolved_by or fm.resolved_by
+    if target_state == RfcStateEnum.rejected and resolved_by:
+        blockers.append(
+            Blocker(
+                code="unsupported-resolved-by",
+                message=(
+                    "--resolved-by applies to acceptance only; a rejection records its "
+                    "rationale in the RFC body"
+                ),
+                path=rfc_path,
+                suggestion="drop --resolved-by, or transition to accepted instead",
+            )
+        )
     if target_state == RfcStateEnum.accepted:
         if fm.affects is None:
             blockers.append(
