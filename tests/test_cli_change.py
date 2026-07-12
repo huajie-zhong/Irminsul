@@ -133,6 +133,28 @@ def test_change_verify_plain_shows_tasks(repo: Path) -> None:
     assert "source evidence:" in result.output
 
 
+def test_change_transition_rejected_with_resolved_by_blocks(repo: Path) -> None:
+    rfc = repo / "docs" / "80-evolution" / "rfcs" / "0004-draft-ready.md"
+    before = rfc.read_text(encoding="utf-8")
+    result = runner.invoke(
+        app,
+        [
+            "change",
+            "transition",
+            "0004-draft-ready",
+            "rejected",
+            "--resolved-by",
+            _ADR,
+            "--confirm",
+            "--path",
+            str(repo),
+        ],
+    )
+    assert result.exit_code == 1
+    assert "unsupported-resolved-by" in result.output
+    assert rfc.read_text(encoding="utf-8") == before
+
+
 def test_change_transition_rejects_implemented_target(repo: Path) -> None:
     result = runner.invoke(
         app,

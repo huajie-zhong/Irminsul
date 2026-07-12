@@ -17,7 +17,7 @@ from pathlib import Path
 
 from irminsul.change.footprint import Footprint, touched_components
 from irminsul.checks import HARD_REGISTRY, Finding, Severity, sort_findings
-from irminsul.config import IrminsulConfig
+from irminsul.config import IrminsulConfig, docs_root_prefix
 from irminsul.docgraph import DocGraph, DocNode, build_graph
 from irminsul.docgraph_index import Task as TaskType
 from irminsul.docgraph_index import TasksSection
@@ -101,8 +101,7 @@ class ChangeReport:
 
 def find_rfc_node(graph: DocGraph, config: IrminsulConfig, change: str) -> DocNode:
     """Resolve a change reference: doc id, numeric prefix, or repo-relative path."""
-    docs_root = (config.paths.docs_root or "docs").replace("\\", "/").strip("/")
-    rfc_prefix = f"{docs_root}/80-evolution/rfcs/"
+    rfc_prefix = f"{docs_root_prefix(config)}/80-evolution/rfcs/"
 
     node = graph.nodes.get(change)
     if node is None:
@@ -229,6 +228,18 @@ def build_change_report(
                     suggestion="fix the path or create the decision doc",
                 )
             )
+    elif canonical == RfcStateEnum.draft:
+        blockers.append(
+            Blocker(
+                code="missing-adr",
+                message="an accepted RFC must resolve to a decision record; none is declared",
+                path=node.path.as_posix(),
+                suggestion=(
+                    "create it with `irminsul new adr <title>` and pass "
+                    "--resolved-by <adr path> to `change transition`"
+                ),
+            )
+        )
 
     hard_errors = _hard_errors(graph, config)
     for finding in hard_errors:
@@ -325,11 +336,16 @@ def build_change_report(
                     )
                 )
     else:
-        clues.append(
-            ReviewClue(
-                question=(
-                    "no diff baseline could be resolved; pass --base-ref (or run from "
-                    "a git worktree) to derive implementation evidence"
+        blockers.append(
+            Blocker(
+                code="missing-baseline",
+                message=(
+                    "no diff baseline could be resolved, so no implementation evidence "
+                    "can be derived"
+                ),
+                path=node.path.as_posix(),
+                suggestion=(
+                    "pass --base-ref <ref>, set IRMINSUL_BASE_REF, or run from a git worktree"
                 ),
             )
         )

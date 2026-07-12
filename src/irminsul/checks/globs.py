@@ -34,10 +34,7 @@ def walk_source_files(
         for path in abs_root.rglob("*"):
             if not path.is_file():
                 continue
-            parts = path.relative_to(abs_root).parts
-            if any(part.startswith(".") or part == "__pycache__" for part in parts):
-                continue
-            if path.suffix in {".pyc", ".pyo"}:
+            if _is_excluded(path.relative_to(abs_root).parts):
                 continue
             try:
                 display = str(PurePosixPath(*path.relative_to(repo_root).parts))
@@ -45,6 +42,51 @@ def walk_source_files(
                 display = str(PurePosixPath(*path.relative_to(abs_root).parts))
             files.append((path, display))
     return files, missing
+
+
+def source_root_prefixes(repo_root: Path, source_roots: list[str]) -> list[str]:
+    """Repo-relative POSIX prefixes of the source roots that live inside the repo.
+
+    An empty string means the repo root itself. Roots outside the repo (the
+    sibling code repo of Topology A/B) are omitted: a repo-relative diff path
+    can never fall under them, and their on-disk files already carry a
+    source-root-relative display from `walk_source_files`.
+    """
+    prefixes: list[str] = []
+    root_abs = repo_root.resolve()
+    for root in source_roots:
+        try:
+            rel = (repo_root / root).resolve().relative_to(root_abs)
+        except ValueError:
+            continue
+        prefixes.append(PurePosixPath(*rel.parts).as_posix() if rel.parts else "")
+    return prefixes
+
+
+def is_source_path(display: str, prefixes: list[str]) -> bool:
+    """Whether a repo-relative POSIX path would be walked as a source file.
+
+    The disk-walk answer for a path that still exists, and the only answer
+    available for one that was deleted — a deletion is still a change to the
+    component that owned the file.
+    """
+    path = PurePosixPath(display.replace("\\", "/"))
+    for prefix in prefixes:
+        if prefix:
+            if not path.is_relative_to(prefix):
+                continue
+            parts = path.relative_to(prefix).parts
+        else:
+            parts = path.parts
+        if parts and not _is_excluded(parts):
+            return True
+    return False
+
+
+def _is_excluded(parts: tuple[str, ...]) -> bool:
+    if any(part.startswith(".") or part == "__pycache__" for part in parts):
+        return True
+    return PurePosixPath(parts[-1]).suffix in {".pyc", ".pyo"}
 
 
 class GlobsCheck:

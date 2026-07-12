@@ -75,6 +75,22 @@ def test_diff_outside_declared_scope_warns(repo: Path) -> None:
     assert untouched[0].severity == Severity.info
 
 
+def test_deleted_source_outside_declared_scope_warns(repo: Path) -> None:
+    (repo / "app" / "billing" / "invoice.py").unlink()
+    findings = _findings(repo, diff=frozenset({"app/billing/invoice.py"}))
+    undeclared = _by_category(findings, "touched-but-undeclared")
+    assert len(undeclared) == 1
+    assert "'billing'" in undeclared[0].message
+    assert "app/billing/invoice.py" in undeclared[0].message
+
+
+def test_deleted_source_inside_declared_scope_is_silent(repo: Path) -> None:
+    (repo / "app" / "auth" / "session.py").unlink()
+    findings = _findings(repo, diff=frozenset({"app/auth/session.py"}))
+    assert _by_category(findings, "touched-but-undeclared") == []
+    assert _by_category(findings, "declared-but-untouched") == []
+
+
 def test_diff_covering_both_components(repo: Path) -> None:
     findings = _findings(repo, diff=frozenset({"app/auth/login.py", "app/billing/invoice.py"}))
     undeclared = _by_category(findings, "touched-but-undeclared")

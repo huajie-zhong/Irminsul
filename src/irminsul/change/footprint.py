@@ -9,13 +9,13 @@ this changed file" has exactly one answer everywhere.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 from pathspec import GitIgnoreSpec
 
-from irminsul.checks.globs import walk_source_files
+from irminsul.checks.globs import is_source_path, source_root_prefixes, walk_source_files
 from irminsul.checks.uniqueness import resolve_claims
-from irminsul.config import IrminsulConfig
+from irminsul.config import IrminsulConfig, docs_root_prefix
 from irminsul.docgraph import DocGraph
 
 
@@ -38,12 +38,27 @@ def touched_components(
     config: IrminsulConfig,
     changed_paths: frozenset[str],
 ) -> Footprint:
-    """Resolve `changed_paths` (repo-relative POSIX) to owning components."""
+    """Resolve `changed_paths` (repo-relative POSIX) to owning components.
+
+    A deleted file is not on disk, so it cannot come from the source walk — it
+    is resolved from its path alone. Removing a file is a change to the
+    component that owned it, and an undeclared removal must surface as loudly as
+    an undeclared edit.
+    """
     assert graph.repo_root is not None
-    source_files, _missing = walk_source_files(graph.repo_root, config.paths.source_roots)
-    changed_source = [
+    repo_root = graph.repo_root
+    source_files, _missing = walk_source_files(repo_root, config.paths.source_roots)
+    on_disk = {display for _, display in source_files}
+    prefixes = source_root_prefixes(repo_root, config.paths.source_roots)
+
+    changed_source: list[tuple[Path, str]] = [
         (abs_path, display) for abs_path, display in source_files if display in changed_paths
     ]
+    changed_source.extend(
+        (repo_root / path, path)
+        for path in sorted(changed_paths)
+        if path not in on_disk and is_source_path(path, prefixes)
+    )
     claims_by_file = resolve_claims(graph, changed_source)
 
     touched: dict[str, list[str]] = {}
@@ -58,7 +73,7 @@ def touched_components(
             if score == top_score:
                 touched.setdefault(node.id, []).append(display)
 
-    docs_root = (config.paths.docs_root or "docs").replace("\\", "/").strip("/")
+    docs_root = docs_root_prefix(config)
     changed_docs = sorted(
         path for path in changed_paths if PurePosixPath(path).is_relative_to(docs_root)
     )
