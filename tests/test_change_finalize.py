@@ -23,7 +23,15 @@ _BINDINGS = {
 
 @pytest.fixture
 def repo(fixture_repo: Callable[[str], Path]) -> Path:
-    root = fixture_repo("soft-change-binding")
+    return _committed(fixture_repo("soft-change-binding"))
+
+
+@pytest.fixture
+def edges(fixture_repo: Callable[[str], Path]) -> Path:
+    return _committed(fixture_repo("change-finalize-edges"))
+
+
+def _committed(root: Path) -> Path:
     _git(root, "init", "-q")
     _git(root, "config", "user.email", "test@example.com")
     _git(root, "config", "user.name", "Test")
@@ -171,6 +179,123 @@ def test_finalize_apply_end_to_end_and_idempotent(repo: Path) -> None:
     assert plan2.component_fixes == ()
     assert plan2.rfc_fixes == ()
     assert any("already" in note for note in plan2.notes)
+
+
+def test_finalize_binding_path_is_posix_normalized(repo: Path) -> None:
+    graph, config = _graph(repo)
+    plan = plan_finalize(
+        graph,
+        config,
+        repo,
+        _RFC,
+        bindings={"sso-login": ["app\\auth\\login.py#login"]},
+        env={},
+    )
+    assert plan.blockers == ()
+    [promotion] = plan.promotions
+    assert promotion.anchors[0].startswith("app/auth/login.py#login @sha256:")
+
+    result = apply_fixes(repo, list(plan.component_fixes), dry_run=False, confirm=True)
+    assert result.errors == []
+    owner_text = (repo / "docs" / "20-components" / "auth.md").read_text(encoding="utf-8")
+    assert "<!-- anchor: app/auth/login.py#login @sha256:" in owner_text
+    assert "\\" not in owner_text
+
+
+def test_finalize_unknown_owner_requirement_blocks(repo: Path) -> None:
+    graph, config = _graph(repo)
+    plan = plan_finalize(
+        graph,
+        config,
+        repo,
+        _RFC,
+        bindings=_BINDINGS,
+        owners={"sso-logn": ["billing"]},
+        env={},
+    )
+    unknown = [b for b in plan.blockers if b.code == "unknown-requirement"]
+    assert unknown and "--owner" in unknown[0].message
+    assert plan.component_fixes == ()
+
+
+def test_finalize_already_promoted_still_adds_backlink(repo: Path) -> None:
+    owner_path = repo / "docs" / "20-components" / "auth.md"
+    owner_path.write_text(
+        owner_path.read_text(encoding="utf-8")
+        + "\n## Implemented requirements\n\n"
+        + "- **0001-accepted-good#sso-login** — hand-authored entry (provenance: code)\n",
+        encoding="utf-8",
+    )
+    graph, config = _graph(repo)
+    plan = plan_finalize(graph, config, repo, _RFC, bindings=_BINDINGS, env={})
+    assert plan.blockers == ()
+    [promotion] = plan.promotions
+    assert promotion.already_promoted
+    descriptions = [f.description for f in plan.component_fixes]
+    assert descriptions == ["add implements: 0001-accepted-good to docs/20-components/auth.md"]
+
+    result = apply_fixes(repo, list(plan.component_fixes), dry_run=False, confirm=True)
+    assert result.errors == []
+    graph2, _ = _graph(repo)
+    assert "0001-accepted-good" in graph2.nodes["auth"].frontmatter.implements
+
+
+def test_finalize_required_update_backlink_is_not_a_deadlock(edges: Path) -> None:
+    graph, config = _graph(edges)
+    plan = plan_finalize(
+        graph,
+        config,
+        edges,
+        "0002-required-update",
+        bindings={"login-flow": ["app/auth/login.py#login"]},
+        env={},
+    )
+    assert plan.blockers == ()
+    descriptions = " | ".join(f.description for f in plan.component_fixes)
+    assert "add implements: 0002-required-update to docs/20-components/auth.md" in descriptions
+
+    component_result = apply_fixes(edges, list(plan.component_fixes), dry_run=False, confirm=True)
+    assert component_result.errors == []
+    graph2, _ = _graph(edges)
+    assert "0002-required-update" in graph2.nodes["auth"].frontmatter.implements
+
+
+def test_finalize_binding_on_non_code_requirement_blocks(edges: Path) -> None:
+    graph, config = _graph(edges)
+    plan = plan_finalize(
+        graph,
+        config,
+        edges,
+        "0003-adr-provenance",
+        bindings={"retention-window": ["app/auth/login.py#login"]},
+        env={},
+    )
+    assert any(b.code == "unsupported-binding" for b in plan.blockers)
+
+
+def test_finalize_non_code_requirement_promotes_without_anchors(edges: Path) -> None:
+    graph, config = _graph(edges)
+    plan = plan_finalize(graph, config, edges, "0003-adr-provenance", env={})
+    assert plan.blockers == ()
+    [promotion] = plan.promotions
+    assert promotion.owner == "auth"
+    assert promotion.provenance == "adr"
+    assert promotion.anchors == ()
+
+
+def test_finalize_nested_owner_uses_most_specific_claim(edges: Path) -> None:
+    graph, config = _graph(edges)
+    plan = plan_finalize(
+        graph,
+        config,
+        edges,
+        "0001-nested-owner",
+        bindings={"route-table": ["app/auth/routing/router.py#route"]},
+        env={},
+    )
+    assert plan.blockers == ()
+    [promotion] = plan.promotions
+    assert promotion.owner == "auth-routing"
 
 
 def test_finalize_disposition_rfc_needs_no_bindings(repo: Path) -> None:

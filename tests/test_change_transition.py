@@ -119,6 +119,13 @@ def test_reject_does_not_require_requirements(repo: Path) -> None:
     assert plan.blockers == ()
 
 
+def test_reject_with_resolved_by_blocks(repo: Path) -> None:
+    graph, config = _graph(repo)
+    plan = plan_transition(graph, config, "0004-draft-ready", "rejected", resolved_by=_ADR)
+    assert any(b.code == "unsupported-resolved-by" for b in plan.blockers)
+    assert plan.fixes == ()
+
+
 def test_accept_apply_end_to_end(repo: Path) -> None:
     graph, config = _graph(repo)
     plan = plan_transition(graph, config, "0004-draft-ready", "accepted", resolved_by=_ADR)

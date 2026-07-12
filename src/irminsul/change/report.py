@@ -17,9 +17,10 @@ from pathlib import Path
 
 from irminsul.change.footprint import Footprint, touched_components
 from irminsul.checks import HARD_REGISTRY, Finding, Severity, sort_findings
-from irminsul.config import IrminsulConfig
+from irminsul.config import IrminsulConfig, docs_root_prefix
 from irminsul.docgraph import DocGraph, DocNode, build_graph
 from irminsul.docgraph_index import Task as TaskType
+from irminsul.docgraph_index import TasksSection
 from irminsul.frontmatter import (
     RFC_STATE_TRANSITIONS,
     RfcStateEnum,
@@ -104,8 +105,7 @@ class ChangeReport:
 
 def find_rfc_node(graph: DocGraph, config: IrminsulConfig, change: str) -> DocNode:
     """Resolve a change reference: doc id, numeric prefix, or repo-relative path."""
-    docs_root = (config.paths.docs_root or "docs").replace("\\", "/").strip("/")
-    rfc_prefix = f"{docs_root}/80-evolution/rfcs/"
+    rfc_prefix = f"{docs_root_prefix(config)}/80-evolution/rfcs/"
 
     node = graph.nodes.get(change)
     if node is None:
@@ -232,6 +232,18 @@ def build_change_report(
                     suggestion="fix the path or create the decision doc",
                 )
             )
+    elif canonical == RfcStateEnum.draft:
+        blockers.append(
+            Blocker(
+                code="missing-adr",
+                message="an accepted RFC must resolve to a decision record; none is declared",
+                path=node.path.as_posix(),
+                suggestion=(
+                    "create it with `irminsul new adr <title>` and pass "
+                    "--resolved-by <adr path> to `change transition`"
+                ),
+            )
+        )
 
     if canonical == RfcStateEnum.accepted and not any(
         h.slug == "resolution" for h in graph.headings.get(node.id, [])
@@ -292,13 +304,20 @@ def build_change_report(
                     )
                 )
 
-    tasks = graph.tasks.get(node.id)
-    if tasks is not None:
-        extra["tasks"] = _task_evidence(node, tasks, affects, footprint, clues)
+    tasks_section = graph.tasks.get(node.id)
+    if tasks_section is not None:
+        extra["tasks"] = _task_evidence(node, tasks_section, affects, footprint, clues)
 
     from irminsul.change.impact import build_impact_report, impact_summary
 
-    impact = build_impact_report(repo_root, config, node.id, graph=graph, baseline=baseline)
+    impact = build_impact_report(
+        repo_root,
+        config,
+        node.id,
+        graph=graph,
+        baseline=baseline,
+        footprint=footprint,
+    )
     extra["impact"] = {"level": impact.level, "summary": impact_summary(impact)}
 
     declared_untouched: tuple[str, ...] = ()
@@ -345,11 +364,16 @@ def build_change_report(
                     )
                 )
     else:
-        clues.append(
-            ReviewClue(
-                question=(
-                    "no diff baseline could be resolved; pass --base-ref (or run from "
-                    "a git worktree) to derive implementation evidence"
+        blockers.append(
+            Blocker(
+                code="missing-baseline",
+                message=(
+                    "no diff baseline could be resolved, so no implementation evidence "
+                    "can be derived"
+                ),
+                path=node.path.as_posix(),
+                suggestion=(
+                    "pass --base-ref <ref>, set IRMINSUL_BASE_REF, or run from a git worktree"
                 ),
             )
         )
@@ -581,44 +605,46 @@ def _partition_configured_findings(
 
 def _task_evidence(
     node: DocNode,
-    tasks: tuple[TaskType, ...],
+    tasks_section: TasksSection,
     affects: tuple[str, ...] | None,
     footprint: Footprint | None,
     clues: list[ReviewClue],
 ) -> dict[str, object]:
     """Per-task mechanical evidence (RFC 0031): evidence labels, never
     completion labels. Several tasks may share one requirement and therefore
-    the same changed files — semantics stay with the reviewer."""
+    the same changed files — semantics stay with the reviewer.
+
+    With no diff baseline nothing was measured, so evidence and counts are
+    `None` (unknown), never an empty list that reads as a measured zero.
+    """
+    tasks = tasks_section.tasks
     declared = tuple(affects or ())
     items: list[dict[str, object]] = []
     tasks_with_source = 0
     tasks_with_test = 0
+    measured = footprint is not None
 
     for task in tasks:
         related = (task.component_ref,) if task.component_ref else declared
         source_evidence: list[str] = []
         test_evidence: list[str] = []
+        review_clue: str | None = None
+
         if footprint is not None:
             for component in related:
                 source_evidence.extend(footprint.touched.get(component, ()))
                 test_evidence.extend(footprint.changed_tests.get(component, ()))
-        source_evidence = sorted(set(source_evidence))
-        test_evidence = sorted(set(test_evidence))
-        tasks_with_source += bool(source_evidence)
-        tasks_with_test += bool(test_evidence)
+            source_evidence = sorted(set(source_evidence))
+            test_evidence = sorted(set(test_evidence))
+            tasks_with_source += bool(source_evidence)
+            tasks_with_test += bool(test_evidence)
 
-        review_clue: str | None = None
-        if footprint is not None:
             if not source_evidence:
-                review_clue = (
-                    "no changed source is associated with this task's "
-                    f"{'component' if task.component_ref else 'requirement'}"
-                )
+                review_clue = f"no changed source is associated with {_task_scope(task)}"
             elif not test_evidence:
                 review_clue = "inspect implementation and add or identify scenario coverage"
             else:
                 review_clue = "confirm the changed tests assert this task's scenario"
-        if review_clue is not None:
             clues.append(
                 ReviewClue(
                     question=f"task '{task.task_id}': {review_clue}",
@@ -632,20 +658,32 @@ def _task_evidence(
                 "text": task.text,
                 "req": task.req_ref,
                 "component": task.component_ref,
-                "source_evidence": source_evidence,
-                "test_evidence": test_evidence,
+                "source_evidence": source_evidence if measured else None,
+                "test_evidence": test_evidence if measured else None,
                 "review_clue": review_clue,
             }
         )
 
     return {
         "items": items,
+        "evidence_measured": measured,
         "summary": {
             "total": len(tasks),
-            "with_source_evidence": tasks_with_source,
-            "with_test_evidence": tasks_with_test,
+            "with_source_evidence": tasks_with_source if measured else None,
+            "with_test_evidence": tasks_with_test if measured else None,
         },
     }
+
+
+def _task_scope(task: TaskType) -> str:
+    if task.component_ref:
+        return "this task's component"
+    if task.req_ref:
+        return "this task's requirement"
+    return (
+        "any declared affected component (this task references neither a "
+        "requirement nor a component)"
+    )
 
 
 def requirement_blockers(graph: DocGraph, node: DocNode) -> list[Blocker]:
@@ -675,12 +713,14 @@ def requirement_blockers(graph: DocGraph, node: DocNode) -> list[Blocker]:
         ]
 
     findings = requirement_grammar_findings(node, section, check_name=RequirementGrammarCheck.name)
-    tasks = graph.tasks.get(node.id)
-    if tasks is not None:
+    tasks_section = graph.tasks.get(node.id)
+    if tasks_section is not None:
         from irminsul.checks.requirement_grammar import task_grammar_findings
 
         findings.extend(
-            task_grammar_findings(node, tasks, section, check_name=RequirementGrammarCheck.name)
+            task_grammar_findings(
+                node, tasks_section, section, check_name=RequirementGrammarCheck.name
+            )
         )
     return [
         Blocker(
@@ -860,10 +900,22 @@ def _task_summary(report: ChangeReport) -> str | None:
     if not isinstance(summary, dict):
         return None
     total = summary.get("total")
+    if not payload.get("evidence_measured"):
+        return f"{total} declared; evidence unknown (no diff baseline)"
     return (
         f"{summary.get('with_source_evidence')}/{total} with source evidence, "
         f"{summary.get('with_test_evidence')}/{total} with test evidence"
     )
+
+
+def _evidence_line(label: str, paths: object, measured: bool) -> str:
+    if not measured:
+        value = "unknown (no diff baseline)"
+    elif isinstance(paths, list) and paths:
+        value = ", ".join(str(p) for p in paths)
+    else:
+        value = "none"
+    return f"      {label} {value}"
 
 
 def _tasks_lines(report: ChangeReport) -> list[str]:
@@ -873,6 +925,7 @@ def _tasks_lines(report: ChangeReport) -> list[str]:
     items = payload.get("items")
     if not isinstance(items, list):
         return []
+    measured = bool(payload.get("evidence_measured"))
     summary = _task_summary(report)
     lines = [f"  tasks: {summary}" if summary else "  tasks:"]
     for item in items:
@@ -884,10 +937,8 @@ def _tasks_lines(report: ChangeReport) -> list[str]:
         elif item.get("component"):
             ref = f" (component: {item['component']})"
         lines.append(f"    {item.get('id')} {item.get('text')}{ref}")
-        source = item.get("source_evidence") or []
-        tests = item.get("test_evidence") or []
-        lines.append(f"      source evidence: {', '.join(source) if source else 'none'}")
-        lines.append(f"      test evidence:   {', '.join(tests) if tests else 'none'}")
+        lines.append(_evidence_line("source evidence:", item.get("source_evidence"), measured))
+        lines.append(_evidence_line("test evidence:  ", item.get("test_evidence"), measured))
         if item.get("review_clue"):
             lines.append(f"      review clue:     {item['review_clue']}")
     return lines

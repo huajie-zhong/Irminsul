@@ -194,7 +194,7 @@ class _RequirementDraft:
         )
 
 
-_H2_RE = re.compile(r"^##\s+(?P<title>.+?)\s*$")
+_SECTION_HEADING_RE = re.compile(r"^(?P<hashes>#{1,2})\s+(?P<title>.+?)\s*$")
 _REQUIREMENT_RE = re.compile(r"^###\s+Requirement:\s*(?P<title>.+?)\s*$")
 _SCENARIO_RE = re.compile(r"^####\s+Scenario:\s*(?P<name>.+?)\s*$")
 _ID_LINE_RE = re.compile(r"^ID:\s*(?P<id>\S+)\s*$")
@@ -205,8 +205,85 @@ _BEHAVIOR_RE = re.compile(r"(?<![A-Za-z0-9])(SHALL|MUST)(?![A-Za-z0-9])")
 _WHEN_RE = re.compile(r"(?<![A-Za-z0-9])WHEN(?![A-Za-z0-9])")
 _THEN_RE = re.compile(r"(?<![A-Za-z0-9])THEN(?![A-Za-z0-9])")
 _DISPOSITION_RE = re.compile(r"^no new behavioral requirements\b", re.IGNORECASE)
-_REQ_FENCE_RE = re.compile(r"^\s*(```|~~~)")
+_FENCE_RE = re.compile(r"^\s*(?P<marker>`{3,}|~{3,})(?P<info>.*)$")
 _REQUIREMENTS_HINT_RE = re.compile(r"^##\s+requirements\b", re.IGNORECASE | re.MULTILINE)
+
+
+class FenceTracker:
+    """CommonMark fenced-code-block state, fed one body line at a time.
+
+    A fence closes only on the same character, at least as long as the opening
+    marker, and without an info string. So a ````-fenced quote may contain ```
+    blocks verbatim, and a stray ``` inside a ~~~ block is content rather than
+    a toggle.
+    """
+
+    __slots__ = ("_char", "_length")
+
+    def __init__(self) -> None:
+        self._char: str | None = None
+        self._length = 0
+
+    @property
+    def inside(self) -> bool:
+        return self._char is not None
+
+    def consume(self, line: str) -> bool:
+        """Feed one line; True when it is fence syntax or fenced content."""
+        match = _FENCE_RE.match(line)
+        if match is None:
+            return self.inside
+
+        marker = match.group("marker")
+        info = match.group("info")
+        if self._char is None:
+            if marker[0] == "`" and "`" in info:
+                return False
+            self._char = marker[0]
+            self._length = len(marker)
+        elif marker[0] == self._char and len(marker) >= self._length and not info.strip():
+            self._char = None
+            self._length = 0
+        return True
+
+
+@dataclass(frozen=True)
+class SectionBody:
+    """The content lines of a `## <slug>` section, with fenced blocks removed."""
+
+    line: int
+    lines: tuple[tuple[int, str], ...]
+    """`(line number, text)` for every non-fenced line under the heading."""
+
+
+def extract_section(body: str, slug: str) -> SectionBody | None:
+    """Collect the lines belonging to the `## <slug>` section of a doc body.
+
+    Any heading of level 1 or 2 closes the section, and fenced code blocks are
+    dropped, so quoted grammar never contributes headings, ids, or keywords.
+    """
+    fence = FenceTracker()
+    section_line: int | None = None
+    lines: list[tuple[int, str]] = []
+    in_section = False
+
+    for lineno, line in enumerate(body.splitlines(), start=1):
+        if fence.consume(line):
+            continue
+        heading = _SECTION_HEADING_RE.match(line)
+        if heading is not None:
+            in_section = (
+                len(heading.group("hashes")) == 2 and slugify(heading.group("title")) == slug
+            )
+            if in_section and section_line is None:
+                section_line = lineno
+            continue
+        if in_section:
+            lines.append((lineno, line))
+
+    if section_line is None:
+        return None
+    return SectionBody(line=section_line, lines=tuple(lines))
 
 
 def parse_requirements(body: str) -> RequirementsSection | None:
@@ -216,7 +293,10 @@ def parse_requirements(body: str) -> RequirementsSection | None:
     ids, or keywords, so an RFC can *quote* requirement grammar without
     declaring requirements.
     """
-    section_line: int | None = None
+    section = extract_section(body, "requirements")
+    if section is None:
+        return None
+
     disposition: str | None = None
     requirements: list[Requirement] = []
 
@@ -236,27 +316,7 @@ def parse_requirements(body: str) -> RequirementsSection | None:
             requirements.append(current_req.build())
         current_req = None
 
-    in_fence = False
-    in_section = False
-    for lineno, line in enumerate(body.splitlines(), start=1):
-        if _REQ_FENCE_RE.match(line):
-            in_fence = not in_fence
-            continue
-        if in_fence:
-            continue
-
-        h2 = _H2_RE.match(line)
-        if h2 is not None:
-            if in_section:
-                close_requirement()
-                in_section = False
-            if slugify(h2.group("title")) == "requirements":
-                in_section = True
-                section_line = lineno
-            continue
-        if not in_section:
-            continue
-
+    for lineno, line in section.lines:
         req_match = _REQUIREMENT_RE.match(line)
         if req_match is not None:
             close_requirement()
@@ -267,6 +327,12 @@ def parse_requirements(body: str) -> RequirementsSection | None:
         if scenario_match is not None:
             close_scenario()
             current_scenario = _ScenarioDraft(scenario_match.group("name"), lineno)
+            continue
+
+        # Checked before the requirement/scenario branches consume the line: a
+        # disposition appended after the blocks is the contradiction to report.
+        if disposition is None and _DISPOSITION_RE.match(line.strip()):
+            disposition = line.strip()
             continue
 
         if current_scenario is not None:
@@ -287,18 +353,11 @@ def parse_requirements(body: str) -> RequirementsSection | None:
                 current_req.provenance = provenance_match.group("value")
                 continue
             current_req.text_lines.append(line)
-            continue
 
-        if disposition is None and _DISPOSITION_RE.match(line.strip()):
-            disposition = line.strip()
+    close_requirement()
 
-    if in_section:
-        close_requirement()
-
-    if section_line is None:
-        return None
     return RequirementsSection(
-        line=section_line,
+        line=section.line,
         disposition=disposition,
         requirements=tuple(requirements),
     )
@@ -315,68 +374,101 @@ class Task:
     component_ref: str | None
 
 
-_TASKS_HINT_RE = re.compile(r"^##\s+tasks\b", re.IGNORECASE | re.MULTILINE)
-_TASK_ITEM_RE = re.compile(
-    r"^-\s+`(?P<id>[^`]+)`\s+(?P<text>.*?)"
-    r"(?:\s*\((?:req:\s*(?P<req>[^)]+?)|component:\s*(?P<comp>[^)]+?))\s*\))?\s*$"
-)
+@dataclass(frozen=True)
+class MalformedTask:
+    """A `## Tasks` bullet that does not parse as a task.
 
-
-def parse_tasks(body: str) -> tuple[Task, ...] | None:
-    """Parse the `## Tasks` section of a doc body, if present.
-
-    Returns None when the doc has no section; an empty tuple means the section
-    exists but declares no parseable task items.
+    Recorded rather than dropped: a task list that silently loses items is
+    indistinguishable from a plan that was never written.
     """
-    section_found = False
-    tasks: list[Task] = []
 
-    in_fence = False
-    in_section = False
-    for lineno, line in enumerate(body.splitlines(), start=1):
-        if _REQ_FENCE_RE.match(line):
-            in_fence = not in_fence
-            continue
-        if in_fence:
-            continue
+    line: int
+    text: str
+    reason: str
+    """missing-id | multiple-references | misplaced-reference | empty-reference"""
 
-        h2 = _H2_RE.match(line)
-        if h2 is not None:
-            in_section = slugify(h2.group("title")) == "tasks"
-            section_found = section_found or in_section
-            continue
-        if not in_section:
-            continue
 
-        item = _TASK_ITEM_RE.match(line)
-        if item is None:
-            continue
-        req = item.group("req")
-        comp = item.group("comp")
-        tasks.append(
-            Task(
-                task_id=item.group("id").strip(),
-                line=lineno,
-                text=item.group("text").strip(),
-                req_ref=req.strip() if req else None,
-                component_ref=comp.strip() if comp else None,
-            )
+@dataclass(frozen=True)
+class TasksSection:
+    """The parsed `## Tasks` section of one doc."""
+
+    line: int
+    tasks: tuple[Task, ...]
+    malformed: tuple[MalformedTask, ...]
+
+
+_TASKS_HINT_RE = re.compile(r"^##\s+tasks\b", re.IGNORECASE | re.MULTILINE)
+_TASK_BULLET_RE = re.compile(r"^[-*+]\s+(?P<body>\S.*?)\s*$")
+_TASK_ID_RE = re.compile(r"^`(?P<id>[^`]+)`\s*(?P<rest>.*)$")
+_TASK_REF_RE = re.compile(r"\((?P<kind>req|component):\s*(?P<value>[^)]*?)\s*\)")
+
+
+def _parse_task_bullet(body: str, lineno: int) -> Task | MalformedTask:
+    id_match = _TASK_ID_RE.match(body)
+    if id_match is None:
+        return MalformedTask(line=lineno, text=body, reason="missing-id")
+
+    task_id = id_match.group("id").strip()
+    rest = id_match.group("rest")
+    refs = list(_TASK_REF_RE.finditer(rest))
+    if len(refs) > 1:
+        return MalformedTask(line=lineno, text=body, reason="multiple-references")
+    if not refs:
+        return Task(
+            task_id=task_id, line=lineno, text=rest.strip(), req_ref=None, component_ref=None
         )
 
-    if not section_found:
+    ref = refs[0]
+    if rest[ref.end() :].strip():
+        return MalformedTask(line=lineno, text=body, reason="misplaced-reference")
+    value = ref.group("value").strip()
+    if not value:
+        return MalformedTask(line=lineno, text=body, reason="empty-reference")
+    is_req = ref.group("kind") == "req"
+    return Task(
+        task_id=task_id,
+        line=lineno,
+        text=rest[: ref.start()].strip(),
+        req_ref=value if is_req else None,
+        component_ref=None if is_req else value,
+    )
+
+
+def parse_tasks(body: str) -> TasksSection | None:
+    """Parse the `## Tasks` section of a doc body, if present.
+
+    Returns None when the doc has no section. Bullets that do not match the
+    task grammar are kept as `malformed` so the grammar check can report them
+    instead of the plan quietly shrinking.
+    """
+    section = extract_section(body, "tasks")
+    if section is None:
         return None
-    return tuple(tasks)
+
+    tasks: list[Task] = []
+    malformed: list[MalformedTask] = []
+    for lineno, line in section.lines:
+        bullet = _TASK_BULLET_RE.match(line)
+        if bullet is None:
+            continue
+        parsed = _parse_task_bullet(bullet.group("body"), lineno)
+        if isinstance(parsed, Task):
+            tasks.append(parsed)
+        else:
+            malformed.append(parsed)
+
+    return TasksSection(line=section.line, tasks=tuple(tasks), malformed=tuple(malformed))
 
 
-def build_tasks(nodes: dict[str, DocNode]) -> dict[str, tuple[Task, ...]]:
+def build_tasks(nodes: dict[str, DocNode]) -> dict[str, TasksSection]:
     """Parse the `## Tasks` section of every doc that has one."""
-    out: dict[str, tuple[Task, ...]] = {}
+    out: dict[str, TasksSection] = {}
     for doc_id, node in nodes.items():
         if not _TASKS_HINT_RE.search(node.body):
             continue
-        tasks = parse_tasks(node.body)
-        if tasks is not None:
-            out[doc_id] = tasks
+        section = parse_tasks(node.body)
+        if section is not None:
+            out[doc_id] = section
     return out
 
 

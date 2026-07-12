@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from irminsul.docgraph_index import parse_requirements
+from irminsul.docgraph_index import FenceTracker, extract_section, parse_requirements
 
 _GOOD = """# RFC
 
@@ -80,6 +80,92 @@ def test_fenced_examples_are_ignored() -> None:
         "## Drawbacks\n"
     )
     assert parse_requirements(body) is None
+
+
+def test_quoted_grammar_inside_a_wider_fence_is_ignored() -> None:
+    body = (
+        "# RFC\n\n## Design\n\n"
+        "````markdown\n"
+        "## Requirements\n\n### Requirement: Quoted\nID: quoted\n\n"
+        "```\nnested\n```\n"
+        "````\n\n"
+        "## Drawbacks\n"
+    )
+    assert parse_requirements(body) is None
+
+
+def test_unbalanced_inner_fence_does_not_swallow_the_section() -> None:
+    body = (
+        "# RFC\n\n## Design\n\n"
+        "~~~text\na transcript that opens a fence:\n```\n~~~\n\n"
+        "## Requirements\n\n"
+        "### Requirement: Real\nID: real\nProvenance: code\n\n"
+        "It SHALL be seen.\n\n"
+        "#### Scenario: Seen\n- **WHEN** the fence closes\n- **THEN** the section is parsed\n"
+    )
+    section = parse_requirements(body)
+    assert section is not None
+    assert [r.req_id for r in section.requirements] == ["real"]
+
+
+def test_disposition_after_requirement_blocks_is_detected() -> None:
+    body = (
+        "# RFC\n\n## Requirements\n\n"
+        "### Requirement: Descoped\nID: descoped\nProvenance: code\n\n"
+        "It SHALL happen.\n\n"
+        "#### Scenario: Descoped\n- **WHEN** x\n- **THEN** y\n\n"
+        "No new behavioral requirements: the block above was descoped.\n"
+    )
+    section = parse_requirements(body)
+    assert section is not None
+    assert section.disposition is not None
+    assert [r.req_id for r in section.requirements] == ["descoped"]
+
+
+def test_h1_closes_the_section() -> None:
+    body = (
+        "# RFC\n\n## Requirements\n\n"
+        "### Requirement: Real\nID: real\nProvenance: code\n\n"
+        "It SHALL happen.\n\n"
+        "#### Scenario: Real\n- **WHEN** x\n- **THEN** y\n\n"
+        "# Appendix\n\n"
+        "### Requirement: Stray\nID: stray\n"
+    )
+    section = parse_requirements(body)
+    assert section is not None
+    assert [r.req_id for r in section.requirements] == ["real"]
+
+
+def test_fence_tracker_matches_char_and_length() -> None:
+    tracker = FenceTracker()
+    assert tracker.consume("````markdown")
+    assert tracker.inside
+    assert tracker.consume("```")  # too short to close
+    assert tracker.inside
+    assert tracker.consume("~~~~")  # wrong character
+    assert tracker.inside
+    assert tracker.consume("`````")  # longer than the opener closes it
+    assert not tracker.inside
+    assert not tracker.consume("plain text")
+
+
+def test_fence_tracker_ignores_closing_info_strings() -> None:
+    tracker = FenceTracker()
+    assert tracker.consume("```python")
+    assert tracker.consume("```markdown")  # an info string cannot close a fence
+    assert tracker.inside
+    assert tracker.consume("```")
+    assert not tracker.inside
+
+
+def test_extract_section_drops_fenced_lines() -> None:
+    body = (
+        "# RFC\n\n## Requirements\n\nkept\n\n```\ndropped\n```\n\nalso kept\n\n## Drawbacks\n\nno\n"
+    )
+    section = extract_section(body, "requirements")
+    assert section is not None
+    assert section.line == 3
+    assert [text for _, text in section.lines if text.strip()] == ["kept", "also kept"]
 
 
 def test_disposition_sentence() -> None:

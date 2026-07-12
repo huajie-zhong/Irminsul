@@ -6,3 +6,8 @@ source_roots = ["app"]
 
 [checks]
 soft_deterministic = ["change-binding"]
+
+[[checks.inventory_drift.generic]]
+kind = "events"
+glob = "app/**/events.py"
+pattern = 'EVENT\("([^"]+)"\)'

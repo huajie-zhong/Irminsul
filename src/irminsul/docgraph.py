@@ -21,7 +21,7 @@ from irminsul.frontmatter import (
 )
 
 if TYPE_CHECKING:
-    from irminsul.docgraph_index import Heading, RequirementsSection, Task
+    from irminsul.docgraph_index import Heading, RequirementsSection, TasksSection
     from irminsul.git.mtime import GitTime
 
 # Top-level docs that aren't doc atoms — `README.md`, the glossary, contributor
@@ -58,7 +58,7 @@ class DocGraph:
     requirements: dict[str, RequirementsSection] = field(default_factory=dict)
     """Parsed `## Requirements` sections keyed by doc id (RFC 0030); only docs
     that have the section appear here."""
-    tasks: dict[str, tuple[Task, ...]] = field(default_factory=dict)
+    tasks: dict[str, TasksSection] = field(default_factory=dict)
     """Parsed `## Tasks` sections keyed by doc id (RFC 0031); only docs that
     have the section appear here."""
     git_times: dict[Path, GitTime] = field(default_factory=dict)
