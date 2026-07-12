@@ -11,6 +11,7 @@ import pytest
 from typer.testing import CliRunner
 
 from irminsul.change.impact import (
+    _surface_kinds,
     build_impact_report,
     format_impact_plain,
     impact_report_to_json,
@@ -99,6 +100,85 @@ def test_observed_impact_lists_changed_docs_by_layer(repo: Path) -> None:
     assert any(
         "docs/30-workflows/login-flow.md" in o.observation for o in report.layers["workflows"]
     )
+
+
+def test_observed_impact_lists_changed_component_docs(repo: Path) -> None:
+    _git_init(repo)
+    component = repo / "docs" / "20-components" / "auth.md"
+    component.write_text(component.read_text(encoding="utf-8") + "\nUpdated.\n", encoding="utf-8")
+    report = build_impact_report(repo, load(find_config(repo)), _RFC, env={})
+    [observation] = [
+        o for o in report.layers["components"] if o.source == "diff:docs/20-components/auth.md"
+    ]
+    assert "component doc changed in the diff" in observation.observation
+    assert "component 'auth'" in observation.observation
+    assert observation.review is None
+
+
+def test_undeclared_changed_component_doc_is_a_divergence(repo: Path) -> None:
+    _git_init(repo)
+    component = repo / "docs" / "20-components" / "billing.md"
+    component.write_text(component.read_text(encoding="utf-8") + "\nUpdated.\n", encoding="utf-8")
+    report = build_impact_report(repo, load(find_config(repo)), _RFC, env={})
+    [observation] = [
+        o for o in report.layers["components"] if o.source == "diff:docs/20-components/billing.md"
+    ]
+    assert "absent from `affects`" in observation.observation
+    assert observation.review is not None
+
+
+def test_new_component_doc_surfaces_in_components(repo: Path) -> None:
+    _git_init(repo)
+    (repo / "docs" / "20-components" / "sso.md").write_text(
+        "---\n"
+        "id: sso\n"
+        "title: SSO\n"
+        "audience: explanation\n"
+        "tier: 3\n"
+        "status: stable\n"
+        "---\n\n"
+        "# SSO\n\nNew component doc added by the change.\n",
+        encoding="utf-8",
+    )
+    report = build_impact_report(repo, load(find_config(repo)), _RFC, env={})
+    assert any(
+        "docs/20-components/sso.md" in o.observation and "component 'sso'" in o.observation
+        for o in report.layers["components"]
+    )
+
+
+def test_removed_component_doc_surfaces_in_architecture(repo: Path) -> None:
+    _git_init(repo)
+    (repo / "docs" / "20-components" / "billing.md").unlink()
+    report = build_impact_report(repo, load(find_config(repo)), _RFC, env={})
+    [observation] = report.layers["architecture"]
+    assert "removed or moved" in observation.observation
+    assert "docs/20-components/billing.md" in observation.observation
+    assert observation.review is not None
+
+
+def test_configured_generic_inventory_kind_surfaces(repo: Path) -> None:
+    _git_init(repo)
+    (repo / "app" / "auth" / "events.py").write_text('EVENT("user.logged-in")\n', encoding="utf-8")
+    report = build_impact_report(repo, load(find_config(repo)), _RFC, env={})
+    [observation] = [o for o in report.layers["surfaces"] if o.source == "surface:events"]
+    assert "user.logged-in" in observation.observation
+
+
+def test_surface_extraction_failure_is_reported_not_swallowed(repo: Path) -> None:
+    _git_init(repo)
+    (repo / "app" / "auth" / "broken.py").write_bytes(b"\xff\xfe def login(): pass\n")
+    report = build_impact_report(repo, load(find_config(repo)), _RFC, env={})
+    [observation] = [o for o in report.layers["surfaces"] if o.source == "surface:cli"]
+    assert "extraction failed" in observation.observation
+    assert "UnicodeDecodeError" in observation.observation
+    assert observation.review is not None
+
+
+def test_registered_kinds_include_mcp_and_configured_kinds(repo: Path) -> None:
+    kinds = _surface_kinds(load(find_config(repo)))
+    assert "mcp" in kinds
+    assert "events" in kinds
 
 
 def test_impact_summary_counts_only_nonempty_layers(repo: Path) -> None:

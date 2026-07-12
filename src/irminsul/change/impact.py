@@ -46,7 +46,7 @@ _LAYER_DIRS = {
     "evolution": "80-evolution",
 }
 
-_SURFACE_KINDS = ("cli", "http", "exports", "env-vars")
+_COMPONENTS_DIR = "20-components"
 
 
 @dataclass(frozen=True)
@@ -75,6 +75,7 @@ def build_impact_report(
     env: Mapping[str, str] | None = None,
     graph: DocGraph | None = None,
     baseline: ChangeBaseline | None = None,
+    footprint: Footprint | None = None,
 ) -> ImpactReport:
     if graph is None:
         graph = build_graph(repo_root, config)
@@ -84,8 +85,9 @@ def build_impact_report(
 
     if baseline is None:
         baseline = resolve_change_baseline(repo_root, base_ref, env=env)
-    footprint: Footprint | None = None
-    if baseline.changed_paths is not None:
+    if baseline.changed_paths is None:
+        footprint = None
+    elif footprint is None:
         footprint = touched_components(graph, config, frozenset(baseline.changed_paths))
 
     docs_root = (config.paths.docs_root or "docs").replace("\\", "/").strip("/")
@@ -256,6 +258,8 @@ def _observed_impact(
                     )
                 )
 
+    _changed_component_docs(graph, footprint, docs_root, declared, layers)
+
     for component, files in footprint.touched.items():
         divergence = "" if component in declared else " - absent from `affects`"
         layers["components"].append(
@@ -298,22 +302,7 @@ def _observed_impact(
         )
 
     changed = set(footprint.changed_paths)
-    for kind in _SURFACE_KINDS:
-        try:
-            items = _surface_items_in_changed_files(repo_root, config, kind, changed)
-        except Exception:
-            continue
-        if not items:
-            continue
-        layers["surfaces"].append(
-            Observation(
-                observation=(
-                    f"{kind} surface identities defined in changed files: {', '.join(items)}"
-                ),
-                source=f"surface:{kind}",
-                review=("Does the RFC describe this public behavior and its failure cases?"),
-            )
-        )
+    _surface_impact(repo_root, config, changed, layers)
 
     glossary_findings = _glossary_findings_for_paths(graph, changed | {node.path.as_posix()})
     for finding_path, message in glossary_findings:
@@ -326,31 +315,121 @@ def _observed_impact(
         )
 
 
-def _surface_items_in_changed_files(
+def _changed_component_docs(
+    graph: DocGraph,
+    footprint: Footprint,
+    docs_root: str,
+    declared: set[str],
+    layers: dict[str, list[Observation]],
+) -> None:
+    """Component docs touched by the diff.
+
+    A doc still in the tree is a components-layer observation attributed to the
+    component it defines. A doc that changed but no longer resolves left the
+    tree — removed or moved — which is an architecture-layer fact.
+    """
+    prefix = f"{docs_root}/{_COMPONENTS_DIR}/"
+    for doc_path in footprint.changed_docs:
+        if not doc_path.startswith(prefix):
+            continue
+        owner = graph.by_path.get(Path(doc_path))
+        if owner is None:
+            layers["architecture"].append(
+                Observation(
+                    observation=f"component doc removed or moved: {doc_path}",
+                    source=f"diff:{doc_path}",
+                    review=(
+                        "Does every inbound link, claim, and `affects` entry that named "
+                        "this component still resolve?"
+                    ),
+                )
+            )
+            continue
+        divergence = "" if owner.id in declared else " - absent from `affects`"
+        layers["components"].append(
+            Observation(
+                observation=(
+                    f"component doc changed in the diff: {doc_path} "
+                    f"(component '{owner.id}'){divergence}"
+                ),
+                source=f"diff:{doc_path}",
+                review=(
+                    None
+                    if owner.id in declared
+                    else "Intended scope expansion or accidental side effect?"
+                ),
+            )
+        )
+
+
+def _surface_kinds(config: IrminsulConfig) -> list[str]:
+    """Every kind an extractor can serve: the registry plus configured generic rules."""
+    from irminsul.inventory import KNOWN_KINDS
+
+    kinds = list(KNOWN_KINDS)
+    kinds.extend(
+        sorted(
+            {
+                rule.kind
+                for rule in config.checks.inventory_drift.generic
+                if rule.kind not in KNOWN_KINDS
+            }
+        )
+    )
+    return kinds
+
+
+def _surface_impact(
     repo_root: Path,
     config: IrminsulConfig,
-    kind: str,
     changed: set[str],
-) -> list[str]:
-    """Surface identities defined in the changed files only.
+    layers: dict[str, list[Observation]],
+) -> None:
+    """Surface identities defined in the changed files, one walk for every kind.
 
-    Feeds the extractor just the changed source files instead of deriving the
+    Feeds the extractors just the changed source files instead of deriving the
     whole repository surface per kind — impact stays cheap on large codebases.
+    An extractor that raises costs its kind's identities, so the failure is
+    reported rather than swallowed: a kind is never silently empty.
     """
     from irminsul.checks.globs import walk_source_files
     from irminsul.inventory import get_extractor
 
-    extractor = get_extractor(kind, config)
-    if extractor is None:
-        return []
-
     files, _missing = walk_source_files(repo_root, config.paths.source_roots)
     changed_files = [(abs_path, display) for abs_path, display in files if display in changed]
     if not changed_files:
-        return []
+        return
 
-    items = extractor.extract(changed_files, config)
-    return sorted({item.identity for item in items})
+    for kind in _surface_kinds(config):
+        extractor = get_extractor(kind, config)
+        if extractor is None:
+            continue
+        try:
+            items = extractor.extract(changed_files, config)
+        except Exception as exc:
+            layers["surfaces"].append(
+                Observation(
+                    observation=(f"{kind} surface extraction failed: {type(exc).__name__}: {exc}"),
+                    source=f"surface:{kind}",
+                    review=(
+                        f"This kind's identities are unknown, not absent - inspect the "
+                        f"changed files for {kind} surface changes by hand."
+                    ),
+                )
+            )
+            continue
+        identities = sorted({item.identity for item in items})
+        if not identities:
+            continue
+        layers["surfaces"].append(
+            Observation(
+                observation=(
+                    f"{kind} surface identities defined in changed files: {', '.join(identities)}"
+                ),
+                source=f"surface:{kind}",
+                review="Does the RFC describe this public behavior and its failure cases?",
+            )
+        )
 
 
 def _glossary_findings_for_paths(graph: DocGraph, paths: set[str]) -> list[tuple[str, str]]:

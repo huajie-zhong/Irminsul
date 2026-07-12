@@ -282,7 +282,14 @@ def build_change_report(
 
     from irminsul.change.impact import build_impact_report, impact_summary
 
-    impact = build_impact_report(repo_root, config, node.id, graph=graph, baseline=baseline)
+    impact = build_impact_report(
+        repo_root,
+        config,
+        node.id,
+        graph=graph,
+        baseline=baseline,
+        footprint=footprint,
+    )
     extra["impact"] = {"level": impact.level, "summary": impact_summary(impact)}
 
     declared_untouched: tuple[str, ...] = ()
