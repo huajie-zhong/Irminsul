@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from irminsul.anchors import Anchor, resolve
-from irminsul.change.footprint import touched_components
+from irminsul.change.footprint import most_specific_claims, touched_components
 from irminsul.change.report import (
     Blocker,
     ChangeError,
@@ -49,6 +49,7 @@ class Promotion:
     provenance: str
     anchors: tuple[str, ...]  # "path#symbol @sha256:hash" marker payloads
     already_promoted: bool
+    implements_present: bool
 
 
 @dataclass(frozen=True)
@@ -185,22 +186,6 @@ def plan_finalize(
             )
         )
 
-    for finding in DecisionUpdatesCheck().run(graph):
-        relates = finding.doc_id == node.id or f"'{node.id}'" in finding.message
-        if relates and finding.category in (
-            "no-required-updates-field",
-            "missing-required-update-path",
-            "missing-backlink",
-        ):
-            blockers.append(
-                Blocker(
-                    code=f"decision-updates:{finding.category}",
-                    message=finding.message,
-                    path=finding.path.as_posix() if finding.path else None,
-                    suggestion=finding.suggestion,
-                )
-            )
-
     promotions: list[Promotion] = []
     section = graph.requirements.get(node.id)
     if section is not None and section.disposition is None:
@@ -209,29 +194,38 @@ def plan_finalize(
         )
         blockers.extend(promotion_blockers)
 
-    unknown_binding_reqs = set(bindings) - {
+    declared_req_ids = {
         req.req_id for req in (section.requirements if section else ()) if req.req_id
     }
-    for req_id in sorted(unknown_binding_reqs):
-        blockers.append(
-            Blocker(
-                code="unknown-requirement",
-                message=f"--anchor names requirement '{req_id}' which this RFC does not declare",
-                path=rfc_path,
+    for flag, supplied in (("--anchor", bindings), ("--owner", owners)):
+        for req_id in sorted(set(supplied) - declared_req_ids):
+            blockers.append(
+                Blocker(
+                    code="unknown-requirement",
+                    message=(
+                        f"{flag} names requirement '{req_id}' which this RFC does not declare"
+                    ),
+                    path=rfc_path,
+                )
             )
-        )
+
+    blockers.extend(_decision_update_blockers(graph, node, {p.owner for p in promotions}))
 
     component_fixes: list[Fix] = []
     rfc_fixes: list[Fix] = []
     if not blockers:
+        backlinked: set[str] = set()
         for promotion in promotions:
             if promotion.already_promoted:
                 notes.append(
                     f"claim {promotion.global_id} already present in "
-                    f"{promotion.owner_path.as_posix()}; skipping"
+                    f"{promotion.owner_path.as_posix()}; skipping the claim entry"
                 )
+            else:
+                component_fixes.append(_promotion_fix(node, promotion))
+            if promotion.implements_present or promotion.owner in backlinked:
                 continue
-            component_fixes.append(_promotion_fix(node, promotion))
+            backlinked.add(promotion.owner)
             component_fixes.append(
                 Fix(
                     path=promotion.owner_path,
@@ -271,6 +265,37 @@ def plan_finalize(
         rfc_fixes=tuple(rfc_fixes),
         notes=tuple(notes),
     )
+
+
+def _decision_update_blockers(
+    graph: DocGraph, node: DocNode, promotion_owners: set[str]
+) -> list[Blocker]:
+    """Required-update blockers for this RFC.
+
+    A `missing-backlink` against a doc this run will promote into is not a
+    blocker: adding that `implements` entry is exactly what finalization does,
+    and blocking on it would make the write that resolves it unreachable.
+    """
+    out: list[Blocker] = []
+    for finding in DecisionUpdatesCheck().run(graph):
+        relates = finding.doc_id == node.id or f"'{node.id}'" in finding.message
+        if not relates or finding.category not in (
+            "no-required-updates-field",
+            "missing-required-update-path",
+            "missing-backlink",
+        ):
+            continue
+        if finding.category == "missing-backlink" and finding.doc_id in promotion_owners:
+            continue
+        out.append(
+            Blocker(
+                code=f"decision-updates:{finding.category}",
+                message=finding.message,
+                path=finding.path.as_posix() if finding.path else None,
+                suggestion=finding.suggestion,
+            )
+        )
+    return out
 
 
 def _plan_promotions(
@@ -317,10 +342,15 @@ def _plan_promotions(
                 )
                 continue
             for binding in req_bindings:
-                path_part, _, symbol_part = binding.partition("#")
+                raw_path, _, symbol_part = binding.partition("#")
+                # POSIX-normalize before resolving: a Windows-authored
+                # `app\auth\login.py` must persist (and re-resolve in CI) as
+                # `app/auth/login.py`.
+                path_part = raw_path.replace("\\", "/")
+                target = f"{path_part}#{symbol_part}" if symbol_part else path_part
                 anchor = Anchor(
                     line=0,
-                    raw=binding,
+                    raw=target,
                     path=path_part,
                     symbol=symbol_part or None,
                     pinned=None,
@@ -331,20 +361,36 @@ def _plan_promotions(
                         Blocker(
                             code="unresolvable-binding",
                             message=(
-                                f"binding '{binding}' for requirement '{req.req_id}' "
+                                f"binding '{target}' for requirement '{req.req_id}' "
                                 f"did not resolve ({resolution.status})"
                             ),
                             path=path_part,
                         )
                     )
                     continue
-                marker_payloads.append(f"{binding} @sha256:{resolution.current}")
+                marker_payloads.append(f"{target} @sha256:{resolution.current}")
                 claims = resolve_claims(
                     graph, [display_index[path_part]] if path_part in display_index else []
                 )
-                for claim_node, _, _ in claims.get(path_part, []):
+                for claim_node in most_specific_claims(claims.get(path_part, [])):
                     if claim_node.id in declared:
                         binding_owner_candidates.add(claim_node.id)
+        elif req_bindings:
+            blockers.append(
+                Blocker(
+                    code="unsupported-binding",
+                    message=(
+                        f"--anchor was given for requirement '{req.req_id}' whose provenance is "
+                        f"'{req.provenance or 'unspecified'}'; only code-provenance requirements "
+                        "take confirmed anchors"
+                    ),
+                    path=rfc_path,
+                    suggestion=(
+                        "drop the --anchor, or declare `Provenance: code` on the requirement"
+                    ),
+                )
+            )
+            continue
 
         owner = _choose_owner(
             req.req_id,
@@ -369,6 +415,7 @@ def _plan_promotions(
                 provenance=req.provenance or "code",
                 anchors=tuple(marker_payloads),
                 already_promoted=f"**{global_id}**" in owner_node.body,
+                implements_present=node.id in owner_node.frontmatter.implements,
             )
         )
 

@@ -192,6 +192,25 @@ def test_change_finalize_confirm_applies(repo: Path) -> None:
     assert "**0001-accepted-good#sso-login**" in owner.read_text(encoding="utf-8")
 
 
+def test_change_finalize_presents_semantic_review(repo: Path) -> None:
+    _git_init(repo)
+    result = runner.invoke(
+        app,
+        [
+            "change",
+            "finalize",
+            "0001-accepted-good",
+            "--anchor",
+            "sso-login=app/auth/login.py#login",
+            "--path",
+            str(repo),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "semantic review" in result.output
+    assert "task 'T1'" in result.output
+
+
 def test_change_finalize_blocked_exits_one(repo: Path) -> None:
     _git_init(repo)
     result = runner.invoke(

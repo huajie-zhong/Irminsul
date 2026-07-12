@@ -1406,7 +1406,7 @@ def change_finalize(
     implemented RFC without its promoted claims.
     """
     from irminsul.change.finalize import parse_binding_flags, plan_finalize
-    from irminsul.change.report import ChangeError
+    from irminsul.change.report import ChangeError, build_change_report
     from irminsul.fix import apply_fixes
 
     repo_root, config = _load_repo(path)
@@ -1414,6 +1414,7 @@ def change_finalize(
     try:
         bindings = parse_binding_flags(anchor or [], "--anchor")
         owners = parse_binding_flags(owner or [], "--owner")
+        report = build_change_report(repo_root, config, change_id, base_ref=base_ref, graph=graph)
         plan = plan_finalize(
             graph,
             config,
@@ -1434,6 +1435,13 @@ def change_finalize(
             if blocker.suggestion:
                 typer.echo(typer.style(f"    -> {blocker.suggestion}", dim=True))
         raise typer.Exit(code=1)
+
+    if report.semantic_review:
+        typer.echo("  semantic review (--confirm asserts you reviewed these):")
+        for clue in report.semantic_review:
+            typer.echo(typer.style(f"    - {clue.question}", fg="yellow"))
+    else:
+        typer.echo("  semantic review: (no remaining clues)")
 
     for note in plan.notes:
         typer.echo(typer.style(f"  note: {note}", fg="yellow"))
