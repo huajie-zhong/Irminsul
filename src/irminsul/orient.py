@@ -64,6 +64,10 @@ _COMMANDS: tuple[tuple[str, str], ...] = (
         "irminsul change status <rfc-id>",
         "orient on one RFC: lifecycle state, evidence, blockers, and the next action",
     ),
+    (
+        "irminsul new rfc <title>",
+        "start a change: reports repository binding readiness, then scaffolds the RFC",
+    ),
 )
 
 # The command vocabulary's accuracy and completeness is governed by the

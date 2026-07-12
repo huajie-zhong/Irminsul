@@ -45,8 +45,9 @@ class BindingReadinessReport:
     blockers: tuple[ReadinessItem, ...]
     clues: tuple[ReadinessItem, ...]
     repository_debt: tuple[tuple[str, int], ...]
-    """(check name, warning count) for configured findings that are neither
-    blockers nor drift clues."""
+    """(check name, finding count) for configured findings that are neither
+    blockers nor drift clues. Soft checks emit errors as well as warnings, so
+    the count is not warnings-only."""
 
 
 def build_binding_readiness_report(
@@ -111,7 +112,7 @@ def binding_readiness_to_json(report: BindingReadinessReport) -> str:
             "blockers": [_item_dict(i) for i in report.blockers],
             "clues": [_item_dict(i) for i in report.clues],
             "repository_debt": [
-                {"check": check, "warnings": count} for check, count in report.repository_debt
+                {"check": check, "findings": count} for check, count in report.repository_debt
             ],
         },
         indent=2,
@@ -143,5 +144,5 @@ def format_binding_readiness_plain(report: BindingReadinessReport) -> str:
             lines.append(f"    ... and {len(report.clues) - 10} more")
     if report.repository_debt:
         debt = ", ".join(f"{check} {count}" for check, count in report.repository_debt)
-        lines.append(f"  repository debt (unrelated warnings): {debt}")
+        lines.append(f"  repository debt (unrelated findings): {debt}")
     return "\n".join(lines)

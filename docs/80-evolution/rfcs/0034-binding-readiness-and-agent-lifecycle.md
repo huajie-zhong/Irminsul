@@ -71,8 +71,11 @@ The result uses `mechanically_ready_for: accepted|implemented|none`. It never em
 
 ### Pre-proposal baseline
 
-When an agent begins a new RFC through `new rfc`, `orient`, or MCP, Irminsul first
-runs a repository binding-readiness summary:
+When an agent begins a new RFC through `new rfc` or the MCP readiness tool, Irminsul
+first runs a repository binding-readiness summary. `orient` teaches `new rfc` in its
+command vocabulary rather than running the summary itself: it stays a checkless
+structure snapshot, and the readiness report is a check-running command. The summary
+reports:
 
 - hard-profile errors are blockers because the base graph is structurally invalid;
 - stale anchors, undocumented source, lifecycle debt, and co-change findings are

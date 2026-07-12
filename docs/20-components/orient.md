@@ -25,6 +25,7 @@ inventory:
       - list undocumented
       - list lifecycle
       - change status
+      - new rfc
     omit:
       - anchors
       - change finalize
@@ -38,7 +39,6 @@ inventory:
       - mcp
       - new adr
       - new component
-      - new rfc
       - orient
       - regen agents-md
       - seed

@@ -93,8 +93,9 @@ class ChangeReport:
     semantic_review: tuple[ReviewClue, ...] = ()
     mechanically_ready_for: str = "none"  # accepted | implemented | none
     repository_debt: tuple[tuple[str, int], ...] = ()
-    """(check, warning count) for configured findings unrelated to this change —
-    visible without gating the transition (RFC 0034)."""
+    """(check, finding count) for configured findings unrelated to this change —
+    visible without gating the transition (RFC 0034). Soft checks emit errors as
+    well as warnings, so the count is not warnings-only."""
     next_actions: tuple[str, ...] = ()
     extra: dict[str, object] = field(default_factory=dict)
     """Escape hatch for later RFCs (requirements, tasks, impact) to extend the
@@ -355,7 +356,9 @@ def build_change_report(
 
     if canonical == RfcStateEnum.accepted:
         blockers.extend(_decision_update_blockers(graph, node))
-        blockers.extend(_stale_anchor_blockers(graph, node, affects))
+        blockers.extend(_anchor_blockers(graph, node, affects))
+        if footprint is not None:
+            blockers.extend(_unowned_change_blockers(footprint))
 
     scoped_findings, repository_debt = _partition_configured_findings(
         graph, config, node, affects, baseline, canonical
@@ -423,6 +426,42 @@ def build_change_report(
     )
 
 
+_PROMOTED_DECISION_CATEGORIES = frozenset(
+    {
+        "no-required-updates-field",
+        "missing-required-update-path",
+        "missing-backlink",
+    }
+)
+
+
+def _relates_to_rfc(finding: Finding, node: DocNode) -> bool:
+    return finding.doc_id == node.id or f"'{node.id}'" in finding.message
+
+
+def _promotes_decision_update(finding: Finding, node: DocNode) -> bool:
+    """The exact decision-updates findings `_decision_update_blockers` promotes."""
+    return _relates_to_rfc(finding, node) and finding.category in _PROMOTED_DECISION_CATEGORIES
+
+
+def _anchor_scope(graph: DocGraph, node: DocNode, affects: tuple[str, ...] | None) -> set[str]:
+    """The docs whose anchors gate this RFC's finalization: the RFC itself and
+    the component docs it declares in `affects`."""
+    scope = {node.path.as_posix()}
+    for component in affects or ():
+        owner = graph.nodes.get(component)
+        if owner is not None:
+            scope.add(owner.path.as_posix())
+    return scope
+
+
+def _promotes_anchor(finding: Finding, scope: set[str]) -> bool:
+    """The exact claim-anchor findings `_anchor_blockers` promotes."""
+    if finding.severity not in (Severity.warning, Severity.error):
+        return False
+    return (finding.path.as_posix() if finding.path else None) in scope
+
+
 def _decision_update_blockers(graph: DocGraph, node: DocNode) -> list[Blocker]:
     """This RFC's unresolved required updates block finalization readiness.
 
@@ -431,50 +470,54 @@ def _decision_update_blockers(graph: DocGraph, node: DocNode) -> list[Blocker]:
     """
     from irminsul.checks.decision_updates import DecisionUpdatesCheck
 
-    out: list[Blocker] = []
-    for finding in DecisionUpdatesCheck().run(graph):
-        relates = finding.doc_id == node.id or f"'{node.id}'" in finding.message
-        if relates and finding.category in (
-            "no-required-updates-field",
-            "missing-required-update-path",
-            "missing-backlink",
-        ):
-            out.append(
-                Blocker(
-                    code=f"decision-updates:{finding.category}",
-                    message=finding.message,
-                    path=finding.path.as_posix() if finding.path else None,
-                    suggestion=finding.suggestion,
-                )
-            )
-    return out
+    return [
+        Blocker(
+            code=f"decision-updates:{finding.category}",
+            message=finding.message,
+            path=finding.path.as_posix() if finding.path else None,
+            suggestion=finding.suggestion,
+        )
+        for finding in DecisionUpdatesCheck().run(graph)
+        if _promotes_decision_update(finding, node)
+    ]
 
 
-def _stale_anchor_blockers(
+def _anchor_blockers(
     graph: DocGraph, node: DocNode, affects: tuple[str, ...] | None
 ) -> list[Blocker]:
-    """Anchors in the affected scope must be fresh before finalization (RFC 0034)."""
+    """Anchors in the affected scope must resolve and be fresh before
+    finalization (RFC 0034). A broken anchor (missing file or symbol) is an
+    error and blocks at least as hard as a stale one."""
     from irminsul.checks.claim_anchor import ClaimAnchorCheck
 
-    scope = {node.path.as_posix()}
-    for component in affects or ():
-        owner = graph.nodes.get(component)
-        if owner is not None:
-            scope.add(owner.path.as_posix())
+    scope = _anchor_scope(graph, node, affects)
+    return [
+        Blocker(
+            code="broken-anchor" if finding.severity == Severity.error else "stale-anchor",
+            message=finding.message,
+            path=finding.path.as_posix() if finding.path else None,
+            suggestion=finding.suggestion,
+        )
+        for finding in sort_findings(ClaimAnchorCheck().run(graph))
+        if _promotes_anchor(finding, scope)
+    ]
 
-    out: list[Blocker] = []
-    for finding in ClaimAnchorCheck().run(graph):
-        finding_path = finding.path.as_posix() if finding.path else None
-        if finding.severity == Severity.warning and finding_path in scope:
-            out.append(
-                Blocker(
-                    code="stale-anchor",
-                    message=finding.message,
-                    path=finding_path,
-                    suggestion=finding.suggestion,
-                )
-            )
-    return out
+
+def _unowned_change_blockers(footprint: Footprint) -> list[Blocker]:
+    """Changed source no component claims is unreconciled scope (RFC 0034).
+
+    Mirrors the `plan_finalize` gate exactly, so `change verify` cannot report
+    ready for a tree that `change finalize` will refuse.
+    """
+    return [
+        Blocker(
+            code="unowned-change",
+            message=f"changed source '{unowned}' has no component claim",
+            path=unowned,
+            suggestion="extend a component doc's `describes` (curated, not automatic)",
+        )
+        for unowned in footprint.unowned_source
+    ]
 
 
 def _partition_configured_findings(
@@ -485,10 +528,11 @@ def _partition_configured_findings(
     baseline: ChangeBaseline,
     canonical: RfcStateEnum,
 ) -> tuple[list[dict[str, object]], tuple[tuple[str, int], ...]]:
-    """Split configured soft warnings into change-scoped findings and
-    repository debt (RFC 0034). Findings already promoted to blockers by the
-    direct decision-updates and stale-anchor passes are skipped here so they
-    are not double-reported; everything unrelated to this change stays visible
+    """Split configured soft findings into change-scoped findings and
+    repository debt (RFC 0034). A finding is skipped here only when it was
+    *actually* promoted to a blocker above — the skip predicates are the same
+    ones the blocker passes use, so nothing can fall between the two and
+    disappear. Everything unrelated to this change stays visible as debt
     without gating the transition."""
     from collections import Counter
 
@@ -500,11 +544,8 @@ def _partition_configured_findings(
         if cls is not None:
             findings.extend(cls().run(graph))
 
-    scope_paths = {node.path.as_posix()}
-    for component in affects or ():
-        owner = graph.nodes.get(component)
-        if owner is not None:
-            scope_paths.add(owner.path.as_posix())
+    anchor_scope = _anchor_scope(graph, node, affects)
+    scope_paths = set(anchor_scope)
     if baseline.changed_paths is not None:
         scope_paths.update(baseline.changed_paths)
 
@@ -516,13 +557,12 @@ def _partition_configured_findings(
         if finding.severity not in (Severity.warning, Severity.error):
             continue
         finding_path = finding.path.as_posix() if finding.path else None
-        relates_to_rfc = finding.doc_id == node.id or f"'{node.id}'" in finding.message
         in_scope = finding_path in scope_paths or finding.doc_id == node.id
 
         if canonical == RfcStateEnum.accepted:
-            if finding.check == "decision-updates" and relates_to_rfc:
+            if finding.check == "decision-updates" and _promotes_decision_update(finding, node):
                 continue
-            if finding.check == "claim-anchor" and in_scope:
+            if finding.check == "claim-anchor" and _promotes_anchor(finding, anchor_scope):
                 continue
         if in_scope:
             scoped.append(
@@ -704,7 +744,7 @@ def change_report_to_json(report: ChangeReport) -> str:
         ],
         "mechanically_ready_for": report.mechanically_ready_for,
         "repository_debt": [
-            {"check": check, "warnings": count} for check, count in report.repository_debt
+            {"check": check, "findings": count} for check, count in report.repository_debt
         ],
         "next_actions": list(report.next_actions),
     }
@@ -733,6 +773,9 @@ def format_change_status_plain(report: ChangeReport) -> str:
         lines.append(impact_line)
     if report.evidence:
         lines.append(f"  evidence: {len(report.evidence)} item(s); run `change verify` for detail")
+    scoped = _scoped_findings(report)
+    if scoped:
+        lines.append(f"  findings about this change: {len(scoped)}; run `change verify` for detail")
     if report.next_actions:
         lines.append("  next:")
         lines.extend(f"    {action}" for action in report.next_actions)
@@ -774,6 +817,14 @@ def format_change_verify_plain(report: ChangeReport) -> str:
     impact_line = _impact_summary_line(report)
     if impact_line is not None:
         lines.append(impact_line)
+    scoped = _scoped_findings(report)
+    if scoped:
+        lines.append(f"  findings about this change: {len(scoped)}")
+        for item in scoped:
+            location = f"{item['path']}: " if item.get("path") else ""
+            lines.append(f"    [{item['check']}] {location}{item['message']}")
+            if item.get("suggestion"):
+                lines.append(f"      -> {item['suggestion']}")
     if report.repository_debt:
         debt = ", ".join(f"{check} {count}" for check, count in report.repository_debt)
         lines.append(f"  repository debt (unrelated): {debt}")
@@ -781,6 +832,13 @@ def format_change_verify_plain(report: ChangeReport) -> str:
         lines.append("  next:")
         lines.extend(f"    {action}" for action in report.next_actions)
     return "\n".join(lines)
+
+
+def _scoped_findings(report: ChangeReport) -> list[dict[str, object]]:
+    payload = report.extra.get("scoped_findings")
+    if not isinstance(payload, list):
+        return []
+    return [item for item in payload if isinstance(item, dict)]
 
 
 def _impact_summary_line(report: ChangeReport) -> str | None:
