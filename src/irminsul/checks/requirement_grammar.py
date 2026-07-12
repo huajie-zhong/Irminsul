@@ -18,8 +18,7 @@ from typing import ClassVar
 
 from irminsul.checks.base import Finding, Severity
 from irminsul.docgraph import DocGraph, DocNode
-from irminsul.docgraph_index import RequirementsSection
-from irminsul.docgraph_index import Task as TaskType
+from irminsul.docgraph_index import RequirementsSection, TasksSection
 
 # Evidence classes shared with claim provenance (RFC 0010 / RFC 0030).
 PROVENANCE_CLASSES = ("code", "adr", "citation")
@@ -164,9 +163,29 @@ def requirement_grammar_findings(
     return out
 
 
+_MALFORMED_TASK_MESSAGES = {
+    "missing-id": (
+        "has no backticked task id",
+        "start the item with a stable id, e.g. `` - `T1` Wire the client. (req: sso-login) ``",
+    ),
+    "multiple-references": (
+        "carries more than one reference",
+        "a task references at most one requirement or one component",
+    ),
+    "misplaced-reference": (
+        "has text after its reference",
+        "put the `(req: ...)` or `(component: ...)` reference last",
+    ),
+    "empty-reference": (
+        "names no target in its reference",
+        "reference a requirement id or a declared component id, or drop the parentheses",
+    ),
+}
+
+
 def task_grammar_findings(
     node: DocNode,
-    tasks: tuple[TaskType, ...],
+    tasks_section: TasksSection,
     section: RequirementsSection | None,
     *,
     check_name: str,
@@ -175,7 +194,9 @@ def task_grammar_findings(
 
     Task ids must be unique within the RFC; a `(req: ...)` reference must
     resolve to a requirement id declared in the same RFC and a
-    `(component: ...)` reference to a declared affected component.
+    `(component: ...)` reference to a declared affected component. A section
+    that declares no task, or whose bullets do not parse, is reported rather
+    than dropped — an empty plan must not look like a plan.
     """
     out: list[Finding] = []
 
@@ -191,13 +212,35 @@ def task_grammar_findings(
             suggestion=suggestion,
         )
 
+    for bad in tasks_section.malformed:
+        summary, suggestion = _MALFORMED_TASK_MESSAGES[bad.reason]
+        out.append(
+            finding(
+                f"task-{bad.reason}",
+                f"task list item {summary}: '{bad.text}'",
+                bad.line,
+                suggestion,
+            )
+        )
+
+    if not tasks_section.tasks:
+        out.append(
+            finding(
+                "empty-tasks",
+                "tasks section declares no parseable task item",
+                tasks_section.line,
+                "add items of the form `` - `T1` Do the thing. (req: <requirement id>) ``, "
+                "or remove the `## Tasks` section",
+            )
+        )
+
     requirement_ids = {
         req.req_id for req in (section.requirements if section else ()) if req.req_id
     }
     declared_components = set(node.frontmatter.affects or [])
 
     seen: dict[str, int] = {}
-    for task in tasks:
+    for task in tasks_section.tasks:
         if task.task_id in seen:
             out.append(
                 finding(
@@ -259,7 +302,9 @@ class RequirementGrammarCheck:
             section = graph.requirements.get(doc_id)
             if section is not None:
                 out.extend(requirement_grammar_findings(node, section, check_name=self.name))
-            tasks = graph.tasks.get(doc_id)
-            if tasks is not None:
-                out.extend(task_grammar_findings(node, tasks, section, check_name=self.name))
+            tasks_section = graph.tasks.get(doc_id)
+            if tasks_section is not None:
+                out.extend(
+                    task_grammar_findings(node, tasks_section, section, check_name=self.name)
+                )
         return out

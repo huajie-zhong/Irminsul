@@ -14,6 +14,8 @@ from irminsul.change.report import (
     build_change_report,
     change_report_to_json,
     find_rfc_node,
+    format_change_status_plain,
+    format_change_verify_plain,
     resolve_change_baseline,
 )
 from irminsul.config import Checks, IrminsulConfig, find_config, load
@@ -41,6 +43,15 @@ def _git_init(repo: Path) -> None:
     _git(repo, "config", "user.name", "Test")
     _git(repo, "add", ".")
     _git(repo, "commit", "-q", "-m", "init")
+
+
+def _set_resolved_by(repo: Path, rfc_id: str, adr: str) -> None:
+    path = repo / "docs" / "80-evolution" / "rfcs" / f"{rfc_id}.md"
+    text = path.read_text(encoding="utf-8")
+    path.write_text(
+        text.replace("rfc_state: draft\n", f"rfc_state: draft\nresolved_by: {adr}\n", 1),
+        encoding="utf-8",
+    )
 
 
 def test_find_rfc_node_by_id(repo: Path) -> None:
@@ -125,6 +136,33 @@ def test_report_accepted_undeclared_touch_not_ready(repo: Path) -> None:
     assert any("billing" in clue.question for clue in report.semantic_review)
 
 
+def test_report_deleted_undeclared_source_is_touched(repo: Path) -> None:
+    _git_init(repo)
+    (repo / "app" / "billing" / "invoice.py").unlink()
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+    assert "billing" in report.touched_undeclared
+    assert report.mechanically_ready_for == "none"
+    assert any(
+        item.kind == "changed-source"
+        and item.path == "app/billing/invoice.py"
+        and item.component == "billing"
+        for item in report.evidence
+    )
+
+
+def test_report_deleted_declared_source_is_evidence(repo: Path) -> None:
+    _git_init(repo)
+    (repo / "app" / "auth" / "session.py").unlink()
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+    assert report.blockers == ()
+    assert report.footprint is not None
+    assert report.footprint.touched["auth"] == ("app/auth/session.py",)
+    assert report.footprint.unowned_source == ()
+    assert report.declared_untouched == ()
+    assert report.touched_undeclared == ()
+    assert report.mechanically_ready_for == "implemented"
+
+
 def test_report_missing_affects_blocks(repo: Path) -> None:
     _git_init(repo)
     report = build_change_report(
@@ -142,7 +180,16 @@ def test_report_unknown_component_blocks(repo: Path) -> None:
     assert any(b.code == "unknown-component" for b in report.blockers)
 
 
-def test_report_draft_with_affects_ready_for_accepted(repo: Path) -> None:
+def test_report_draft_without_adr_is_not_ready(repo: Path) -> None:
+    _git_init(repo)
+    report = build_change_report(repo, load(find_config(repo)), "0004-draft-ready", env={})
+    assert report.canonical_state == "draft"
+    assert any(b.code == "missing-adr" for b in report.blockers)
+    assert report.mechanically_ready_for == "none"
+
+
+def test_report_draft_with_affects_and_adr_ready_for_accepted(repo: Path) -> None:
+    _set_resolved_by(repo, "0004-draft-ready", "docs/50-decisions/0001-adr.md")
     _git_init(repo)
     report = build_change_report(repo, load(find_config(repo)), "0004-draft-ready", env={})
     assert report.canonical_state == "draft"
@@ -151,11 +198,11 @@ def test_report_draft_with_affects_ready_for_accepted(repo: Path) -> None:
     assert any("transition" in action for action in report.next_actions)
 
 
-def test_report_unknown_baseline_emits_clue(repo: Path) -> None:
+def test_report_unknown_baseline_blocks(repo: Path) -> None:
     report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
     assert report.baseline.source == "unknown"
+    assert any(b.code == "missing-baseline" for b in report.blockers)
     assert report.mechanically_ready_for == "none"
-    assert any("baseline" in clue.question for clue in report.semantic_review)
 
 
 def test_report_deprecated_state_flagged(tmp_path: Path) -> None:
@@ -231,6 +278,7 @@ def test_report_task_evidence(repo: Path) -> None:
     assert t1["req"] == "sso-login"
     assert "app/auth/sso.py" in t1["source_evidence"]
     assert "tests/test_auth.py" in t1["test_evidence"]
+    assert payload["evidence_measured"] is True
     assert payload["summary"] == {
         "total": 3,
         "with_source_evidence": 3,
@@ -243,9 +291,64 @@ def test_report_task_without_evidence_gets_clue(repo: Path) -> None:
     report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
     payload = report.extra["tasks"]
     assert isinstance(payload, dict)
+    assert payload["evidence_measured"] is True
     assert payload["summary"]["with_source_evidence"] == 0
     assert all(item["review_clue"] for item in payload["items"])
     assert any("task 'T1'" in clue.question for clue in report.semantic_review)
+
+
+def test_report_task_evidence_unknown_without_baseline(repo: Path) -> None:
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+    assert report.baseline.changed_paths is None
+
+    payload = report.extra["tasks"]
+    assert isinstance(payload, dict)
+    assert payload["evidence_measured"] is False
+    assert payload["summary"] == {
+        "total": 3,
+        "with_source_evidence": None,
+        "with_test_evidence": None,
+    }
+    assert all(item["source_evidence"] is None for item in payload["items"])
+    assert all(item["test_evidence"] is None for item in payload["items"])
+    assert all(item["review_clue"] is None for item in payload["items"])
+    assert not any(clue.question.startswith("task '") for clue in report.semantic_review)
+
+    data = json.loads(change_report_to_json(report))
+    assert data["tasks"]["summary"]["with_source_evidence"] is None
+    assert data["tasks"]["items"][0]["source_evidence"] is None
+
+
+def test_plain_output_never_shows_measured_zeros_without_baseline(repo: Path) -> None:
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+    status = format_change_status_plain(report)
+    verify = format_change_verify_plain(report)
+
+    assert "tasks: 3 declared; evidence unknown (no diff baseline)" in status
+    assert "0/3" not in status
+    assert "source evidence: unknown (no diff baseline)" in verify
+    assert "test evidence:   unknown (no diff baseline)" in verify
+    assert "source evidence: none" not in verify
+
+
+def test_report_unreferenced_task_clue_names_declared_components(repo: Path) -> None:
+    _git_init(repo)
+    path = repo / "docs" / "80-evolution" / "rfcs" / "0001-accepted-good.md"
+    text = path.read_text(encoding="utf-8")
+    path.write_text(
+        text.replace(
+            "- `T3` Refresh the auth component doc. (component: auth)",
+            "- `T3` Refresh the auth component doc.",
+        ),
+        encoding="utf-8",
+    )
+
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+    payload = report.extra["tasks"]
+    assert isinstance(payload, dict)
+    clue = payload["items"][2]["review_clue"]
+    assert "declared affected component" in clue
+    assert "requirement" not in clue.split("(")[0]
 
 
 def test_report_json_round_trips(repo: Path) -> None:
