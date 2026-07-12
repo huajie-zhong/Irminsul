@@ -310,21 +310,76 @@ class Task:
     component_ref: str | None
 
 
+@dataclass(frozen=True)
+class MalformedTask:
+    """A `## Tasks` bullet that does not parse as a task.
+
+    Recorded rather than dropped: a task list that silently loses items is
+    indistinguishable from a plan that was never written.
+    """
+
+    line: int
+    text: str
+    reason: str
+    """missing-id | multiple-references | misplaced-reference | empty-reference"""
+
+
+@dataclass(frozen=True)
+class TasksSection:
+    """The parsed `## Tasks` section of one doc."""
+
+    line: int
+    tasks: tuple[Task, ...]
+    malformed: tuple[MalformedTask, ...]
+
+
 _TASKS_HINT_RE = re.compile(r"^##\s+tasks\b", re.IGNORECASE | re.MULTILINE)
-_TASK_ITEM_RE = re.compile(
-    r"^-\s+`(?P<id>[^`]+)`\s+(?P<text>.*?)"
-    r"(?:\s*\((?:req:\s*(?P<req>[^)]+?)|component:\s*(?P<comp>[^)]+?))\s*\))?\s*$"
-)
+_TASK_BULLET_RE = re.compile(r"^[-*+]\s+(?P<body>\S.*?)\s*$")
+_TASK_ID_RE = re.compile(r"^`(?P<id>[^`]+)`\s*(?P<rest>.*)$")
+_TASK_REF_RE = re.compile(r"\((?P<kind>req|component):\s*(?P<value>[^)]*?)\s*\)")
 
 
-def parse_tasks(body: str) -> tuple[Task, ...] | None:
+def _parse_task_bullet(body: str, lineno: int) -> Task | MalformedTask:
+    id_match = _TASK_ID_RE.match(body)
+    if id_match is None:
+        return MalformedTask(line=lineno, text=body, reason="missing-id")
+
+    task_id = id_match.group("id").strip()
+    rest = id_match.group("rest")
+    refs = list(_TASK_REF_RE.finditer(rest))
+    if len(refs) > 1:
+        return MalformedTask(line=lineno, text=body, reason="multiple-references")
+    if not refs:
+        return Task(
+            task_id=task_id, line=lineno, text=rest.strip(), req_ref=None, component_ref=None
+        )
+
+    ref = refs[0]
+    if rest[ref.end() :].strip():
+        return MalformedTask(line=lineno, text=body, reason="misplaced-reference")
+    value = ref.group("value").strip()
+    if not value:
+        return MalformedTask(line=lineno, text=body, reason="empty-reference")
+    is_req = ref.group("kind") == "req"
+    return Task(
+        task_id=task_id,
+        line=lineno,
+        text=rest[: ref.start()].strip(),
+        req_ref=value if is_req else None,
+        component_ref=None if is_req else value,
+    )
+
+
+def parse_tasks(body: str) -> TasksSection | None:
     """Parse the `## Tasks` section of a doc body, if present.
 
-    Returns None when the doc has no section; an empty tuple means the section
-    exists but declares no parseable task items.
+    Returns None when the doc has no section. Bullets that do not match the
+    task grammar are kept as `malformed` so the grammar check can report them
+    instead of the plan quietly shrinking.
     """
-    section_found = False
+    section_line: int | None = None
     tasks: list[Task] = []
+    malformed: list[MalformedTask] = []
 
     in_fence = False
     in_section = False
@@ -338,40 +393,35 @@ def parse_tasks(body: str) -> tuple[Task, ...] | None:
         h2 = _H2_RE.match(line)
         if h2 is not None:
             in_section = slugify(h2.group("title")) == "tasks"
-            section_found = section_found or in_section
+            if in_section and section_line is None:
+                section_line = lineno
             continue
         if not in_section:
             continue
 
-        item = _TASK_ITEM_RE.match(line)
-        if item is None:
+        bullet = _TASK_BULLET_RE.match(line)
+        if bullet is None:
             continue
-        req = item.group("req")
-        comp = item.group("comp")
-        tasks.append(
-            Task(
-                task_id=item.group("id").strip(),
-                line=lineno,
-                text=item.group("text").strip(),
-                req_ref=req.strip() if req else None,
-                component_ref=comp.strip() if comp else None,
-            )
-        )
+        parsed = _parse_task_bullet(bullet.group("body"), lineno)
+        if isinstance(parsed, Task):
+            tasks.append(parsed)
+        else:
+            malformed.append(parsed)
 
-    if not section_found:
+    if section_line is None:
         return None
-    return tuple(tasks)
+    return TasksSection(line=section_line, tasks=tuple(tasks), malformed=tuple(malformed))
 
 
-def build_tasks(nodes: dict[str, DocNode]) -> dict[str, tuple[Task, ...]]:
+def build_tasks(nodes: dict[str, DocNode]) -> dict[str, TasksSection]:
     """Parse the `## Tasks` section of every doc that has one."""
-    out: dict[str, tuple[Task, ...]] = {}
+    out: dict[str, TasksSection] = {}
     for doc_id, node in nodes.items():
         if not _TASKS_HINT_RE.search(node.body):
             continue
-        tasks = parse_tasks(node.body)
-        if tasks is not None:
-            out[doc_id] = tasks
+        section = parse_tasks(node.body)
+        if section is not None:
+            out[doc_id] = section
     return out
 
 

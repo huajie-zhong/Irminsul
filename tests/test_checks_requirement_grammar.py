@@ -83,6 +83,23 @@ def test_task_unresolved_req_names_reference(repo: Path) -> None:
     assert "'ghost-req'" in finding.message
 
 
+def test_unparseable_task_list_is_reported(repo: Path) -> None:
+    findings = _findings(repo)
+    assert _categories(findings, "0008-draft-unparseable-tasks") == [
+        "empty-tasks",
+        "task-missing-id",
+        "task-missing-id",
+    ]
+
+
+def test_misreferenced_tasks_are_reported(repo: Path) -> None:
+    findings = _findings(repo)
+    assert _categories(findings, "0009-draft-misreferenced-tasks") == [
+        "task-misplaced-reference",
+        "task-multiple-references",
+    ]
+
+
 def test_incomplete_scenario_names_missing_keyword(repo: Path) -> None:
     findings = _findings(repo)
     [incomplete] = [
