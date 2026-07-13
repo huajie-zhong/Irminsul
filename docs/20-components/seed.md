@@ -27,7 +27,9 @@ overview doc, an anchoring ADR under `docs/50-decisions/` titled from the user's
 idea, and an anchoring RFC (`0001-initial-direction`) under
 `docs/80-evolution/rfcs/`. The RFC records the original direction so later drift
 can be compared against it explicitly, and it gives the evolution layer a
-non-empty starting point.
+non-empty starting point. When the scaffolded RFC index is present, seed also
+appends a navigation bullet for the anchoring RFC there (idempotently), so the
+RFC is reachable from day one.
 
 Input arrives three ways: interactive prompts (the default), individual flags
 (`--principle`, `--idea`, `--belief`, `--first-user`, `--non-goals`,

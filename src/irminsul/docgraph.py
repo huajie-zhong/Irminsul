@@ -58,9 +58,10 @@ class DocGraph:
     git_times: dict[Path, GitTime] = field(default_factory=dict)
     now: _dt.date | None = None
     diff_changed_paths: frozenset[str] | None = None
-    """Repo-relative POSIX paths changed in a base...head range, when `check`
-    was given `--base-ref`/`--head-ref`. None means no diff was requested;
-    diff-aware checks fall back to their non-diff behaviour."""
+    """Repo-relative POSIX paths changed in the CLI's diff range, or None when
+    no range resolved. Registered checks only ever receive a DocGraph, so a
+    diff-aware check (`change-binding`) reads its changed set from here.
+    `co-change` is unregistered and takes the same set as an argument."""
 
 
 def _to_repo_relative(absolute: Path, repo_root: Path) -> Path:
@@ -100,7 +101,9 @@ def build_graph(
             if result.error == "missing frontmatter":
                 graph.missing_frontmatter.append(rel_posix)
             else:
-                graph.parse_failures.append(ParseFailure(path=rel_posix, error=result.error))
+                graph.parse_failures.append(
+                    ParseFailure(path=rel_posix, error=result.error, data=result.data)
+                )
             continue
 
         node = DocNode(

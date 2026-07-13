@@ -35,6 +35,7 @@ class CoverageCheck:
                         path=node.path,
                         doc_id=node.id,
                         suggestion="Add `tests: [path/to/test_file.py]` to frontmatter",
+                        data={"problem": "missing-tests-entry", "field": "tests"},
                     )
                 )
                 continue
@@ -53,6 +54,11 @@ class CoverageCheck:
                             path=node.path,
                             doc_id=node.id,
                             suggestion=f"Create '{test_path}' or update the tests: field",
+                            data={
+                                "problem": "tests-path-missing",
+                                "field": "tests",
+                                "value": test_path,
+                            },
                         )
                     )
 

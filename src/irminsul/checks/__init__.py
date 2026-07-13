@@ -1,13 +1,22 @@
 """Check registry.
 
 Looking-up by name keeps the CLI/config side honest: `irminsul.toml`'s
-`checks.hard` (and `soft_deterministic`, `soft_llm`) are just lists of strings,
-and we resolve them here.
+`checks.hard` (and `soft_deterministic`) are just lists of strings, and we
+resolve them here.
 """
 
 from __future__ import annotations
 
-from irminsul.checks.base import Check, Finding, Fix, Severity, sort_findings, summarize
+from irminsul.checks.base import (
+    Check,
+    Finding,
+    Fix,
+    Severity,
+    finding_records,
+    fix_commands,
+    sort_findings,
+    summarize,
+)
 from irminsul.checks.boundary import BoundaryCheck
 from irminsul.checks.change_binding import ChangeBindingCheck
 from irminsul.checks.claim_anchor import ClaimAnchorCheck
@@ -32,14 +41,11 @@ from irminsul.checks.liar import LiarCheck
 from irminsul.checks.links import LinksCheck
 from irminsul.checks.mtime_drift import MtimeDriftCheck
 from irminsul.checks.orphans import OrphansCheck
-from irminsul.checks.overlap import OverlapCheck
 from irminsul.checks.parent_child import ParentChildCheck
 from irminsul.checks.phantom_layer import PhantomLayerCheck
 from irminsul.checks.reality import RealityCheck
 from irminsul.checks.rfc_resolution import RfcResolutionCheck
 from irminsul.checks.schema_leak import SchemaLeakCheck
-from irminsul.checks.scope_appropriateness import ScopeAppropriatenessCheck
-from irminsul.checks.semantic_drift import SemanticDriftCheck
 from irminsul.checks.stale_reaper import StaleReaperCheck
 from irminsul.checks.supersession import SupersessionCheck
 from irminsul.checks.uniqueness import UniquenessCheck
@@ -80,15 +86,8 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     ChangeBindingCheck.name: ChangeBindingCheck,
 }
 
-LLM_REGISTRY: dict[str, type] = {
-    OverlapCheck.name: OverlapCheck,
-    SemanticDriftCheck.name: SemanticDriftCheck,
-    ScopeAppropriatenessCheck.name: ScopeAppropriatenessCheck,
-}
-
 __all__ = [
     "HARD_REGISTRY",
-    "LLM_REGISTRY",
     "SOFT_REGISTRY",
     "AgentsManifestCheck",
     "BoundaryCheck",
@@ -107,15 +106,14 @@ __all__ = [
     "GlossaryDisciplineCheck",
     "InventoryDriftCheck",
     "LiarCheck",
-    "OverlapCheck",
     "PhantomLayerCheck",
     "ProseFileReferenceCheck",
     "RealityCheck",
     "RfcResolutionCheck",
-    "ScopeAppropriatenessCheck",
-    "SemanticDriftCheck",
     "Severity",
     "TerminologyOverloadCheck",
+    "finding_records",
+    "fix_commands",
     "sort_findings",
     "summarize",
 ]

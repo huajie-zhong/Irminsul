@@ -23,6 +23,15 @@ from irminsul.docgraph_index import Heading
 from irminsul.frontmatter import RFC_STATE_ALIASES, RfcStateEnum, StatusEnum, canonical_rfc_state
 from irminsul.frontmatter_edit import set_value
 
+# Finding categories. `fixes()` keys on these, so the two with a remediation are
+# named apart from the four without one.
+_CAT_STATUS_NOT_STABLE = "status-not-stable"
+_CAT_MISSING_SECTION = "missing-section"
+_CAT_DANGLING_RESOLVED_BY = "dangling-resolved-by"
+_CAT_MISSING_BACKLINK = "missing-backlink"
+_CAT_RETAINED_QUESTIONS = "retained-unresolved-questions"
+_CAT_STALE_TARGET_DATE = "stale-target-date"
+
 # Terminal states and the scaffolding section a resolved RFC of that state must
 # carry. The fix inserts the first listed heading; the check accepts any.
 _TERMINAL_SECTIONS: dict[RfcStateEnum, tuple[str, ...]] = {
@@ -87,13 +96,12 @@ class RfcResolutionCheck:
 
         For an RFC already in a terminal `rfc_state`, set `status: stable` and
         insert the missing scaffolding section as a stub. Touches load-bearing
-        metadata, so it requires `--confirm`. Gated on this check's findings.
+        metadata, so it requires `--confirm`. Each fix is gated on the finding
+        category it remediates, never merely on the doc: an RFC's dangling
+        `resolved_by` and its retained questions have no fix, and must not
+        inherit fixability from a `status`/`section` finding on the same doc.
         """
-        flagged = {
-            finding.doc_id
-            for finding in findings
-            if finding.check == self.name and finding.doc_id is not None
-        }
+        flagged = self._flagged_by_category(findings)
         if not flagged:
             return []
 
@@ -102,8 +110,6 @@ class RfcResolutionCheck:
 
         out: list[Fix] = []
         for node in graph.nodes.values():
-            if node.id not in flagged:
-                continue
             if not node.path.as_posix().startswith(rfc_prefix):
                 continue
             state = node.frontmatter.rfc_state
@@ -126,7 +132,10 @@ class RfcResolutionCheck:
             if sections is None:
                 continue
 
-            if node.frontmatter.status != StatusEnum.stable:
+            if (
+                node.id in flagged[_CAT_STATUS_NOT_STABLE]
+                and node.frontmatter.status != StatusEnum.stable
+            ):
                 out.append(
                     Fix(
                         path=node.path,
@@ -137,7 +146,9 @@ class RfcResolutionCheck:
                 )
 
             headings = graph.headings.get(node.id, [])
-            if not any(_has_heading(headings, _slug(title)) for title in sections):
+            if node.id in flagged[_CAT_MISSING_SECTION] and not any(
+                _has_heading(headings, _slug(title)) for title in sections
+            ):
                 title = sections[0]
                 out.append(
                     Fix(
@@ -149,6 +160,15 @@ class RfcResolutionCheck:
                 )
 
         return out
+
+    def _flagged_by_category(self, findings: list[Finding]) -> dict[str, set[str]]:
+        flagged: dict[str, set[str]] = {_CAT_STATUS_NOT_STABLE: set(), _CAT_MISSING_SECTION: set()}
+        for finding in findings:
+            if finding.check != self.name or finding.doc_id is None:
+                continue
+            if finding.category in flagged:
+                flagged[finding.category].add(finding.doc_id)
+        return flagged if any(flagged.values()) else {}
 
     def _check_accepted(
         self, graph: DocGraph, node: DocNode, headings: list[Heading]
@@ -169,6 +189,7 @@ class RfcResolutionCheck:
                     path=node.path,
                     doc_id=node.id,
                     suggestion="set status: stable",
+                    category=_CAT_STATUS_NOT_STABLE,
                 )
             )
 
@@ -191,6 +212,7 @@ class RfcResolutionCheck:
                         "check the path; resolved_by is a repo-relative POSIX "
                         "path to an existing decision doc"
                     ),
+                    category=_CAT_DANGLING_RESOLVED_BY,
                 )
             )
         else:
@@ -210,6 +232,7 @@ class RfcResolutionCheck:
                             f"add a markdown link to {node.path.as_posix()} "
                             f"in the decision doc body"
                         ),
+                        category=_CAT_MISSING_BACKLINK,
                     )
                 )
 
@@ -225,6 +248,7 @@ class RfcResolutionCheck:
                         "add a '## Resolution' section pointing to the "
                         "decision doc and summarising the outcome"
                     ),
+                    category=_CAT_MISSING_SECTION,
                 )
             )
 
@@ -241,6 +265,7 @@ class RfcResolutionCheck:
                     path=node.path,
                     doc_id=node.id,
                     suggestion=("remove the section or list explicit required update work"),
+                    category=_CAT_RETAINED_QUESTIONS,
                 )
             )
 
@@ -260,6 +285,7 @@ class RfcResolutionCheck:
                     path=node.path,
                     doc_id=node.id,
                     suggestion="set status: stable once the rejection rationale is recorded",
+                    category=_CAT_STATUS_NOT_STABLE,
                 )
             )
         # `withdrawal-rationale` stays accepted for RFCs canonicalized from the
@@ -280,6 +306,7 @@ class RfcResolutionCheck:
                     path=node.path,
                     doc_id=node.id,
                     suggestion=("add a section explaining why the proposal was rejected"),
+                    category=_CAT_MISSING_SECTION,
                 )
             )
         return out
@@ -298,6 +325,7 @@ class RfcResolutionCheck:
                     path=node.path,
                     doc_id=node.id,
                     suggestion="set status: stable",
+                    category=_CAT_STATUS_NOT_STABLE,
                 )
             )
         if not (
@@ -314,6 +342,7 @@ class RfcResolutionCheck:
                     path=node.path,
                     doc_id=node.id,
                     suggestion=("add a section recording why the proposal was withdrawn"),
+                    category=_CAT_MISSING_SECTION,
                 )
             )
         if _has_heading(headings, "unresolved-questions") and not _section_empty(
@@ -330,6 +359,7 @@ class RfcResolutionCheck:
                         "remove the section or fold remaining questions into "
                         "the withdrawal rationale"
                     ),
+                    category=_CAT_RETAINED_QUESTIONS,
                 )
             )
         return out
@@ -351,6 +381,7 @@ class RfcResolutionCheck:
                         path=node.path,
                         doc_id=node.id,
                         suggestion=("decide, withdraw, or update target_decision_date"),
+                        category=_CAT_STALE_TARGET_DATE,
                     )
                 )
         return out

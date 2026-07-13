@@ -12,12 +12,11 @@ rfc_state: draft
 
 ## Summary
 
-Surface a "you touched code but not its doc" co-change signal by **folding it
-into the two surfaces that already resolve changed-source → owning-doc**, rather
-than adding a new check. Specifically: (1) `irminsul context --changed` flags
-every changed source whose owning doc is *not* itself in the change set, and
-(2) `mtime-drift` gains an optional diff-aware mode for the CI path. No new
-check, no new frontmatter field.
+Surface a "you touched code but not its doc" co-change signal on the two
+surfaces that already resolve changed-source → owning-doc: (1) `irminsul context
+--changed` flags every changed source whose owning doc is *not* itself in the
+change set, and (2) `irminsul check --diff <base>` reports the same gap over a
+git range for the CI path. No new frontmatter field.
 
 > **Revision note.** This RFC was originally drafted as a standalone soft check
 > `code-doc-cochange` with two new CLI flags, three escape valves, and a
@@ -25,6 +24,12 @@ check, no new frontmatter field.
 > `_pending_for_changed` (`src/irminsul/context.py`) and that escape valves are
 > over-engineering for a non-blocking signal. The design below is the descoped
 > fold.
+>
+> **As-shipped note.** The CI half landed as a standalone module
+> (`src/irminsul/checks/co_change.py`) driven by a new `--diff` flag, *not* as a
+> mode folded into `mtime-drift`. Detailed Design §2 below has been rewritten to
+> describe what shipped; the reasoning for the divergence is in
+> [Alternatives](#alternatives).
 
 ## Motivation
 
@@ -72,36 +77,44 @@ Because this reads the working tree, it catches drift *before commit* — earlie
 than PR time — exactly where an agent already looks before finishing an edit. It
 needs **zero new git plumbing**.
 
-### 2. `mtime-drift` — the CI / maintenance-queue surface (secondary)
+### 2. `check --diff` — the CI / maintenance-queue surface (secondary)
 
-For the PR-diff path that reaches CI and the RFC-0018 queue, extend the existing
-`MtimeDriftCheck` (`src/irminsul/checks/mtime_drift.py`) rather than adding a
-parallel check. It already iterates per doc and resolves described sources
-(`mtime_drift.py:33-48`).
-
-Add two optional flags to `irminsul check`:
+The PR-diff path that reaches CI and the RFC-0018 queue ships as
+`src/irminsul/checks/co_change.py`, a standalone module deliberately kept
+**outside all three registries**. A registered `Check` receives only a
+`DocGraph`; this signal additionally needs the changed-file set from `git diff
+<base>...<head>`, which only the CLI can supply. Registering it would mean either
+smuggling diff state onto the graph for one consumer or listing a check in
+`irminsul.toml` that silently no-ops on every run without a diff flag. So the
+CLI calls `run_co_change(graph, changed)` directly and folds its findings into
+the normal sort/print/JSON/summary pipeline:
 
 ```text
-irminsul check --profile configured --base-ref origin/main --head-ref HEAD
+irminsul check --diff origin/main
+irminsul check --base-ref origin/main --head-ref HEAD   # equivalent, older spelling
 ```
 
-When both are supplied, `mtime-drift` additionally emits a diff-precise finding
-for any doc whose described sources changed in `base...head` but whose own path
-did not — a stronger signal than the clock threshold. When the flags are absent,
-behavior is exactly today's clock-based check. The two flags are the only new
-CLI surface, shared by (and justified for) the existing check.
+Ownership resolution reuses `resolve_claims` / `most_specific_claims` from the
+`uniqueness` check, so "who owns this file?" has exactly one answer across the
+tool. Claims resolve against the changed set directly rather than a full source
+walk, which also means a *deleted* claimed file still enforces on its owning doc.
+Findings are grouped one-per-owning-doc, listing every changed-but-unreflected
+file it claims.
+
+`mtime-drift` keeps only its clock signal; the diff-precise finding it briefly
+carried was removed rather than duplicated.
 
 ### CI wiring
 
-The composite Action sets `--base-ref ${{ github.event.pull_request.base.sha }}`
-and `--head-ref ${{ github.event.pull_request.head.sha }}` on `pull_request`
-triggers. On `push` to the main branch the flags are omitted, so `mtime-drift`
-falls back to its clock signal.
+`--diff <base>` is the flag CI templates: on `pull_request`, `--diff ${{
+github.event.pull_request.base.sha }}`. `--base-ref`/`--head-ref` remain as the
+two-flag spelling. On `push` to the main branch the flags are omitted and no
+co-change finding is produced.
 
 ### Strict mode
 
-`--strict` promotes the diff-aware finding to a hard error along with the rest of
-the soft deterministic set, giving projects a path to gate on doc co-change once
+`--strict` promotes the co-change warning to an error along with the rest of the
+soft deterministic set, giving projects a path to gate on doc co-change once
 their authoring conventions settle.
 
 ### Deliberately deferred: escape valves
@@ -117,33 +130,62 @@ shipped stale.)
 
 ## Relationship to Existing RFCs
 
-- Diff-aware `mtime-drift` findings land in the maintenance queue defined by
-  RFC-0018. Complementary: 0018 enforces what an accepted decision *declared*;
-  this surfaces what a change *actually* touched without doc updates.
+- Co-change findings land in the maintenance queue defined by RFC-0018.
+  Complementary: 0018 enforces what an accepted decision *declared*; this
+  surfaces what a change *actually* touched without doc updates.
 - Reuses the `describes` glob resolution already used by hard `globs` and
   `uniqueness`, and the changed-path resolution already in `context`.
 - Consistent with RFC-0020 "derive, don't materialize": no new declared-intent
   frontmatter is introduced (the dropped `docs-frozen` / `docs-n/a` fields would
   have been exactly the kind of rot-prone cache 0020 removed).
 
+## Failure semantics
+
+The CI path requires git ref access, and the two spellings fail differently on
+purpose:
+
+- **`--diff <base>` fails loudly (exit 2).** An empty or unresolvable base ref
+  exits 2 with a message that distinguishes "no git repository with commit
+  history here" from "that ref does not resolve". `--diff` is an explicit opt-in
+  gate, and a gate whose diff cannot be computed is a gate that never fires: it
+  would report zero findings and exit 0, which is indistinguishable from a clean
+  run. That silent pass is the failure mode worth spending an exit code on — an
+  empty ref is the common shape of it, since a workflow templating `--diff ${{
+  github.base_ref }}` interpolates to the empty string on `push` events.
+- **`--base-ref`/`--head-ref` degrade gracefully.** They predate the gate and are
+  used by pipelines that expect the run to continue; an unresolvable ref (a
+  shallow `actions/checkout` clone that never fetched the base sha, a tarball
+  checkout with no history) prints a yellow stderr warning, skips the co-change
+  signal, and reports the remaining findings normally. An *empty* value is still
+  exit 2 — that is a malformed invocation, not a hostile environment.
+
+So "in hermetic CI without a base ref the finding is simply absent" holds for the
+older flags, and operators who want the stronger guarantee opt into `--diff`.
+
 ## Drawbacks
 
-The CI path requires git ref access. In hermetic CI without a base ref the
-diff-aware finding is simply absent and `mtime-drift` reverts to its clock
-signal — worth calling out so operators do not assume diff coverage they do not
-have.
-
-Folding two distinct signals (clock drift, diff co-change) into one check makes
-`mtime-drift`'s output slightly less single-purpose. The shared per-doc owner
-loop and the unified "doc lags its sources" intent make this an acceptable trade
-versus a second near-identical check.
+The signal lives outside the check registries, so it is not selectable from
+`irminsul.toml` and does not appear in `--profile` listings — it is reachable
+only through the CLI flags. That is the cost of the input it needs (see
+Detailed Design §2); the mitigation is that its findings are otherwise
+indistinguishable from a soft check's, including `--strict` promotion.
 
 ## Alternatives
 
-- **Keep the standalone `code-doc-cochange` check (the original draft).**
-  Rejected: it duplicates `_pending_for_changed` and answers the same "code
-  moved, doc didn't" question as `mtime-drift`, paying for a parallel check plus
-  escape-valve and frontmatter machinery the soft default does not need.
+- **Fold the diff signal into `mtime-drift` (what this RFC first specified).**
+  Not shipped. The fold saved a file but not the machinery: a registered check
+  sees only the `DocGraph`, so the changed-path set had to be smuggled onto the
+  graph as a field that exactly one check read and every other consumer ignored.
+  It also welded two signals with different inputs (a clock threshold; a git
+  range) and different lifetimes into one check whose output no longer said
+  which one fired. The standalone module keeps `mtime-drift` single-purpose,
+  keeps the graph free of per-invocation diff state, and still reuses the
+  ownership resolution — which was the actual duplication worth avoiding.
+  Registering it as a normal soft check was likewise rejected: it would sit in
+  `irminsul.toml` no-opping on every run that lacks a diff flag.
+- **Keep the escape valves from the original draft** (`Doc-Impact:` trailers,
+  `docs-frozen:`, `docs-n/a:`). Still rejected, unchanged — see *Deliberately
+  deferred* above.
 - **Make it a hard check by default.** Rejected: RFC-0018 chose a queue-based
   philosophy over a gate; a hard default conflicts. `--strict` is the opt-in.
 - **`context --changed` only, no CI path.** Rejected: `context` is a local/agent
@@ -154,12 +196,20 @@ versus a second near-identical check.
 
 ## Unresolved Questions
 
-- Many-to-one ownership: when several docs `describe` a changed file, must all of
-  them co-change, or any one? `mtime-drift`'s per-doc loop already flags each
-  owner independently, which suggests "each owning doc is evaluated on its own" —
-  confirm this is the intended semantics for the diff-aware finding too.
-- Should the diff use `git diff --name-only --find-renames` so a renamed source
-  file is not seen as an add plus a delete?
-- For multi-commit PRs, should the base be the merge base or the PR base SHA?
-  The merge base is more accurate but slower; the PR base SHA is what GitHub
-  provides directly.
+Resolved during implementation:
+
+- **Many-to-one ownership.** Settled as "any one owner suffices": a changed
+  source file is unreflected only when *none* of its most-specific owning docs
+  changed in the same diff. Findings are then grouped per owning doc, so each
+  owner still gets its own finding listing its own files.
+- **Renames.** Yes — the diff runs `git diff --name-only --find-renames`, so a
+  renamed source file appears once at its destination rather than as an add plus
+  a delete.
+- **Merge base vs. PR base SHA.** The three-dot range (`<base>...<head>`), i.e.
+  the merge base. A two-dot range against a moving PR base attributes unrelated
+  commits from the target branch to the PR.
+
+Still open:
+
+- Whether `--strict` co-change gating produces tolerable noise on real repos, and
+  therefore whether the deferred escape valves ever need to ship.
