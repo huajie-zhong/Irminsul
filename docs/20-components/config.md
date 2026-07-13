@@ -20,7 +20,7 @@ Hard checks and deterministic soft checks are enabled by default. Projects can o
 
 `checks.terminology_overload.rules` configures ambiguous terminology warnings. There are no default rules — which terms are overloaded is project-specific, so each project (including this repo, whose own config declares a `coverage` rule) defines its own.
 
-Generated configs include the stable/useful deterministic sections: paths, hard and soft checks, implemented nested check settings, overrides, and languages. LLM config is supported by the schema but intentionally omitted from the scaffold until LLM checks are part of the normal rollout.
+Generated configs include the stable/useful deterministic sections: paths, hard and soft checks, implemented nested check settings, overrides, and languages. The schema is closed — unknown keys are rejected rather than ignored, so a stale or misspelled table fails fast instead of silently doing nothing.
 
 A loader walks up from the invocation directory looking for `irminsul.toml` so subcommands work regardless of cwd.
 

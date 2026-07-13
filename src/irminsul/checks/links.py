@@ -105,6 +105,7 @@ class LinksCheck:
                                 ),
                                 path=node.path,
                                 doc_id=node.id,
+                                data={"problem": "unknown-anchor", "anchor": anchor},
                             )
                         )
                     continue
@@ -120,6 +121,11 @@ class LinksCheck:
                             message=f"broken link: '{href}' (resolved to '{target_rel}')",
                             path=node.path,
                             doc_id=node.id,
+                            data={
+                                "problem": "broken-link",
+                                "target": href,
+                                "resolved": target_rel.as_posix(),
+                            },
                         )
                     )
                     continue
@@ -145,6 +151,11 @@ class LinksCheck:
                             ),
                             path=node.path,
                             doc_id=node.id,
+                            data={
+                                "problem": "unknown-anchor",
+                                "anchor": anchor,
+                                "target": target_rel.as_posix(),
+                            },
                         )
                     )
 

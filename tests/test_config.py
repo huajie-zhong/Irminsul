@@ -23,7 +23,6 @@ def test_defaults_are_valid() -> None:
     assert set(cfg.checks.hard) == set(HARD_CHECKS)
     assert set(cfg.checks.soft_deterministic) == set(SOFT_DETERMINISTIC_CHECKS)
     assert cfg.checks.terminology_overload.rules == []
-    assert cfg.llm.provider == "anthropic"
 
 
 def test_load_missing_file_returns_defaults(tmp_path: Path) -> None:
@@ -43,10 +42,6 @@ source_roots = ["app"]
 
 [checks]
 hard = ["frontmatter", "globs"]
-
-[llm]
-provider = "openai"
-model = "gpt-4o-mini"
 """.strip()
     )
     cfg = load(p)
@@ -54,7 +49,6 @@ model = "gpt-4o-mini"
     assert cfg.paths.docs_root == "documentation"
     assert cfg.paths.source_roots == ["app"]
     assert cfg.checks.hard == ["frontmatter", "globs"]
-    assert cfg.llm.provider == "openai"
 
 
 def test_unknown_check_rejected(tmp_path: Path) -> None:
@@ -68,6 +62,24 @@ def test_unknown_top_level_key_rejected(tmp_path: Path) -> None:
     p = tmp_path / CONFIG_FILENAME
     p.write_text("mystery_field = 42\n")
     with pytest.raises(Exception):
+        load(p)
+
+
+def test_removed_llm_config_keys_rejected(tmp_path: Path) -> None:
+    """Breaking change: the `[llm]` table and the LLM check list under
+    `[checks]` were removed along with the LLM check subsystem. Configs that
+    still set them must fail loudly (extra="forbid") rather than be silently
+    ignored.
+    """
+    removed_checks_field = "soft_" + "llm"  # assembled so repo-wide greps stay clean
+    p = tmp_path / CONFIG_FILENAME
+
+    p.write_text('[llm]\nprovider = "anthropic"\n')
+    with pytest.raises(Exception, match="llm"):
+        load(p)
+
+    p.write_text(f'[checks]\n{removed_checks_field} = ["overlap"]\n')
+    with pytest.raises(Exception, match=removed_checks_field):
         load(p)
 
 
