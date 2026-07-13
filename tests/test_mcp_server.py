@@ -34,7 +34,13 @@ EXPECTED_TOOL_NAMES = {
     "list_docs",
     "surface",
     "anchors",
+    "change_status",
+    "change_verify",
+    "change_impact",
+    "binding_readiness",
 }
+
+_CHANGE_FIXTURE = Path(__file__).parent / "fixtures" / "repos" / "soft-change-binding"
 
 
 def _load_config(repo_root: Path) -> IrminsulConfig:
@@ -272,6 +278,52 @@ def test_anchors_json_matches_cli_output(tmp_path: Path) -> None:
     result = runner.invoke(app, ["anchors", "--format", "json", "--path", str(repo)])
     assert result.exit_code == 0, result.output
     assert json.loads(out) == json.loads(result.output)
+
+
+# --- change lifecycle tools ---
+
+
+def test_change_status_json_matches_cli_output() -> None:
+    out = mcp_server.change_status_json(
+        _CHANGE_FIXTURE, _load_config(_CHANGE_FIXTURE), "0001-accepted-good"
+    )
+    result = runner.invoke(
+        app,
+        [
+            "change",
+            "status",
+            "0001-accepted-good",
+            "--format",
+            "json",
+            "--path",
+            str(_CHANGE_FIXTURE),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert json.loads(out) == json.loads(result.output)
+
+
+def test_change_verify_json_reports_blockers() -> None:
+    out = mcp_server.change_verify_json(
+        _CHANGE_FIXTURE, _load_config(_CHANGE_FIXTURE), "0002-accepted-missing-affects"
+    )
+    data = json.loads(out)
+    assert any(b["code"] == "missing-affects" for b in data["blockers"])
+
+
+def test_change_impact_json_reports_layers() -> None:
+    out = mcp_server.change_impact_json(
+        _CHANGE_FIXTURE, _load_config(_CHANGE_FIXTURE), "0001-accepted-good"
+    )
+    data = json.loads(out)
+    assert "components" in data["layers"]
+
+
+def test_binding_readiness_json_shape() -> None:
+    out = mcp_server.binding_readiness_json(_CHANGE_FIXTURE, _load_config(_CHANGE_FIXTURE))
+    data = json.loads(out)
+    assert data["ready"] is True
+    assert isinstance(data["blockers"], list)
 
 
 # --- FastMCP wiring ---

@@ -26,7 +26,8 @@ def findings_and_graph_for_kind(
     """The findings behind one `irminsul list` subcommand, plus the graph they came from.
 
     The graph is returned because the shared findings serializer needs it to
-    decide whether `irminsul fix` would remediate each finding.
+    decide whether `irminsul fix` would remediate each finding, and because
+    `list lifecycle` reuses it to derive the accepted-RFC backlog.
     """
     graph = build_graph(repo_root, config)
     if kind == "orphans":
@@ -176,17 +177,45 @@ def _to_queue_item(f: Finding) -> _QueueItem:
     )
 
 
+def _accepted_backlog_items(config: IrminsulConfig, graph: DocGraph) -> list[_QueueItem]:
+    """Accepted-but-not-implemented RFCs and their next mechanical action
+    (RFC 0034). Ordering is deterministic document order; priority metadata is
+    deliberately out of scope."""
+    from irminsul.frontmatter import RfcStateEnum, canonical_rfc_state
+
+    docs_root = (config.paths.docs_root or "docs").replace("\\", "/").strip("/")
+    rfc_prefix = f"{docs_root}/80-evolution/rfcs/"
+
+    out: list[_QueueItem] = []
+    for node in graph.nodes.values():
+        if not node.path.as_posix().startswith(rfc_prefix):
+            continue
+        state = node.frontmatter.rfc_state
+        if state is None or canonical_rfc_state(state) != RfcStateEnum.accepted:
+            continue
+        out.append(
+            _QueueItem(
+                priority=6,
+                kind="implement",
+                target_path=node.path.as_posix(),
+                related_id=node.id,
+                reason="accepted RFC is not yet implemented",
+                suggested_command=f"irminsul change status {node.id}",
+            )
+        )
+    return out
+
+
 def list_lifecycle(repo_root: Path, *, fmt: str, queue: bool) -> None:
-    findings, graph = findings_and_graph_for_kind(
-        repo_root, load(find_config(repo_root)), "lifecycle"
-    )
+    config = load(find_config(repo_root))
+    findings, graph = findings_and_graph_for_kind(repo_root, config, "lifecycle")
 
     if not queue:
         _print(findings, graph, fmt)
         return
 
     items = sorted(
-        [_to_queue_item(f) for f in findings],
+        [_to_queue_item(f) for f in findings] + _accepted_backlog_items(config, graph),
         key=lambda i: (i.priority, i.target_path),
     )
     if fmt == "json":

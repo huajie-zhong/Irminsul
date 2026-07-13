@@ -23,22 +23,22 @@ inventory:
       - check
       - fix
       - list undocumented
+      - list lifecycle
+      - change status
+      - new rfc
     omit:
       - anchors
       - change finalize
       - change impact
-      - change status
       - change transition
       - change verify
       - init
       - init-docs-only
-      - list lifecycle
       - list orphans
       - list stale
       - mcp
       - new adr
       - new component
-      - new rfc
       - orient
       - regen agents-md
       - seed

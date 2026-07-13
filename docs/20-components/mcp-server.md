@@ -7,6 +7,7 @@ status: stable
 summary: Read-only MCP stdio server that lets AI agents query the doc graph natively instead of shelling out to the CLI.
 depends_on:
   - anchors
+  - change
   - checks
   - cli
   - config
@@ -26,6 +27,10 @@ inventory:
     complete: true
     items:
       - anchors
+      - binding_readiness
+      - change_impact
+      - change_status
+      - change_verify
       - check
       - context_changed
       - context_for_path
@@ -52,6 +57,8 @@ The server is strictly read-only: no tool writes files, and there is no MCP path
 - `list_docs(kind)` — `orphans`, `stale`, `undocumented`, or `lifecycle`.
 - `surface(kind, source_glob)` — derives a live code surface (`cli`, `http`, `exports`, `env-vars`, or a configured generic kind).
 - `anchors()` — the [anchored prose claims](anchors.md) report. Read-only: re-pinning an anchor remains a deliberate human acknowledgement through the CLI, never an MCP call.
+- `change_status(change)` / `change_verify(change, base_ref)` / `change_impact(change, base_ref)` — the read side of the [bound-change lifecycle](change.md): state, evidence, blockers, semantic-review clues, and layered impact for one RFC. Each tool description names the confirmed CLI command to run next, because lifecycle mutation is deliberately not exposed over MCP — a write surface needs an explicit authorization model first.
+- `binding_readiness()` — the pre-proposal baseline: hard-check blockers, drift clues, and unrelated repository debt.
 
 ## Wiring it into an agent
 
