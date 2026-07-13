@@ -16,7 +16,7 @@ from pathspec import GitIgnoreSpec
 from irminsul.checks.globs import is_source_path, source_root_prefixes, walk_source_files
 from irminsul.checks.uniqueness import resolve_claims
 from irminsul.config import IrminsulConfig, docs_root_prefix
-from irminsul.docgraph import DocGraph
+from irminsul.docgraph import DocGraph, DocNode
 
 
 @dataclass(frozen=True)
@@ -31,6 +31,20 @@ class Footprint:
     changed_docs: tuple[str, ...] = ()
     changed_tests: dict[str, tuple[str, ...]] = field(default_factory=dict)
     """Component doc id -> changed files matched by that doc's `tests:` entries."""
+
+
+def most_specific_claims(
+    claims: list[tuple[DocNode, str, tuple[int, int, int]]],
+) -> list[DocNode]:
+    """The doc(s) owning a file under the most-specific-claim rule (`uniqueness`).
+
+    A broader parent claim is shadowed by a narrower child claim; only a genuine
+    tie at the top score yields more than one owner.
+    """
+    if not claims:
+        return []
+    top_score = max(score for _, _, score in claims)
+    return [node for node, _, score in claims if score == top_score]
 
 
 def touched_components(
@@ -64,14 +78,12 @@ def touched_components(
     touched: dict[str, list[str]] = {}
     unowned: list[str] = []
     for _, display in changed_source:
-        claims = claims_by_file.get(display)
-        if not claims:
+        owners = most_specific_claims(claims_by_file.get(display, []))
+        if not owners:
             unowned.append(display)
             continue
-        top_score = max(score for _, _, score in claims)
-        for node, _, score in claims:
-            if score == top_score:
-                touched.setdefault(node.id, []).append(display)
+        for node in owners:
+            touched.setdefault(node.id, []).append(display)
 
     docs_root = docs_root_prefix(config)
     changed_docs = sorted(

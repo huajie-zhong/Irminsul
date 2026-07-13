@@ -133,6 +133,102 @@ def test_change_verify_plain_shows_tasks(repo: Path) -> None:
     assert "source evidence:" in result.output
 
 
+def _git_init(repo: Path) -> None:
+    import subprocess
+
+    for args in (
+        ("init", "-q"),
+        ("config", "user.email", "t@example.com"),
+        ("config", "user.name", "T"),
+        ("add", "."),
+        ("commit", "-q", "-m", "init"),
+    ):
+        subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+
+
+def test_change_finalize_plan_only(repo: Path) -> None:
+    _git_init(repo)
+    rfc = repo / "docs" / "80-evolution" / "rfcs" / "0001-accepted-good.md"
+    before = rfc.read_text(encoding="utf-8")
+    result = runner.invoke(
+        app,
+        [
+            "change",
+            "finalize",
+            "0001-accepted-good",
+            "--anchor",
+            "sso-login=app/auth/login.py#login",
+            "--path",
+            str(repo),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "--confirm" in result.output
+    assert rfc.read_text(encoding="utf-8") == before
+
+
+def test_change_finalize_confirm_applies(repo: Path) -> None:
+    _git_init(repo)
+    result = runner.invoke(
+        app,
+        [
+            "change",
+            "finalize",
+            "0001-accepted-good",
+            "--anchor",
+            "sso-login=app/auth/login.py#login",
+            "--anchor",
+            "sso-login=tests/test_auth.py#test_login",
+            "--confirm",
+            "--path",
+            str(repo),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "updated" in result.output
+    rfc = repo / "docs" / "80-evolution" / "rfcs" / "0001-accepted-good.md"
+    assert "rfc_state: implemented" in rfc.read_text(encoding="utf-8")
+    owner = repo / "docs" / "20-components" / "auth.md"
+    assert "**0001-accepted-good#sso-login**" in owner.read_text(encoding="utf-8")
+
+
+def test_change_finalize_presents_semantic_review(repo: Path) -> None:
+    _git_init(repo)
+    result = runner.invoke(
+        app,
+        [
+            "change",
+            "finalize",
+            "0001-accepted-good",
+            "--anchor",
+            "sso-login=app/auth/login.py#login",
+            "--path",
+            str(repo),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "semantic review" in result.output
+    assert "task 'T1'" in result.output
+
+
+def test_change_finalize_blocked_exits_one(repo: Path) -> None:
+    _git_init(repo)
+    result = runner.invoke(
+        app,
+        ["change", "finalize", "0001-accepted-good", "--path", str(repo)],
+    )
+    assert result.exit_code == 1
+    assert "missing-binding" in result.output
+
+
+def test_change_transition_rejects_implemented_target(repo: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["change", "transition", "0004-draft-ready", "implemented", "--path", str(repo)],
+    )
+    assert result.exit_code == 2
+
+
 def test_change_transition_rejected_with_resolved_by_blocks(repo: Path) -> None:
     rfc = repo / "docs" / "80-evolution" / "rfcs" / "0004-draft-ready.md"
     before = rfc.read_text(encoding="utf-8")
@@ -153,11 +249,3 @@ def test_change_transition_rejected_with_resolved_by_blocks(repo: Path) -> None:
     assert result.exit_code == 1
     assert "unsupported-resolved-by" in result.output
     assert rfc.read_text(encoding="utf-8") == before
-
-
-def test_change_transition_rejects_implemented_target(repo: Path) -> None:
-    result = runner.invoke(
-        app,
-        ["change", "transition", "0004-draft-ready", "implemented", "--path", str(repo)],
-    )
-    assert result.exit_code == 2
