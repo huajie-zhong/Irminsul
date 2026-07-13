@@ -57,10 +57,6 @@ class DocGraph:
     headings: dict[str, list[Heading]] = field(default_factory=dict)
     git_times: dict[Path, GitTime] = field(default_factory=dict)
     now: _dt.date | None = None
-    diff_changed_paths: frozenset[str] | None = None
-    """Repo-relative POSIX paths changed in a base...head range, when `check`
-    was given `--base-ref`/`--head-ref`. None means no diff was requested;
-    diff-aware checks fall back to their non-diff behaviour."""
 
 
 def _to_repo_relative(absolute: Path, repo_root: Path) -> Path:
@@ -75,14 +71,12 @@ def build_graph(
     config: IrminsulConfig,
     *,
     now: _dt.date | None = None,
-    diff_changed_paths: frozenset[str] | None = None,
 ) -> DocGraph:
     docs_root_abs = (repo_root / config.paths.docs_root).resolve()
     graph = DocGraph(
         config=config,
         repo_root=repo_root,
         now=now,
-        diff_changed_paths=diff_changed_paths,
     )
 
     if not docs_root_abs.exists():

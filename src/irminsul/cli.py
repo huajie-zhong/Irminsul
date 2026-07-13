@@ -28,7 +28,7 @@ from irminsul.checks import (
 )
 from irminsul.config import IrminsulConfig, find_config, load
 from irminsul.docgraph import DocGraph, build_graph
-from irminsul.git.mtime import diff_name_only
+from irminsul.git.mtime import diff_name_only, has_history
 from irminsul.init.command import (
     detect_code_signals,
     run_init,
@@ -435,6 +435,37 @@ def _findings_to_json(
     return json.dumps(payload, indent=2)
 
 
+_GITHUB_COMMAND = {
+    Severity.error: "error",
+    Severity.warning: "warning",
+    Severity.info: "notice",
+}
+
+
+def _escape_github_data(value: str) -> str:
+    """Escape workflow-command message data per the GitHub Actions spec."""
+    return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
+def _escape_github_property(value: str) -> str:
+    """Escape workflow-command property values (data escapes plus ',' and ':')."""
+    return _escape_github_data(value).replace(",", "%2C").replace(":", "%3A")
+
+
+def _github_annotation(finding: Finding) -> str:
+    """One `::error|::warning|::notice` workflow command per finding."""
+    props: list[str] = []
+    if finding.path is not None:
+        props.append(f"file={_escape_github_property(finding.path.as_posix())}")
+    if finding.line is not None:
+        props.append(f"line={finding.line}")
+    props.append("title=" + _escape_github_property(f"irminsul {finding.check}"))
+    data = finding.message
+    if finding.suggestion:
+        data = f"{data} — {finding.suggestion}"
+    return f"::{_GITHUB_COMMAND[finding.severity]} {','.join(props)}::{_escape_github_data(data)}"
+
+
 def _print_summary(counts: dict[Severity, int]) -> None:
     parts: list[str] = [
         f"{counts[Severity.error]} error{'s' if counts[Severity.error] != 1 else ''}",
@@ -457,6 +488,19 @@ def _soft_check_names(profile: Profile, config: IrminsulConfig) -> list[str]:
     if profile == Profile.all_available:
         return list(SOFT_REGISTRY)
     return list(config.checks.soft_deterministic)
+
+
+def _diff_failure_reason(repo_root: Path, co_change_range: tuple[str, str]) -> str:
+    base, head = co_change_range
+    if not has_history(repo_root):
+        return (
+            f"no git repository with commit history found at {repo_root}; "
+            "co-change needs one to diff against"
+        )
+    return (
+        f"could not compute `git diff {base}...{head}`; "
+        "at least one ref could not be resolved in this repository"
+    )
 
 
 def _run_registered_checks(
@@ -496,8 +540,18 @@ def check(
     ] = False,
     fmt: Annotated[
         str,
-        typer.Option("--format", help="Output format: plain or json."),
+        typer.Option("--format", help="Output format: plain, json, or github."),
     ] = "plain",
+    diff: Annotated[
+        str | None,
+        typer.Option(
+            "--diff",
+            help=(
+                "Base git ref for co-change enforcement: warn when source files "
+                "changed in <base>...HEAD without their owning docs."
+            ),
+        ),
+    ] = None,
     path: Annotated[
         Path,
         typer.Option(
@@ -545,8 +599,10 @@ def check(
     ] = False,
 ) -> None:
     """Run the configured checks. Errors exit non-zero."""
-    if fmt not in ("plain", "json"):
-        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+    if fmt not in ("plain", "json", "github"):
+        typer.echo(
+            typer.style(f"unknown --format '{fmt}'; expected plain, json, or github", fg="red")
+        )
         raise typer.Exit(code=2)
 
     if (base_ref is None) != (head_ref is None):
@@ -573,19 +629,42 @@ def check(
     config_path = find_config(repo_root)
     config = load(config_path)
 
-    diff_changed: frozenset[str] | None = None
-    if base_ref is not None and head_ref is not None:
-        diff_changed = diff_name_only(repo_root, base_ref, head_ref)
-        if diff_changed is None:
+    if diff is not None and base_ref is not None:
+        typer.echo(typer.style("--diff and --base-ref/--head-ref are mutually exclusive", fg="red"))
+        raise typer.Exit(code=2)
+
+    for flag, value in (("--diff", diff), ("--base-ref", base_ref), ("--head-ref", head_ref)):
+        if value is not None and not value.strip():
             typer.echo(
                 typer.style(
-                    f"could not compute diff {base_ref}...{head_ref}; skipping diff-aware checks",
-                    fg="yellow",
-                ),
+                    f"{flag} was given an empty value; pass a git ref or omit the flag",
+                    fg="red",
+                )
+            )
+            raise typer.Exit(code=2)
+
+    co_change_paths: frozenset[str] | None = None
+    co_change_range: tuple[str, str] | None = None
+    if diff is not None:
+        co_change_range = (diff, "HEAD")
+    elif base_ref is not None and head_ref is not None:
+        co_change_range = (base_ref, head_ref)
+    if co_change_range is not None:
+        co_change_paths = diff_name_only(repo_root, *co_change_range)
+        if co_change_paths is None:
+            reason = _diff_failure_reason(repo_root, co_change_range)
+            # --diff is an explicit opt-in gate: failing to compute its diff means
+            # the gate would silently pass, so exit. --base-ref/--head-ref predate
+            # it and degrade gracefully so a shallow clone still reports findings.
+            if diff is not None:
+                typer.echo(typer.style(reason, fg="red"))
+                raise typer.Exit(code=2)
+            typer.echo(
+                typer.style(f"{reason}; skipping diff-aware checks", fg="yellow"),
                 err=True,
             )
 
-    graph = build_graph(repo_root, config, now=now_date, diff_changed_paths=diff_changed)
+    graph = build_graph(repo_root, config, now=now_date)
 
     findings: list[Finding] = []
     findings.extend(
@@ -598,6 +677,11 @@ def check(
             _soft_check_names(profile, config), SOFT_REGISTRY, graph, tier="soft"
         )
     )
+
+    if co_change_paths is not None:
+        from irminsul.checks.co_change import run_co_change
+
+        findings.extend(run_co_change(graph, co_change_paths))
 
     findings = sort_findings(findings)
 
@@ -646,6 +730,10 @@ def check(
                 baseline=baseline_status,
             )
         )
+    elif fmt == "github":
+        for finding in findings:
+            typer.echo(_github_annotation(finding))
+        _print_summary(counts)
     else:
         for finding in findings:
             _print_finding(finding)

@@ -180,7 +180,7 @@ def test_check_base_ref_requires_head_ref(fixture_repo: Callable[[str], Path]) -
     assert "must be provided together" in result.stdout
 
 
-def test_check_diff_aware_mtime_drift_flags_source_without_doc(tmp_path: Path) -> None:
+def test_check_base_head_refs_alias_unified_co_change(tmp_path: Path) -> None:
     from git import Repo
 
     repo_root = tmp_path / "repo"
@@ -226,7 +226,87 @@ def test_check_diff_aware_mtime_drift_flags_source_without_doc(tmp_path: Path) -
             str(repo_root),
         ],
     )
-    assert "sources changed in this diff but the doc was not updated" in result.stdout
+    # --base-ref/--head-ref is the two-flag spelling of --diff: the unified
+    # co-change signal fires instead of the old mtime-drift diff finding.
+    assert "co-change" in result.stdout
+    assert "changed in the diff but the doc did not" in result.stdout
+
+
+def _init_repo(root: Path) -> None:
+    from git import Repo
+
+    repo = Repo.init(root)
+    with repo.config_writer() as cw:
+        cw.set_value("user", "name", "Test")
+        cw.set_value("user", "email", "test@example.com")
+    repo.git.add("-A")
+    repo.index.commit("seed")
+    repo.close()
+
+
+def test_check_unresolvable_base_ref_warns_and_still_reports_findings(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    """A ref the repo cannot resolve (e.g. a shallow CI clone that never fetched
+    the base sha) must not swallow the run: warn, skip co-change, keep checking."""
+    repo = fixture_repo("bad-frontmatter")
+    _init_repo(repo)
+
+    result = runner.invoke(
+        app,
+        [
+            "check",
+            "--profile",
+            "hard",
+            "--base-ref",
+            "no-such-ref",
+            "--head-ref",
+            "HEAD",
+            "--path",
+            str(repo),
+        ],
+    )
+
+    assert "skipping diff-aware checks" in result.output
+    # Exit code is driven by the findings, not by the failed ref resolution.
+    assert result.exit_code == 1
+    assert "[frontmatter]" in result.stdout
+    assert "missing frontmatter" in result.stdout
+
+
+def test_check_unresolvable_base_ref_still_exits_zero_on_a_clean_repo(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("good")
+    _init_repo(repo)
+
+    result = runner.invoke(
+        app,
+        [
+            "check",
+            "--profile",
+            "hard",
+            "--base-ref",
+            "no-such-ref",
+            "--head-ref",
+            "HEAD",
+            "--path",
+            str(repo),
+        ],
+    )
+
+    assert "skipping diff-aware checks" in result.output
+    assert result.exit_code == 0, result.output
+    assert "0 errors" in result.stdout
+
+
+def test_check_empty_base_ref_exits_2(fixture_repo: Callable[[str], Path]) -> None:
+    repo = fixture_repo("good")
+    result = runner.invoke(
+        app, ["check", "--base-ref", "", "--head-ref", "HEAD", "--path", str(repo)]
+    )
+    assert result.exit_code == 2
+    assert "empty value" in result.output
 
 
 # --- machine-actionable findings: `data`, `fixable`, `fix_command` ---
