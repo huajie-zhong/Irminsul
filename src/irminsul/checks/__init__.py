@@ -44,6 +44,7 @@ from irminsul.checks.orphans import OrphansCheck
 from irminsul.checks.parent_child import ParentChildCheck
 from irminsul.checks.phantom_layer import PhantomLayerCheck
 from irminsul.checks.reality import RealityCheck
+from irminsul.checks.requirement_grammar import RequirementGrammarCheck
 from irminsul.checks.rfc_resolution import RfcResolutionCheck
 from irminsul.checks.schema_leak import SchemaLeakCheck
 from irminsul.checks.stale_reaper import StaleReaperCheck
@@ -84,6 +85,7 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     ClaimAnchorCheck.name: ClaimAnchorCheck,
     DocRefsCheck.name: DocRefsCheck,
     ChangeBindingCheck.name: ChangeBindingCheck,
+    RequirementGrammarCheck.name: RequirementGrammarCheck,
 }
 
 __all__ = [
@@ -109,6 +111,7 @@ __all__ = [
     "PhantomLayerCheck",
     "ProseFileReferenceCheck",
     "RealityCheck",
+    "RequirementGrammarCheck",
     "RfcResolutionCheck",
     "Severity",
     "TerminologyOverloadCheck",

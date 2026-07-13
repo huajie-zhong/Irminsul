@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from irminsul.change.report import Blocker, ChangeError, find_rfc_node
+from irminsul.change.report import Blocker, ChangeError, find_rfc_node, requirement_blockers
 from irminsul.checks.base import Fix
 from irminsul.checks.rfc_resolution import _append_section, _has_heading
 from irminsul.config import IrminsulConfig
@@ -151,6 +151,8 @@ def plan_transition(
                     f"decision doc '{effective_resolved_by}' does not yet link back to "
                     "this RFC; rfc-resolution will warn until it does"
                 )
+
+        blockers.extend(requirement_blockers(graph, node))
 
     fixes: list[Fix] = []
     if not blockers:

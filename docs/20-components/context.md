@@ -28,4 +28,4 @@ Each result reports the owning doc, matching source claims, first declared entry
 
 ## Scope & Limitations
 
-Topic search is plain substring matching, not fuzzy search. `--changed` depends on `git status --porcelain`; outside a git worktree it reports the git error instead of guessing.
+Topic search is plain substring matching, not fuzzy search. `--changed` depends on `git status --porcelain` via the shared `irminsul.git.changes` helper (also used by the [change lifecycle](change.md) for its local diff baseline); outside a git worktree it reports the git error instead of guessing.

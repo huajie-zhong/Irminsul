@@ -52,6 +52,7 @@ SOFT_DETERMINISTIC_CHECKS = (
     "claim-anchor",
     "doc-refs",
     "change-binding",
+    "requirement-grammar",
 )
 
 

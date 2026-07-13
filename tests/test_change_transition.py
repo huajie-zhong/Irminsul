@@ -88,6 +88,37 @@ def test_reject_plan_adds_rationale_stub(repo: Path) -> None:
     assert "required_updates" not in descriptions
 
 
+def test_accept_without_requirements_section_blocks(repo: Path) -> None:
+    path = repo / "docs" / "80-evolution" / "rfcs" / "0004-draft-ready.md"
+    text = path.read_text(encoding="utf-8")
+    path.write_text(text.split("## Requirements")[0], encoding="utf-8")
+
+    graph, config = _graph(repo)
+    plan = plan_transition(graph, config, "0004-draft-ready", "accepted", resolved_by=_ADR)
+    assert any(b.code == "missing-requirements" for b in plan.blockers)
+
+
+def test_accept_with_grammar_findings_blocks(repo: Path) -> None:
+    graph, config = _graph(repo)
+    plan = plan_transition(graph, config, "0005-draft-bad-grammar", "accepted", resolved_by=_ADR)
+    codes = {b.code for b in plan.blockers}
+    assert "requirement-grammar:missing-id" in codes
+    assert "requirement-grammar:duplicate-id" in codes
+    assert plan.fixes == ()
+
+
+def test_accept_with_disposition_passes_requirements_gate(repo: Path) -> None:
+    graph, config = _graph(repo)
+    plan = plan_transition(graph, config, "0007-draft-disposition", "accepted", resolved_by=_ADR)
+    assert plan.blockers == ()
+
+
+def test_reject_does_not_require_requirements(repo: Path) -> None:
+    graph, config = _graph(repo)
+    plan = plan_transition(graph, config, "0003-draft-unknown-component", "rejected")
+    assert plan.blockers == ()
+
+
 def test_reject_with_resolved_by_blocks(repo: Path) -> None:
     graph, config = _graph(repo)
     plan = plan_transition(graph, config, "0004-draft-ready", "rejected", resolved_by=_ADR)

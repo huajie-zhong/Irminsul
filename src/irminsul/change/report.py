@@ -250,6 +250,42 @@ def build_change_report(
             )
         )
 
+    extra: dict[str, object] = {}
+    section = graph.requirements.get(node.id)
+    if canonical in (RfcStateEnum.draft, RfcStateEnum.accepted):
+        blockers.extend(requirement_blockers(graph, node))
+    if section is not None:
+        extra["requirements"] = {
+            "disposition": section.disposition,
+            "items": [
+                {
+                    "id": req.req_id,
+                    "global_id": f"{node.id}#{req.req_id}" if req.req_id else None,
+                    "title": req.title,
+                    "provenance": req.provenance,
+                    "scenarios": len(req.scenarios),
+                    "binding": (
+                        "planned/unbound"
+                        if req.provenance == "code"
+                        and canonical in (RfcStateEnum.draft, RfcStateEnum.accepted)
+                        else None
+                    ),
+                }
+                for req in section.requirements
+            ],
+        }
+        for req in section.requirements:
+            if len(req.scenarios) == 1:
+                clues.append(
+                    ReviewClue(
+                        question=(
+                            f"requirement '{req.req_id or req.title}' has a single "
+                            "scenario; is a negative or failure scenario missing?"
+                        ),
+                        evidence=(node.path.as_posix(),),
+                    )
+                )
+
     declared_untouched: tuple[str, ...] = ()
     touched_undeclared: tuple[str, ...] = ()
     if footprint is not None:
@@ -356,7 +392,46 @@ def build_change_report(
         semantic_review=tuple(clues),
         mechanically_ready_for=mechanically_ready_for,
         next_actions=tuple(next_actions),
+        extra=extra,
     )
+
+
+def requirement_blockers(graph: DocGraph, node: DocNode) -> list[Blocker]:
+    """Requirement-contract blockers shared by reports and transitions (RFC 0030).
+
+    Acceptance freezes the contract to implement: the RFC needs either
+    well-formed requirements or an explicit no-new-behavior disposition, and
+    grammar findings that warn elsewhere block here.
+    """
+    from irminsul.checks.requirement_grammar import (
+        RequirementGrammarCheck,
+        requirement_grammar_findings,
+    )
+
+    section = graph.requirements.get(node.id)
+    if section is None:
+        return [
+            Blocker(
+                code="missing-requirements",
+                message=(
+                    "no `## Requirements` section: add requirement blocks or the "
+                    "explicit sentence 'No new behavioral requirements: ...'"
+                ),
+                path=node.path.as_posix(),
+                suggestion="see RFC 0030 for the requirement/scenario grammar",
+            )
+        ]
+
+    findings = requirement_grammar_findings(node, section, check_name=RequirementGrammarCheck.name)
+    return [
+        Blocker(
+            code=f"requirement-grammar:{finding.category}",
+            message=finding.message,
+            path=node.path.as_posix(),
+            suggestion=finding.suggestion,
+        )
+        for finding in findings
+    ]
 
 
 def _hard_errors(graph: DocGraph, config: IrminsulConfig) -> list[Finding]:
@@ -443,6 +518,7 @@ def format_change_verify_plain(report: ChangeReport) -> str:
         f"  affects: {_affects_line(report.affects)}",
         f"  baseline: {_baseline_line(report.baseline)}",
     ]
+    lines.extend(_requirements_lines(report))
     if report.blockers:
         lines.append("  blockers:")
         for b in report.blockers:
@@ -470,6 +546,29 @@ def format_change_verify_plain(report: ChangeReport) -> str:
         lines.append("  next:")
         lines.extend(f"    {action}" for action in report.next_actions)
     return "\n".join(lines)
+
+
+def _requirements_lines(report: ChangeReport) -> list[str]:
+    payload = report.extra.get("requirements")
+    if not isinstance(payload, dict):
+        return []
+    disposition = payload.get("disposition")
+    if disposition:
+        return [f"  requirements: {disposition}"]
+    items = payload.get("items")
+    if not isinstance(items, list):
+        return []
+    lines = [f"  requirements: {len(items)}"]
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        binding = f" [{item['binding']}]" if item.get("binding") else ""
+        lines.append(
+            f"    {item.get('id') or '(no id)'}: {item.get('title')} "
+            f"(provenance {item.get('provenance') or '?'}, "
+            f"{item.get('scenarios')} scenario(s)){binding}"
+        )
+    return lines
 
 
 def _state_line(report: ChangeReport) -> str:

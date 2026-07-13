@@ -224,6 +224,42 @@ def test_report_deprecated_state_flagged(tmp_path: Path) -> None:
     assert report.valid_transitions == ()
 
 
+def test_report_requirements_payload(repo: Path) -> None:
+    _git_init(repo)
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+    payload = report.extra["requirements"]
+    assert isinstance(payload, dict)
+    assert payload["disposition"] is None
+    [item] = payload["items"]
+    assert item["id"] == "sso-login"
+    assert item["global_id"] == "0001-accepted-good#sso-login"
+    assert item["provenance"] == "code"
+    assert item["scenarios"] == 2
+    assert item["binding"] == "planned/unbound"
+
+    data = json.loads(change_report_to_json(report))
+    assert data["requirements"]["items"][0]["id"] == "sso-login"
+
+
+def test_report_accepted_without_requirements_blocks(repo: Path) -> None:
+    _git_init(repo)
+    report = build_change_report(
+        repo, load(find_config(repo)), "0002-accepted-missing-affects", env={}
+    )
+    assert any(b.code == "missing-requirements" for b in report.blockers)
+
+
+def test_report_single_scenario_clue(repo: Path) -> None:
+    _git_init(repo)
+    path = repo / "docs" / "80-evolution" / "rfcs" / "0004-draft-ready.md"
+    text = path.read_text(encoding="utf-8")
+    marker = "#### Scenario: Unknown address"
+    path.write_text(text.split(marker)[0], encoding="utf-8")
+
+    report = build_change_report(repo, load(find_config(repo)), "0004-draft-ready", env={})
+    assert any("failure scenario" in clue.question for clue in report.semantic_review)
+
+
 def test_report_json_round_trips(repo: Path) -> None:
     _git_init(repo)
     report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})

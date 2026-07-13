@@ -15,6 +15,22 @@ required_updates: []
 
 Adds SSO login to the auth component.
 
+## Requirements
+
+### Requirement: SSO login
+ID: sso-login
+Provenance: code
+
+Users SHALL be able to authenticate through their company identity provider.
+
+#### Scenario: Valid SSO assertion
+- **WHEN** the identity provider returns a valid assertion
+- **THEN** a session is established
+
+#### Scenario: Expired SSO assertion
+- **WHEN** the identity provider returns an expired assertion
+- **THEN** authentication is rejected
+
 ## Resolution
 
 Approved for implementation; see

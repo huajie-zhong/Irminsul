@@ -26,7 +26,7 @@ inventory:
 
 # Change lifecycle
 
-The `irminsul change` command group treats an RFC as the forward artifact for significant change ([RFC 0029](../80-evolution/rfcs/0029-bound-change-loop.md)): a roadmap item that moves through `draft -> accepted -> implemented`, with `rejected` as the alternate terminal state. The module owns the read-only reports and the confirmed decision transition; the RFC document itself stays the single authored source of intent.
+The `irminsul change` command group treats an RFC as the forward artifact for significant change ([RFC 0029](../80-evolution/rfcs/0029-bound-change-loop.md)): a work item that moves through `draft -> accepted -> implemented`, with `rejected` as the alternate terminal state. The module owns the read-only reports and the confirmed decision transition; the RFC document itself stays the single authored source of intent.
 
 Two linked rules shape every report:
 
@@ -38,6 +38,10 @@ Two linked rules shape every report:
 - `irminsul change status <id>` — lifecycle state (with deprecated-alias resolution), declared `affects`, valid next transitions, a compact evidence summary, and next actions.
 - `irminsul change verify <id> [--base-ref REF]` — the full read-only report: blockers, per-file evidence, declared-vs-derived scope divergence, and semantic-review clues, as plain text or versioned JSON.
 - `irminsul change transition <id> accepted|rejected --confirm` — validate and apply a human-authorized decision atomically: `rfc_state`, `status: stable`, `resolved_by`, an empty `required_updates`, and the terminal scaffolding section land in one confirmed pass, reusing the dry-run/confirm contract of `fix`. `implemented` is deliberately not a valid target here; only finalization may write it.
+
+## Requirements as review contracts
+
+Behavior-changing RFCs carry a `## Requirements` section ([RFC 0030](../80-evolution/rfcs/0030-rfc-requirements-and-scenarios.md)): requirement blocks with a stable local id, an evidence obligation (`Provenance: code|adr|citation`), SHALL/MUST behavior text, and named WHEN/THEN scenarios. A maintenance RFC instead writes the explicit sentence `No new behavioral requirements: ...` — reviewable intent, not silent omission. Reports surface each requirement with its globally addressable id `<rfc-id>#<requirement-id>`; a `Provenance: code` requirement stays an unbound evidence obligation until finalization binds it to an anchored claim. Grammar findings are warnings while drafting and blockers at `change transition ... accepted`.
 
 ## Diff baseline
 
