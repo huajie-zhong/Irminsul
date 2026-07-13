@@ -21,6 +21,8 @@ from irminsul.checks import (
     Finding,
     Fix,
     Severity,
+    finding_records,
+    fix_commands,
     sort_findings,
     summarize,
 )
@@ -414,25 +416,14 @@ def _print_finding(finding: Finding) -> None:
 def _findings_to_json(
     findings: list[Finding],
     counts: dict[Severity, int],
+    commands: list[str | None],
     baseline: dict[str, object] | None = None,
 ) -> str:
     import json
 
     payload: dict[str, object] = {
         "version": 1,
-        "findings": [
-            {
-                "check": f.check,
-                "severity": f.severity.value,
-                "message": f.message,
-                "path": f.path.as_posix() if f.path else None,
-                "doc_id": f.doc_id,
-                "line": f.line,
-                "suggestion": f.suggestion,
-                "category": f.category,
-            }
-            for f in findings
-        ],
+        "findings": finding_records(findings, commands),
         "summary": {
             "errors": counts[Severity.error],
             "warnings": counts[Severity.warning],
@@ -647,7 +638,14 @@ def check(
     fail = counts[Severity.error] > 0 or (strict and counts[Severity.warning] > 0)
 
     if fmt == "json":
-        typer.echo(_findings_to_json(findings, counts, baseline=baseline_status))
+        typer.echo(
+            _findings_to_json(
+                findings,
+                counts,
+                fix_commands(findings, graph, profile=profile.value),
+                baseline=baseline_status,
+            )
+        )
     else:
         for finding in findings:
             _print_finding(finding)
@@ -1076,7 +1074,8 @@ def anchors_command(
 
     findings = sort_findings(ClaimAnchorCheck().run(graph))
     if fmt == "json":
-        typer.echo(_findings_to_json(findings, summarize(findings)))
+        commands = fix_commands(findings, graph, profile=Profile.all_available.value)
+        typer.echo(_findings_to_json(findings, summarize(findings), commands))
         return
     for finding in findings:
         _print_finding(finding)

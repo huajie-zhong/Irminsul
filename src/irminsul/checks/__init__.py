@@ -7,7 +7,16 @@ resolve them here.
 
 from __future__ import annotations
 
-from irminsul.checks.base import Check, Finding, Fix, Severity, sort_findings, summarize
+from irminsul.checks.base import (
+    Check,
+    Finding,
+    Fix,
+    Severity,
+    finding_records,
+    fix_commands,
+    sort_findings,
+    summarize,
+)
 from irminsul.checks.boundary import BoundaryCheck
 from irminsul.checks.claim_anchor import ClaimAnchorCheck
 from irminsul.checks.coverage import CoverageCheck
@@ -100,6 +109,8 @@ __all__ = [
     "RfcResolutionCheck",
     "Severity",
     "TerminologyOverloadCheck",
+    "finding_records",
+    "fix_commands",
     "sort_findings",
     "summarize",
 ]
