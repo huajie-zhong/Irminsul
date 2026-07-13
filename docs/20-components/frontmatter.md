@@ -18,7 +18,7 @@ Every doc atom carries a YAML frontmatter block matching Appendix B of the [Doc 
 
 `extra="allow"` is intentional — projects extend the schema with their own fields. Strictness comes from validating canonical fields, not from forbidding unknown ones.
 
-`parse_doc()` returns either a `ParsedDoc` (success) or a `ParseFailure` (YAML error or schema rejection). Callers decide how to surface failures — the [DocGraph](docgraph.md) collects them and the [frontmatter check](checks.md) translates them to findings.
+`parse_doc()` returns either a `ParsedDoc` (success) or a `ParseFailure` (YAML error or schema rejection). A failure also carries a machine-readable `data` decomposition of the first validation error (a kebab-case `problem` key plus the offending field/value), so downstream findings can expose structure instead of prose. Callers decide how to surface failures — the [DocGraph](docgraph.md) collects them and the [frontmatter check](checks.md) translates them to findings.
 
 `expected_id_for(path)` codifies the filename rule: folder index docs take their parent folder's name; everything else uses the filename stem.
 

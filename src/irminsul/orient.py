@@ -91,7 +91,6 @@ class DocTotals:
 class ChecksSummary:
     hard: list[str]
     soft_deterministic: list[str]
-    soft_llm: list[str]
 
 
 @dataclass(frozen=True)
@@ -150,7 +149,6 @@ def build_orient_report(repo_root: Path, config: IrminsulConfig) -> OrientReport
         checks=ChecksSummary(
             hard=list(config.checks.hard),
             soft_deterministic=list(config.checks.soft_deterministic),
-            soft_llm=list(config.checks.soft_llm),
         ),
         commands=[CommandHint(command=cmd, when=when) for cmd, when in _COMMANDS],
     )
@@ -179,7 +177,6 @@ def format_orient_plain(report: OrientReport) -> str:
     lines.append("checks:")
     lines.append(f"  hard: {_format_list(report.checks.hard)}")
     lines.append(f"  soft deterministic: {_format_list(report.checks.soft_deterministic)}")
-    lines.append(f"  soft llm: {_format_list(report.checks.soft_llm)}")
 
     lines.append("commands:")
     for hint in report.commands:
@@ -214,7 +211,6 @@ def _report_to_dict(report: OrientReport) -> dict[str, object]:
         "checks": {
             "hard": report.checks.hard,
             "soft_deterministic": report.checks.soft_deterministic,
-            "soft_llm": report.checks.soft_llm,
         },
         "commands": [{"command": hint.command, "when": hint.when} for hint in report.commands],
     }

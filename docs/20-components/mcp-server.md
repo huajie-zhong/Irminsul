@@ -53,7 +53,7 @@ The server is strictly read-only: no tool writes files, and there is no MCP path
 - `orient()` — the recommended first call in an unfamiliar repo: docs layout, doc counts, entry docs, configured checks, and the command vocabulary (see [orient](orient.md)).
 - `context_for_path(path)` / `context_for_topic(query)` / `context_changed()` — the three input modes of `irminsul context`: ownership, tests, dependencies, and relevant findings for a file, a topic, or the current git changes.
 - `refs(target)` — backlinks for a doc id or path; if the target is not a doc, it falls back to symbol owner/reference lookup (the `--symbol` mode).
-- `check(profile)` — runs the registered deterministic checks; only `hard` and `configured` are accepted, so LLM checks never run over MCP.
+- `check(profile)` — runs the registered deterministic checks; only `hard` and `configured` are accepted.
 - `list_docs(kind)` — `orphans`, `stale`, `undocumented`, or `lifecycle`.
 - `surface(kind, source_glob)` — derives a live code surface (`cli`, `http`, `exports`, `env-vars`, or a configured generic kind).
 - `anchors()` — the [anchored prose claims](anchors.md) report. Read-only: re-pinning an anchor remains a deliberate human acknowledgement through the CLI, never an MCP call.
@@ -87,6 +87,6 @@ Any other MCP client, via the generic `mcpServers` shape:
 
 ## Scope & Limitations
 
-Read-only by design: agents that want to mutate the tree (scaffold docs, apply fixes, re-pin anchors) must run the CLI commands directly. Only stdio transport is supported — there is no HTTP/SSE listener, matching the no-server, no-hosted-state principle. LLM-backed advisory checks are excluded even if configured, so an MCP call can never spend API budget.
+Read-only by design: agents that want to mutate the tree (scaffold docs, apply fixes, re-pin anchors) must run the CLI commands directly. Only stdio transport is supported — there is no HTTP/SSE listener, matching the no-server, no-hosted-state principle.
 
 The tool set above is a [watched surface](../80-evolution/rfcs/0028-mcp-tool-surface-governance.md): the `inventory:` block in this doc's frontmatter opts into completeness (`complete: true`), so the `inventory-drift` check keeps the declared tools honest against the live `@server.tool()` registrations — a tool added, removed, or renamed in `mcp_server.py` is flagged until the list is updated or the tool is added to `omit`. Governance is name-based and internal: it checks the doc's list against the registered tools, not parity with the CLI read commands.

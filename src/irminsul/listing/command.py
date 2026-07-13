@@ -9,7 +9,7 @@ from pathlib import Path, PurePosixPath
 
 import typer
 
-from irminsul.checks.base import Finding, Severity
+from irminsul.checks.base import Finding, Severity, finding_records, fix_commands
 from irminsul.checks.globs import walk_source_files
 from irminsul.checks.orphans import OrphansCheck
 from irminsul.checks.stale_reaper import StaleReaperCheck
@@ -20,59 +20,63 @@ from irminsul.docgraph import DocGraph, build_graph
 LIST_KINDS = ("orphans", "stale", "undocumented", "lifecycle")
 
 
-def findings_for_kind(
-    repo_root: Path,
-    config: IrminsulConfig,
-    kind: str,
-    *,
-    graph: DocGraph | None = None,
-) -> list[Finding]:
-    """Collect the findings behind one `irminsul list` subcommand."""
-    if graph is None:
-        graph = build_graph(repo_root, config)
+def findings_and_graph_for_kind(
+    repo_root: Path, config: IrminsulConfig, kind: str
+) -> tuple[list[Finding], DocGraph]:
+    """The findings behind one `irminsul list` subcommand, plus the graph they came from.
+
+    The graph is returned because the shared findings serializer needs it to
+    decide whether `irminsul fix` would remediate each finding, and because
+    `list lifecycle` reuses it to derive the accepted-RFC backlog.
+    """
+    graph = build_graph(repo_root, config)
     if kind == "orphans":
-        return OrphansCheck().run(graph)
+        return OrphansCheck().run(graph), graph
     if kind == "stale":
-        return StaleReaperCheck().run(graph)
+        return StaleReaperCheck().run(graph), graph
     if kind == "undocumented":
         return [
             f
             for f in UniquenessCheck().run(graph)
             if f.severity == Severity.warning and "no doc claims it" in f.message
-        ]
+        ], graph
     if kind == "lifecycle":
         from irminsul.checks.decision_updates import DecisionUpdatesCheck
 
-        return DecisionUpdatesCheck().run(graph)
+        return DecisionUpdatesCheck().run(graph), graph
     raise ValueError(f"unknown list kind '{kind}'; expected one of: {', '.join(LIST_KINDS)}")
 
 
-def findings_to_json(findings: list[Finding]) -> str:
-    data = [
-        {
-            "check": f.check,
-            "severity": f.severity.value,
-            "message": f.message,
-            "path": f.path.as_posix() if f.path else None,
-            "doc_id": f.doc_id,
-        }
-        for f in findings
-    ]
-    return json.dumps(data, indent=2)
+def findings_to_json(findings: list[Finding], graph: DocGraph) -> str:
+    """The same finding shape `irminsul check --format json` emits.
+
+    `list` wraps checks that implement `fixes()` (notably `decision-updates`
+    behind `lifecycle`), so hiding `data`/`fixable` here would make the one
+    findings surface that lies about fixability. The fix commands name the
+    `all-available` profile because `list` selects its checks regardless of
+    what `irminsul.toml` activates.
+    """
+    commands = fix_commands(findings, graph, profile="all-available")
+    return json.dumps(finding_records(findings, commands), indent=2)
 
 
 def list_orphans(repo_root: Path, *, fmt: str) -> None:
-    _print(findings_for_kind(repo_root, load(find_config(repo_root)), "orphans"), fmt)
+    findings, graph = findings_and_graph_for_kind(
+        repo_root, load(find_config(repo_root)), "orphans"
+    )
+    _print(findings, graph, fmt)
 
 
 def list_stale(repo_root: Path, *, fmt: str) -> None:
-    _print(findings_for_kind(repo_root, load(find_config(repo_root)), "stale"), fmt)
+    findings, graph = findings_and_graph_for_kind(repo_root, load(find_config(repo_root)), "stale")
+    _print(findings, graph, fmt)
 
 
 def list_undocumented(repo_root: Path, *, fmt: str, all_files: bool = False) -> None:
     config = load(find_config(repo_root))
     if not all_files:
-        _print(findings_for_kind(repo_root, config, "undocumented"), fmt)
+        findings, graph = findings_and_graph_for_kind(repo_root, config, "undocumented")
+        _print(findings, graph, fmt)
         return
 
     graph = build_graph(repo_root, config)
@@ -204,11 +208,10 @@ def _accepted_backlog_items(config: IrminsulConfig, graph: DocGraph) -> list[_Qu
 
 def list_lifecycle(repo_root: Path, *, fmt: str, queue: bool) -> None:
     config = load(find_config(repo_root))
-    graph = build_graph(repo_root, config)
-    findings = findings_for_kind(repo_root, config, "lifecycle", graph=graph)
+    findings, graph = findings_and_graph_for_kind(repo_root, config, "lifecycle")
 
     if not queue:
-        _print(findings, fmt)
+        _print(findings, graph, fmt)
         return
 
     items = sorted(
@@ -238,9 +241,9 @@ def list_lifecycle(repo_root: Path, *, fmt: str, queue: bool) -> None:
             typer.echo("(none)")
 
 
-def _print(findings: list[Finding], fmt: str) -> None:
+def _print(findings: list[Finding], graph: DocGraph, fmt: str) -> None:
     if fmt == "json":
-        typer.echo(findings_to_json(findings))
+        typer.echo(findings_to_json(findings, graph))
     else:
         for f in findings:
             loc = f.path.as_posix() if f.path else "<repo>"

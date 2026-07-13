@@ -59,16 +59,18 @@ def specificity(pattern: str) -> tuple[int, int, int]:
     return (literal_segments, depth, -wildcard_chars)
 
 
-def resolve_claims(
-    graph: DocGraph, source_files: list[tuple[Path, str]]
-) -> dict[str, list[tuple[DocNode, str, tuple[int, int, int]]]]:
+# One `describes` claim on a source file: (doc, pattern, specificity score).
+Claim = tuple[DocNode, str, tuple[int, int, int]]
+
+
+def resolve_claims(graph: DocGraph, source_files: list[tuple[Path, str]]) -> dict[str, list[Claim]]:
     """Map each claimed source display path to its (doc, pattern, specificity) claims.
 
-    This is the single claim-resolution routine shared by the uniqueness check
-    and `irminsul list undocumented` — a file is "claimed" iff it has an entry
-    here.
+    This is the single claim-resolution routine shared by the uniqueness check,
+    `irminsul list undocumented`, and the co-change enforcement — "who owns
+    this file?" has exactly one answer.
     """
-    claims_by_file: dict[str, list[tuple[DocNode, str, tuple[int, int, int]]]] = defaultdict(list)
+    claims_by_file: dict[str, list[Claim]] = defaultdict(list)
     displays = [display for _, display in source_files]
     for node in graph.nodes.values():
         for pattern in node.frontmatter.describes:
@@ -77,6 +79,12 @@ def resolve_claims(
             for display in spec.match_files(displays):
                 claims_by_file[display].append((node, pattern, score))
     return claims_by_file
+
+
+def most_specific_claims(claims: list[Claim]) -> list[Claim]:
+    """The claims at the highest specificity score — the file's owning docs."""
+    top_score = max(c[2] for c in claims)
+    return [c for c in claims if c[2] == top_score]
 
 
 class UniquenessCheck:
@@ -89,15 +97,13 @@ class UniquenessCheck:
 
         source_files, _missing = walk_source_files(graph.repo_root, graph.config.paths.source_roots)
 
-        # claims_by_file: source file -> list of (DocNode, pattern, score).
         claims_by_file = resolve_claims(graph, source_files)
 
         out: list[Finding] = []
 
         # Tie at most-specific level → silent duplication, error.
         for source_file, claims in claims_by_file.items():
-            top_score = max(c[2] for c in claims)
-            top_claims = [c for c in claims if c[2] == top_score]
+            top_claims = most_specific_claims(claims)
             if len(top_claims) > 1:
                 claim_descs = ", ".join(
                     f"{node.path.as_posix()} (`{pattern}`)" for node, pattern, _ in top_claims
