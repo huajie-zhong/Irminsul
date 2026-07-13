@@ -55,10 +55,49 @@ def test_bad_grammar_categories(repo: Path) -> None:
         "missing-id",
         "missing-provenance",
         "missing-scenario",
+        "task-duplicate-id",
+        "task-unresolved-component",
+        "task-unresolved-req",
     ]
     assert all(
         f.severity == Severity.warning for f in findings if f.doc_id == "0005-draft-bad-grammar"
     )
+
+
+def test_well_formed_tasks_are_silent(repo: Path) -> None:
+    findings = _findings(repo)
+    assert not [
+        f
+        for f in findings
+        if (f.category or "").startswith("task-") and f.doc_id == "0001-accepted-good"
+    ]
+
+
+def test_task_unresolved_req_names_reference(repo: Path) -> None:
+    findings = _findings(repo)
+    [finding] = [
+        f
+        for f in findings
+        if f.doc_id == "0005-draft-bad-grammar" and f.category == "task-unresolved-req"
+    ]
+    assert "'ghost-req'" in finding.message
+
+
+def test_unparseable_task_list_is_reported(repo: Path) -> None:
+    findings = _findings(repo)
+    assert _categories(findings, "0008-draft-unparseable-tasks") == [
+        "empty-tasks",
+        "task-missing-id",
+        "task-missing-id",
+    ]
+
+
+def test_misreferenced_tasks_are_reported(repo: Path) -> None:
+    findings = _findings(repo)
+    assert _categories(findings, "0009-draft-misreferenced-tasks") == [
+        "task-misplaced-reference",
+        "task-multiple-references",
+    ]
 
 
 def test_incomplete_scenario_names_missing_keyword(repo: Path) -> None:

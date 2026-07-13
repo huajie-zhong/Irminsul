@@ -801,6 +801,13 @@ def context_command(
         bool,
         typer.Option("--changed", help="Inspect staged, unstaged, and untracked git files."),
     ] = False,
+    change: Annotated[
+        str | None,
+        typer.Option(
+            "--change",
+            help="Present the change-aware evidence report for one RFC (alias of `change status`).",
+        ),
+    ] = None,
     profile: Annotated[
         ContextProfile,
         typer.Option(
@@ -835,6 +842,30 @@ def context_command(
 
     repo_root = path.resolve()
     config = load(find_config(repo_root))
+
+    if change is not None:
+        if target is not None or topic is not None or changed:
+            typer.echo(typer.style("--change cannot be combined with other input modes", fg="red"))
+            raise typer.Exit(code=2)
+        from irminsul.change.report import (
+            ChangeError,
+            build_change_report,
+            change_report_to_json,
+            format_change_status_plain,
+        )
+
+        try:
+            change_report = build_change_report(repo_root, config, change)
+        except ChangeError as exc:
+            typer.echo(typer.style(str(exc), fg="red"))
+            raise typer.Exit(code=exc.code) from exc
+        typer.echo(
+            change_report_to_json(change_report)
+            if fmt == "json"
+            else format_change_status_plain(change_report)
+        )
+        return
+
     try:
         report = build_context_report(
             repo_root,

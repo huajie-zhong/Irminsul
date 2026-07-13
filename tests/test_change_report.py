@@ -14,6 +14,8 @@ from irminsul.change.report import (
     build_change_report,
     change_report_to_json,
     find_rfc_node,
+    format_change_status_plain,
+    format_change_verify_plain,
     resolve_change_baseline,
 )
 from irminsul.config import Checks, IrminsulConfig, find_config, load
@@ -258,6 +260,95 @@ def test_report_single_scenario_clue(repo: Path) -> None:
 
     report = build_change_report(repo, load(find_config(repo)), "0004-draft-ready", env={})
     assert any("failure scenario" in clue.question for clue in report.semantic_review)
+
+
+def test_report_task_evidence(repo: Path) -> None:
+    _git_init(repo)
+    (repo / "app" / "auth" / "sso.py").write_text("x = 1\n", encoding="utf-8")
+    (repo / "tests" / "test_auth.py").write_text(
+        "def test_login() -> None:\n    assert 1\n", encoding="utf-8"
+    )
+
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+    payload = report.extra["tasks"]
+    assert isinstance(payload, dict)
+    items = payload["items"]
+    assert [item["id"] for item in items] == ["T1", "T2", "T3"]
+    t1 = items[0]
+    assert t1["req"] == "sso-login"
+    assert "app/auth/sso.py" in t1["source_evidence"]
+    assert "tests/test_auth.py" in t1["test_evidence"]
+    assert payload["evidence_measured"] is True
+    assert payload["summary"] == {
+        "total": 3,
+        "with_source_evidence": 3,
+        "with_test_evidence": 3,
+    }
+
+
+def test_report_task_without_evidence_gets_clue(repo: Path) -> None:
+    _git_init(repo)
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+    payload = report.extra["tasks"]
+    assert isinstance(payload, dict)
+    assert payload["evidence_measured"] is True
+    assert payload["summary"]["with_source_evidence"] == 0
+    assert all(item["review_clue"] for item in payload["items"])
+    assert any("task 'T1'" in clue.question for clue in report.semantic_review)
+
+
+def test_report_task_evidence_unknown_without_baseline(repo: Path) -> None:
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+    assert report.baseline.changed_paths is None
+
+    payload = report.extra["tasks"]
+    assert isinstance(payload, dict)
+    assert payload["evidence_measured"] is False
+    assert payload["summary"] == {
+        "total": 3,
+        "with_source_evidence": None,
+        "with_test_evidence": None,
+    }
+    assert all(item["source_evidence"] is None for item in payload["items"])
+    assert all(item["test_evidence"] is None for item in payload["items"])
+    assert all(item["review_clue"] is None for item in payload["items"])
+    assert not any(clue.question.startswith("task '") for clue in report.semantic_review)
+
+    data = json.loads(change_report_to_json(report))
+    assert data["tasks"]["summary"]["with_source_evidence"] is None
+    assert data["tasks"]["items"][0]["source_evidence"] is None
+
+
+def test_plain_output_never_shows_measured_zeros_without_baseline(repo: Path) -> None:
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+    status = format_change_status_plain(report)
+    verify = format_change_verify_plain(report)
+
+    assert "tasks: 3 declared; evidence unknown (no diff baseline)" in status
+    assert "0/3" not in status
+    assert "source evidence: unknown (no diff baseline)" in verify
+    assert "test evidence:   unknown (no diff baseline)" in verify
+    assert "source evidence: none" not in verify
+
+
+def test_report_unreferenced_task_clue_names_declared_components(repo: Path) -> None:
+    _git_init(repo)
+    path = repo / "docs" / "80-evolution" / "rfcs" / "0001-accepted-good.md"
+    text = path.read_text(encoding="utf-8")
+    path.write_text(
+        text.replace(
+            "- `T3` Refresh the auth component doc. (component: auth)",
+            "- `T3` Refresh the auth component doc.",
+        ),
+        encoding="utf-8",
+    )
+
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+    payload = report.extra["tasks"]
+    assert isinstance(payload, dict)
+    clue = payload["items"][2]["review_clue"]
+    assert "declared affected component" in clue
+    assert "requirement" not in clue.split("(")[0]
 
 
 def test_report_json_round_trips(repo: Path) -> None:

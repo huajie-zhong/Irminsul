@@ -103,6 +103,36 @@ def test_change_transition_blocked_exits_one(repo: Path) -> None:
     assert "invalid-transition" in result.output
 
 
+def test_context_change_alias(repo: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["context", "--change", "0001-accepted-good", "--format", "json", "--path", str(repo)],
+    )
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["change"] == "0001-accepted-good"
+    assert "tasks" in data
+
+
+def test_context_change_exclusive_with_other_modes(repo: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["context", "--change", "0001-accepted-good", "--changed", "--path", str(repo)],
+    )
+    assert result.exit_code == 2
+    assert "cannot be combined" in result.output
+
+
+def test_change_verify_plain_shows_tasks(repo: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["change", "verify", "0001-accepted-good", "--path", str(repo)],
+    )
+    assert result.exit_code == 0, result.output
+    assert "T1 Wire the identity-provider client. (req: sso-login)" in result.output
+    assert "source evidence:" in result.output
+
+
 def test_change_transition_rejected_with_resolved_by_blocks(repo: Path) -> None:
     rfc = repo / "docs" / "80-evolution" / "rfcs" / "0004-draft-ready.md"
     before = rfc.read_text(encoding="utf-8")

@@ -19,6 +19,8 @@ from irminsul.change.footprint import Footprint, touched_components
 from irminsul.checks import HARD_REGISTRY, Finding, Severity, sort_findings
 from irminsul.config import IrminsulConfig, docs_root_prefix
 from irminsul.docgraph import DocGraph, DocNode, build_graph
+from irminsul.docgraph_index import Task as TaskType
+from irminsul.docgraph_index import TasksSection
 from irminsul.frontmatter import (
     RFC_STATE_TRANSITIONS,
     RfcStateEnum,
@@ -286,6 +288,10 @@ def build_change_report(
                     )
                 )
 
+    tasks_section = graph.tasks.get(node.id)
+    if tasks_section is not None:
+        extra["tasks"] = _task_evidence(node, tasks_section, affects, footprint, clues)
+
     declared_untouched: tuple[str, ...] = ()
     touched_undeclared: tuple[str, ...] = ()
     if footprint is not None:
@@ -396,6 +402,89 @@ def build_change_report(
     )
 
 
+def _task_evidence(
+    node: DocNode,
+    tasks_section: TasksSection,
+    affects: tuple[str, ...] | None,
+    footprint: Footprint | None,
+    clues: list[ReviewClue],
+) -> dict[str, object]:
+    """Per-task mechanical evidence (RFC 0031): evidence labels, never
+    completion labels. Several tasks may share one requirement and therefore
+    the same changed files — semantics stay with the reviewer.
+
+    With no diff baseline nothing was measured, so evidence and counts are
+    `None` (unknown), never an empty list that reads as a measured zero.
+    """
+    tasks = tasks_section.tasks
+    declared = tuple(affects or ())
+    items: list[dict[str, object]] = []
+    tasks_with_source = 0
+    tasks_with_test = 0
+    measured = footprint is not None
+
+    for task in tasks:
+        related = (task.component_ref,) if task.component_ref else declared
+        source_evidence: list[str] = []
+        test_evidence: list[str] = []
+        review_clue: str | None = None
+
+        if footprint is not None:
+            for component in related:
+                source_evidence.extend(footprint.touched.get(component, ()))
+                test_evidence.extend(footprint.changed_tests.get(component, ()))
+            source_evidence = sorted(set(source_evidence))
+            test_evidence = sorted(set(test_evidence))
+            tasks_with_source += bool(source_evidence)
+            tasks_with_test += bool(test_evidence)
+
+            if not source_evidence:
+                review_clue = f"no changed source is associated with {_task_scope(task)}"
+            elif not test_evidence:
+                review_clue = "inspect implementation and add or identify scenario coverage"
+            else:
+                review_clue = "confirm the changed tests assert this task's scenario"
+            clues.append(
+                ReviewClue(
+                    question=f"task '{task.task_id}': {review_clue}",
+                    evidence=tuple(source_evidence + test_evidence) or (node.path.as_posix(),),
+                )
+            )
+
+        items.append(
+            {
+                "id": task.task_id,
+                "text": task.text,
+                "req": task.req_ref,
+                "component": task.component_ref,
+                "source_evidence": source_evidence if measured else None,
+                "test_evidence": test_evidence if measured else None,
+                "review_clue": review_clue,
+            }
+        )
+
+    return {
+        "items": items,
+        "evidence_measured": measured,
+        "summary": {
+            "total": len(tasks),
+            "with_source_evidence": tasks_with_source if measured else None,
+            "with_test_evidence": tasks_with_test if measured else None,
+        },
+    }
+
+
+def _task_scope(task: TaskType) -> str:
+    if task.component_ref:
+        return "this task's component"
+    if task.req_ref:
+        return "this task's requirement"
+    return (
+        "any declared affected component (this task references neither a "
+        "requirement nor a component)"
+    )
+
+
 def requirement_blockers(graph: DocGraph, node: DocNode) -> list[Blocker]:
     """Requirement-contract blockers shared by reports and transitions (RFC 0030).
 
@@ -423,6 +512,15 @@ def requirement_blockers(graph: DocGraph, node: DocNode) -> list[Blocker]:
         ]
 
     findings = requirement_grammar_findings(node, section, check_name=RequirementGrammarCheck.name)
+    tasks_section = graph.tasks.get(node.id)
+    if tasks_section is not None:
+        from irminsul.checks.requirement_grammar import task_grammar_findings
+
+        findings.extend(
+            task_grammar_findings(
+                node, tasks_section, section, check_name=RequirementGrammarCheck.name
+            )
+        )
     return [
         Blocker(
             code=f"requirement-grammar:{finding.category}",
@@ -503,6 +601,9 @@ def format_change_status_plain(report: ChangeReport) -> str:
         lines.append("  blockers:")
         lines.extend(f"    [{b.code}] {b.message}" for b in report.blockers)
     lines.append(f"  mechanically ready for: {report.mechanically_ready_for}")
+    summary = _task_summary(report)
+    if summary is not None:
+        lines.append(f"  tasks: {summary}")
     if report.evidence:
         lines.append(f"  evidence: {len(report.evidence)} item(s); run `change verify` for detail")
     if report.next_actions:
@@ -519,6 +620,7 @@ def format_change_verify_plain(report: ChangeReport) -> str:
         f"  baseline: {_baseline_line(report.baseline)}",
     ]
     lines.extend(_requirements_lines(report))
+    lines.extend(_tasks_lines(report))
     if report.blockers:
         lines.append("  blockers:")
         for b in report.blockers:
@@ -546,6 +648,58 @@ def format_change_verify_plain(report: ChangeReport) -> str:
         lines.append("  next:")
         lines.extend(f"    {action}" for action in report.next_actions)
     return "\n".join(lines)
+
+
+def _task_summary(report: ChangeReport) -> str | None:
+    payload = report.extra.get("tasks")
+    if not isinstance(payload, dict):
+        return None
+    summary = payload.get("summary")
+    if not isinstance(summary, dict):
+        return None
+    total = summary.get("total")
+    if not payload.get("evidence_measured"):
+        return f"{total} declared; evidence unknown (no diff baseline)"
+    return (
+        f"{summary.get('with_source_evidence')}/{total} with source evidence, "
+        f"{summary.get('with_test_evidence')}/{total} with test evidence"
+    )
+
+
+def _evidence_line(label: str, paths: object, measured: bool) -> str:
+    if not measured:
+        value = "unknown (no diff baseline)"
+    elif isinstance(paths, list) and paths:
+        value = ", ".join(str(p) for p in paths)
+    else:
+        value = "none"
+    return f"      {label} {value}"
+
+
+def _tasks_lines(report: ChangeReport) -> list[str]:
+    payload = report.extra.get("tasks")
+    if not isinstance(payload, dict):
+        return []
+    items = payload.get("items")
+    if not isinstance(items, list):
+        return []
+    measured = bool(payload.get("evidence_measured"))
+    summary = _task_summary(report)
+    lines = [f"  tasks: {summary}" if summary else "  tasks:"]
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        ref = ""
+        if item.get("req"):
+            ref = f" (req: {item['req']})"
+        elif item.get("component"):
+            ref = f" (component: {item['component']})"
+        lines.append(f"    {item.get('id')} {item.get('text')}{ref}")
+        lines.append(_evidence_line("source evidence:", item.get("source_evidence"), measured))
+        lines.append(_evidence_line("test evidence:  ", item.get("test_evidence"), measured))
+        if item.get("review_clue"):
+            lines.append(f"      review clue:     {item['review_clue']}")
+    return lines
 
 
 def _requirements_lines(report: ChangeReport) -> list[str]:

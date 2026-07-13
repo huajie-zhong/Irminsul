@@ -13,6 +13,9 @@ Indexes are built once at the end of `build_graph`:
   requirement/scenario structure (RFC 0030). One parser, one representation:
   the grammar check, transitions, and change reports all consume this index
   instead of running their own regexes over the body.
+- `tasks` — for each doc with a `## Tasks` section, the static implementation
+  task list (RFC 0031): ordinary list items with stable ids and requirement or
+  component references, never mutable status records.
 
 Builders are pure: they take only the inputs they read and return new dicts.
 `docgraph.build_graph` calls them; checks consume the populated fields.
@@ -353,6 +356,115 @@ def parse_requirements(body: str) -> RequirementsSection | None:
         disposition=disposition,
         requirements=tuple(requirements),
     )
+
+
+@dataclass(frozen=True)
+class Task:
+    """One `## Tasks` list item (RFC 0031): `` - `T1` text (req: id) ``."""
+
+    task_id: str
+    line: int
+    text: str
+    req_ref: str | None
+    component_ref: str | None
+
+
+@dataclass(frozen=True)
+class MalformedTask:
+    """A `## Tasks` bullet that does not parse as a task.
+
+    Recorded rather than dropped: a task list that silently loses items is
+    indistinguishable from a plan that was never written.
+    """
+
+    line: int
+    text: str
+    reason: str
+    """missing-id | multiple-references | misplaced-reference | empty-reference"""
+
+
+@dataclass(frozen=True)
+class TasksSection:
+    """The parsed `## Tasks` section of one doc."""
+
+    line: int
+    tasks: tuple[Task, ...]
+    malformed: tuple[MalformedTask, ...]
+
+
+_TASKS_HINT_RE = re.compile(r"^##\s+tasks\b", re.IGNORECASE | re.MULTILINE)
+_TASK_BULLET_RE = re.compile(r"^[-*+]\s+(?P<body>\S.*?)\s*$")
+_TASK_ID_RE = re.compile(r"^`(?P<id>[^`]+)`\s*(?P<rest>.*)$")
+_TASK_REF_RE = re.compile(r"\((?P<kind>req|component):\s*(?P<value>[^)]*?)\s*\)")
+
+
+def _parse_task_bullet(body: str, lineno: int) -> Task | MalformedTask:
+    id_match = _TASK_ID_RE.match(body)
+    if id_match is None:
+        return MalformedTask(line=lineno, text=body, reason="missing-id")
+
+    task_id = id_match.group("id").strip()
+    rest = id_match.group("rest")
+    refs = list(_TASK_REF_RE.finditer(rest))
+    if len(refs) > 1:
+        return MalformedTask(line=lineno, text=body, reason="multiple-references")
+    if not refs:
+        return Task(
+            task_id=task_id, line=lineno, text=rest.strip(), req_ref=None, component_ref=None
+        )
+
+    ref = refs[0]
+    if rest[ref.end() :].strip():
+        return MalformedTask(line=lineno, text=body, reason="misplaced-reference")
+    value = ref.group("value").strip()
+    if not value:
+        return MalformedTask(line=lineno, text=body, reason="empty-reference")
+    is_req = ref.group("kind") == "req"
+    return Task(
+        task_id=task_id,
+        line=lineno,
+        text=rest[: ref.start()].strip(),
+        req_ref=value if is_req else None,
+        component_ref=None if is_req else value,
+    )
+
+
+def parse_tasks(body: str) -> TasksSection | None:
+    """Parse the `## Tasks` section of a doc body, if present.
+
+    Returns None when the doc has no section. Bullets that do not match the
+    task grammar are kept as `malformed` so the grammar check can report them
+    instead of the plan quietly shrinking.
+    """
+    section = extract_section(body, "tasks")
+    if section is None:
+        return None
+
+    tasks: list[Task] = []
+    malformed: list[MalformedTask] = []
+    for lineno, line in section.lines:
+        bullet = _TASK_BULLET_RE.match(line)
+        if bullet is None:
+            continue
+        parsed = _parse_task_bullet(bullet.group("body"), lineno)
+        if isinstance(parsed, Task):
+            tasks.append(parsed)
+        else:
+            malformed.append(parsed)
+
+    return TasksSection(line=section.line, tasks=tuple(tasks), malformed=tuple(malformed))
+
+
+def build_tasks(nodes: dict[str, DocNode]) -> dict[str, TasksSection]:
+    """Parse the `## Tasks` section of every doc that has one."""
+    out: dict[str, TasksSection] = {}
+    for doc_id, node in nodes.items():
+        if not _TASKS_HINT_RE.search(node.body):
+            continue
+        section = parse_tasks(node.body)
+        if section is not None:
+            out[doc_id] = section
+    return out
 
 
 def build_requirements(nodes: dict[str, DocNode]) -> dict[str, RequirementsSection]:
