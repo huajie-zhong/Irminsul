@@ -25,7 +25,9 @@ def test_init_no_interactive_creates_expected_tree(tmp_path: Path) -> None:
         "docs/README.md",
         "docs/GLOSSARY.md",
         "docs/CONTRIBUTING.md",
+        "docs/00-foundation/INDEX.md",
         "docs/00-foundation/principles.md",
+        "docs/10-architecture/INDEX.md",
         "docs/10-architecture/overview.md",
         "docs/20-components/INDEX.md",
         "docs/30-workflows/INDEX.md",
@@ -34,6 +36,7 @@ def test_init_no_interactive_creates_expected_tree(tmp_path: Path) -> None:
         "docs/60-operations/INDEX.md",
         "docs/70-knowledge/INDEX.md",
         "docs/80-evolution/INDEX.md",
+        "docs/80-evolution/rfcs/INDEX.md",
         "docs/90-meta/INDEX.md",
         "docs/90-meta/agent-protocol.md",
         ".github/workflows/docs-pr.yml",
@@ -55,6 +58,15 @@ def test_init_scaffold_config_includes_only_useful_default_knobs(tmp_path: Path)
     assert "enabled = false" in toml
     assert "[checks.parent_child]" in toml
     assert "[checks.stale_reaper]" in toml
+    # No dogfood leakage: nothing about Irminsul's own internals, and no
+    # config tables that nothing in the tool consumes. Parsed assertions so
+    # comments and formatting can't fool the test either way.
+    import tomllib
+
+    parsed = tomllib.loads(toml)
+    assert "CoverageCheck" not in toml
+    assert "tiers" not in parsed
+    assert "rules" not in parsed.get("checks", {}).get("terminology_overload", {})
 
 
 def test_init_fresh_no_interactive_creates_source_root(tmp_path: Path) -> None:
@@ -243,7 +255,7 @@ def test_init_then_check_passes_on_freshly_scaffolded_repo(tmp_path: Path) -> No
 
     check_result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(target)])
     # The freshly-scaffolded repo has no `describes` claims yet so nothing
-    # should be flagged. (Source coverage is advisory, not hard.)
+    # should be flagged. (Source coverage is warning-level, not hard.)
     assert check_result.exit_code == 0, check_result.stdout
 
 

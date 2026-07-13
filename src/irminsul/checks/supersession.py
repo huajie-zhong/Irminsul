@@ -14,12 +14,21 @@ Severity policy:
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 from typing import ClassVar
 
 from irminsul.checks.base import Finding, Fix, Severity
 from irminsul.docgraph import DocGraph
 from irminsul.frontmatter import StatusEnum
 from irminsul.frontmatter_edit import set_value
+
+# Finding categories. `fixes()` keys on these, so the two with a remediation are
+# named apart from the three without one.
+_CAT_STATUS_NOT_DEPRECATED = "status-not-deprecated"
+_CAT_MISSING_SUPERSEDED_BY = "missing-superseded-by"
+_CAT_MISSING_SUPERSEDES = "missing-supersedes"
+_CAT_UNKNOWN_SUPERSEDES = "unknown-supersedes"
+_CAT_UNKNOWN_SUPERSEDED_BY = "unknown-superseded-by"
 
 
 class SupersessionCheck:
@@ -40,6 +49,7 @@ class SupersessionCheck:
                             message=(f"'supersedes' references unknown doc id '{old_id}'"),
                             path=new_doc.path,
                             doc_id=new_doc.id,
+                            category=_CAT_UNKNOWN_SUPERSEDES,
                         )
                     )
                     continue
@@ -56,6 +66,7 @@ class SupersessionCheck:
                             path=old.path,
                             doc_id=old.id,
                             suggestion=f"set 'status: deprecated' in {old.path.as_posix()}",
+                            category=_CAT_STATUS_NOT_DEPRECATED,
                         )
                     )
 
@@ -72,6 +83,7 @@ class SupersessionCheck:
                             path=old.path,
                             doc_id=old.id,
                             suggestion=f"add 'superseded_by: {new_doc.id}' to {old.path.as_posix()}",
+                            category=_CAT_MISSING_SUPERSEDED_BY,
                         )
                     )
 
@@ -89,6 +101,7 @@ class SupersessionCheck:
                         message=f"'superseded_by' references unknown doc id '{sb}'",
                         path=node.path,
                         doc_id=node.id,
+                        category=_CAT_UNKNOWN_SUPERSEDED_BY,
                     )
                 )
                 continue
@@ -104,26 +117,36 @@ class SupersessionCheck:
                         path=target.path,
                         doc_id=target.id,
                         suggestion=f"add '{node.id}' to '{sb}.supersedes'",
+                        category=_CAT_MISSING_SUPERSEDES,
                     )
                 )
 
         return out
 
     def fixes(self, findings: list[Finding], graph: DocGraph) -> list[Fix]:
-        fixable = {
-            (finding.path, finding.doc_id)
-            for finding in findings
-            if finding.check == self.name and finding.severity == Severity.warning
-        }
-        out: list[Fix] = []
+        """Stamp the forward-superseded doc's deprecation metadata.
 
+        Each fix is gated on the finding category it remediates, never merely on
+        the doc: the reverse-pointer warning (stamped with the *superseding*
+        doc's path/id) has no fix, and must not inherit fixability from a
+        `status`/`superseded_by` finding that happens to name the same doc.
+        """
+        flagged = self._flagged_by_category(findings)
+        if not flagged:
+            return []
+
+        out: list[Fix] = []
         for new_doc in graph.nodes.values():
             for old_id in new_doc.frontmatter.supersedes:
                 old = graph.nodes.get(old_id)
-                if old is None or (old.path, old.id) not in fixable:
+                if old is None:
                     continue
+                key = (old.path, old.id)
 
-                if old.frontmatter.status != StatusEnum.deprecated:
+                if (
+                    key in flagged[_CAT_STATUS_NOT_DEPRECATED]
+                    and old.frontmatter.status != StatusEnum.deprecated
+                ):
                     out.append(
                         Fix(
                             path=old.path,
@@ -132,7 +155,10 @@ class SupersessionCheck:
                         )
                     )
 
-                if old.frontmatter.superseded_by != new_doc.id:
+                if (
+                    key in flagged[_CAT_MISSING_SUPERSEDED_BY]
+                    and old.frontmatter.superseded_by != new_doc.id
+                ):
                     replacement = new_doc.id
                     out.append(
                         Fix(
@@ -145,6 +171,20 @@ class SupersessionCheck:
                     )
 
         return out
+
+    def _flagged_by_category(
+        self, findings: list[Finding]
+    ) -> dict[str, set[tuple[Path | None, str | None]]]:
+        flagged: dict[str, set[tuple[Path | None, str | None]]] = {
+            _CAT_STATUS_NOT_DEPRECATED: set(),
+            _CAT_MISSING_SUPERSEDED_BY: set(),
+        }
+        for finding in findings:
+            if finding.check != self.name or finding.severity != Severity.warning:
+                continue
+            if finding.category in flagged:
+                flagged[finding.category].add((finding.path, finding.doc_id))
+        return flagged if any(flagged.values()) else {}
 
 
 def _frontmatter_setter(key: str, value: str) -> Callable[[str], str]:

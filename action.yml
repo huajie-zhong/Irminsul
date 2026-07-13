@@ -6,7 +6,7 @@ branding:
 
 inputs:
   profile:
-    description: 'Check profile to run: hard | configured | advisory | all-available.'
+    description: 'Check profile to run: hard | configured | all-available.'
     default: hard
   strict:
     description: 'Promote warning findings to a non-zero exit code.'
