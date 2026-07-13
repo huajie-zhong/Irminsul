@@ -6,6 +6,7 @@ tier: 2
 status: stable
 describes: []
 rfc_state: accepted
+affects: [anchors, checks]
 resolved_by: docs/50-decisions/0012-anchored-prose-claims.md
 required_updates: []
 ---

@@ -11,6 +11,8 @@ from irminsul.config import (
     HARD_CHECKS,
     SOFT_DETERMINISTIC_CHECKS,
     IrminsulConfig,
+    Paths,
+    docs_root_prefix,
     find_config,
     load,
 )
@@ -96,3 +98,16 @@ def test_find_config_returns_target_when_missing(tmp_path: Path) -> None:
     found = find_config(tmp_path)
     assert found == tmp_path / CONFIG_FILENAME
     assert not found.exists()
+
+
+def test_docs_root_prefix_normalizes() -> None:
+    assert docs_root_prefix(IrminsulConfig()) == "docs"
+    assert docs_root_prefix(IrminsulConfig(paths=Paths(docs_root="/documentation/"))) == (
+        "documentation"
+    )
+    assert docs_root_prefix(IrminsulConfig(paths=Paths(docs_root="doc\\nested"))) == "doc/nested"
+
+
+def test_docs_root_prefix_falls_back_when_value_normalizes_away() -> None:
+    for pathological in ("/", "", "\\"):
+        assert docs_root_prefix(IrminsulConfig(paths=Paths(docs_root=pathological))) == "docs"

@@ -51,6 +51,7 @@ SOFT_DETERMINISTIC_CHECKS = (
     "inventory-drift",
     "claim-anchor",
     "doc-refs",
+    "change-binding",
 )
 
 
@@ -212,3 +213,13 @@ def find_config(start: Path) -> Path:
         if p.exists():
             return p
     return start / CONFIG_FILENAME
+
+
+def docs_root_prefix(config: IrminsulConfig) -> str:
+    """`docs_root` as a POSIX path prefix with no leading or trailing slash.
+
+    A pathological value ("/", "", "\\") would normalize to the empty string and
+    make every path look like a doc path, so it falls back to the default.
+    """
+    normalized = (config.paths.docs_root or "").replace("\\", "/").strip("/")
+    return normalized or Paths().docs_root

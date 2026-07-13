@@ -45,11 +45,42 @@ class ClaimStateEnum(StrEnum):
 
 class RfcStateEnum(StrEnum):
     draft = "draft"
+    accepted = "accepted"
+    implemented = "implemented"
+    rejected = "rejected"
+    # Deprecated aliases (RFC 0029): accepted for one deprecation window; checks
+    # treat them as their canonical state and emit a fixable lifecycle warning.
     open = "open"
     fcp = "fcp"
-    accepted = "accepted"
-    rejected = "rejected"
     withdrawn = "withdrawn"
+
+
+# Alias -> canonical state for the RFC 0029 deprecation window. The next
+# breaking release removes the aliases from `RfcStateEnum` and this map.
+RFC_STATE_ALIASES: dict[RfcStateEnum, RfcStateEnum] = {
+    RfcStateEnum.open: RfcStateEnum.draft,
+    RfcStateEnum.fcp: RfcStateEnum.draft,
+    RfcStateEnum.withdrawn: RfcStateEnum.rejected,
+}
+
+
+def canonical_rfc_state(state: RfcStateEnum) -> RfcStateEnum:
+    """Resolve a deprecated alias to its canonical four-state value."""
+    return RFC_STATE_ALIASES.get(state, state)
+
+
+# Valid lifecycle transitions over canonical states (RFC 0029).
+RFC_STATE_TRANSITIONS: dict[RfcStateEnum, frozenset[RfcStateEnum]] = {
+    RfcStateEnum.draft: frozenset({RfcStateEnum.accepted, RfcStateEnum.rejected}),
+    RfcStateEnum.accepted: frozenset({RfcStateEnum.implemented, RfcStateEnum.rejected}),
+    RfcStateEnum.implemented: frozenset(),
+    RfcStateEnum.rejected: frozenset(),
+}
+
+
+class DirectionEnum(StrEnum):
+    extends = "extends"
+    revises = "revises"
 
 
 class RequiredUpdateKindEnum(StrEnum):
@@ -126,6 +157,8 @@ class DocFrontmatter(BaseModel):
     requires_env: list[str] = Field(default_factory=list)
     claims: list[Claim] = Field(default_factory=list)
     rfc_state: RfcStateEnum | None = None
+    affects: list[str] | None = None
+    direction: DirectionEnum | None = None
     resolved_by: str | None = None
     target_decision_date: str | None = None
     summary: str | None = None
@@ -141,8 +174,11 @@ class DocFrontmatter(BaseModel):
         )
         if duplicate_ids:
             raise ValueError(f"duplicate claim id(s): {duplicate_ids}")
-        if self.rfc_state == RfcStateEnum.accepted and not self.resolved_by:
-            raise ValueError("resolved_by is required when rfc_state is accepted")
+        if (
+            self.rfc_state in (RfcStateEnum.accepted, RfcStateEnum.implemented)
+            and not self.resolved_by
+        ):
+            raise ValueError(f"resolved_by is required when rfc_state is {self.rfc_state.value}")
         if self.target_decision_date is not None:
             try:
                 _dt.date.fromisoformat(self.target_decision_date)

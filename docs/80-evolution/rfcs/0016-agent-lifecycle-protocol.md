@@ -6,6 +6,7 @@ tier: 2
 status: stable
 describes: []
 rfc_state: accepted
+affects: []
 resolved_by: docs/50-decisions/0007-implement-rfc-0016-agent-lifecycle-protocol.md
 required_updates: []
 ---

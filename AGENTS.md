@@ -59,6 +59,7 @@ irminsul regen agents-md                 # rebuild the docs/AGENTS.md manifest
 **Two check registries** (`src/irminsul/checks/__init__.py`). Names in `irminsul.toml` are resolved against these maps; an unknown name prints a yellow note and is skipped (not an error).
 - `HARD_REGISTRY` — 9 checks: `frontmatter`, `globs`, `uniqueness`, `links`, `schema-leak`, `coverage`, `liar`, `prose-file-reference`, `agents-manifest`. Errors from these always block (exit 1) regardless of `--strict`.
 - `SOFT_REGISTRY` — 19 deterministic warnings: `mtime-drift`, `orphans`, `stale-reaper`, `supersession`, `parent-child`, `glossary-discipline`, `external-links`, `rfc-resolution`, `reality`, `claim-anchor`, … (full list in `checks/__init__.py`). Promoted to errors only with `--strict`.
+
 All checks subclass `Check` and return `list[Finding]` with `(check, severity, path, line, message, suggestion)`. Severity ordering and exit-code logic live in `cli.check`.
 
 **Cross-repo source files**. `walk_source_files()` (`src/irminsul/checks/globs.py`) returns `list[tuple[Path, str]]` — `(abs_path, display_posix)` — where `display_posix` is repo-relative for same-repo files but source-root-relative for files outside the docs repo. `src/irminsul/git/mtime.py` exposes `last_commit_time_any_repo()` which walks up from any absolute path to find its nearest `.git`, so `mtime-drift` works across sibling repos (Topology A/B). If a cross-repo source file has no `.git`, a Finding is emitted rather than silently skipping.

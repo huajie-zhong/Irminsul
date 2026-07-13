@@ -36,6 +36,7 @@ soft_deterministic = [
     "decision-updates",
     "inventory-drift",
     "doc-refs",
+    "change-binding",
 ]
 
 [checks.schema_leak]

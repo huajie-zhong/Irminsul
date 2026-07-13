@@ -87,6 +87,67 @@ def test_check_ignores_non_rfc_docs(repo: Path) -> None:
     assert _by_doc(findings, "0001-good-adr") == []
 
 
+def test_withdrawn_state_emits_deprecation_warning(repo: Path) -> None:
+    findings = _findings(repo, now=_dt.date(2025, 1, 1))
+    matched = [
+        f for f in _by_doc(findings, "0005-withdrawn-bad") if f.category == "deprecated-rfc-state"
+    ]
+    assert len(matched) == 1
+    assert "'withdrawn'" in matched[0].message
+    assert "rejected" in matched[0].message
+
+
+def test_deprecated_state_fix_rewrites_rfc_state(repo: Path) -> None:
+    from irminsul.config import find_config, load
+    from irminsul.docgraph import build_graph
+
+    config = load(find_config(repo))
+    graph = build_graph(repo, config, now=_dt.date(2025, 1, 1))
+    check = RfcResolutionCheck()
+    findings = check.run(graph)
+    fixes = check.fixes(findings, graph)
+    matched = [f for f in fixes if "rfc_state: rejected" in f.description]
+    assert len(matched) == 1
+    assert matched[0].requires_confirm
+
+    node = graph.nodes["0005-withdrawn-bad"]
+    original = (repo / node.path).read_text(encoding="utf-8")
+    rewritten = matched[0].apply(original)
+    assert "rfc_state: rejected" in rewritten
+    assert "rfc_state: withdrawn" not in rewritten
+
+
+def test_implemented_rfc_checked_like_accepted() -> None:
+    from irminsul.config import IrminsulConfig
+    from irminsul.docgraph import DocGraph, DocNode
+    from irminsul.frontmatter import AudienceEnum, DocFrontmatter, RfcStateEnum, StatusEnum
+
+    fm = DocFrontmatter(
+        id="0100-implemented",
+        title="Implemented without resolution section",
+        audience=AudienceEnum.explanation,
+        tier=2,
+        status=StatusEnum.draft,
+        rfc_state=RfcStateEnum.implemented,
+        resolved_by="docs/50-decisions/0001-adr.md",
+    )
+    path = Path("docs/80-evolution/rfcs/0100-implemented.md")
+    node = DocNode(id="0100-implemented", path=path, frontmatter=fm, body="# x")
+    graph = DocGraph(
+        nodes={"0100-implemented": node},
+        by_path={path: node},
+        config=IrminsulConfig(),
+        now=_dt.date(2026, 1, 1),
+    )
+
+    findings = RfcResolutionCheck().run(graph)
+    messages = [f.message for f in findings]
+    assert any("rfc_state: implemented but status is 'draft'" in m for m in messages)
+    assert any("implemented RFC is missing a '## Resolution' section" in m for m in messages)
+    assert any("no such doc was found" in m for m in messages)
+    assert all(f.category != "deprecated-rfc-state" for f in findings)
+
+
 def test_rfc_prefix_honours_custom_docs_root() -> None:
     """Projects can override `paths.docs_root`; the check must follow."""
     from irminsul.config import IrminsulConfig, Paths

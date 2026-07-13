@@ -14,6 +14,7 @@ tests:
 Each architectural piece of Irminsul has a dedicated doc here. Frontmatter `describes:` claims map components to source paths.
 
 - [`cli`](cli.md) — CLI entry point
+- [`change`](change.md) — bound-change lifecycle reports and transitions for RFCs
 - [`config`](config.md) — `irminsul.toml` schema
 - [`orient`](orient.md) — first-call agent orientation report
 - [`context`](context.md) — task-specific agent navigation context

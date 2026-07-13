@@ -18,6 +18,7 @@ from irminsul.checks.base import (
     summarize,
 )
 from irminsul.checks.boundary import BoundaryCheck
+from irminsul.checks.change_binding import ChangeBindingCheck
 from irminsul.checks.claim_anchor import ClaimAnchorCheck
 from irminsul.checks.coverage import CoverageCheck
 from irminsul.checks.decision_updates import DecisionUpdatesCheck
@@ -82,6 +83,7 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     InventoryDriftCheck.name: InventoryDriftCheck,
     ClaimAnchorCheck.name: ClaimAnchorCheck,
     DocRefsCheck.name: DocRefsCheck,
+    ChangeBindingCheck.name: ChangeBindingCheck,
 }
 
 __all__ = [
@@ -89,6 +91,7 @@ __all__ = [
     "SOFT_REGISTRY",
     "AgentsManifestCheck",
     "BoundaryCheck",
+    "ChangeBindingCheck",
     "Check",
     "ClaimAnchorCheck",
     "ClaimProvenanceCheck",

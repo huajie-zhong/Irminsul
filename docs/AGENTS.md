@@ -58,6 +58,7 @@ automatically once any doc declares one.
 | `20-components` | [Components](20-components/INDEX.md) | reference | 3 |  |
 | `anchors` | [Anchored prose claims](20-components/anchors.md) | explanation | 3 |  |
 | `baseline` | [Baseline ratchet](20-components/baseline.md) | explanation | 3 | Brownfield adoption mechanism — a baseline file grandfathers existing findings so CI fails only on new ones, and only ever shrinks. |
+| `change` | [Change lifecycle](20-components/change.md) | explanation | 3 |  |
 | `checks` | [Checks](20-components/checks.md) | explanation | 3 |  |
 | `cli` | [CLI](20-components/cli.md) | explanation | 3 |  |
 | `config` | [Config](20-components/config.md) | reference | 3 |  |

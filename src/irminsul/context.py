@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -15,6 +14,7 @@ from irminsul.checks import HARD_REGISTRY, SOFT_REGISTRY, Check, Finding, sort_f
 from irminsul.checks.uniqueness import specificity
 from irminsul.config import IrminsulConfig
 from irminsul.docgraph import DocGraph, DocNode, build_graph
+from irminsul.git.changes import GitChangesError, working_tree_changed_paths
 
 ContextMode = Literal["path", "topic", "changed"]
 ContextProfile = Literal["configured", "all-available"]
@@ -385,78 +385,10 @@ def _ownership_for_source_path(
 
 
 def _git_changed_paths(repo_root: Path) -> list[str]:
-    prefix = _git_worktree_prefix(repo_root)
-    result = _run_git(
-        repo_root,
-        "status",
-        "--porcelain",
-        "-z",
-        "--untracked-files=all",
-        "--",
-        ".",
-    )
-    if result.returncode != 0:
-        detail = _git_error_detail(result, "git status failed")
-        raise ContextError(detail, code=1)
-
-    paths: list[str] = []
-    records = result.stdout.split("\0")
-    index = 0
-    while index < len(records):
-        record = records[index]
-        index += 1
-        if not record:
-            continue
-
-        status = record[:2]
-        path = _project_relative_git_path(record[3:], prefix)
-        if not path:
-            continue
-        paths.append(path)
-
-        if "R" in status or "C" in status:
-            index += 1
-
-    return sorted(paths)
-
-
-def _git_worktree_prefix(repo_root: Path) -> str:
-    result = _run_git(repo_root, "rev-parse", "--show-prefix")
-    if result.returncode != 0:
-        detail = _git_error_detail(result, "git rev-parse failed")
-        raise ContextError(detail, code=1)
-
-    prefix = result.stdout.rstrip("\r\n")
-    if prefix and not prefix.endswith("/"):
-        prefix = f"{prefix}/"
-    return prefix
-
-
-def _run_git(repo_root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     try:
-        return subprocess.run(
-            ["git", "-C", str(repo_root), *args],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError as exc:
-        raise ContextError(
-            "git command not found; ensure git is installed and in your PATH",
-            code=1,
-        ) from exc
-
-
-def _git_error_detail(result: subprocess.CompletedProcess[str], fallback: str) -> str:
-    return result.stderr.strip() or result.stdout.strip() or fallback
-
-
-def _project_relative_git_path(path: str, prefix: str) -> str | None:
-    if not prefix:
-        return path
-    if not path.startswith(prefix):
-        return None
-    return path[len(prefix) :]
+        return working_tree_changed_paths(repo_root)
+    except GitChangesError as exc:
+        raise ContextError(str(exc), code=1) from exc
 
 
 def _run_deterministic_checks(

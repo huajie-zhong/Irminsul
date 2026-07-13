@@ -25,6 +25,9 @@ inventory:
       - list undocumented
     omit:
       - anchors
+      - change status
+      - change transition
+      - change verify
       - init
       - init-docs-only
       - list lifecycle

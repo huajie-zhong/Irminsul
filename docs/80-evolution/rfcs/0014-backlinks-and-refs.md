@@ -6,6 +6,7 @@ tier: 2
 status: stable
 describes: []
 rfc_state: accepted
+affects: [docgraph, refs]
 resolved_by: docs/50-decisions/0005-backlinks-and-refs.md
 required_updates: []
 ---

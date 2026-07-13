@@ -6,6 +6,7 @@ tier: 2
 status: stable
 describes: []
 rfc_state: accepted
+affects: [checks]
 resolved_by: docs/50-decisions/0010-implement-rfc-0019-glossary-discipline.md
 required_updates: []
 ---

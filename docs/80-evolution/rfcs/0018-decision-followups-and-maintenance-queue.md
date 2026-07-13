@@ -6,6 +6,7 @@ tier: 2
 status: stable
 describes: []
 rfc_state: accepted
+affects: [checks, new-list-regen]
 resolved_by: docs/50-decisions/0009-implement-rfc-0018-decision-followups-and-maintenance-queue.md
 required_updates: []
 ---

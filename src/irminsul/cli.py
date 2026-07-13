@@ -664,7 +664,7 @@ def check(
                 err=True,
             )
 
-    graph = build_graph(repo_root, config, now=now_date)
+    graph = build_graph(repo_root, config, now=now_date, diff_changed_paths=co_change_paths)
 
     findings: list[Finding] = []
     findings.extend(
@@ -1168,6 +1168,156 @@ def anchors_command(
     for finding in findings:
         _print_finding(finding)
     typer.echo(f"{len(findings)} anchor finding(s)")
+
+
+_change_app = typer.Typer(
+    name="change",
+    help="Bound-change lifecycle for RFCs: status, verification, and transitions.",
+    no_args_is_help=True,
+)
+app.add_typer(_change_app)
+
+
+class TransitionTarget(StrEnum):
+    accepted = "accepted"
+    rejected = "rejected"
+
+
+@_change_app.command("status")
+def change_status(
+    change_id: Annotated[str, typer.Argument(help="RFC id, number, or repo-relative path.")],
+    fmt: Annotated[str, typer.Option("--format", help="Output format: plain or json.")] = "plain",
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Show a change's lifecycle, declared scope, evidence summary, and next actions."""
+    from irminsul.change.report import (
+        ChangeError,
+        build_change_report,
+        change_report_to_json,
+        format_change_status_plain,
+    )
+
+    if fmt not in ("plain", "json"):
+        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+        raise typer.Exit(code=2)
+
+    repo_root, config = _load_repo(path)
+    try:
+        report = build_change_report(repo_root, config, change_id)
+    except ChangeError as exc:
+        typer.echo(typer.style(str(exc), fg="red"))
+        raise typer.Exit(code=exc.code) from exc
+    typer.echo(
+        change_report_to_json(report) if fmt == "json" else format_change_status_plain(report)
+    )
+
+
+@_change_app.command("verify")
+def change_verify(
+    change_id: Annotated[str, typer.Argument(help="RFC id, number, or repo-relative path.")],
+    base_ref: Annotated[
+        str | None,
+        typer.Option(
+            "--base-ref",
+            help="Base git ref for implementation evidence (compared against HEAD).",
+        ),
+    ] = None,
+    fmt: Annotated[str, typer.Option("--format", help="Output format: plain or json.")] = "plain",
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Report implementation evidence, mechanical blockers, and semantic-review clues.
+
+    Read-only. The result can say a change is mechanically ready; it never
+    claims the behavior is correct — that judgment stays with the reviewer.
+    """
+    from irminsul.change.report import (
+        ChangeError,
+        build_change_report,
+        change_report_to_json,
+        format_change_verify_plain,
+    )
+
+    if fmt not in ("plain", "json"):
+        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+        raise typer.Exit(code=2)
+
+    repo_root, config = _load_repo(path)
+    try:
+        report = build_change_report(repo_root, config, change_id, base_ref=base_ref)
+    except ChangeError as exc:
+        typer.echo(typer.style(str(exc), fg="red"))
+        raise typer.Exit(code=exc.code) from exc
+    typer.echo(
+        change_report_to_json(report) if fmt == "json" else format_change_verify_plain(report)
+    )
+
+
+@_change_app.command("transition")
+def change_transition(
+    change_id: Annotated[str, typer.Argument(help="RFC id, number, or repo-relative path.")],
+    target: Annotated[
+        TransitionTarget,
+        typer.Argument(help="Human-authorized decision: accepted or rejected."),
+    ],
+    resolved_by: Annotated[
+        str | None,
+        typer.Option(
+            "--resolved-by",
+            help="Repo-relative path of the decision doc resolving this RFC (accepted only).",
+        ),
+    ] = None,
+    confirm: Annotated[
+        bool,
+        typer.Option("--confirm", help="Apply the transition. Without it, only the plan prints."),
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Print the planned edits without writing files."),
+    ] = False,
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Validate and apply a lifecycle decision atomically.
+
+    `implemented` is not a valid target here: only `change finalize` may write
+    it, after verification.
+    """
+    from irminsul.change.report import ChangeError
+    from irminsul.change.transition import plan_transition
+    from irminsul.fix import apply_fixes
+
+    repo_root, config = _load_repo(path)
+    graph = build_graph(repo_root, config)
+    try:
+        plan = plan_transition(graph, config, change_id, target.value, resolved_by=resolved_by)
+    except ChangeError as exc:
+        typer.echo(typer.style(str(exc), fg="red"))
+        raise typer.Exit(code=exc.code) from exc
+
+    typer.echo(f"{plan.change}: {plan.current_state} -> {plan.target_state}")
+    if plan.blockers:
+        for blocker in plan.blockers:
+            typer.echo(typer.style(f"  blocker [{blocker.code}]: {blocker.message}", fg="red"))
+            if blocker.suggestion:
+                typer.echo(typer.style(f"    -> {blocker.suggestion}", dim=True))
+        raise typer.Exit(code=1)
+
+    for note in plan.notes:
+        typer.echo(typer.style(f"  note: {note}", fg="yellow"))
+
+    result = apply_fixes(repo_root, list(plan.fixes), dry_run=dry_run or not confirm, confirm=True)
+    for planned in result.planned:
+        typer.echo(f"  {planned.path.as_posix()}: {planned.description}")
+    if result.errors:
+        for error in result.errors:
+            typer.echo(typer.style(error, fg="red"))
+        raise typer.Exit(code=1)
+
+    if dry_run or not confirm:
+        suffix = "" if confirm else "; re-run with --confirm to apply"
+        typer.echo(typer.style(f"planned {len(result.planned)} edit(s){suffix}", fg="green"))
+    else:
+        typer.echo(typer.style(f"updated {len(result.written)} file(s)", fg="green"))
+    raise typer.Exit(code=0)
 
 
 _new_app = typer.Typer(name="new", help="Scaffold a new doc atom.", no_args_is_help=True)

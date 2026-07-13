@@ -6,6 +6,7 @@ tier: 2
 status: stable
 describes: []
 rfc_state: accepted
+affects: [surface]
 resolved_by: docs/50-decisions/0003-generated-code-reference-surfaces.md
 required_updates: []
 ---
