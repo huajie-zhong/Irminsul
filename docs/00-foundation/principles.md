@@ -57,7 +57,7 @@ What Irminsul therefore checks:
 
 - **Mechanical enforcement of structural invariants.** A check that depends on human attention will fail eventually. CI either accepts a PR or doesn't.
 - **One fact, one home.** Every domain definition lives in exactly one place. References point at it; copies don't exist.
-- **Build correctness never depends on LLM judgment.** Hard checks are pure graph operations, regex, glob resolution, and git arithmetic. LLM checks may exist, but they only ever surface advisories and stay outside the hard profile.
+- **Build correctness never depends on LLM judgment.** Hard checks are pure graph operations, regex, glob resolution, and git arithmetic. Irminsul makes no LLM calls at all — every check is deterministic. Semantic judgment belongs to the coding agent consuming Irminsul, not to the tool itself.
 - **Adoption in three commands.** `pipx install irminsul && cd repo && irminsul init` produces a fully wired skeleton. Friction at adoption is fatal.
 - **Useful from the first belief.** `irminsul init --fresh` supports a project that starts with only user intent. The user's principle, idea, or belief belongs in foundation docs first; agents can elaborate docs and code from there.
 
