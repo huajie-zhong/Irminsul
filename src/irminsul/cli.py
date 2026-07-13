@@ -1351,6 +1351,50 @@ def change_transition(
     raise typer.Exit(code=0)
 
 
+@_change_app.command("impact")
+def change_impact(
+    change_id: Annotated[str, typer.Argument(help="RFC id, number, or repo-relative path.")],
+    base_ref: Annotated[
+        str | None,
+        typer.Option("--base-ref", help="Base git ref for observed impact (compared to HEAD)."),
+    ] = None,
+    all_layers: Annotated[
+        bool,
+        typer.Option("--all-layers", help="Include layers with no observations."),
+    ] = False,
+    fmt: Annotated[str, typer.Option("--format", help="Output format: plain or json.")] = "plain",
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Show where a change reached, layer by layer, with review routes.
+
+    Derived on demand from the diff and the doc graph — never stored on the
+    RFC. Without a resolvable diff the report is plan-level impact, stated
+    explicitly rather than rendered as an empty observed impact.
+    """
+    from irminsul.change.impact import (
+        build_impact_report,
+        format_impact_plain,
+        impact_report_to_json,
+    )
+    from irminsul.change.report import ChangeError
+
+    if fmt not in ("plain", "json"):
+        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+        raise typer.Exit(code=2)
+
+    repo_root, config = _load_repo(path)
+    try:
+        report = build_impact_report(repo_root, config, change_id, base_ref=base_ref)
+    except ChangeError as exc:
+        typer.echo(typer.style(str(exc), fg="red"))
+        raise typer.Exit(code=exc.code) from exc
+    typer.echo(
+        impact_report_to_json(report, all_layers=all_layers)
+        if fmt == "json"
+        else format_impact_plain(report, all_layers=all_layers)
+    )
+
+
 @_change_app.command("finalize")
 def change_finalize(
     change_id: Annotated[str, typer.Argument(help="RFC id, number, or repo-relative path.")],

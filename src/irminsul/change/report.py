@@ -292,6 +292,18 @@ def build_change_report(
     if tasks_section is not None:
         extra["tasks"] = _task_evidence(node, tasks_section, affects, footprint, clues)
 
+    from irminsul.change.impact import build_impact_report, impact_summary
+
+    impact = build_impact_report(
+        repo_root,
+        config,
+        node.id,
+        graph=graph,
+        baseline=baseline,
+        footprint=footprint,
+    )
+    extra["impact"] = {"level": impact.level, "summary": impact_summary(impact)}
+
     declared_untouched: tuple[str, ...] = ()
     touched_undeclared: tuple[str, ...] = ()
     if footprint is not None:
@@ -374,6 +386,7 @@ def build_change_report(
             next_actions.append(f"irminsul change transition {node.id} accepted --confirm")
     elif canonical == RfcStateEnum.accepted:
         next_actions.append(f"irminsul change verify {node.id} --base-ref <ref>")
+        next_actions.append(f"irminsul change impact {node.id}")
 
     return ChangeReport(
         version=REPORT_VERSION,
@@ -604,6 +617,9 @@ def format_change_status_plain(report: ChangeReport) -> str:
     summary = _task_summary(report)
     if summary is not None:
         lines.append(f"  tasks: {summary}")
+    impact_line = _impact_summary_line(report)
+    if impact_line is not None:
+        lines.append(impact_line)
     if report.evidence:
         lines.append(f"  evidence: {len(report.evidence)} item(s); run `change verify` for detail")
     if report.next_actions:
@@ -644,10 +660,24 @@ def format_change_verify_plain(report: ChangeReport) -> str:
         lines.append("  semantic review:")
         lines.extend(f"    - {c.question}" for c in report.semantic_review)
     lines.append(f"  mechanically ready for: {report.mechanically_ready_for}")
+    impact_line = _impact_summary_line(report)
+    if impact_line is not None:
+        lines.append(impact_line)
     if report.next_actions:
         lines.append("  next:")
         lines.extend(f"    {action}" for action in report.next_actions)
     return "\n".join(lines)
+
+
+def _impact_summary_line(report: ChangeReport) -> str | None:
+    payload = report.extra.get("impact")
+    if not isinstance(payload, dict):
+        return None
+    summary = payload.get("summary")
+    if not isinstance(summary, dict) or not summary:
+        return None
+    parts = ", ".join(f"{layer} {count}" for layer, count in summary.items())
+    return f"  impact ({payload.get('level')}): {parts} - run `change impact` for detail"
 
 
 def _task_summary(report: ChangeReport) -> str | None:

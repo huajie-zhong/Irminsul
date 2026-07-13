@@ -59,22 +59,26 @@ The report gathers only facts existing machinery can support:
 - **Foundation (00).** `direction: revises` creates a foundation-review clue and
   lists foundation docs linked from the RFC. Irminsul does not infer which
   principle code semantically violates.
-- **Architecture (10).** New, removed, or moved component docs; parent-child
-  changes; architecture docs changed in the diff; and existing hierarchy or
-  phantom-layer findings.
+- **Architecture (10).** Architecture docs changed in the diff, and component docs
+  that left the tree — a changed component path that no longer resolves in the graph
+  was removed or moved, which is a structural fact, not a component-local one.
 - **Components (20).** Declared affected components, diff-derived owners, scope
-  divergence, unowned source, related tests, and component findings.
+  divergence, unowned source, related tests, and component docs changed in the diff
+  (including newly added ones) attributed to the component they define.
 - **Workflows (30).** Workflow docs linked to or dependent on affected components,
   plus workflow docs actually changed. A link is a review route, not proof that the
   workflow behavior changed.
-- **Decisions (50).** The RFC's ADR, unresolved required updates, and decision
-  backlinks.
-- **Evolution (80).** Superseded or related RFCs and claims that may need promotion
-  or retirement.
-- **Surfaces.** Added, removed, or changed CLI, HTTP, export, environment-variable,
-  and configured inventory identities from the existing surface extractors.
-- **Glossary.** Existing glossary-discipline findings and candidate terms from the
-  RFC or changed docs; agents decide whether a candidate is truly a domain term.
+- **Decisions (50).** The RFC's ADR and its required updates, flagged when the path
+  does not resolve.
+- **Evolution (80).** Superseded RFCs and evolution docs that reference this one.
+- **Surfaces.** CLI, HTTP, export, environment-variable, MCP, and configured generic
+  inventory identities defined in the changed files. The kinds are derived from the
+  extractor registry plus the repo's `[[checks.inventory_drift.generic]]` rules, so a
+  project that declares a new kind gets it here without a code change. An extractor
+  that fails reports the failure as its own observation: a kind is never silently
+  empty.
+- **Glossary.** Existing glossary-discipline findings on the RFC or the changed docs;
+  agents decide whether a candidate is truly a domain term.
 
 Every observation includes its source: declared RFC field, diff path, graph edge,
 surface extractor, or finding id.
@@ -102,17 +106,31 @@ advisory. Deterministic checks only enforce the underlying structural facts.
 
 Impact is not a fifth disconnected report:
 
-- `change status` includes a terse impact summary and next review routes;
-- `change verify` includes full observed impact and scope-divergence clues;
+- `change status` and `change verify` embed a terse per-layer impact summary and
+  point at `change impact` for the detail; they build one report and one footprint,
+  so the embed costs no extra source-tree walk;
 - `change finalize` blocks only on mechanical impact problems such as unowned code
   or unreconciled touched-but-undeclared components;
 - `context --change` links to the same report instead of reproducing its logic.
 
 ### Impact altitude
 
-Output defaults to the highest layer with actual evidence plus the components and
-surfaces involved. A component-only change remains compact. `--all-layers` includes
-empty sections for automation or exhaustive review.
+Output defaults to every layer that has actual evidence; empty layers are omitted
+so a component-only change stays compact. `--all-layers` includes the empty sections
+for automation or exhaustive review.
+
+### First-iteration scope
+
+Three behaviors described above are deliberately deferred, because each depends on
+work that is not yet mechanical enough to ground an observation:
+
+- architecture-layer parent-child, hierarchy, and phantom-layer findings — impact
+  reports the structural doc moves it can see from the diff, but does not yet re-run
+  those checks and attribute their findings to a layer;
+- a full observed-impact section embedded in `change verify` (it embeds the summary
+  line and defers the detail to `change impact`);
+- the altitude rule that renders only the highest layer with evidence plus components
+  and surfaces; the shipped default renders every non-empty layer.
 
 ## Drawbacks
 
@@ -140,7 +158,7 @@ empty sections for automation or exhaustive review.
 ## Unresolved Questions
 
 - Configuration of default impact altitude and maximum clue count.
-- Whether candidate glossary terms come from a deterministic tokenizer or only
-  existing glossary findings in the first iteration.
+- Whether candidate glossary terms should later come from a deterministic tokenizer;
+  the first iteration uses existing glossary findings only.
 - How to represent source attribution compactly in plain output while preserving
   complete JSON evidence.

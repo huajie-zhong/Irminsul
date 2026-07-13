@@ -41,6 +41,7 @@ inventory:
       - change verify
       - change transition
       - change finalize
+      - change impact
       - new adr
       - new component
       - new rfc
