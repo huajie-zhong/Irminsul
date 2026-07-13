@@ -24,7 +24,7 @@ The command supports exactly one input mode:
 - `irminsul context --topic <query>` for deterministic substring search over doc id, title, path, `describes`, and `tests`
 - `irminsul context --changed` for staged, unstaged, and untracked git files
 
-Each result reports the owning doc, matching source claims, first declared entrypoint, tests, `depends_on`, docs that depend on it, relevant deterministic findings, and next command hints. `--profile configured|all-available` controls deterministic finding breadth only; LLM checks are not part of context lookup.
+Each result reports the owning doc, matching source claims, first declared entrypoint, tests, `depends_on`, docs that depend on it, relevant deterministic findings, and next command hints. `--profile configured|all-available` controls deterministic finding breadth.
 
 ## Scope & Limitations
 

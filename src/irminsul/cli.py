@@ -16,18 +16,19 @@ import typer
 from irminsul import __version__
 from irminsul.checks import (
     HARD_REGISTRY,
-    LLM_REGISTRY,
     SOFT_REGISTRY,
     Check,
     Finding,
     Fix,
     Severity,
+    finding_records,
+    fix_commands,
     sort_findings,
     summarize,
 )
 from irminsul.config import IrminsulConfig, find_config, load
 from irminsul.docgraph import DocGraph, build_graph
-from irminsul.git.mtime import diff_name_only
+from irminsul.git.mtime import diff_name_only, has_history
 from irminsul.init.command import (
     detect_code_signals,
     run_init,
@@ -54,7 +55,6 @@ app = typer.Typer(
 class Profile(StrEnum):
     hard = "hard"
     configured = "configured"
-    advisory = "advisory"
     all_available = "all-available"
 
 
@@ -416,25 +416,14 @@ def _print_finding(finding: Finding) -> None:
 def _findings_to_json(
     findings: list[Finding],
     counts: dict[Severity, int],
+    commands: list[str | None],
     baseline: dict[str, object] | None = None,
 ) -> str:
     import json
 
     payload: dict[str, object] = {
         "version": 1,
-        "findings": [
-            {
-                "check": f.check,
-                "severity": f.severity.value,
-                "message": f.message,
-                "path": f.path.as_posix() if f.path else None,
-                "doc_id": f.doc_id,
-                "line": f.line,
-                "suggestion": f.suggestion,
-                "category": f.category,
-            }
-            for f in findings
-        ],
+        "findings": finding_records(findings, commands),
         "summary": {
             "errors": counts[Severity.error],
             "warnings": counts[Severity.warning],
@@ -444,6 +433,37 @@ def _findings_to_json(
     if baseline is not None:
         payload["baseline"] = baseline
     return json.dumps(payload, indent=2)
+
+
+_GITHUB_COMMAND = {
+    Severity.error: "error",
+    Severity.warning: "warning",
+    Severity.info: "notice",
+}
+
+
+def _escape_github_data(value: str) -> str:
+    """Escape workflow-command message data per the GitHub Actions spec."""
+    return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
+def _escape_github_property(value: str) -> str:
+    """Escape workflow-command property values (data escapes plus ',' and ':')."""
+    return _escape_github_data(value).replace(",", "%2C").replace(":", "%3A")
+
+
+def _github_annotation(finding: Finding) -> str:
+    """One `::error|::warning|::notice` workflow command per finding."""
+    props: list[str] = []
+    if finding.path is not None:
+        props.append(f"file={_escape_github_property(finding.path.as_posix())}")
+    if finding.line is not None:
+        props.append(f"line={finding.line}")
+    props.append("title=" + _escape_github_property(f"irminsul {finding.check}"))
+    data = finding.message
+    if finding.suggestion:
+        data = f"{data} — {finding.suggestion}"
+    return f"::{_GITHUB_COMMAND[finding.severity]} {','.join(props)}::{_escape_github_data(data)}"
 
 
 def _print_summary(counts: dict[Severity, int]) -> None:
@@ -470,10 +490,17 @@ def _soft_check_names(profile: Profile, config: IrminsulConfig) -> list[str]:
     return list(config.checks.soft_deterministic)
 
 
-def _llm_check_names(profile: Profile, config: IrminsulConfig) -> list[str]:
-    if profile != Profile.advisory:
-        return []
-    return list(config.checks.soft_llm)
+def _diff_failure_reason(repo_root: Path, co_change_range: tuple[str, str]) -> str:
+    base, head = co_change_range
+    if not has_history(repo_root):
+        return (
+            f"no git repository with commit history found at {repo_root}; "
+            "co-change needs one to diff against"
+        )
+    return (
+        f"could not compute `git diff {base}...{head}`; "
+        "at least one ref could not be resolved in this repository"
+    )
 
 
 def _run_registered_checks(
@@ -498,94 +525,12 @@ def _run_registered_checks(
     return findings
 
 
-def _run_llm_checks(
-    check_names: list[str],
-    *,
-    repo_root: Path,
-    config: IrminsulConfig,
-    graph: DocGraph,
-    llm_budget: float | None,
-    fmt: str,
-) -> list[Finding]:
-    if not check_names:
-        return []
-
-    from irminsul.llm.client import LlmClient
-
-    findings: list[Finding] = []
-    budget = llm_budget if llm_budget is not None else config.llm.max_cost_usd
-    llm_client = LlmClient(
-        provider=config.llm.provider,
-        model=config.llm.model,
-        max_cost_usd=budget,
-        cache_path=repo_root / config.llm.cache_path,
-        required_in_ci=config.llm.required_in_ci,
-    )
-
-    if not llm_client.is_available():
-        if config.llm.required_in_ci:
-            findings.append(
-                Finding(
-                    check="llm",
-                    severity=Severity.error,
-                    message=(
-                        f"LLM checks required (required_in_ci=true) "
-                        f"but no API key found for provider '{config.llm.provider}'"
-                    ),
-                )
-            )
-        else:
-            for check_name in check_names:
-                if check_name in LLM_REGISTRY:
-                    findings.append(
-                        Finding(
-                            check=check_name,
-                            severity=Severity.info,
-                            message=(
-                                f"LLM check skipped: no API key configured "
-                                f"for provider '{config.llm.provider}'"
-                            ),
-                        )
-                    )
-        return findings
-
-    calls_before = len(llm_client._cache)
-    for check_name in check_names:
-        cls_llm = LLM_REGISTRY.get(check_name)
-        if cls_llm is None:
-            typer.echo(
-                typer.style(
-                    f"note: LLM check '{check_name}' not yet implemented; skipping.",
-                    fg="yellow",
-                )
-            )
-            continue
-        findings.extend(cls_llm(llm_client=llm_client).run(graph))
-
-    spent = budget - llm_client.remaining_budget()
-    cache_size = len(llm_client._cache)
-    api_calls = max(0, cache_size - calls_before)
-    if fmt == "plain":
-        typer.echo(
-            typer.style(
-                f"LLM: ${spent:.4f} / ${budget:.2f} budget used"
-                + (f"; {api_calls} API call(s)" if api_calls else ""),
-                dim=True,
-            )
-        )
-    return findings
-
-
 @app.command()
 def check(
     profile: Annotated[
         Profile,
         typer.Option("--profile", help="Check profile to run."),
     ] = Profile.hard,
-    llm_budget: Annotated[
-        float | None,
-        typer.Option("--llm-budget", help="Override the LLM cost ceiling (USD) for this run."),
-    ] = None,
     strict: Annotated[
         bool,
         typer.Option(
@@ -595,8 +540,18 @@ def check(
     ] = False,
     fmt: Annotated[
         str,
-        typer.Option("--format", help="Output format: plain or json."),
+        typer.Option("--format", help="Output format: plain, json, or github."),
     ] = "plain",
+    diff: Annotated[
+        str | None,
+        typer.Option(
+            "--diff",
+            help=(
+                "Base git ref for co-change enforcement: warn when source files "
+                "changed in <base>...HEAD without their owning docs."
+            ),
+        ),
+    ] = None,
     path: Annotated[
         Path,
         typer.Option(
@@ -644,8 +599,10 @@ def check(
     ] = False,
 ) -> None:
     """Run the configured checks. Errors exit non-zero."""
-    if fmt not in ("plain", "json"):
-        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+    if fmt not in ("plain", "json", "github"):
+        typer.echo(
+            typer.style(f"unknown --format '{fmt}'; expected plain, json, or github", fg="red")
+        )
         raise typer.Exit(code=2)
 
     if (base_ref is None) != (head_ref is None):
@@ -672,19 +629,42 @@ def check(
     config_path = find_config(repo_root)
     config = load(config_path)
 
-    diff_changed: frozenset[str] | None = None
-    if base_ref is not None and head_ref is not None:
-        diff_changed = diff_name_only(repo_root, base_ref, head_ref)
-        if diff_changed is None:
+    if diff is not None and base_ref is not None:
+        typer.echo(typer.style("--diff and --base-ref/--head-ref are mutually exclusive", fg="red"))
+        raise typer.Exit(code=2)
+
+    for flag, value in (("--diff", diff), ("--base-ref", base_ref), ("--head-ref", head_ref)):
+        if value is not None and not value.strip():
             typer.echo(
                 typer.style(
-                    f"could not compute diff {base_ref}...{head_ref}; skipping diff-aware checks",
-                    fg="yellow",
-                ),
+                    f"{flag} was given an empty value; pass a git ref or omit the flag",
+                    fg="red",
+                )
+            )
+            raise typer.Exit(code=2)
+
+    co_change_paths: frozenset[str] | None = None
+    co_change_range: tuple[str, str] | None = None
+    if diff is not None:
+        co_change_range = (diff, "HEAD")
+    elif base_ref is not None and head_ref is not None:
+        co_change_range = (base_ref, head_ref)
+    if co_change_range is not None:
+        co_change_paths = diff_name_only(repo_root, *co_change_range)
+        if co_change_paths is None:
+            reason = _diff_failure_reason(repo_root, co_change_range)
+            # --diff is an explicit opt-in gate: failing to compute its diff means
+            # the gate would silently pass, so exit. --base-ref/--head-ref predate
+            # it and degrade gracefully so a shallow clone still reports findings.
+            if diff is not None:
+                typer.echo(typer.style(reason, fg="red"))
+                raise typer.Exit(code=2)
+            typer.echo(
+                typer.style(f"{reason}; skipping diff-aware checks", fg="yellow"),
                 err=True,
             )
 
-    graph = build_graph(repo_root, config, now=now_date, diff_changed_paths=diff_changed)
+    graph = build_graph(repo_root, config, now=now_date, diff_changed_paths=co_change_paths)
 
     findings: list[Finding] = []
     findings.extend(
@@ -697,16 +677,11 @@ def check(
             _soft_check_names(profile, config), SOFT_REGISTRY, graph, tier="soft"
         )
     )
-    findings.extend(
-        _run_llm_checks(
-            _llm_check_names(profile, config),
-            repo_root=repo_root,
-            config=config,
-            graph=graph,
-            llm_budget=llm_budget,
-            fmt=fmt,
-        )
-    )
+
+    if co_change_paths is not None:
+        from irminsul.checks.co_change import run_co_change
+
+        findings.extend(run_co_change(graph, co_change_paths))
 
     findings = sort_findings(findings)
 
@@ -747,7 +722,18 @@ def check(
     fail = counts[Severity.error] > 0 or (strict and counts[Severity.warning] > 0)
 
     if fmt == "json":
-        typer.echo(_findings_to_json(findings, counts, baseline=baseline_status))
+        typer.echo(
+            _findings_to_json(
+                findings,
+                counts,
+                fix_commands(findings, graph, profile=profile.value),
+                baseline=baseline_status,
+            )
+        )
+    elif fmt == "github":
+        for finding in findings:
+            typer.echo(_github_annotation(finding))
+        _print_summary(counts)
     else:
         for finding in findings:
             _print_finding(finding)
@@ -1176,7 +1162,8 @@ def anchors_command(
 
     findings = sort_findings(ClaimAnchorCheck().run(graph))
     if fmt == "json":
-        typer.echo(_findings_to_json(findings, summarize(findings)))
+        commands = fix_commands(findings, graph, profile=Profile.all_available.value)
+        typer.echo(_findings_to_json(findings, summarize(findings), commands))
         return
     for finding in findings:
         _print_finding(finding)

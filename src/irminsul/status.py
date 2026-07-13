@@ -196,7 +196,7 @@ def _layer_of(doc_path: Path, docs_root: str) -> str:
 
 
 def _run_configured_checks(config: IrminsulConfig, graph: DocGraph) -> list[Finding]:
-    """Run configured hard + soft deterministic checks (never LLM checks).
+    """Run configured hard + soft deterministic checks.
 
     Unknown configured names are skipped silently, matching `context`.
     """

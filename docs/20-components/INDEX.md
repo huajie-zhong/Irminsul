@@ -24,7 +24,6 @@ Each architectural piece of Irminsul has a dedicated doc here. Frontmatter `desc
 - [`checks`](checks.md) — registered checks; exact names live in `src/irminsul/checks/__init__.py`
 - [`languages`](languages.md) — language-profile registry
 - [`init`](init.md) — scaffolding command and templates
-- [`llm`](llm.md) — LLM client (budget tracking, disk cache, LiteLLM wrapper)
 - [`new-list-regen`](new-list-regen.md) — `new`, `list`, `fix`, and `regen agents-md` commands
 - [`mcp-server`](mcp-server.md) — read-only MCP stdio server for AI agents
 - [`status`](status.md) — one-glance digest of doc-system health

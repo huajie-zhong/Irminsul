@@ -77,7 +77,7 @@ just this one. Follow each step in order; do not skip ahead.
   rules (those live in [`CONTRIBUTING.md`](../CONTRIBUTING.md)) or coding
   conventions (those live in the project's own style guide).
 - Steps 8–9 require running `irminsul check`; the protocol does not itself
-  define which checks are hard, soft, or advisory — that is the province of
+  define which checks are hard or soft — that is the province of
   the check registry in `src/irminsul/checks/__init__.py` and the
   project's `irminsul.toml`.
 - Violations are not yet enforced by a mechanical check; later RFCs add

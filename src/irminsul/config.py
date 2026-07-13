@@ -1,7 +1,7 @@
 """Schema for `irminsul.toml`.
 
 The config file lives at the root of a consuming codebase. It declares where
-docs and source live, which checks are active, and which LLM provider to use.
+docs and source live and which checks are active.
 Defaults match the shape described in Part XII of `Irminsul-reference.md`.
 """
 
@@ -54,7 +54,6 @@ SOFT_DETERMINISTIC_CHECKS = (
     "change-binding",
     "requirement-grammar",
 )
-SOFT_LLM_CHECKS = ("overlap", "semantic-drift", "scope-appropriateness")
 
 
 class Paths(BaseModel):
@@ -66,6 +65,10 @@ class Paths(BaseModel):
 
 
 class Tiers(BaseModel):
+    """Deprecated: nothing consumes `[tiers]`; accepted only so existing
+    configs that still carry the table keep loading. Doc stability is driven
+    by per-doc frontmatter (`tier:`), not by config globs."""
+
     model_config = ConfigDict(extra="forbid")
 
     stable: list[str] = Field(
@@ -122,28 +125,9 @@ class TerminologyRule(BaseModel):
 class TerminologyOverloadSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    rules: list[TerminologyRule] = Field(
-        default_factory=lambda: [
-            TerminologyRule(
-                term="coverage",
-                explicit_phrases=[
-                    "source ownership coverage",
-                    "source-file coverage",
-                    "source file",
-                    "source files",
-                    "source paths",
-                    "coveragecheck",
-                    "`coverage`",
-                    "tests:",
-                    "`tests:`",
-                ],
-                suggestion=(
-                    "Clarify whether this means source ownership coverage "
-                    "or the `CoverageCheck` tests: rule"
-                ),
-            )
-        ]
-    )
+    # No default rules: which terms are overloaded is project-specific. This
+    # repo declares its own `coverage` rule in its irminsul.toml.
+    rules: list[TerminologyRule] = Field(default_factory=list)
 
 
 class GenericInventoryRule(BaseModel):
@@ -165,7 +149,6 @@ class Checks(BaseModel):
 
     hard: list[str] = Field(default_factory=lambda: list(HARD_CHECKS))
     soft_deterministic: list[str] = Field(default_factory=lambda: list(SOFT_DETERMINISTIC_CHECKS))
-    soft_llm: list[str] = Field(default_factory=list)
 
     schema_leak: SchemaLeakSettings = Field(default_factory=SchemaLeakSettings)
     external_links: ExternalLinksSettings = Field(default_factory=ExternalLinksSettings)
@@ -179,15 +162,10 @@ class Checks(BaseModel):
     )
     inventory_drift: InventoryDriftSettings = Field(default_factory=InventoryDriftSettings)
 
-    @field_validator("hard", "soft_deterministic", "soft_llm")
+    @field_validator("hard", "soft_deterministic")
     @classmethod
     def _no_unknown_checks(cls, v: list[str]) -> list[str]:
-        known = (
-            set(HARD_CHECKS)
-            | set(OPT_IN_HARD_CHECKS)
-            | set(SOFT_DETERMINISTIC_CHECKS)
-            | set(SOFT_LLM_CHECKS)
-        )
+        known = set(HARD_CHECKS) | set(OPT_IN_HARD_CHECKS) | set(SOFT_DETERMINISTIC_CHECKS)
         unknown = [c for c in v if c not in known]
         if unknown:
             raise ValueError(f"unknown check name(s): {unknown}")
@@ -198,18 +176,7 @@ class Overrides(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     ignore_uniqueness: list[str] = Field(default_factory=list)
-    llm_ignore: list[str] = Field(default_factory=list)
     mtime_drift_days: int = 30
-
-
-class Llm(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    provider: str = "anthropic"
-    model: str = "claude-haiku-4-5"
-    max_cost_usd: float = 1.00
-    required_in_ci: bool = False
-    cache_path: str = ".irminsul-cache/llm.json"
 
 
 class Languages(BaseModel):
@@ -226,7 +193,6 @@ class IrminsulConfig(BaseModel):
     tiers: Tiers = Field(default_factory=Tiers)
     checks: Checks = Field(default_factory=Checks)
     overrides: Overrides = Field(default_factory=Overrides)
-    llm: Llm = Field(default_factory=Llm)
     languages: Languages = Field(default_factory=Languages)
 
 

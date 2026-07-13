@@ -4,8 +4,9 @@
 and architecture docs. A project that moves into components and code while
 those docs are still scaffold text has no real root intent. This check warns
 when a doc under `00-foundation/` or `10-architecture/` still contains any of
-the known scaffold placeholder phrases. It is advisory: a short foundation can
-be valid, but a literal scaffold placeholder is not useful project intent.
+the known scaffold placeholder phrases. It is warning-level, never blocking: a
+short foundation can be valid, but a literal scaffold placeholder is not useful
+project intent.
 
 The placeholder phrase set lives alongside the scaffolds in
 `irminsul.init.placeholders`, so this check and the scaffolds stay in sync.

@@ -43,5 +43,5 @@ Cross-cutting: the [composite GitHub Action](../20-components/init.md) (`action.
 ## What's not here
 
 - No backend service. No webhooks. No state persisted between invocations.
-- No LLM calls in the v0.1.0 hard-check path. The `litellm` dependency is wired but unused; LLM advisory checks land in Sprint 2.
+- No LLM calls anywhere. Every check is deterministic; semantic judgment belongs to the coding agent consuming Irminsul, not to the tool itself.
 - No git history queries in the hard-check path. `mtime` drift, supersession checks, and the stale reaper live outside the hard profile.
