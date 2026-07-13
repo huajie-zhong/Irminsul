@@ -96,8 +96,8 @@ def check_json(repo_root: Path, config: IrminsulConfig, profile: str = "hard") -
     """Run the registered deterministic checks for `profile`, as JSON.
 
     Same selection as `irminsul check`, restricted to the `hard` and
-    `configured` profiles — LLM checks are never run over MCP. Unknown check
-    names from config are skipped silently (the CLI prints a note instead).
+    `configured` profiles. Unknown check names from config are skipped
+    silently (the CLI prints a note instead).
     """
     if profile not in CHECK_PROFILES:
         raise ValueError(
