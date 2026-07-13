@@ -53,7 +53,7 @@ The report contains:
 - each top-level layer directory that contains docs, with its doc count
 - doc totals, broken down by frontmatter `status`
 - the entry docs that exist on disk under the docs root ([`AGENTS.md`](../AGENTS.md), [`README.md`](../README.md), [`CONTRIBUTING.md`](../CONTRIBUTING.md), [`GLOSSARY.md`](../GLOSSARY.md))
-- the configured hard, soft deterministic, and soft LLM check names
+- the configured hard and soft deterministic check names
 - a curated command vocabulary: which command to run when, phrased for an agent working the edit-verify loop
 
 ## The JSON contract

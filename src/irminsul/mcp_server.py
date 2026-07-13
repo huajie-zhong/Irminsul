@@ -18,12 +18,20 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from irminsul.checks import HARD_REGISTRY, SOFT_REGISTRY, Check, Finding, sort_findings, summarize
+from irminsul.checks import (
+    HARD_REGISTRY,
+    SOFT_REGISTRY,
+    Check,
+    Finding,
+    fix_commands,
+    sort_findings,
+    summarize,
+)
 from irminsul.checks.claim_anchor import ClaimAnchorCheck
 from irminsul.config import IrminsulConfig, find_config, load
 from irminsul.context import build_context_report, context_report_to_json
 from irminsul.docgraph import build_graph
-from irminsul.listing.command import findings_for_kind, findings_to_json
+from irminsul.listing.command import findings_and_graph_for_kind, findings_to_json
 from irminsul.orient import build_orient_report, orient_report_to_json
 from irminsul.refs import (
     RefsError,
@@ -88,8 +96,8 @@ def check_json(repo_root: Path, config: IrminsulConfig, profile: str = "hard") -
     """Run the registered deterministic checks for `profile`, as JSON.
 
     Same selection as `irminsul check`, restricted to the `hard` and
-    `configured` profiles — LLM checks are never run over MCP. Unknown check
-    names from config are skipped silently (the CLI prints a note instead).
+    `configured` profiles. Unknown check names from config are skipped
+    silently (the CLI prints a note instead).
     """
     if profile not in CHECK_PROFILES:
         raise ValueError(
@@ -98,7 +106,12 @@ def check_json(repo_root: Path, config: IrminsulConfig, profile: str = "hard") -
 
     # The name-selection and JSON shape are owned by the CLI module; reuse them
     # rather than duplicating the logic here.
-    from irminsul.cli import Profile, _findings_to_json, _hard_check_names, _soft_check_names
+    from irminsul.cli import (
+        Profile,
+        _findings_to_json,
+        _hard_check_names,
+        _soft_check_names,
+    )
 
     prof = Profile(profile)
     graph = build_graph(repo_root, config)
@@ -115,16 +128,18 @@ def check_json(repo_root: Path, config: IrminsulConfig, profile: str = "hard") -
         findings.extend(cls().run(graph))
 
     findings = sort_findings(findings)
-    return _findings_to_json(findings, summarize(findings))
+    commands = fix_commands(findings, graph, profile=profile)
+    return _findings_to_json(findings, summarize(findings), commands)
 
 
 def list_docs_json(repo_root: Path, config: IrminsulConfig, kind: str) -> str:
     """Findings behind one `irminsul list` subcommand, as JSON.
 
-    Kind validation lives in `findings_for_kind`, which raises ValueError for
-    unknown kinds — no second copy of the check here.
+    Kind validation lives in `findings_and_graph_for_kind`, which raises
+    ValueError for unknown kinds — no second copy of the check here.
     """
-    return findings_to_json(findings_for_kind(repo_root, config, kind))
+    findings, graph = findings_and_graph_for_kind(repo_root, config, kind)
+    return findings_to_json(findings, graph)
 
 
 def surface_json(
@@ -150,7 +165,8 @@ def anchors_json(repo_root: Path, config: IrminsulConfig) -> str:
 
     graph = build_graph(repo_root, config)
     findings = sort_findings(ClaimAnchorCheck().run(graph))
-    return _findings_to_json(findings, summarize(findings))
+    commands = fix_commands(findings, graph, profile="all-available")
+    return _findings_to_json(findings, summarize(findings), commands)
 
 
 def create_server(repo_root: Path) -> FastMCP:

@@ -1,4 +1,12 @@
-"""PhantomLayerCheck — directories that have only INDEX.md and no content docs."""
+"""PhantomLayerCheck — directories that have only INDEX.md and no content docs.
+
+A hollow directory is navigation rot: an INDEX that promises a section but
+points at nothing. Severity depends on the INDEX's own status. A `status:
+draft` INDEX marks a layer deliberately under construction (every freshly
+scaffolded layer starts this way), so the finding is downgraded to `info` —
+visible, but not a gating warning. A hollow layer whose INDEX claims `stable`
+is a real warning: it asserts a finished section that has no content.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +15,7 @@ from typing import ClassVar
 
 from irminsul.checks.base import Finding, Severity
 from irminsul.docgraph import DocGraph
+from irminsul.frontmatter import StatusEnum
 
 
 class PhantomLayerCheck:
@@ -27,13 +36,25 @@ class PhantomLayerCheck:
             non_index = [f for f in md_files if f.name != "INDEX.md"]
             if md_files and not non_index:
                 rel = d.relative_to(graph.repo_root).as_posix()
+                index_node = graph.by_path.get(Path(rel) / "INDEX.md")
+                is_draft = (
+                    index_node is not None and index_node.frontmatter.status == StatusEnum.draft
+                )
+                if is_draft:
+                    severity = Severity.info
+                    message = f"layer under construction: '{rel}' has only a draft INDEX.md"
+                    suggestion = "add content docs, or this stays as a non-gating note while draft"
+                else:
+                    severity = Severity.warning
+                    message = f"phantom layer: '{rel}' has only INDEX.md and no content docs"
+                    suggestion = "add content docs or remove the directory from the nav"
                 out.append(
                     Finding(
                         check=self.name,
-                        severity=Severity.warning,
-                        message=f"phantom layer: '{rel}' has only INDEX.md and no content docs",
+                        severity=severity,
+                        message=message,
                         path=Path(rel + "/INDEX.md"),
-                        suggestion="add content docs or remove the directory from the nav",
+                        suggestion=suggestion,
                     )
                 )
 

@@ -1,7 +1,7 @@
 name: docs-nightly
 
-# Configured deterministic warnings run nightly. Switch the profile to
-# `advisory` when LLM checks are configured and should run on this schedule.
+# Configured deterministic warnings run nightly, catching drift that the
+# blocking hard profile does not gate on (orphans, staleness, mtime drift).
 
 on:
   schedule:

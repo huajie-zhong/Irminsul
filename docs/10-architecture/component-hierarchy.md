@@ -20,13 +20,6 @@ claims:
     evidence:
       - src/irminsul/checks/schema_leak.py
       - .github/workflows/ci.yml
-  - id: llm-scope-available
-    state: available
-    kind: advisory_check
-    claim: LLM scope and semantic checks are available as advisory checks.
-    evidence:
-      - src/irminsul/checks/scope_appropriateness.py
-      - docs/20-components/checks.md
 ---
 
 # Component Hierarchy and Doctrine
@@ -78,10 +71,9 @@ Several checks make the highest-frequency doctrine violations costly and visible
 2. **No-broad-globs in parents-with-children.** If a folder has children, its index doc's `describes` field must be empty or an explicit list of files — never directory wildcards. The parent-child check reports an error on broad globs in parent docs. <!-- claim:parent-child-check-available -->
 3. **Length cap as smell.** Warn if an index doc exceeds ~300 lines. Architecture writing should be concise; long parents indicate accumulated implementation detail. Advisory.
 4. **Folder auto-ownership.** An `INDEX.md` auto-owns sibling docs in its folder. No `children:` registry is required. <!-- irminsul:ignore prose-file-reference reason="literal filename rule" -->
-5. **LLM contradiction and scope checks.** Advisory LLM checks can flag semantic overlap, drift, or inappropriate detail. They are review signals, not hard gates. <!-- claim:llm-scope-available -->
 
 ### The Honest Limit
 
 The semantic boundary between "architectural" and "implementational" cannot be fully mechanized. Two reviewers can legitimately disagree about which side a paragraph falls on. No regex catches "this is too detailed for a parent doc."
 
-The deterministic checks reduce the surface area where doctrine can be violated. The LLM advisory checks catch a fraction of the residual semantic cases. Everything else is review quality — every PR touching a folder index doc should be reviewed by someone who understands the doctrine.
+The deterministic checks reduce the surface area where doctrine can be violated. The residual semantic cases belong to review — by the humans and coding agents reading the docs — so every PR touching a folder index doc should be reviewed by someone who understands the doctrine.
