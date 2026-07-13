@@ -21,7 +21,7 @@ tests:
 
 The headline is source-file coverage. Every file under the configured source roots is counted, and a file is claimed when at least one doc's `describes:` glob matches it — the same claim resolution the [uniqueness check](checks.md) uses. The digest reports the claimed total, the percentage, and the top directories ranked by unclaimed-file count, so a brownfield adopter sees coverage debt that the green check run cannot: the uniqueness omission warning only fires inside directories that already contain a claimed file.
 
-The findings summary runs the configured hard and soft deterministic checks — the same selection as the configured check profile — and reports counts by severity plus per-check counts. LLM checks never run here.
+The findings summary runs the configured hard and soft deterministic checks — the same selection as the configured check profile — and reports counts by severity plus per-check counts.
 
 ## Scope & Limitations
 

@@ -11,11 +11,6 @@
 - **glossary** — warns when a doc redefines a term that belongs in `GLOSSARY.md`
 - **external-links** — HEAD-checks external URLs with a persistent disk cache (disabled by default; enable in nightly CI)
 
-### New checks (LLM advisory)
-- **overlap** — detects docs in the same layer covering the same topic
-- **semantic-drift** — detects divergence between a doc's body and the source code it describes
-- **scope-appropriateness** — flags docs that cross tier boundaries
-
 ### New commands
 - `irminsul new adr <title>` — scaffold an ADR in `docs/50-decisions/`
 - `irminsul new component <name>` — scaffold a component doc in `docs/20-components/`
@@ -29,10 +24,8 @@
 - `irminsul init-docs-only --code-repo <spec>` — scaffold a docs-only repo where code lives in a separate GitHub repo (Topology A)
 
 ### Enhancements
-- `irminsul check --profile=hard|configured|advisory|all-available` — explicit check profiles replace `--scope`
-- `irminsul fix --profile=hard|configured|advisory|all-available` — fix selection now uses the same profile vocabulary
-- `irminsul check --profile=advisory` — LLM checks are now real (LiteLLM-backed, budget-aware, disk-cached)
-- `irminsul check --llm-budget=<usd>` — override per-invocation cost ceiling
+- `irminsul check --profile=hard|configured|all-available` — explicit check profiles replace `--scope`
+- `irminsul fix --profile=hard|configured|all-available` — fix selection now uses the same profile vocabulary
 - `irminsul check --strict` — promote warnings to errors for exit code
 - Go and Rust language profiles added to `LANGUAGE_REGISTRY`
 - Anchor validation in `LinksCheck` (same-doc `#heading` and cross-doc `file.md#heading`)
@@ -45,6 +38,7 @@
 ### Removed
 - The render subsystem — `irminsul render`, `regen python`/`typescript`, the `[render]`/`[regen]` config, and the `[mkdocs]` extra (ADR-0013). Derivable reference is obtained on demand via `irminsul surface`.
 - Tier 1 ("Generated") and the `40-reference/` layer, plus the `[tiers].generated` config field (ADR-0014). `tier:` frontmatter now accepts 2–4; non-derivable reference lives in its owning layer.
+- The `[llm]` config table and `checks.soft_llm` — accepted by the v0.1.0 schema but never backed by a working check. The config schema now rejects both; remove them from `irminsul.toml`. Every check is deterministic.
 
 ## v0.1.0
 

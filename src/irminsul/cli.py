@@ -16,7 +16,6 @@ import typer
 from irminsul import __version__
 from irminsul.checks import (
     HARD_REGISTRY,
-    LLM_REGISTRY,
     SOFT_REGISTRY,
     Check,
     Finding,
@@ -54,7 +53,6 @@ app = typer.Typer(
 class Profile(StrEnum):
     hard = "hard"
     configured = "configured"
-    advisory = "advisory"
     all_available = "all-available"
 
 
@@ -470,12 +468,6 @@ def _soft_check_names(profile: Profile, config: IrminsulConfig) -> list[str]:
     return list(config.checks.soft_deterministic)
 
 
-def _llm_check_names(profile: Profile, config: IrminsulConfig) -> list[str]:
-    if profile != Profile.advisory:
-        return []
-    return list(config.checks.soft_llm)
-
-
 def _run_registered_checks(
     check_names: list[str],
     registry: dict[str, type[Check]],
@@ -498,94 +490,12 @@ def _run_registered_checks(
     return findings
 
 
-def _run_llm_checks(
-    check_names: list[str],
-    *,
-    repo_root: Path,
-    config: IrminsulConfig,
-    graph: DocGraph,
-    llm_budget: float | None,
-    fmt: str,
-) -> list[Finding]:
-    if not check_names:
-        return []
-
-    from irminsul.llm.client import LlmClient
-
-    findings: list[Finding] = []
-    budget = llm_budget if llm_budget is not None else config.llm.max_cost_usd
-    llm_client = LlmClient(
-        provider=config.llm.provider,
-        model=config.llm.model,
-        max_cost_usd=budget,
-        cache_path=repo_root / config.llm.cache_path,
-        required_in_ci=config.llm.required_in_ci,
-    )
-
-    if not llm_client.is_available():
-        if config.llm.required_in_ci:
-            findings.append(
-                Finding(
-                    check="llm",
-                    severity=Severity.error,
-                    message=(
-                        f"LLM checks required (required_in_ci=true) "
-                        f"but no API key found for provider '{config.llm.provider}'"
-                    ),
-                )
-            )
-        else:
-            for check_name in check_names:
-                if check_name in LLM_REGISTRY:
-                    findings.append(
-                        Finding(
-                            check=check_name,
-                            severity=Severity.info,
-                            message=(
-                                f"LLM check skipped: no API key configured "
-                                f"for provider '{config.llm.provider}'"
-                            ),
-                        )
-                    )
-        return findings
-
-    calls_before = len(llm_client._cache)
-    for check_name in check_names:
-        cls_llm = LLM_REGISTRY.get(check_name)
-        if cls_llm is None:
-            typer.echo(
-                typer.style(
-                    f"note: LLM check '{check_name}' not yet implemented; skipping.",
-                    fg="yellow",
-                )
-            )
-            continue
-        findings.extend(cls_llm(llm_client=llm_client).run(graph))
-
-    spent = budget - llm_client.remaining_budget()
-    cache_size = len(llm_client._cache)
-    api_calls = max(0, cache_size - calls_before)
-    if fmt == "plain":
-        typer.echo(
-            typer.style(
-                f"LLM: ${spent:.4f} / ${budget:.2f} budget used"
-                + (f"; {api_calls} API call(s)" if api_calls else ""),
-                dim=True,
-            )
-        )
-    return findings
-
-
 @app.command()
 def check(
     profile: Annotated[
         Profile,
         typer.Option("--profile", help="Check profile to run."),
     ] = Profile.hard,
-    llm_budget: Annotated[
-        float | None,
-        typer.Option("--llm-budget", help="Override the LLM cost ceiling (USD) for this run."),
-    ] = None,
     strict: Annotated[
         bool,
         typer.Option(
@@ -695,16 +605,6 @@ def check(
     findings.extend(
         _run_registered_checks(
             _soft_check_names(profile, config), SOFT_REGISTRY, graph, tier="soft"
-        )
-    )
-    findings.extend(
-        _run_llm_checks(
-            _llm_check_names(profile, config),
-            repo_root=repo_root,
-            config=config,
-            graph=graph,
-            llm_budget=llm_budget,
-            fmt=fmt,
         )
     )
 

@@ -21,13 +21,6 @@ claims:
     evidence:
       - src/irminsul/checks/doc_reality.py
       - docs/20-components/checks.md
-  - id: llm-advisory-available
-    state: available
-    kind: advisory_checks
-    claim: LLM checks are implemented as advisory checks and are separate from hard deterministic checks.
-    evidence:
-      - src/irminsul/checks/semantic_drift.py
-      - docs/20-components/checks.md
   - id: precommit-external
     state: external
     kind: local_tooling
@@ -62,19 +55,17 @@ This technical layer provides the mechanical realization of [**The Harness Princ
 
 ## Two Tiers of Enforcement
 
-Every check in this system falls into one of three categories:
+Every check in this system falls into one of two categories:
 
 - **Hard, deterministic, blocking.** CI fails when these checks emit errors. <!-- claim:hard-checks-enabled -->
 - **Soft, deterministic, advisory.** These checks can warn about drift or suspicious structure without being part of the hard profile. <!-- claim:soft-deterministic-available -->
-- **Soft, LLM-based, advisory.** These checks use a model only for review signals and are kept separate from deterministic hard gates. <!-- claim:llm-advisory-available -->
 
-The boundary between hard and soft is principled: build correctness must not depend on LLM judgment. A hallucinated finding should never prevent a merge. Hard checks are pure graph operations, set comparisons, regex, glob resolution, and git-log arithmetic. <!-- claim:hard-checks-enabled -->
+The boundary between hard and soft is principled, and everything is deterministic: build correctness must never depend on model judgment, and semantic review belongs to the coding agent consuming Irminsul, not to the tool. Checks are pure graph operations, set comparisons, regex, glob resolution, and git-log arithmetic. <!-- claim:hard-checks-enabled -->
 
 | Tier | Examples |
 |------|----------|
 | Hard | Frontmatter validity, glob resolution, source ownership coverage uniqueness, internal link integrity, schema-leak detection |
 | Soft, deterministic | Mtime drift, external link rot, stale-doc reaper, orphan detector, generated-reference drift, claim provenance, boundary, import-deps, phantom-layer, reality |
-| Soft, LLM | Behavioral overlap detector, semantic drift judge, scope-appropriateness judge |
 
 ## The Change Triplet
 

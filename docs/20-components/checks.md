@@ -10,7 +10,6 @@ depends_on:
   - frontmatter
   - init
   - languages
-  - llm
   - new-list-regen
 describes:
   - src/irminsul/checks/**
@@ -43,7 +42,7 @@ Checks consume a [DocGraph](docgraph.md) and return `Finding` records with sever
 
 Soft deterministic checks warn rather than block. For example, `foundation-readiness` warns when a `00-foundation/` or `10-architecture/` doc still contains literal scaffold placeholder phrases — a signal the project never ran [`irminsul seed`](seed.md) to capture real intent. Another, `doc-refs`, warns when a `depends_on` entry names a doc id that doesn't exist in the graph — a dangling edge would otherwise silently weaken orphan detection and the other consumers of strong dependencies; the [refs query](refs.md) helps locate the intended doc. A third, `phantom-layer`, flags a directory whose only doc is its INDEX as navigation rot — at `warning` when that INDEX is `status: stable`, downgraded to `info` when it is `status: draft`, since a draft INDEX marks a layer deliberately under construction (the state every freshly scaffolded layer starts in) rather than abandoned navigation.
 
-Checks are registered in `HARD_REGISTRY`, `SOFT_REGISTRY`, and `LLM_REGISTRY` keyed by name. The CLI selects checks with `--profile`: `hard` runs configured hard checks, `configured` adds configured soft deterministic checks, `advisory` adds configured LLM checks, and `all-available` runs every implemented deterministic check regardless of config.
+Checks are registered in `HARD_REGISTRY` and `SOFT_REGISTRY` keyed by name. The CLI selects checks with `--profile`: `hard` runs configured hard checks, `configured` adds configured soft deterministic checks, and `all-available` runs every implemented deterministic check regardless of config.
 
 ## Scope & Limitations
 

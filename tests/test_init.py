@@ -255,7 +255,7 @@ def test_init_then_check_passes_on_freshly_scaffolded_repo(tmp_path: Path) -> No
 
     check_result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(target)])
     # The freshly-scaffolded repo has no `describes` claims yet so nothing
-    # should be flagged. (Source coverage is advisory, not hard.)
+    # should be flagged. (Source coverage is warning-level, not hard.)
     assert check_result.exit_code == 0, check_result.stdout
 
 
