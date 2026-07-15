@@ -109,6 +109,15 @@ def test_rfc_state_implemented_with_resolved_by_parses() -> None:
     assert fm.rfc_state == RfcStateEnum.implemented
 
 
+def test_frozen_hash_requires_full_lowercase_sha256() -> None:
+    valid = "sha256:" + "a" * 64
+    fm = DocFrontmatter.model_validate(_good_payload() | {"frozen_hash": valid})
+    assert fm.frozen_hash == valid
+    for invalid in ("sha256:abc", "sha256:" + "A" * 64, "md5:" + "a" * 64):
+        with pytest.raises(ValidationError):
+            DocFrontmatter.model_validate(_good_payload() | {"frozen_hash": invalid})
+
+
 def test_deprecated_rfc_states_still_parse() -> None:
     for state in ("open", "fcp", "withdrawn"):
         fm = DocFrontmatter.model_validate(_good_payload() | {"rfc_state": state})

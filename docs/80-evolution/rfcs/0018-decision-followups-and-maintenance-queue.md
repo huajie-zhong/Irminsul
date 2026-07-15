@@ -5,10 +5,11 @@ audience: explanation
 tier: 2
 status: stable
 describes: []
-rfc_state: accepted
+rfc_state: implemented
 affects: [checks, new-list-regen]
 resolved_by: docs/50-decisions/0009-implement-rfc-0018-decision-followups-and-maintenance-queue.md
 required_updates: []
+frozen_hash: "sha256:efb6c271c1c209dcd3a97ac7e148d406f0a5b7dc342e43130f3ae8b8f7c619d2"
 ---
 
 # RFC 0018: Decision required updates and maintenance queue

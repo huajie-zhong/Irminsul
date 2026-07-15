@@ -5,10 +5,11 @@ audience: explanation
 tier: 2
 status: stable
 describes: []
-rfc_state: accepted
+rfc_state: implemented
 affects: [checks]
 resolved_by: docs/50-decisions/0010-implement-rfc-0019-glossary-discipline.md
 required_updates: []
+frozen_hash: "sha256:9b670270c2e760536a24addd5a41ab2fdc274174943ae6d1ba4f88d79d9819bd"
 ---
 
 # RFC 0019: Glossary discipline and terminology resolution

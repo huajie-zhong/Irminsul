@@ -3,9 +3,15 @@ id: 0022-universal-fix-coverage
 title: Universal auto-fix coverage
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: implemented
+affects:
+- checks
+- new-list-regen
+resolved_by: docs/50-decisions/0016-freeze-implemented-rfc-records.md
+required_updates: []
+frozen_hash: "sha256:9b5852bc09a12abaf641a64512bcaa288ad000c30bcc39a935b8c768139667d0"
 ---
 
 # RFC 0022: Universal auto-fix coverage
@@ -177,3 +183,9 @@ items in the manifest never land. The RFC notes progress with a `## Status` log.
 - Should a planned-write report include the unified diff, or only the file path
   and description? Deferred: the current path+description report ships; a diff
   mode can be added later if noise proves acceptable.
+
+## Resolution
+
+Implemented before 2026-07-15 and recorded by
+[`ADR-0016`](../../50-decisions/0016-freeze-implemented-rfc-records.md). The
+finding-driven fixes and confirmation gate described by this RFC are shipped.

@@ -15,6 +15,7 @@ hard = [
     "liar",
     "prose-file-reference",
     "agents-manifest",
+    "rfc-lifecycle-integrity",
 ]
 soft_deterministic = [
     "mtime-drift",

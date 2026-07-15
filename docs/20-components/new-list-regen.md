@@ -20,6 +20,8 @@ tests:
   - tests/test_cli_regen.py
   - tests/test_cli_list.py
   - tests/test_cli_fix.py
+implements:
+  - 0035-rfc-lifecycle-integrity-and-frozen-records
 ---
 
 # New / List / Regen / Fix commands
@@ -34,13 +36,18 @@ The `component` kind accepts repeatable `--describes` and `--tests` options that
 
 ## `irminsul list {orphans,stale,undocumented}`
 
-Thin wrappers over existing soft checks: `orphans` delegates to `OrphansCheck`, `stale` to `StaleReaperCheck`, `undocumented` to `UniquenessCheck` (filtering to omission warnings), `lifecycle` to `DecisionUpdatesCheck`. Output is plain text by default; `--format json` emits a JSON array of the same finding records [`irminsul check --format json`](checks.md) produces — including `data` and `fixable`/`fix_command`. That sharing is deliberate: `lifecycle` wraps a check that *does* implement fixes, so a separate serializer here would be the one findings surface that hides fixability from agents.
+Thin wrappers over existing checks: `orphans` delegates to `OrphansCheck`, `stale` to `StaleReaperCheck`, `undocumented` to `UniquenessCheck` (filtering to omission warnings), and `lifecycle` combines `DecisionUpdatesCheck` with `RfcLifecycleIntegrityCheck`. Output is plain text by default; `--format json` emits a JSON array of the same finding records [`irminsul check --format json`](checks.md) produces — including `data` and `fixable`/`fix_command`. That sharing is deliberate: `lifecycle` wraps checks that *do* implement fixes, so a separate serializer here would be the one findings surface that hides fixability from agents.
 
 By default `undocumented` only reports files in covered directories — directories where at least one file is already claimed. The `--all` flag drops that heuristic and lists every source file with no doc claim, grouped by directory with per-directory counts, directories sorted by undocumented count descending; this is the brownfield on-ramp for repos with little or no existing coverage. In JSON mode each `--all` entry carries the file `path` and its parent `dir`.
 
+`list lifecycle --queue` also includes accepted implementation backlog entries,
+missing RFC seals, seal violations, premature implementation evidence, and stable
+live docs that still point at draft RFCs. Each category receives a deterministic
+priority, action kind, and suggested next command.
+
 ## `irminsul fix`
 
-Applies deterministic remediations for fixable findings selected by `--profile`. The default profile is `configured`; `hard`, `configured`, and `all-available` use the same selection policy as `irminsul check`. A check opts in by exposing a `fixes(findings, graph)` method that returns `Fix` objects; each fix only ever remediates a finding the check actually emits ([RFC 0022](../80-evolution/rfcs/0022-universal-fix-coverage.md)). The covered checks are `supersession` (deprecation metadata), `decision-updates` (the inverse `implements:` back-link), `inventory-drift` (pruning a drifted item), `rfc-resolution` (aligning a resolved RFC's `status` and inserting a scaffolding section), and `glossary-discipline` (linking the first use of a term).
+Applies deterministic remediations for fixable findings selected by `--profile`. The default profile is `configured`; `hard`, `configured`, and `all-available` use the same selection policy as `irminsul check`. A check opts in by exposing a `fixes(findings, graph)` method that returns `Fix` objects; each fix only ever remediates a finding the check actually emits ([RFC 0022](../80-evolution/rfcs/0022-universal-fix-coverage.md)). The covered checks are `supersession` (deprecation metadata), `decision-updates` (the inverse `implements:` back-link), `inventory-drift` (pruning a drifted item), `rfc-resolution` (aligning a resolved RFC's `status` and inserting a scaffolding section), `glossary-discipline` (linking the first use of a term), and `rfc-lifecycle-integrity` (adding a missing legacy seal with `--confirm`; it never re-seals changed history).
 
 `--dry-run` prints the edits that would be applied without writing files; normal runs group fixes by path and write each file atomically through a temporary file plus rename. Fixes that modify or remove existing content or load-bearing metadata are tagged `requires_confirm` and are held back — listed but not written — unless `--confirm` is passed; only purely additive inverse pointers apply by default. `--check <name>` harvests fixes from a single active check for targeted runs. Edits go through the shared [frontmatter-edit](frontmatter.md) helpers so every rewrite re-emits keys in canonical order and is idempotent.
 

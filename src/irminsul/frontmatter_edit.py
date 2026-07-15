@@ -18,6 +18,7 @@ from irminsul.frontmatter import DocFrontmatter
 def _yaml() -> YAML:
     yaml = YAML()
     yaml.preserve_quotes = True
+    yaml.width = 4096
     return yaml
 
 
