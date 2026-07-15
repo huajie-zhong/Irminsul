@@ -58,5 +58,3 @@ relationship fields that imply lifecycle evidence where none exists.
 - Configured checks expose incomplete and ambiguous ADR structure as warnings.
 - Existing decisions receive a small, content-preserving section backfill.
 - Lifecycle commands and metadata remain the sole authority for RFC state.
-- ADR number 0016 remains available to the independent lifecycle-integrity change;
-  this separate change uses 0017 to avoid a merge collision.
