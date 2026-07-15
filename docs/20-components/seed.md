@@ -12,6 +12,8 @@ describes:
   - src/irminsul/seed/**
 tests:
   - tests/test_seed.py
+implements:
+  - 0023-adr-template-structure
 ---
 
 # Seed command
@@ -30,6 +32,11 @@ can be compared against it explicitly, and it gives the evolution layer a
 non-empty starting point. When the scaffolded RFC index is present, seed also
 appends a navigation bullet for the anchoring RFC there (idempotently), so the
 RFC is reachable from day one.
+
+The anchoring ADR uses the canonical Status, Context, Decision, Alternatives
+Considered, and Consequences sections. This keeps a freshly initialized and seeded
+repository warning-free when `adr-structure` is enabled by the default configured
+profile.
 
 Input arrives three ways: interactive prompts (the default), individual flags
 (`--principle`, `--idea`, `--belief`, `--first-user`, `--non-goals`,

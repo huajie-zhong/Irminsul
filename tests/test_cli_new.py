@@ -47,6 +47,21 @@ def test_new_adr_passes_frontmatter_check(tmp_path: Path) -> None:
     assert errors == [], errors
 
 
+def test_new_adr_has_canonical_sections(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    runner.invoke(app, ["new", "adr", "Test Decision", "--path", str(repo)])
+    [adr] = (repo / "docs" / "50-decisions").glob("*.md")
+    text = adr.read_text(encoding="utf-8")
+    for heading in (
+        "## Status",
+        "## Context",
+        "## Decision",
+        "## Alternatives Considered",
+        "## Consequences",
+    ):
+        assert text.count(heading) == 1
+
+
 def test_new_adr_sequential_numbering(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
     runner.invoke(app, ["new", "adr", "First", "--path", str(repo)])

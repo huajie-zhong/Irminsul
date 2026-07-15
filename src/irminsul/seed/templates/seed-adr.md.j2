@@ -9,6 +9,10 @@ describes: []
 
 # {{ title }}
 
+## Status
+
+Proposed.
+
 ## Context
 
 {{ project_name }} starts from intent rather than from existing code. Before any
@@ -33,7 +37,12 @@ The first user this should serve is {{ first_user }}.
 
 {% for item in direction_risks %}- {{ item }}
 {% endfor %}
-{% endif %}## Consequences
+{% endif %}## Alternatives Considered
+
+- **Leave the direction implicit until implementation begins.** Rejected: later
+  changes would have no durable baseline for distinguishing evolution from drift.
+
+## Consequences
 
 The foundation layer now carries real project intent instead of scaffold
 placeholders. Architecture and component work can proceed against a stated
