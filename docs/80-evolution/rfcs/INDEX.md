@@ -47,3 +47,4 @@ In-flight proposals. See [`80-evolution`](../INDEX.md) for the RFC lifecycle.
 - [`0034-binding-readiness-and-agent-lifecycle`](0034-binding-readiness-and-agent-lifecycle.md) — Lifecycle readiness reports and a governed read-only agent surface
 - [`0035-rfc-lifecycle-integrity-and-frozen-records`](0035-rfc-lifecycle-integrity-and-frozen-records.md) — Freeze implemented RFC history and expose lifecycle-state contradictions
 - [`0037-workflow-context-modes`](0037-workflow-context-modes.md) — Stateless before-edit and after-edit context orchestration for agents
+- [`0038-context-content-excerpts`](0038-context-content-excerpts.md) — Bounded deterministic owner, claim, requirement, and dependency excerpts in context packets
