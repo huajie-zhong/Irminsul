@@ -12,6 +12,7 @@ depends_on:
 describes:
   - src/irminsul/change/**
 tests:
+  - tests/test_change_footprint.py
   - tests/test_change_report.py
   - tests/test_change_transition.py
   - tests/test_change_finalize.py
@@ -70,6 +71,8 @@ Findings are partitioned by their relationship to the change, and nothing is dro
 ## Diff baseline
 
 Evidence needs a comparison range, and the resolver never guesses a clean result: an explicit `--base-ref`, a CI-provided base ref (`IRMINSUL_BASE_REF` or `GITHUB_BASE_REF`), or the local staged/unstaged/untracked set — in that order. When none is available the baseline is reported as `unknown`, which can never be mechanically ready for finalization.
+
+Changed and deleted source paths use the same configured source policy as the on-disk inventory. A deletion that matches `.gitignore` or `source_excludes` therefore does not appear as owned or undocumented source merely because the file is no longer available to the walker.
 
 ## Scope & Limitations
 

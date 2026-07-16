@@ -49,6 +49,9 @@ Three consumers share this one engine: the `irminsul surface` query (aggregate t
 live surface for a human or agent), the inventory-drift check (verify a doc's
 curated subset still exists), and the boundary lint (catch a doc hand-copying a
 surface). Run `irminsul surface <kind>` to see a surface; nothing is written.
+Every consumer starts from the same configured source inventory, so ignored or
+explicitly excluded generated/vendor files cannot silently re-enter through a
+surface extractor.
 
 ## Scope & Limitations
 

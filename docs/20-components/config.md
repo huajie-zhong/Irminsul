@@ -28,9 +28,17 @@ Generated configs include the stable/useful deterministic sections: paths, hard 
 
 A loader walks up from the invocation directory looking for `irminsul.toml` so subcommands work regardless of cwd.
 
+## Source discovery policy
+
+`paths.source_roots` defines the explicit inventory boundaries. `source_includes` is an optional Git-wildmatch allow-list; an empty list includes every otherwise eligible file. `source_excludes` is a veto list and wins over includes. `honor_gitignore` defaults to `true` and applies repository-local `.gitignore` files with nested negation and last-match semantics. Global Git excludes and `.git/info/exclude` are not read, so inventory is reproducible across machines.
+
+Patterns match the normalized POSIX display path used by `describes:`. Same-repository files use repository-relative paths; files from an external source root use paths relative to that source root. Built-in cache/dot-path exclusions, `.gitignore`, and explicit excludes cannot be reversed by an include.
+
+Every configured root is deliberate. An enclosing repository rule that ignores the root directory does not hide it, which preserves private-docs layouts with a gitignored nested code checkout. More specific ignore rules for files inside the root still apply, using the nearest enclosing repository as the ignore boundary.
+
 `rfc-lifecycle-integrity` is a default hard check: it is inert in repositories
 without RFC lifecycle atoms and protects implemented RFC history when they exist.
 
 ## Scope & Limitations
 
-Config declares where files live and which checks are active — it does not validate source file contents. `find_config()` walks upward from the invocation directory but does not scan sibling directories or auto-discover projects. Config does not enforce runtime behavior; it only shapes which checks run.
+Config declares where files live and which checks are active — it does not validate source file contents. `find_config()` walks upward from the invocation directory but does not scan sibling directories or auto-discover projects. Explicit source roots may resolve outside the config repository; discovered symlink entries are still contained to the root that selected them.
