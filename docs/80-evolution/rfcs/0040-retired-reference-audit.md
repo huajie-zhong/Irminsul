@@ -40,7 +40,8 @@ Provenance: code
 
 Frontmatter MUST support `retires` entries with a stable id, a typed kind
 (`cli-command` or `concept`), one or more exact match phrases, and actionable
-guidance. Only stable ADR declarations are authoritative.
+guidance. CLI entries MUST also name the extractor's canonical
+`surface_identity`. Only stable ADR declarations are authoritative.
 
 #### Scenario: Stable ADR declares a retirement
 - **WHEN** a stable ADR carries a valid `retires` entry
@@ -49,6 +50,10 @@ guidance. Only stable ADR declarations are authoritative.
 #### Scenario: Declaration has no authoritative owner
 - **WHEN** a non-ADR or non-stable doc carries `retires`
 - **THEN** the check reports that the declaration is inactive instead of silently using it
+
+#### Scenario: Retired command is live again
+- **WHEN** a CLI tombstone's `surface_identity` exists in the current derived CLI surface
+- **THEN** the check reports a retirement contradiction on the ADR and does not flag current docs for that tombstone
 
 ### Requirement: Audit current guidance
 ID: audit-current-guidance
@@ -107,7 +112,9 @@ comments MUST NOT count as visible mentions.
 `DocFrontmatter.retires` contains validated `RetirementEntry` records. The soft
 deterministic `retired-references` check builds a registry only from stable ADR
 nodes, reports inactive and conflicting declarations, and scans current guidance
-line by line so findings carry usable file locations.
+line by line so findings carry usable file locations. Before activating CLI
+tombstones, it derives the current static CLI surface; a live identity produces a
+contradiction finding and disables that tombstone for the run.
 
 Inline and reference-style Markdown links retain their visible labels while
 their destinations are masked. HTML comments, reference definitions, and bare
@@ -115,9 +122,10 @@ URLs are masked. Fenced code remains visible because obsolete examples are one
 of the highest-risk failure modes. An exact link label resolving to the owning
 ADR is recorded as the sole historical-citation exception.
 
-V1 does not infer removals from Git or compare against the current CLI because
-absence does not encode intent, replacement, or ownership. A retirement becomes
-auditable when a human-approved ADR records it.
+V1 does not infer removals from Git because absence does not encode intent,
+replacement, or ownership. Current CLI derivation can disprove a retirement but
+cannot establish one. A retirement becomes auditable only when a human-approved
+ADR records it.
 
 ## Tasks
 
