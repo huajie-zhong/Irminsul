@@ -23,7 +23,7 @@ Adopt Irminsul as the canonical doc system for the Irminsul codebase itself. The
 
 The reference document moves from the repo root (`Irminsul-reference.md`) into `docs/90-meta/doc-system.md` so it's discoverable through the standard layer structure rather than as a special-cased top-level file. <!-- irminsul:ignore prose-file-reference reason="historical moved path" -->
 
-## Alternatives considered
+## Alternatives Considered
 
 - **Wait until v0.1.0 ships.** Tempting but circular — we'd be asking adopters to trust a system we hadn't tested ourselves.
 - **Keep the reference at repo root with a redirect.** Adds a special case the doc system explicitly forbids (`90-meta/` is the canonical home for docs about the doc system). No good reason to break our own rule.

@@ -104,6 +104,7 @@ automatically once any doc declares one.
 | `0014-retire-tier-1-and-reference-layer` | [ADR-0014: Retire Tier 1 and the reference layer](50-decisions/0014-retire-tier-1-and-reference-layer.md) | adr | 2 | Remove the Tier 1 ("Generated") tier and the 40-reference layer; non-derivable reference lives in its owning layer, derivable surfaces stay on-demand. |
 | `0015-govern-mcp-tool-surface` | [ADR-0015: Govern the MCP tool surface as a watched surface](50-decisions/0015-govern-mcp-tool-surface.md) | adr | 2 | Govern the MCP tool set with a dedicated `mcp` extractor and a watched `inventory:` block in mcp-server.md (internal consistency), rather than a generic-regex rule or a two-surface CLI-parity check. |
 | `0016-freeze-implemented-rfc-records` | [ADR-0016: Freeze implemented RFC records](50-decisions/0016-freeze-implemented-rfc-records.md) | adr | 2 | Seal implemented RFCs with an enforced full-file SHA-256 and treat extensions as new RFCs. |
+| `0017-standardize-adr-structure` | [ADR-0017: Standardize ADR structure without deriving lifecycle state](50-decisions/0017-standardize-adr-structure.md) | adr | 2 | Require a reviewable ADR shape while keeping RFC lifecycle state in structured metadata. |
 | `50-decisions` | [Architecture decisions](50-decisions/INDEX.md) | reference | 2 |  |
 
 ### 60-operations

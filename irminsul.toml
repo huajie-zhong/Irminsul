@@ -39,6 +39,7 @@ soft_deterministic = [
     "doc-refs",
     "change-binding",
     "requirement-grammar",
+    "adr-structure",
 ]
 
 [checks.schema_leak]

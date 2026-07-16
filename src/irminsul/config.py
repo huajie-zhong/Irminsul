@@ -54,6 +54,7 @@ SOFT_DETERMINISTIC_CHECKS = (
     "doc-refs",
     "change-binding",
     "requirement-grammar",
+    "adr-structure",
 )
 
 
