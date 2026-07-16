@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -210,3 +211,20 @@ def test_lifecycle_queue_prioritizes_frozen_record_violation() -> None:
     item = _to_queue_item(finding)
     assert item.priority == 1
     assert item.kind == "supersede"
+
+
+def test_lifecycle_queue_routes_pre_lifecycle_rfc_to_migration(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("change-migration")
+
+    result = runner.invoke(
+        app,
+        ["list", "lifecycle", "--queue", "--format", "json", "--path", str(repo)],
+    )
+
+    assert result.exit_code == 0, result.output
+    items = json.loads(result.output)
+    item = next(entry for entry in items if entry["kind"] == "migrate")
+    assert item["related_id"] == "0001-legacy"
+    assert item["suggested_command"] == "irminsul change migrate 0001-legacy"

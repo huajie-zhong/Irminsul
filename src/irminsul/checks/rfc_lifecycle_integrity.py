@@ -20,6 +20,16 @@ class RfcLifecycleIntegrityCheck:
         for node in rfc_nodes.values():
             state = node.frontmatter.rfc_state
             if state is None:
+                out.append(
+                    _finding(
+                        node,
+                        "pre-lifecycle-rfc",
+                        Severity.warning,
+                        "RFC has no structured lifecycle state",
+                        f"run `irminsul change migrate {node.id}` to inspect and classify it",
+                        data={"problem": "pre-lifecycle-rfc", "rfc": node.id},
+                    )
+                )
                 continue
             canonical = canonical_rfc_state(state)
             frozen_hash = node.frontmatter.frozen_hash
@@ -141,7 +151,7 @@ def _rfc_nodes(graph: DocGraph) -> dict[str, DocNode]:
     return {
         node.id: node
         for node in graph.nodes.values()
-        if node.path.as_posix().startswith(prefix) and node.frontmatter.rfc_state is not None
+        if node.path.as_posix().startswith(prefix) and node.path.name != "INDEX.md"
     }
 
 
