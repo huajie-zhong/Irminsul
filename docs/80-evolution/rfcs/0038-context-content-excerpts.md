@@ -4,6 +4,8 @@ title: "Deterministic content excerpts in context packets"
 audience: explanation
 tier: 2
 status: draft
+depends_on:
+  - 0037-workflow-context-modes
 describes: []
 rfc_state: draft
 affects:
@@ -23,6 +25,7 @@ documents using the same deterministic rules.
 
 This RFC defines extraction and fixed output bounds only. It does not introduce
 weighted relevance, token budgets, semantic search, or interactive expansion.
+It is the explicit content-selection extension deferred by RFC 0037.
 
 ## Motivation
 
