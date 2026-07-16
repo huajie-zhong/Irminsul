@@ -23,4 +23,8 @@ Tier dictates enforcement:
 - **T3 docs** trigger drift warnings if their `describes` files change without them.
 - **T4 docs** auto-archive after a deadline.
 
-There is no T1. The old "Generated" tier held CI-built reference under `40-reference/`; it was retired along with that layer when derivable surfaces moved on-demand to `irminsul surface`. The numbering is kept (T2–T4) so existing `tier:` frontmatter stays valid. See [`0014-retire-tier-1-and-reference-layer`](../50-decisions/0014-retire-tier-1-and-reference-layer.md).
+There is no T1. The old "Generated" tier held CI-built reference under
+[`40-reference/`](../50-decisions/0014-retire-tier-1-and-reference-layer.md); it
+was retired along with that layer when derivable surfaces moved on-demand to
+`irminsul surface`. The numbering is kept (T2–T4) so existing `tier:`
+frontmatter stays valid.

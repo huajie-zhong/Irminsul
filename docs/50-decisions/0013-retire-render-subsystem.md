@@ -6,6 +6,47 @@ tier: 2
 status: stable
 describes: []
 summary: Remove the MkDocs renderer and the regen python/typescript stubs; keep check + derive + agent manifest.
+retires:
+  - id: render-command
+    kind: cli-command
+    surface_identity: render
+    matches:
+      - irminsul render
+      - irm render
+    guidance: Point a static-site generator directly at the portable Markdown tree if a site is needed.
+  - id: regen-python-command
+    kind: cli-command
+    surface_identity: regen python
+    matches:
+      - irminsul regen python
+      - irm regen python
+    guidance: Use `irminsul surface exports` to derive Python exports on demand.
+  - id: regen-typescript-command
+    kind: cli-command
+    surface_identity: regen typescript
+    matches:
+      - irminsul regen typescript
+      - irm regen typescript
+    guidance: Use `irminsul surface exports` to derive exports on demand.
+  - id: regen-docs-surfaces-command
+    kind: cli-command
+    surface_identity: regen docs-surfaces
+    matches:
+      - irminsul regen docs-surfaces
+      - irm regen docs-surfaces
+    guidance: Use `irminsul surface <kind>` to derive the needed surface without committing it.
+  - id: regen-all-command
+    kind: cli-command
+    surface_identity: regen all
+    matches:
+      - irminsul regen all
+      - irm regen all
+    guidance: Run the specific retained command; only `regen agents-md` remains as a materialized artifact.
+  - id: render-subsystem
+    kind: concept
+    matches:
+      - render subsystem
+    guidance: Treat Irminsul as a checker and on-demand deriver; site rendering belongs to downstream tooling.
 ---
 
 # ADR-0013: Retire the render and reference-stub subsystem
