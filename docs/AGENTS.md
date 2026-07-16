@@ -160,6 +160,7 @@ automatically once any doc declares one.
 | `0033-derived-layered-impact` | [Derived change impact and semantic-review clues](80-evolution/rfcs/0033-derived-layered-impact.md) | explanation | 2 |  |
 | `0034-binding-readiness-and-agent-lifecycle` | [Binding readiness and the governed agent lifecycle surface](80-evolution/rfcs/0034-binding-readiness-and-agent-lifecycle.md) | explanation | 2 |  |
 | `0035-rfc-lifecycle-integrity-and-frozen-records` | [RFC lifecycle integrity and frozen implemented records](80-evolution/rfcs/0035-rfc-lifecycle-integrity-and-frozen-records.md) | explanation | 2 |  |
+| `0037-workflow-context-modes` | [Workflow-oriented context modes](80-evolution/rfcs/0037-workflow-context-modes.md) | explanation | 2 |  |
 | `80-evolution` | [Evolution](80-evolution/INDEX.md) | reference | 4 |  |
 | `patterns` | [Evolution Patterns](80-evolution/patterns.md) | explanation | 2 |  |
 | `rfcs` | [RFCs](80-evolution/rfcs/INDEX.md) | reference | 2 |  |
