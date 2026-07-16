@@ -168,6 +168,7 @@ automatically once any doc declares one.
 | `0038-context-content-excerpts` | [Deterministic content excerpts in context packets](80-evolution/rfcs/0038-context-content-excerpts.md) | explanation | 2 |  |
 | `0039-stale-prose-suppressions` | [Detect stale prose file-reference suppressions](80-evolution/rfcs/0039-stale-prose-suppressions.md) | explanation | 2 |  |
 | `0040-retired-reference-audit` | [Detect references to retired commands and concepts](80-evolution/rfcs/0040-retired-reference-audit.md) | explanation | 2 |  |
+| `0041-pre-lifecycle-rfc-migration` | [Migrate pre-lifecycle RFCs without inferring intent](80-evolution/rfcs/0041-pre-lifecycle-rfc-migration.md) | explanation | 2 |  |
 | `0042-rfc-dependency-and-supersession-graphs` | [RFC dependency and supersession graphs](80-evolution/rfcs/0042-rfc-dependency-and-supersession-graphs.md) | explanation | 2 |  |
 | `80-evolution` | [Evolution](80-evolution/INDEX.md) | reference | 4 |  |
 | `patterns` | [Evolution Patterns](80-evolution/patterns.md) | explanation | 2 |  |
