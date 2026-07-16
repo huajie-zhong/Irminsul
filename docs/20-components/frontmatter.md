@@ -50,6 +50,14 @@ ADR, detects a CLI identity that has become live again, and audits current
 guidance. A current historical mention is explicit only when the exact phrase is
 linked to the owning ADR.
 
+An RFC classified through the legacy migration path carries typed
+`lifecycle_migration` provenance ([RFC 0041](../80-evolution/rfcs/0041-pre-lifecycle-rfc-migration.md)).
+Its source is `pre-lifecycle`; its basis is either `human-classification` or,
+only for an implemented RFC, `human-implementation-attestation`. Model validation
+rejects an attestation on any other state and rejects an implemented migration
+that lacks it. This distinguishes historical classification from ordinary
+anchor-backed finalization without consulting Git history.
+
 The write side lives in `src/irminsul/frontmatter_edit.py`: round-trip helpers (`set_value`, `add_to_list`, `remove_inventory_item`) that the deterministic [fix](new-list-regen.md) actions share so every rewrite re-emits keys in canonical order, leaves the body untouched, and is idempotent.
 
 ## Frozen RFC records

@@ -48,6 +48,11 @@ missing RFC seals, seal violations, premature implementation evidence, and stabl
 live docs that still point at draft RFCs. Each category receives a deterministic
 priority, action kind, and suggested next command.
 
+Pre-lifecycle RFCs appear as `migrate` work with the direct command
+`irminsul change migrate <id>`. They are deliberately not folded into the draft
+or implementation queues: choosing their lifecycle state is a human decision,
+while the queue's job is to keep that unresolved decision visible.
+
 ## `irminsul fix`
 
 Applies deterministic remediations for fixable findings selected by `--profile`. The default profile is `configured`; `hard`, `configured`, and `all-available` use the same selection policy as `irminsul check`. A check opts in by exposing a `fixes(findings, graph)` method that returns `Fix` objects; each fix only ever remediates a finding the check actually emits ([RFC 0022](../80-evolution/rfcs/0022-universal-fix-coverage.md)). The covered checks are `supersession` (deprecation metadata), `decision-updates` (the inverse `implements:` back-link), `inventory-drift` (pruning a drifted item), `rfc-resolution` (aligning a resolved RFC's `status` and inserting a scaffolding section), `glossary-discipline` (linking the first use of a term), and `rfc-lifecycle-integrity` (adding a missing legacy seal with `--confirm`; it never re-seals changed history).

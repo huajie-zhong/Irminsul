@@ -42,6 +42,7 @@ inventory:
       - change status
       - change verify
       - change transition
+      - change migrate
       - change graph
       - change finalize
       - change impact
