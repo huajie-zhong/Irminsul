@@ -3,13 +3,15 @@ id: 0042-rfc-dependency-and-supersession-graphs
 title: "RFC dependency and supersession graphs"
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: accepted
 affects:
-  - change
-  - checks
-  - cli
+- change
+- checks
+- cli
+resolved_by: docs/50-decisions/0021-derive-rfc-relationship-graphs.md
+required_updates: []
 ---
 
 # RFC 0042: RFC dependency and supersession graphs
@@ -199,3 +201,11 @@ inspect a broken graph before deciding how to repair it.
 - Which graph issues should later gate acceptance or implementation, and at which
   transition?
 - Should MCP expose the same query after the CLI/JSON contract has stabilized?
+
+## Resolution
+
+Accepted by
+[`ADR-0021`](../../50-decisions/0021-derive-rfc-relationship-graphs.md).
+RFC relations remain authored through the existing forward fields and derived on
+read. The query exposes lifecycle-aware planning evidence without inferring human
+decisions, mutating frozen predecessors, or turning observation issues into gates.
