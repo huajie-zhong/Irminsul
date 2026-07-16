@@ -3,11 +3,13 @@ id: 0039-stale-prose-suppressions
 title: "Detect stale prose file-reference suppressions"
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: accepted
 affects:
-  - checks
+- checks
+resolved_by: docs/50-decisions/0018-audit-stale-prose-suppressions.md
+required_updates: []
 ---
 
 # RFC 0039: Detect stale prose file-reference suppressions
@@ -116,3 +118,10 @@ riskier remediation contract.
 
 - Whether suppression reasons should become typed and required belongs to a
   later policy RFC.
+
+## Resolution
+
+Accepted by
+[`ADR-0018`](../../50-decisions/0018-audit-stale-prose-suppressions.md): use the
+same deterministic violation predicate to audit line and block exceptions,
+report stale markers as non-baselineable information, and keep removal manual.

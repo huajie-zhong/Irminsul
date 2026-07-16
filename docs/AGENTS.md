@@ -105,6 +105,7 @@ automatically once any doc declares one.
 | `0015-govern-mcp-tool-surface` | [ADR-0015: Govern the MCP tool surface as a watched surface](50-decisions/0015-govern-mcp-tool-surface.md) | adr | 2 | Govern the MCP tool set with a dedicated `mcp` extractor and a watched `inventory:` block in mcp-server.md (internal consistency), rather than a generic-regex rule or a two-surface CLI-parity check. |
 | `0016-freeze-implemented-rfc-records` | [ADR-0016: Freeze implemented RFC records](50-decisions/0016-freeze-implemented-rfc-records.md) | adr | 2 | Seal implemented RFCs with an enforced full-file SHA-256 and treat extensions as new RFCs. |
 | `0017-standardize-adr-structure` | [ADR-0017: Standardize ADR structure without deriving lifecycle state](50-decisions/0017-standardize-adr-structure.md) | adr | 2 | Require a reviewable ADR shape while keeping RFC lifecycle state in structured metadata. |
+| `0018-audit-stale-prose-suppressions` | [ADR-0018: Audit stale prose suppressions](50-decisions/0018-audit-stale-prose-suppressions.md) | adr | 2 | Report obsolete prose-file-reference exceptions without making them baseline-suppressible or automatically removing them. |
 | `0021-derive-rfc-relationship-graphs` | [ADR-0021: Derive RFC relationship graphs](50-decisions/0021-derive-rfc-relationship-graphs.md) | adr | 2 | Derive lifecycle-aware RFC relationships from forward declarations without mutating frozen predecessors. |
 | `50-decisions` | [Architecture decisions](50-decisions/INDEX.md) | reference | 2 |  |
 

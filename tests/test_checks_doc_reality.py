@@ -352,6 +352,106 @@ def test_prose_file_reference_allows_block_ignore(tmp_path: Path) -> None:
     assert ProseFileReferenceCheck().run(_graph(tmp_path)) == []
 
 
+def test_prose_file_reference_reports_stale_line_ignore(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/20-components/widget.md",
+        doc_id="widget",
+        body=(
+            "No local file reference remains. "
+            '<!-- irminsul:ignore prose-file-reference reason="old example.md" -->'
+        ),
+    )
+
+    findings = ProseFileReferenceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert findings[0].severity.value == "info"
+    assert findings[0].category == "stale-suppression"
+    assert findings[0].data == {"problem": "stale-suppression", "scope": "line"}
+
+
+def test_prose_file_reference_reports_linked_only_line_ignore_as_stale(
+    tmp_path: Path,
+) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/20-components/widget.md",
+        doc_id="widget",
+        body=(
+            "See [neighbor](neighbor.md). "
+            '<!-- irminsul:ignore prose-file-reference reason="legacy" -->'
+        ),
+    )
+
+    findings = ProseFileReferenceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert findings[0].category == "stale-suppression"
+
+
+def test_prose_file_reference_reports_stale_block_ignore(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/20-components/widget.md",
+        doc_id="widget",
+        body=(
+            '<!-- irminsul:ignore-start prose-file-reference reason="legacy" -->\n'
+            "See [neighbor](neighbor.md).\n"
+            "<!-- irminsul:ignore-end prose-file-reference -->"
+        ),
+    )
+
+    findings = ProseFileReferenceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert findings[0].line == 3
+    assert findings[0].data == {"problem": "stale-suppression", "scope": "block"}
+
+
+def test_prose_file_reference_reports_same_line_empty_block_as_stale(
+    tmp_path: Path,
+) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/20-components/widget.md",
+        doc_id="widget",
+        body=(
+            "<!-- irminsul:ignore-start prose-file-reference "
+            "--><!-- irminsul:ignore-end prose-file-reference -->"
+        ),
+    )
+
+    findings = ProseFileReferenceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert findings[0].category == "stale-suppression"
+
+
+def test_prose_file_reference_ignores_suppression_markers_in_fences(
+    tmp_path: Path,
+) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/20-components/widget.md",
+        doc_id="widget",
+        body=(
+            "```markdown\n"
+            "<!-- irminsul:ignore prose-file-reference -->\n"
+            "<!-- irminsul:ignore-start prose-file-reference -->\n"
+            "<!-- irminsul:ignore-end prose-file-reference -->\n"
+            "```"
+        ),
+    )
+
+    assert ProseFileReferenceCheck().run(_graph(tmp_path)) == []
+
+
 def test_prose_file_reference_flags_unclosed_block_ignore(tmp_path: Path) -> None:
     _write_config(tmp_path)
     _write_doc(
