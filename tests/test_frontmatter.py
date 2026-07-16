@@ -12,6 +12,7 @@ from irminsul.frontmatter import (
     DocFrontmatter,
     ParsedDoc,
     ParseFailure,
+    RetirementKindEnum,
     RfcStateEnum,
     canonical_rfc_state,
     expected_id_for,
@@ -58,6 +59,92 @@ def test_doc_frontmatter_accepts_required_updates() -> None:
     fm = DocFrontmatter.model_validate(payload)
     assert fm.required_updates is not None
     assert fm.required_updates[0].path == "docs/20-components/widget.md"
+
+
+def test_doc_frontmatter_accepts_retirement_tombstones() -> None:
+    payload = _good_payload() | {
+        "retires": [
+            {
+                "id": "old-render-command",
+                "kind": "cli-command",
+                "surface_identity": "render",
+                "matches": ["irminsul   render", "irm render"],
+                "guidance": "Use irminsul surface instead.",
+            }
+        ]
+    }
+
+    fm = DocFrontmatter.model_validate(payload)
+
+    assert fm.retires[0].kind == RetirementKindEnum.cli_command
+    assert fm.retires[0].surface_identity == "render"
+    assert fm.retires[0].matches == ["irminsul render", "irm render"]
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        {
+            "id": "Uppercase",
+            "kind": "concept",
+            "matches": ["old idea"],
+            "guidance": "Use the new idea.",
+        },
+        {
+            "id": "old-idea",
+            "kind": "other",
+            "matches": ["old idea"],
+            "guidance": "Use the new idea.",
+        },
+        {
+            "id": "old-command",
+            "kind": "cli-command",
+            "matches": ["irminsul old"],
+            "guidance": "Use irminsul new.",
+        },
+        {
+            "id": "old-idea",
+            "kind": "concept",
+            "surface_identity": "old",
+            "matches": ["old idea"],
+            "guidance": "Use the new idea.",
+        },
+        {
+            "id": "old-idea",
+            "kind": "concept",
+            "matches": [],
+            "guidance": "Use the new idea.",
+        },
+        {
+            "id": "old-idea",
+            "kind": "concept",
+            "matches": ["old idea", "old   idea"],
+            "guidance": "Use the new idea.",
+        },
+        {
+            "id": "old-idea",
+            "kind": "concept",
+            "matches": ["old idea"],
+            "guidance": "",
+        },
+    ],
+)
+def test_doc_frontmatter_rejects_invalid_retirement_tombstone(
+    entry: dict[str, object],
+) -> None:
+    with pytest.raises(ValidationError):
+        DocFrontmatter.model_validate(_good_payload() | {"retires": [entry]})
+
+
+def test_doc_frontmatter_rejects_duplicate_retirement_ids() -> None:
+    entry = {
+        "id": "old-idea",
+        "kind": "concept",
+        "matches": ["old idea"],
+        "guidance": "Use the new idea.",
+    }
+    with pytest.raises(ValidationError, match="duplicate retirement"):
+        DocFrontmatter.model_validate(_good_payload() | {"retires": [entry, entry]})
 
 
 def test_doc_frontmatter_treats_followups_as_extra_key() -> None:

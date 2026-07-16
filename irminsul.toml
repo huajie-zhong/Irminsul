@@ -43,6 +43,7 @@ soft_deterministic = [
     "change-binding",
     "requirement-grammar",
     "adr-structure",
+    "retired-references",
 ]
 
 [checks.schema_leak]
