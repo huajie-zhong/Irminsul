@@ -56,6 +56,8 @@ inventory:
 
 The Typer app that backs both the `irminsul` and `irm` console scripts. The exact command surface is derived on demand from the Typer app — run `irminsul surface cli`.
 
+On Windows, both console-script entry points configure stdout and stderr as UTF-8 before invoking Typer. This keeps Unicode help text and findings stable under legacy code pages without changing streams when the app is imported as a library or invoked through `CliRunner`.
+
 Common command paths:
 
 - `irminsul init` — scaffold a new codebase. Delegates to [`init`](init.md).
