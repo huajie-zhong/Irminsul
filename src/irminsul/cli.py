@@ -1315,6 +1315,173 @@ class TransitionTarget(StrEnum):
     rejected = "rejected"
 
 
+class MigrationTarget(StrEnum):
+    draft = "draft"
+    accepted = "accepted"
+    implemented = "implemented"
+    rejected = "rejected"
+
+
+@_change_app.command("migrate")
+def change_migrate(
+    change_id: Annotated[
+        str | None,
+        typer.Argument(help="Optional pre-lifecycle RFC id, number, or path."),
+    ] = None,
+    state: Annotated[
+        MigrationTarget | None,
+        typer.Option("--state", help="Explicit human-selected lifecycle state."),
+    ] = None,
+    resolved_by: Annotated[
+        str | None,
+        typer.Option("--resolved-by", help="Existing stable ADR path for accepted/implemented."),
+    ] = None,
+    affects: Annotated[
+        list[str] | None,
+        typer.Option("--affects", help="Affected component id. Repeatable."),
+    ] = None,
+    affects_none: Annotated[
+        bool,
+        typer.Option("--affects-none", help="Explicitly declare that no components are affected."),
+    ] = False,
+    required_update: Annotated[
+        list[str] | None,
+        typer.Option("--required-update", help="Required downstream doc path. Repeatable."),
+    ] = None,
+    no_required_updates: Annotated[
+        bool,
+        typer.Option("--no-required-updates", help="Explicitly declare no required doc updates."),
+    ] = False,
+    reason: Annotated[
+        str | None,
+        typer.Option("--reason", help="Human rejection rationale (rejected only)."),
+    ] = None,
+    attest_implemented: Annotated[
+        bool,
+        typer.Option(
+            "--attest-implemented",
+            help="Human attestation that a legacy RFC was historically implemented.",
+        ),
+    ] = False,
+    fmt: Annotated[str, typer.Option("--format", help="Output format: plain or json.")] = "plain",
+    confirm: Annotated[
+        bool,
+        typer.Option("--confirm", help="Apply the migration. Without it, only the plan prints."),
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Print the plan without writing even with --confirm."),
+    ] = False,
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Inventory or explicitly classify RFCs created before lifecycle metadata.
+
+    Evidence is never converted into a state recommendation. Mutations are
+    one-RFC-at-a-time, dry-run by default, and require human-selected inputs.
+    """
+    from irminsul.change.migrate import (
+        format_inventory_plain,
+        format_plan_plain,
+        get_candidate,
+        inventory_candidates,
+        inventory_to_json,
+        plan_migration,
+        plan_to_json,
+    )
+    from irminsul.change.report import ChangeError
+    from irminsul.fix import apply_fixes
+
+    if fmt not in ("plain", "json"):
+        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+        raise typer.Exit(code=2)
+
+    repo_root, config = _load_repo(path)
+    graph = build_graph(repo_root, config)
+    mutation_flags = any(
+        (
+            state is not None,
+            resolved_by is not None,
+            bool(affects),
+            affects_none,
+            bool(required_update),
+            no_required_updates,
+            reason is not None,
+            attest_implemented,
+            confirm,
+            dry_run,
+        )
+    )
+    try:
+        if change_id is None:
+            if mutation_flags:
+                raise ChangeError("an RFC argument is required for migration planning", code=2)
+            candidates = inventory_candidates(graph, config)
+            typer.echo(
+                inventory_to_json(candidates)
+                if fmt == "json"
+                else format_inventory_plain(candidates)
+            )
+            return
+
+        if state is None:
+            if mutation_flags:
+                raise ChangeError(
+                    "--state is required before migration options can be used", code=2
+                )
+            _, candidate = get_candidate(graph, config, change_id)
+            typer.echo(
+                inventory_to_json([candidate])
+                if fmt == "json"
+                else format_inventory_plain([candidate])
+            )
+            return
+
+        plan = plan_migration(
+            graph,
+            config,
+            change_id,
+            state.value,
+            resolved_by=resolved_by,
+            affects=affects,
+            affects_none=affects_none,
+            required_updates=required_update,
+            no_required_updates=no_required_updates,
+            reason=reason,
+            attest_implemented=attest_implemented,
+        )
+    except ChangeError as exc:
+        typer.echo(typer.style(str(exc), fg="red"))
+        raise typer.Exit(code=exc.code) from exc
+
+    if plan.blockers:
+        typer.echo(plan_to_json(plan) if fmt == "json" else format_plan_plain(plan))
+        raise typer.Exit(code=1)
+
+    assert plan.fix is not None
+    result = apply_fixes(
+        repo_root,
+        [plan.fix],
+        dry_run=dry_run or not confirm,
+        confirm=True,
+    )
+    if result.errors:
+        for error in result.errors:
+            typer.echo(typer.style(error, fg="red"))
+        raise typer.Exit(code=1)
+
+    applied = confirm and not dry_run
+    if fmt == "json":
+        typer.echo(plan_to_json(plan, applied=applied, written=bool(result.written)))
+    else:
+        typer.echo(format_plan_plain(plan))
+        if applied:
+            typer.echo(typer.style(f"updated {len(result.written)} file(s)", fg="green"))
+        else:
+            typer.echo(
+                typer.style("planned 1 migration; re-run with --confirm to apply", fg="green")
+            )
+
+
 class RelationSelection(StrEnum):
     all = "all"
     dependency = "dependency"

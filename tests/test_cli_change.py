@@ -39,6 +39,95 @@ def test_change_status_unknown_id(repo: Path) -> None:
     assert "no RFC found" in result.output
 
 
+def test_change_migrate_inventory_has_no_state_recommendation(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    migration_repo = fixture_repo("change-migration")
+
+    result = runner.invoke(
+        app,
+        ["change", "migrate", "--format", "json", "--path", str(migration_repo)],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["state_inference"] is False
+    assert [candidate["id"] for candidate in data["candidates"]] == ["0001-legacy"]
+    assert data["candidates"][0]["recommended_state"] is None
+
+
+def test_change_migrate_draft_is_plan_only_by_default(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    migration_repo = fixture_repo("change-migration")
+    rfc = migration_repo / "docs" / "80-evolution" / "rfcs" / "0001-legacy.md"
+    before = rfc.read_text(encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "change",
+            "migrate",
+            "1",
+            "--state",
+            "draft",
+            "--format",
+            "json",
+            "--path",
+            str(migration_repo),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["applied"] is False
+    assert data["written"] is False
+    assert rfc.read_text(encoding="utf-8") == before
+
+
+def test_change_migrate_confirm_applies_one_rfc(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    migration_repo = fixture_repo("change-migration")
+    rfc = migration_repo / "docs" / "80-evolution" / "rfcs" / "0001-legacy.md"
+
+    result = runner.invoke(
+        app,
+        [
+            "change",
+            "migrate",
+            "0001-legacy",
+            "--state",
+            "draft",
+            "--confirm",
+            "--format",
+            "json",
+            "--path",
+            str(migration_repo),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["applied"] is True
+    assert data["written"] is True
+    assert "rfc_state: draft" in rfc.read_text(encoding="utf-8")
+
+
+def test_change_migrate_mutation_requires_one_rfc(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    migration_repo = fixture_repo("change-migration")
+
+    result = runner.invoke(
+        app,
+        ["change", "migrate", "--state", "draft", "--path", str(migration_repo)],
+    )
+
+    assert result.exit_code == 2
+    assert "RFC argument is required" in result.output
+
+
 def test_change_verify_json(repo: Path) -> None:
     result = runner.invoke(
         app,

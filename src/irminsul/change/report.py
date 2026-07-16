@@ -103,8 +103,8 @@ class ChangeReport:
     report without changing this dataclass on every iteration."""
 
 
-def find_rfc_node(graph: DocGraph, config: IrminsulConfig, change: str) -> DocNode:
-    """Resolve a change reference: doc id, numeric prefix, or repo-relative path."""
+def find_rfc_artifact(graph: DocGraph, config: IrminsulConfig, change: str) -> DocNode:
+    """Resolve an RFC by doc id, numeric prefix, or repo-relative path."""
     rfc_prefix = f"{docs_root_prefix(config)}/80-evolution/rfcs/"
 
     node = graph.nodes.get(change)
@@ -128,6 +128,12 @@ def find_rfc_node(graph: DocGraph, config: IrminsulConfig, change: str) -> DocNo
         raise ChangeError(f"no RFC found for '{change}'", code=2)
     if not node.path.as_posix().startswith(rfc_prefix):
         raise ChangeError(f"'{change}' resolves to {node.path.as_posix()}, not an RFC", code=2)
+    return node
+
+
+def find_rfc_node(graph: DocGraph, config: IrminsulConfig, change: str) -> DocNode:
+    """Resolve a structured lifecycle RFC for ordinary change commands."""
+    node = find_rfc_artifact(graph, config, change)
     if node.frontmatter.rfc_state is None:
         raise ChangeError(f"'{node.id}' has no rfc_state; it is not a change artifact", code=2)
     return node
