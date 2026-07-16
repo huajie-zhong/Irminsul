@@ -7,20 +7,21 @@ status: stable
 describes: []
 rfc_state: implemented
 affects:
-  - checks
-  - new-list-regen
-  - seed
+- checks
+- new-list-regen
+- seed
 resolved_by: docs/50-decisions/0017-standardize-adr-structure.md
 required_updates:
-  - path: docs/20-components/checks.md
-    reason: Document the ADR structure check and its review-quality boundary
-    kind: update
-  - path: docs/20-components/new-list-regen.md
-    reason: Document the complete ADR scaffold emitted by irminsul new adr
-    kind: update
-  - path: docs/20-components/seed.md
-    reason: Keep seeded decision records compliant with the canonical ADR shape
-    kind: update
+- path: docs/20-components/checks.md
+  reason: Document the ADR structure check and its review-quality boundary
+  kind: update
+- path: docs/20-components/new-list-regen.md
+  reason: Document the complete ADR scaffold emitted by irminsul new adr
+  kind: update
+- path: docs/20-components/seed.md
+  reason: Keep seeded decision records compliant with the canonical ADR shape
+  kind: update
+frozen_hash: "sha256:c907020f843bedc58eb3ab34655f52ea9f2a52c1bd82d0219827f7c3f4aa997a"
 ---
 
 # RFC 0023: ADR template and structured decision record
