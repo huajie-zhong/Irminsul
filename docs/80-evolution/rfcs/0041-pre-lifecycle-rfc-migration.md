@@ -3,14 +3,16 @@ id: 0041-pre-lifecycle-rfc-migration
 title: "Migrate pre-lifecycle RFCs without inferring intent"
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: accepted
 affects:
-  - change
-  - checks
-  - frontmatter
-  - new-list-regen
+- change
+- checks
+- frontmatter
+- new-list-regen
+resolved_by: docs/50-decisions/0020-migrate-pre-lifecycle-rfcs-explicitly.md
+required_updates: []
 ---
 
 # RFC 0041: Migrate pre-lifecycle RFCs without inferring intent
@@ -194,3 +196,11 @@ claim promotions, or evidence that did not exist in the pre-lifecycle process.
 
 - A future batch orchestrator may sequence already-approved per-RFC plans, but
   it must not add a state inference policy.
+
+## Resolution
+
+Accepted by
+[`ADR-0020`](../../50-decisions/0020-migrate-pre-lifecycle-rfcs-explicitly.md).
+Migration is an evidence-and-confirmation workflow, not a state inference policy:
+agents may inventory, explain, and prepare a plan, while a human supplies the
+lifecycle classification and any historical implementation attestation.
