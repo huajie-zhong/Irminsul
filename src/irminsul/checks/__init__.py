@@ -46,6 +46,7 @@ from irminsul.checks.parent_child import ParentChildCheck
 from irminsul.checks.phantom_layer import PhantomLayerCheck
 from irminsul.checks.reality import RealityCheck
 from irminsul.checks.requirement_grammar import RequirementGrammarCheck
+from irminsul.checks.rfc_lifecycle_integrity import RfcLifecycleIntegrityCheck
 from irminsul.checks.rfc_resolution import RfcResolutionCheck
 from irminsul.checks.schema_leak import SchemaLeakCheck
 from irminsul.checks.stale_reaper import StaleReaperCheck
@@ -62,6 +63,7 @@ HARD_REGISTRY: dict[str, type[Check]] = {
     LiarCheck.name: LiarCheck,
     ProseFileReferenceCheck.name: ProseFileReferenceCheck,
     AgentsManifestCheck.name: AgentsManifestCheck,
+    RfcLifecycleIntegrityCheck.name: RfcLifecycleIntegrityCheck,
 }
 
 SOFT_REGISTRY: dict[str, type[Check]] = {
@@ -115,6 +117,7 @@ __all__ = [
     "ProseFileReferenceCheck",
     "RealityCheck",
     "RequirementGrammarCheck",
+    "RfcLifecycleIntegrityCheck",
     "RfcResolutionCheck",
     "Severity",
     "TerminologyOverloadCheck",

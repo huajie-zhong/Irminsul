@@ -34,6 +34,7 @@ from irminsul.docgraph import DocGraph, DocNode
 from irminsul.docgraph_index import Requirement
 from irminsul.frontmatter import RfcStateEnum, StatusEnum, canonical_rfc_state
 from irminsul.frontmatter_edit import add_to_list, set_value
+from irminsul.rfc_freeze import seal_text
 
 PROMOTED_SECTION = "Implemented requirements"
 
@@ -252,7 +253,16 @@ def plan_finalize(
                         requires_confirm=True,
                     )
                 )
-        elif not component_fixes:
+        if fm.frozen_hash is None:
+            rfc_fixes.append(
+                Fix(
+                    path=node.path,
+                    description=f"freeze implemented RFC in {rfc_path}",
+                    apply=seal_text,
+                    requires_confirm=True,
+                )
+            )
+        if already_implemented and not component_fixes and not rfc_fixes:
             notes.append("RFC is already implemented and every claim is promoted; nothing to do")
 
     return FinalizePlan(

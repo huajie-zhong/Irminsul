@@ -3,9 +3,17 @@ id: 0034-binding-readiness-and-agent-lifecycle
 title: "Binding readiness and the governed agent lifecycle surface"
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: implemented
+affects:
+- change
+- mcp-server
+- new-list-regen
+- orient
+resolved_by: docs/50-decisions/0016-freeze-implemented-rfc-records.md
+required_updates: []
+frozen_hash: "sha256:c2399cf1f68b57bf1a2105b530672c28f2cc12e1d40278fbf312424c4a5af87a"
 ---
 
 # RFC 0034: Binding readiness and the governed agent lifecycle surface
@@ -200,3 +208,10 @@ let agents focus semantic judgment where it is needed.
   finalization.
 - How an agent records semantic-review acknowledgement without turning Irminsul
   into an identity or approval service.
+
+## Resolution
+
+Implemented before 2026-07-15 and recorded by
+[`ADR-0016`](../../50-decisions/0016-freeze-implemented-rfc-records.md). Later
+lifecycle-integrity and freeze behavior is specified separately by
+[`RFC 0035`](0035-rfc-lifecycle-integrity-and-frozen-records.md).

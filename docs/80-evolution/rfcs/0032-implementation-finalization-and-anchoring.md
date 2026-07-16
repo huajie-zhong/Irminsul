@@ -3,9 +3,16 @@ id: 0032-implementation-finalization-and-anchoring
 title: "Implementation finalization and anchored claims"
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: implemented
+affects:
+- anchors
+- change
+- frontmatter
+resolved_by: docs/50-decisions/0016-freeze-implemented-rfc-records.md
+required_updates: []
+frozen_hash: "sha256:4814045661569962775f676f13aeaf8b144db9975baf65b44fbbe80997a09d15"
 ---
 
 # RFC 0032: Implementation finalization and anchored claims
@@ -191,3 +198,8 @@ change.
 - How finalization records the semantic reviewer without creating identity or
   approval infrastructure.
 - Transaction strategy for restoring multiple Markdown files after a failed write.
+
+## Resolution
+
+Implemented before 2026-07-15 and recorded by
+[`ADR-0016`](../../50-decisions/0016-freeze-implemented-rfc-records.md).

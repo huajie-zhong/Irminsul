@@ -24,6 +24,7 @@ HARD_CHECKS = (
     "coverage",
     "liar",
     "prose-file-reference",
+    "rfc-lifecycle-integrity",
 )
 # Hard checks that ship registered and valid in `checks.hard` but are not
 # enabled by default; projects opt in by listing them. `agents-manifest`

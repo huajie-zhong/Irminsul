@@ -8,6 +8,8 @@ describes:
   - src/irminsul/config.py
 tests:
   - tests/test_config.py
+implements:
+  - 0035-rfc-lifecycle-integrity-and-frozen-records
 ---
 
 # Config
@@ -25,6 +27,9 @@ Hard checks and deterministic soft checks are enabled by default. Projects can o
 Generated configs include the stable/useful deterministic sections: paths, hard and soft checks, implemented nested check settings, overrides, and languages. The schema is closed — unknown keys are rejected rather than ignored, so a stale or misspelled table fails fast instead of silently doing nothing.
 
 A loader walks up from the invocation directory looking for `irminsul.toml` so subcommands work regardless of cwd.
+
+`rfc-lifecycle-integrity` is a default hard check: it is inert in repositories
+without RFC lifecycle atoms and protects implemented RFC history when they exist.
 
 ## Scope & Limitations
 

@@ -3,9 +3,18 @@ id: 0027-watched-surfaces
 title: "Watched surfaces: pin a derivable surface and flag any change for review"
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: implemented
+affects:
+- anchors
+- checks
+- frontmatter
+- orient
+- surface
+resolved_by: docs/50-decisions/0016-freeze-implemented-rfc-records.md
+required_updates: []
+frozen_hash: "sha256:b4879a2f44d7a66dcd3bd1e8071ccb2f4a214fae5f91078cb3014db9c92d2672"
 ---
 
 # RFC 0027: Watched surfaces
@@ -166,3 +175,9 @@ opt-in irminsul feature with zero orient-specific governance code.
   precision) vs. top-level groups.
 - The re-pin command surface (`anchors --re-pin` vs. a new `surface --re-pin`).
 - Whether Phase 2 (freshness) should ship with PR #47 or as a follow-on.
+
+## Resolution
+
+Implemented before 2026-07-15 and recorded by
+[`ADR-0016`](../../50-decisions/0016-freeze-implemented-rfc-records.md). Watched
+surface completeness, omissions, fingerprints, and re-pinning are live behavior.

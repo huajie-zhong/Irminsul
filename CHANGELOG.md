@@ -2,6 +2,9 @@
 
 ## v0.2.0 (unreleased)
 
+### New checks (hard)
+- **rfc-lifecycle-integrity** — freezes implemented RFC records with an enforced SHA-256 seal and detects lifecycle-state contradictions
+
 ### New checks (soft-deterministic)
 - **mtime-drift** — warns when source files were committed more recently than `last_reviewed`
 - **orphans** — warns when a doc has no inbound references (not linked, not in a parent's `children:`)
@@ -24,6 +27,8 @@
 - `irminsul init-docs-only --code-repo <spec>` — scaffold a docs-only repo where code lives in a separate GitHub repo (Topology A)
 
 ### Enhancements
+- `irminsul change finalize` seals the implemented RFC after its lifecycle edits
+- `irminsul list lifecycle --queue` includes freeze violations and draft/live state drift
 - `irminsul check --profile=hard|configured|all-available` — explicit check profiles replace `--scope`
 - `irminsul fix --profile=hard|configured|all-available` — fix selection now uses the same profile vocabulary
 - `irminsul check --strict` — promote warnings to errors for exit code

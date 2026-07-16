@@ -3,9 +3,16 @@ id: 0033-derived-layered-impact
 title: "Derived change impact and semantic-review clues"
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: implemented
+affects:
+- change
+- docgraph
+- surface
+resolved_by: docs/50-decisions/0016-freeze-implemented-rfc-records.md
+required_updates: []
+frozen_hash: "sha256:9270b703ae85a940785b66f017f8371fd265efdf54e071c53f6b2abc1f2825e8"
 ---
 
 # RFC 0033: Derived change impact and semantic-review clues
@@ -162,3 +169,8 @@ work that is not yet mechanical enough to ground an observation:
   the first iteration uses existing glossary findings only.
 - How to represent source attribution compactly in plain output while preserving
   complete JSON evidence.
+
+## Resolution
+
+Implemented before 2026-07-15 and recorded by
+[`ADR-0016`](../../50-decisions/0016-freeze-implemented-rfc-records.md).
