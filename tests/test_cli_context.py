@@ -16,7 +16,12 @@ from irminsul.cli import app
 runner = CliRunner()
 
 
-def _make_context_repo(tmp_path: Path, *, configured_soft: bool = True) -> Path:
+def _make_context_repo(
+    tmp_path: Path,
+    *,
+    configured_soft: bool = True,
+    claim_count: int = 1,
+) -> Path:
     repo = tmp_path / "ctx"
     repo.mkdir()
     checks = "" if configured_soft else "\n[checks]\nsoft_deterministic = []\n"
@@ -47,6 +52,18 @@ def _make_context_repo(tmp_path: Path, *, configured_soft: bool = True) -> Path:
 
     docs = repo / "docs" / "20-components"
     docs.mkdir(parents=True)
+    claim_lines = ["claims:"]
+    for index in range(claim_count):
+        claim_lines.extend(
+            [
+                f"  - id: core-contract-{index + 1}",
+                "    state: implemented",
+                "    kind: invariant",
+                f"    claim: Core invariant {index + 1} remains true.",
+                "    evidence:",
+                "      - src/mylib/core.py",
+            ]
+        )
     (docs / "core.md").write_text(
         "\n".join(
             [
@@ -58,6 +75,7 @@ def _make_context_repo(tmp_path: Path, *, configured_soft: bool = True) -> Path:
                 "status: stable",
                 "depends_on:",
                 "  - helper",
+                *claim_lines,
                 "describes:",
                 "  - src/mylib/core.py",
                 "  - src/mylib/core_extra.py",
@@ -226,6 +244,38 @@ def test_context_before_edit_groups_paths_and_surfaces_active_change(tmp_path: P
             "requirements": [{"id": "bounded-retries", "title": "Bounded retries"}],
         }
     ]
+    assert context["content"] == {
+        "included": [
+            {
+                "category": "owner",
+                "doc_id": "core",
+                "path": "docs/20-components/core.md",
+                "title": "Core",
+                "text": "Owns the core module.",
+                "reason": "Owns the requested path through document 'core'.",
+                "truncated": False,
+            },
+            {
+                "category": "claims",
+                "doc_id": "core",
+                "path": "docs/20-components/core.md",
+                "title": "Claim core-contract-1 (invariant)",
+                "text": "Core invariant 1 remains true.",
+                "reason": "Structured claim declared by the owning document.",
+                "truncated": False,
+            },
+            {
+                "category": "requirements",
+                "doc_id": "0001-retry",
+                "path": "docs/80-evolution/rfcs/0001-retry.md",
+                "title": "Requirement bounded-retries: Bounded retries",
+                "text": "The client MUST stop after the configured retry limit.",
+                "reason": "Active RFC '0001-retry' explicitly affects owner 'core'.",
+                "truncated": False,
+            },
+        ],
+        "omitted": {"owner": 0, "claims": 0, "requirements": 0},
+    }
     assert data["next_actions"] == [
         {
             "command": "irminsul change status 0001-retry",
@@ -254,7 +304,97 @@ def test_context_before_edit_plain_encodes_workflow(tmp_path: Path) -> None:
     assert "Workflow: before-edit" in result.output
     assert "0001-retry [draft]" in result.output
     assert "requirements: bounded-retries" in result.output
+    assert "[owner] Core (docs/20-components/core.md)" in result.output
+    assert "Owns the core module." in result.output
+    assert "The client MUST stop after the configured retry limit." in result.output
     assert "irminsul context --after-edit" in result.output
+
+
+def test_context_include_expands_dependencies_on_primitive_lookup(tmp_path: Path) -> None:
+    repo = _make_context_repo(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "context",
+            "src/mylib/core.py",
+            "--include",
+            "owner,dependencies",
+            "--format",
+            "json",
+            "--path",
+            str(repo),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    [context] = json.loads(result.output)["results"]
+    assert [item["category"] for item in context["content"]["included"]] == [
+        "owner",
+        "dependencies",
+    ]
+    assert context["content"]["included"][1]["doc_id"] == "helper"
+    assert context["content"]["included"][1]["text"] == "Owns the helper module."
+
+
+def test_context_include_none_and_unknown_category(tmp_path: Path) -> None:
+    repo = _make_context_repo(tmp_path)
+
+    none_result = runner.invoke(
+        app,
+        [
+            "context",
+            "--before-edit",
+            "src/mylib/core.py",
+            "--include",
+            "none",
+            "--format",
+            "json",
+            "--path",
+            str(repo),
+        ],
+    )
+    assert none_result.exit_code == 0, none_result.output
+    [context] = json.loads(none_result.output)["results"]
+    assert context["content"] == {"included": [], "omitted": {}}
+
+    invalid_result = runner.invoke(
+        app,
+        [
+            "context",
+            "src/mylib/core.py",
+            "--include",
+            "semantic-ranking",
+            "--path",
+            str(repo),
+        ],
+    )
+    assert invalid_result.exit_code == 2
+    assert "unknown --include categories" in invalid_result.output
+
+
+def test_context_content_reports_fixed_count_omissions(tmp_path: Path) -> None:
+    repo = _make_context_repo(tmp_path, claim_count=10)
+
+    result = runner.invoke(
+        app,
+        [
+            "context",
+            "--before-edit",
+            "src/mylib/core.py",
+            "--include",
+            "claims",
+            "--format",
+            "json",
+            "--path",
+            str(repo),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    [context] = json.loads(result.output)["results"]
+    assert len(context["content"]["included"]) == 8
+    assert context["content"]["omitted"] == {"claims": 2}
 
 
 def test_context_after_edit_runs_global_hard_validation(tmp_path: Path) -> None:
