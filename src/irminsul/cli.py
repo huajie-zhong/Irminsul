@@ -848,6 +848,13 @@ def context_command(
             help="Finding breadth: hard, configured, or all-available.",
         ),
     ] = None,
+    include: Annotated[
+        str | None,
+        typer.Option(
+            "--include",
+            help="Content categories: owner, claims, requirements, dependencies, all, or none.",
+        ),
+    ] = None,
     fmt: Annotated[
         str,
         typer.Option("--format", help="Output format: plain or json."),
@@ -868,6 +875,7 @@ def context_command(
         context_report_should_fail,
         context_report_to_json,
         format_context_plain,
+        parse_content_categories,
     )
     from irminsul.context import (
         ContextProfile as ContextProfileValue,
@@ -882,7 +890,14 @@ def context_command(
     requested_targets = list(targets or [])
 
     if change is not None:
-        if requested_targets or topic is not None or changed or before_edit or after_edit:
+        if (
+            requested_targets
+            or topic is not None
+            or changed
+            or before_edit
+            or after_edit
+            or include is not None
+        ):
             typer.echo(typer.style("--change cannot be combined with other input modes", fg="red"))
             raise typer.Exit(code=2)
         from irminsul.change.report import (
@@ -949,6 +964,7 @@ def context_command(
     )
 
     try:
+        content_categories = parse_content_categories(include) if include is not None else None
         report = build_context_report(
             repo_root,
             config,
@@ -958,6 +974,7 @@ def context_command(
             changed=effective_changed,
             profile=effective_profile,
             workflow=workflow,
+            content_categories=content_categories,
         )
     except ContextError as exc:
         typer.echo(typer.style(str(exc), fg="red"))
