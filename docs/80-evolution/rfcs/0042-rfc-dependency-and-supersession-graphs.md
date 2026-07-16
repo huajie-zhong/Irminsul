@@ -8,6 +8,7 @@ describes: []
 rfc_state: draft
 affects:
   - change
+  - checks
   - cli
 ---
 
@@ -28,8 +29,8 @@ this one, what depends on it, whether a replacement is only planned or effective
 or whether the relationship set contains a cycle or competing successors.
 
 Generic backlinks are not enough. They do not interpret lifecycle state, distinguish
-dependency from replacement, or preserve dangling and non-RFC targets as explicit
-problems. The existing generic supersession check also expects a reverse pointer on
+dependency from replacement, or preserve dangling targets as explicit problems. The
+existing generic supersession check also expects a reverse pointer on
 the old document, which is incompatible with immutable implemented RFC records.
 
 ## Requirements
@@ -49,6 +50,10 @@ a second relationship schema.
 #### Scenario: Reverse pointer on an RFC
 - **WHEN** an RFC carries `superseded_by`
 - **THEN** the graph reports that legacy reverse declaration as an issue and does not treat it as an authoritative edge
+
+#### Scenario: Generic supersession check
+- **WHEN** an RFC participates in a supersession edge
+- **THEN** the generic document supersession check leaves it untouched so it cannot demand a write to a frozen predecessor
 
 ### Requirement: Preserve incomplete evidence
 ID: preserve-incomplete-evidence
@@ -167,6 +172,7 @@ inspect a broken graph before deciding how to repair it.
 - `T3` Add `change graph` with full and focused plain/JSON modes. (component: cli)
 - `T4` Add fixture coverage for valid, incomplete, cyclic, conflicting, and unclassified graphs. (component: change)
 - `T5` Document the agent query and forward-only RFC supersession contract. (component: change)
+- `T6` Scope generic supersession repair away from RFC records while preserving ordinary document behavior. (component: checks)
 
 ## Drawbacks
 

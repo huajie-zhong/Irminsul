@@ -1214,6 +1214,12 @@ class TransitionTarget(StrEnum):
     rejected = "rejected"
 
 
+class RelationSelection(StrEnum):
+    all = "all"
+    dependency = "dependency"
+    supersession = "supersession"
+
+
 @_change_app.command("status")
 def change_status(
     change_id: Annotated[str, typer.Argument(help="RFC id, number, or repo-relative path.")],
@@ -1240,6 +1246,47 @@ def change_status(
         raise typer.Exit(code=exc.code) from exc
     typer.echo(
         change_report_to_json(report) if fmt == "json" else format_change_status_plain(report)
+    )
+
+
+@_change_app.command("graph")
+def change_graph(
+    change_id: Annotated[
+        str | None,
+        typer.Argument(help="Optional RFC id, number, or repo-relative path."),
+    ] = None,
+    relation: Annotated[
+        RelationSelection,
+        typer.Option("--relation", help="Relationship kind: all, dependency, or supersession."),
+    ] = RelationSelection.all,
+    fmt: Annotated[str, typer.Option("--format", help="Output format: plain or json.")] = "plain",
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Show the repository RFC relation graph or one connected component."""
+    from irminsul.change.relations import (
+        build_relation_graph,
+        format_relation_graph_plain,
+        relation_graph_to_json,
+    )
+    from irminsul.change.report import ChangeError
+
+    if fmt not in ("plain", "json"):
+        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+        raise typer.Exit(code=2)
+
+    repo_root, config = _load_repo(path)
+    try:
+        report = build_relation_graph(
+            repo_root,
+            config,
+            focus=change_id,
+            relation=relation.value,
+        )
+    except ChangeError as exc:
+        typer.echo(typer.style(str(exc), fg="red"))
+        raise typer.Exit(code=exc.code) from exc
+    typer.echo(
+        relation_graph_to_json(report) if fmt == "json" else format_relation_graph_plain(report)
     )
 
 
