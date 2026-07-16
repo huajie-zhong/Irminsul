@@ -1,12 +1,12 @@
 # Irminsul
 
-> A documentation system for complex codebases. Designed to resist rot, scale with complexity, and survive philosophy shifts.
+> Repository knowledge that stays accountable to the code.
 
-Irminsul is a Python CLI + composite GitHub Action that enforces structural invariants on your `/docs` tree in CI. The rules are simple: every fact has one home, every doc has one purpose, every cross-reference is bidirectional and machine-verifiable. The tool's job is to make sure those rules stay true while the codebase evolves.
+However your team creates documentation and specifications, Irminsul mechanically verifies their structure, the code they claim, their provenance and lifecycle, and whether those relationships still hold in the repository. It is a Python CLI + composite GitHub Action that enforces those invariants locally and in CI without prescribing an authoring workflow.
 
 ## Why
 
-Docs that rot are worse than no docs — they are noise that reads as signal. Irminsul turns the docs tree into a machine-verified contract between humans and AI coding agents: humans read the curated layers and write the judgment calls; agents query the graph, do the heavy lifting, and are held to the same checks. There is no server, no hosted state, and no LLM in the hard-check path — every structural claim the docs make about the code is verified deterministically, on every PR.
+Docs that rot are worse than no docs — they are noise that reads as signal. Agents are the primary operators and direct consumers of repository knowledge; humans interact with that knowledge primarily through agents and remain the authority for intent and approval. Irminsul gives both a machine-verified contract: agents query the graph and perform the work, while deterministic checks make structural drift visible to the humans who authorize it. There is no server, no hosted state, and no LLM in the check path.
 
 ## Quickstart
 
@@ -37,6 +37,7 @@ The loop: orient, locate the owning docs, edit code and docs in the same commit,
 |---------|--------------|
 | `irminsul orient` | First call in a session: one-shot repo orientation — what this repo is, the layer map, where to start |
 | `irminsul context --changed` (or `--topic <q>`, `<path>`) | Owning docs, tests, dependencies, and findings for the current edit set, a topic, or a path |
+| `irminsul status` | Repository-wide docs inventory, source ownership, and finding totals |
 | `irminsul refs <doc-id>` / `irminsul refs --symbol <name>` | Backlinks for a doc, or the docs that own/reference a symbol |
 | `irminsul surface {cli,http,exports,env-vars}` | Derive a code surface from source on demand — never written to disk, so it cannot drift |
 | `irminsul list {orphans,stale,undocumented}` | Docs nothing references, deprecated docs past threshold, source files no doc claims |
@@ -99,7 +100,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - uses: huajie-zhong/irminsul@v0.1.0
+      - uses: huajie-zhong/irminsul@v0.2.0
         with:
           profile: hard
 ```

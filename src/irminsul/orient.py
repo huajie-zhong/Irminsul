@@ -25,16 +25,16 @@ _ENTRY_DOC_NAMES = ("AGENTS.md", "README.md", "CONTRIBUTING.md", "GLOSSARY.md")
 # guidance is intent, which only a human can curate.
 _COMMANDS: tuple[tuple[str, str], ...] = (
     (
-        "irminsul context --changed",
-        "before and after editing: see which docs own your edits, their tests, and findings",
+        "irminsul context <path>",
+        "before editing a known file: find its owning doc, tests, dependencies, and findings",
     ),
     (
         "irminsul context --topic <query>",
-        "find the docs that cover a topic before starting work",
+        "before locating files: find the docs that cover a topic",
     ),
     (
-        "irminsul context <path>",
-        "look up the owning doc, tests, and dependencies for one file",
+        "irminsul context --changed",
+        "after editing: inspect ownership, tests, dependencies, and findings for this worktree",
     ),
     (
         "irminsul refs <doc-or-symbol>",
@@ -47,6 +47,10 @@ _COMMANDS: tuple[tuple[str, str], ...] = (
     (
         "irminsul check --profile=hard --format json",
         "verify the docs tree before committing; error findings block CI",
+    ),
+    (
+        "irminsul status --format json",
+        "audit repository-wide documentation health, source ownership, and finding totals",
     ),
     (
         "irminsul fix",
