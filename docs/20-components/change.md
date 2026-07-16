@@ -15,6 +15,7 @@ tests:
   - tests/test_change_report.py
   - tests/test_change_transition.py
   - tests/test_change_finalize.py
+  - tests/test_change_relations.py
   - tests/test_cli_change.py
 implements:
   - 0035-rfc-lifecycle-integrity-and-frozen-records
@@ -25,6 +26,7 @@ inventory:
       - change status
       - change verify
       - change transition
+      - change graph
 ---
 
 # Change lifecycle
@@ -41,6 +43,7 @@ Two linked rules shape every report:
 - `irminsul change status <id>` — lifecycle state (with deprecated-alias resolution), declared `affects`, valid next transitions, a compact evidence summary, and next actions.
 - `irminsul change verify <id> [--base-ref REF]` — the full read-only report: blockers, per-file evidence, declared-vs-derived scope divergence, and semantic-review clues, as plain text or versioned JSON.
 - `irminsul change transition <id> accepted|rejected --confirm` — validate and apply a human-authorized decision atomically: `rfc_state`, `status: stable`, `resolved_by`, an empty `required_updates`, and the terminal scaffolding section land in one confirmed pass, reusing the dry-run/confirm contract of `fix`. `implemented` is deliberately not a valid target here; only finalization may write it.
+- `irminsul change graph [<id>] [--relation all|dependency|supersession]` — derive the repository RFC graph or the complete connected component around one RFC ([RFC 0042](../80-evolution/rfcs/0042-rfc-dependency-and-supersession-graphs.md)). Dependency edges come directly from `depends_on`; replacement edges come from the successor's `supersedes`, with reverse successors derived rather than written onto an old frozen RFC. Plain and versioned JSON output retain dangling edges, canonicalize lifecycle aliases, preserve missing lifecycle state as JSON `null`, and expose cycles, self-reference, multiple effective successors, and implemented-before-dependency contradictions without mutating files or changing the command's success exit. `--relation` filters both traversal and analysis.
 - `irminsul change impact <id> [--base-ref REF]` — the derived, layered view ([RFC 0033](../80-evolution/rfcs/0033-derived-layered-impact.md)): where the change reached (foundation, architecture, components, workflows, decisions, evolution, surfaces, glossary), each observation with its source (declared field, diff path, graph edge, surface extractor, or finding) and a grounded review question. Two evidence levels — *plan* impact from declared scope and graph links alone, *observed* impact when a diff resolves; a missing baseline is stated as plan-level, never rendered as an empty observed impact. Surface kinds come from the extractor registry plus the repo's configured generic inventory rules, and an extractor that fails says so rather than dropping its kind — a layer is never silently empty. Output defaults to layers with actual evidence; `--all-layers` includes the empty ones. `change status` and `change verify` embed a terse per-layer summary.
 - `irminsul change finalize <id> --anchor <req>=<path>#<symbol> --confirm` — the only transition to `implemented` ([RFC 0032](../80-evolution/rfcs/0032-implementation-finalization-and-anchoring.md)). It verifies the mechanical preconditions (accepted state, resolved ADR, reconciled scope, usable baseline, hard checks, required updates), presents the remaining semantic-review clues from the same read-only report `change verify` prints, then promotes every code-backed requirement into its owning component doc as an anchored claim with stable id `<rfc-id>#<requirement-id>`, adds the component's `implements` backlink, and flips `rfc_state` only after every component-doc write succeeded. Which symbol satisfies a requirement is a semantic judgment code cannot infer — the `--anchor` bindings are explicit, confirmed input, and an ambiguous owner (after the most-specific-claim rule has resolved nesting) requires `--owner <req>=<component>`. Promotion is idempotent: a claim id already present in the owner doc is skipped — the `implements` backlink is still ensured, so a hand-migrated claim never leaves the RFC without its inbound edge — and re-running against an identical implemented RFC writes nothing. The resulting anchor is a freshness tripwire, not proof of behavior.
 

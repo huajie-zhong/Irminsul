@@ -40,6 +40,7 @@ inventory:
       - change status
       - change verify
       - change transition
+      - change graph
       - change finalize
       - change impact
       - new adr

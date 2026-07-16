@@ -50,6 +50,12 @@ Soft deterministic checks warn rather than block. For example, `foundation-readi
 
 `adr-structure` keeps architecture decision records reviewable by warning on missing or duplicate canonical sections and on an empty or placeholder-only `## Decision`. It is a shape check, not a lifecycle engine: RFC state remains in structured lifecycle metadata, and the check does not interpret an ADR's human-readable `## Status` prose.
 
+The generic `supersession` check maintains reciprocal `supersedes` / `superseded_by`
+metadata for ordinary documents. RFC records are excluded from that repair path:
+their replacement graph is forward-only from the successor's `supersedes`, and
+reverse successors are derived by [`change graph`](change.md). This prevents a new
+proposal from demanding a metadata write to an implemented, sealed predecessor.
+
 One enforcement lives outside the registries: `co-change`. It needs a changed-file set from git, so it runs only when the [CLI](cli.md) is given `--diff <base>` (or the equivalent two-flag spelling `--base-ref`/`--head-ref`; the two forms are mutually exclusive). It is the only diff-precise signal — `mtime-drift` no longer carries one. Each source file changed in `<base>...HEAD` is resolved to its most-specific owning docs through the same `describes` glob logic as `uniqueness`; when none of a file's owning docs changed in the same diff, each owning doc gets one warning listing its changed-but-unreflected files. `--strict` promotes the warning to an error, like the soft deterministic set.
 
 Checks are registered in `HARD_REGISTRY` and `SOFT_REGISTRY` keyed by name. The CLI selects checks with `--profile`: `hard` runs configured hard checks, `configured` adds configured soft deterministic checks, and `all-available` runs every implemented deterministic check regardless of config.
