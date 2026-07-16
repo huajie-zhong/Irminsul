@@ -3,12 +3,14 @@ id: 0040-retired-reference-audit
 title: "Detect references to retired commands and concepts"
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: accepted
 affects:
-  - frontmatter
-  - checks
+- frontmatter
+- checks
+resolved_by: docs/50-decisions/0019-audit-retired-references.md
+required_updates: []
 ---
 
 # RFC 0040: Detect references to retired commands and concepts
@@ -79,8 +81,9 @@ deprecated or removed atoms, and generated navigation manifests.
 ID: permit-historical-citations
 Provenance: code
 
-A current doc MAY mention a retired phrase without warning only when the exact
-visible phrase is a Markdown link to the ADR that owns its tombstone.
+The check MUST allow a current doc to mention a retired phrase without warning
+only when the exact visible phrase is a Markdown link to the ADR that owns its
+tombstone.
 
 #### Scenario: Exact phrase links its decision
 - **WHEN** the exact retired phrase is linked to its declaring ADR
@@ -158,3 +161,11 @@ ADR records it.
 
 - Whether future release tooling should require a retirement tombstone whenever
   a watched public surface removes an item belongs to a later integration RFC.
+
+## Resolution
+
+Accepted by
+[`ADR-0019`](../../50-decisions/0019-audit-retired-references.md): stable ADRs
+own typed retirement tombstones, live CLI derivation can contradict but not
+establish retirement, and exact decision links distinguish historical citations
+from current guidance.
