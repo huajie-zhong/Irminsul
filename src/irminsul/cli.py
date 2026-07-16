@@ -59,6 +59,7 @@ class Profile(StrEnum):
 
 
 class ContextProfile(StrEnum):
+    hard = "hard"
     configured = "configured"
     all_available = "all-available"
 
@@ -789,10 +790,24 @@ def status_command(
 
 @app.command("context")
 def context_command(
-    target: Annotated[
-        Path | None,
-        typer.Argument(help="Source or doc path to inspect."),
+    targets: Annotated[
+        list[Path] | None,
+        typer.Argument(help="Source or doc paths to inspect."),
     ] = None,
+    before_edit: Annotated[
+        bool,
+        typer.Option(
+            "--before-edit",
+            help="Package context for one or more paths before editing.",
+        ),
+    ] = False,
+    after_edit: Annotated[
+        bool,
+        typer.Option(
+            "--after-edit",
+            help="Inspect changed paths and validate the repository after editing.",
+        ),
+    ] = False,
     topic: Annotated[
         str | None,
         typer.Option("--topic", help="Find docs by deterministic substring search."),
@@ -809,12 +824,12 @@ def context_command(
         ),
     ] = None,
     profile: Annotated[
-        ContextProfile,
+        ContextProfile | None,
         typer.Option(
             "--profile",
-            help="Deterministic finding breadth: configured or all-available.",
+            help="Finding breadth: hard, configured, or all-available.",
         ),
-    ] = ContextProfile.configured,
+    ] = None,
     fmt: Annotated[
         str,
         typer.Option("--format", help="Output format: plain or json."),
@@ -830,10 +845,14 @@ def context_command(
     """Return task-specific navigation context."""
     from irminsul.context import (
         ContextError,
+        WorkflowStage,
         build_context_report,
         context_report_should_fail,
         context_report_to_json,
         format_context_plain,
+    )
+    from irminsul.context import (
+        ContextProfile as ContextProfileValue,
     )
 
     if fmt not in ("plain", "json"):
@@ -842,9 +861,10 @@ def context_command(
 
     repo_root = path.resolve()
     config = load(find_config(repo_root))
+    requested_targets = list(targets or [])
 
     if change is not None:
-        if target is not None or topic is not None or changed:
+        if requested_targets or topic is not None or changed or before_edit or after_edit:
             typer.echo(typer.style("--change cannot be combined with other input modes", fg="red"))
             raise typer.Exit(code=2)
         from irminsul.change.report import (
@@ -866,14 +886,60 @@ def context_command(
         )
         return
 
+    if before_edit and after_edit:
+        typer.echo(typer.style("--before-edit and --after-edit cannot be combined", fg="red"))
+        raise typer.Exit(code=2)
+
+    workflow: WorkflowStage | None = None
+    target_path = None
+    target_paths = None
+    effective_changed = changed
+    if before_edit:
+        if topic is not None or changed:
+            typer.echo(
+                typer.style("--before-edit cannot be combined with --topic or --changed", fg="red")
+            )
+            raise typer.Exit(code=2)
+        if not requested_targets:
+            typer.echo(typer.style("--before-edit requires one or more paths", fg="red"))
+            raise typer.Exit(code=2)
+        workflow = "before-edit"
+        target_paths = requested_targets
+    elif after_edit:
+        if requested_targets or topic is not None or changed:
+            typer.echo(
+                typer.style(
+                    "--after-edit cannot be combined with paths, --topic, or --changed",
+                    fg="red",
+                )
+            )
+            raise typer.Exit(code=2)
+        workflow = "after-edit"
+        effective_changed = True
+    else:
+        if len(requested_targets) > 1:
+            typer.echo(typer.style("multiple paths require the --before-edit workflow", fg="red"))
+            raise typer.Exit(code=2)
+        target_path = requested_targets[0] if requested_targets else None
+
+    effective_profile: ContextProfileValue = (
+        profile.value
+        if profile is not None
+        else (
+            ContextProfile.hard.value if workflow is not None else ContextProfile.configured.value
+        )
+    )
+
     try:
         report = build_context_report(
             repo_root,
             config,
-            target_path=target,
+            target_path=target_path,
+            target_paths=target_paths,
             topic=topic,
-            changed=changed,
-            profile=profile.value,
+            changed=effective_changed,
+            profile=effective_profile,
+            workflow=workflow,
         )
     except ContextError as exc:
         typer.echo(typer.style(str(exc), fg="red"))

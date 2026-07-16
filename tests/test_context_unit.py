@@ -55,6 +55,25 @@ def test_path_mode_doc_file_resolves_to_its_own_node(fixture_repo: FixtureRepo) 
     assert report.results[0].input == ["docs/20-components/composer.md"]
 
 
+def test_before_edit_path_mode_aggregates_one_owner(fixture_repo: FixtureRepo) -> None:
+    repo = fixture_repo("good")
+    target = repo / "app" / "composer.py"
+
+    report = build_context_report(
+        repo,
+        _config(repo),
+        target_paths=[target, target],
+        workflow="before-edit",
+    )
+
+    assert report.mode == "path"
+    assert report.workflow == "before-edit"
+    assert [result.owner.id for result in report.results] == ["composer"]
+    assert report.results[0].input == ["app/composer.py"]
+    assert report.validation is not None
+    assert report.next_actions[-1].command == "irminsul context --after-edit"
+
+
 def test_path_mode_prefers_most_specific_claim(fixture_repo: FixtureRepo) -> None:
     repo = fixture_repo("specificity")
     config = _config(repo)
