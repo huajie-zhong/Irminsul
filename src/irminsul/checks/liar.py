@@ -30,7 +30,7 @@ import re
 from typing import ClassVar
 
 from irminsul.checks.base import Finding, Severity
-from irminsul.checks.globs import walk_source_files
+from irminsul.checks.globs import walk_configured_source_files
 from irminsul.docgraph import DocGraph, DocNode
 from irminsul.frontmatter import AudienceEnum, StatusEnum
 from irminsul.inventory import KNOWN_KINDS, get_extractor
@@ -64,7 +64,7 @@ class LiarCheck:
         if graph.config is None or graph.repo_root is None:
             return []
 
-        source_files, _ = walk_source_files(graph.repo_root, graph.config.paths.source_roots)
+        source_files = walk_configured_source_files(graph.repo_root, graph.config).files
         surfaces: dict[str, set[str]] = {}
         for kind in KNOWN_KINDS:
             if kind in _NON_PROSE_KINDS:

@@ -1163,10 +1163,10 @@ def anchors_command(
     graph = build_graph(repo_root, config)
 
     if re_pin:
-        from irminsul.checks.globs import walk_source_files
+        from irminsul.checks.globs import walk_configured_source_files
         from irminsul.inventory.fingerprint import repin_node
 
-        source_files, _ = walk_source_files(repo_root, config.paths.source_roots)
+        source_files = walk_configured_source_files(repo_root, config).files
         anchors_written = 0
         surfaces_written = 0
         for node in graph.nodes.values():

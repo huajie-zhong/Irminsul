@@ -17,7 +17,7 @@ from typing import ClassVar
 from pathspec import GitIgnoreSpec
 
 from irminsul.checks.base import Finding, Severity
-from irminsul.checks.globs import walk_source_files
+from irminsul.checks.globs import walk_configured_source_files
 from irminsul.checks.uniqueness import specificity
 from irminsul.docgraph import DocGraph
 
@@ -59,7 +59,7 @@ class DependencyCheck:
             return []
 
         source_roots = graph.config.paths.source_roots
-        source_files, _ = walk_source_files(graph.repo_root, source_roots)
+        source_files = walk_configured_source_files(graph.repo_root, graph.config).files
 
         # Pass 1: build file→doc ownership (specificity-aware) and cache each
         # doc's Python files to avoid re-matching in pass 2.

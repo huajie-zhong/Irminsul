@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from irminsul.checks import HARD_REGISTRY, SOFT_REGISTRY, Check, Finding, Severity
-from irminsul.checks.globs import walk_source_files
+from irminsul.checks.globs import walk_configured_source_files
 from irminsul.checks.uniqueness import resolve_claims
 from irminsul.config import IrminsulConfig
 from irminsul.docgraph import DocGraph, build_graph
@@ -68,7 +68,7 @@ def build_status_report(repo_root: Path, config: IrminsulConfig) -> StatusReport
         docs_by_layer[_layer_of(node.path, config.paths.docs_root)] += 1
         docs_by_status[node.frontmatter.status.value] += 1
 
-    source_files, _missing_roots = walk_source_files(repo_root, config.paths.source_roots)
+    source_files = walk_configured_source_files(repo_root, config).files
     claims = resolve_claims(graph, source_files)
     displays = [display for _, display in source_files]
     unclaimed = [display for display in displays if display not in claims]

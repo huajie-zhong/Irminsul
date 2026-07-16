@@ -23,7 +23,7 @@ from pathspec import GitIgnoreSpec
 
 from irminsul.anchors import Anchor, resolve
 from irminsul.checks.base import Finding, Fix, Severity
-from irminsul.checks.globs import walk_source_files
+from irminsul.checks.globs import walk_configured_source_files
 from irminsul.docgraph import DocGraph, DocNode
 from irminsul.frontmatter import InventoryEntry
 from irminsul.frontmatter_edit import remove_inventory_item
@@ -45,7 +45,7 @@ class InventoryDriftCheck:
         if graph.config is None or graph.repo_root is None:
             return []
 
-        source_files, _ = walk_source_files(graph.repo_root, graph.config.paths.source_roots)
+        source_files = walk_configured_source_files(graph.repo_root, graph.config).files
         cache: dict[tuple[str, tuple[str, ...]], dict[str, SurfaceItem]] = {}
         out: list[Finding] = []
 
@@ -230,7 +230,7 @@ class InventoryDriftCheck:
         if graph.config is None or graph.repo_root is None:
             return
 
-        source_files, _ = walk_source_files(graph.repo_root, graph.config.paths.source_roots)
+        source_files = walk_configured_source_files(graph.repo_root, graph.config).files
         cache: dict[tuple[str, tuple[str, ...]], set[str]] = {}
 
         for node in graph.nodes.values():

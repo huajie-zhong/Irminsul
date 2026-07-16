@@ -5,8 +5,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+import pytest
+
+import irminsul.checks.globs as globs_module
 from irminsul.checks import Severity
-from irminsul.checks.globs import GlobsCheck
+from irminsul.checks.globs import GlobsCheck, SourceWalkIssue, SourceWalkResult
 from irminsul.config import load
 from irminsul.docgraph import build_graph
 
@@ -53,3 +56,35 @@ def test_missing_source_root_emits_warning(tmp_path: Path) -> None:
     findings = GlobsCheck().run(graph)
 
     assert any(f.severity == Severity.warning and "does-not-exist" in f.message for f in findings)
+
+
+def test_source_walk_issues_become_glob_findings(
+    fixture_repo: Callable[[str], Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = fixture_repo("good")
+    result = SourceWalkResult(
+        files=[(repo / "app" / "composer.py", "app/composer.py")],
+        missing_roots=[],
+        issues=[
+            SourceWalkIssue(
+                kind="source-root-escape",
+                root="app",
+                path="app/escape.py",
+                message="escape",
+            ),
+            SourceWalkIssue(
+                kind="broken-symlink",
+                root="app",
+                path="app/broken.py",
+                message="broken",
+            ),
+        ],
+    )
+    monkeypatch.setattr(globs_module, "walk_configured_source_files", lambda *_: result)
+
+    findings = _run(repo)
+
+    by_problem = {finding.data["problem"]: finding for finding in findings if finding.data}
+    assert by_problem["source-root-escape"].severity == Severity.error
+    assert by_problem["broken-symlink"].severity == Severity.warning

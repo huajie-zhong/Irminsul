@@ -12,7 +12,7 @@ from typing import ClassVar
 from pathspec import GitIgnoreSpec
 
 from irminsul.checks.base import Finding, Severity
-from irminsul.checks.globs import walk_source_files
+from irminsul.checks.globs import walk_configured_source_files
 from irminsul.docgraph import DocGraph
 from irminsul.git.mtime import GitTime, last_commit_time_any_repo
 
@@ -26,7 +26,7 @@ class MtimeDriftCheck:
             return []
 
         threshold = graph.config.overrides.mtime_drift_days
-        source_files, _missing = walk_source_files(graph.repo_root, graph.config.paths.source_roots)
+        source_files = walk_configured_source_files(graph.repo_root, graph.config).files
 
         out: list[Finding] = []
 
