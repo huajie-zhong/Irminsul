@@ -57,6 +57,16 @@ their replacement graph is forward-only from the successor's `supersedes`, and
 reverse successors are derived by [`change graph`](change.md). This prevents a new
 proposal from demanding a metadata write to an implemented, sealed predecessor.
 
+`prose-file-reference` also audits its own exception markers as specified by
+[RFC 0039](../80-evolution/rfcs/0039-stale-prose-suppressions.md). A line marker
+is active only when its line still contains an unlinked local `.md` reference
+after the marker comment is removed. A matched block is active only when an
+enclosed, non-fenced line would independently trigger the check. Clean markers
+produce one `info` finding with `category: stale-suppression` and structured
+line-or-block scope. Informational findings are not stored in baselines, so a
+baseline update cannot hide obsolete exceptions. Unmatched block markers remain
+hard errors, and marker removal stays manual.
+
 One enforcement lives outside the registries: `co-change`. It needs a changed-file set from git, so it runs only when the [CLI](cli.md) is given `--diff <base>` (or the equivalent two-flag spelling `--base-ref`/`--head-ref`; the two forms are mutually exclusive). It is the only diff-precise signal — `mtime-drift` no longer carries one. Each source file changed in `<base>...HEAD` is resolved to its most-specific owning docs through the same `describes` glob logic as `uniqueness`; when none of a file's owning docs changed in the same diff, each owning doc gets one warning listing its changed-but-unreflected files. `--strict` promotes the warning to an error, like the soft deterministic set.
 
 Checks are registered in `HARD_REGISTRY` and `SOFT_REGISTRY` keyed by name. The CLI selects checks with `--profile`: `hard` runs configured hard checks, `configured` adds configured soft deterministic checks, and `all-available` runs every implemented deterministic check regardless of config.
