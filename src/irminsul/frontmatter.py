@@ -163,6 +163,7 @@ class DocFrontmatter(BaseModel):
     target_decision_date: str | None = None
     summary: str | None = None
     required_updates: list[RequiredUpdateEntry] | None = None
+    frozen_hash: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
     implements: list[str] = Field(default_factory=list)
     inventory: list[InventoryEntry] = Field(default_factory=list)
 

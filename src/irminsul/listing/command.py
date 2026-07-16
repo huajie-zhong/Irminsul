@@ -42,8 +42,12 @@ def findings_and_graph_for_kind(
         ], graph
     if kind == "lifecycle":
         from irminsul.checks.decision_updates import DecisionUpdatesCheck
+        from irminsul.checks.rfc_lifecycle_integrity import RfcLifecycleIntegrityCheck
 
-        return DecisionUpdatesCheck().run(graph), graph
+        return [
+            *DecisionUpdatesCheck().run(graph),
+            *RfcLifecycleIntegrityCheck().run(graph),
+        ], graph
     raise ValueError(f"unknown list kind '{kind}'; expected one of: {', '.join(LIST_KINDS)}")
 
 
@@ -135,6 +139,11 @@ _PRIORITY_MAP: dict[str, int] = {
     "no-required-updates-field": 3,
     "broken-implements": 4,
     "stale-claim": 5,
+    "frozen-content-changed": 1,
+    "premature-frozen-hash": 1,
+    "implementation-evidence-before-finalization": 1,
+    "missing-frozen-hash": 6,
+    "stable-doc-links-draft-rfc": 7,
 }
 
 _KIND_MAP: dict[str, str] = {
@@ -143,6 +152,11 @@ _KIND_MAP: dict[str, str] = {
     "no-required-updates-field": "resolve",
     "broken-implements": "resolve",
     "stale-claim": "update",
+    "frozen-content-changed": "supersede",
+    "premature-frozen-hash": "resolve",
+    "implementation-evidence-before-finalization": "finalize",
+    "missing-frozen-hash": "freeze",
+    "stable-doc-links-draft-rfc": "review-state",
 }
 
 

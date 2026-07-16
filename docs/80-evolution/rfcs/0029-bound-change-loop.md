@@ -3,9 +3,16 @@ id: 0029-bound-change-loop
 title: "Bound changes: a code-bound RFC lifecycle"
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: implemented
+affects:
+- change
+- checks
+- frontmatter
+resolved_by: docs/50-decisions/0016-freeze-implemented-rfc-records.md
+required_updates: []
+frozen_hash: "sha256:5f873795cfe4c588f70774f002197e02a7ca0ed1a1e63bf6dd35fdf3002f02d8"
 ---
 
 # RFC 0029: Bound changes - a code-bound RFC lifecycle
@@ -211,3 +218,8 @@ finalization.
   started, or whether that needs a distinct `abandoned` rationale category.
 - Configuration of the default diff baseline for long-running and multi-PR work.
 - Exact JSON schema shared by CLI and MCP change reports.
+
+## Resolution
+
+Implemented before 2026-07-15 and recorded by
+[`ADR-0016`](../../50-decisions/0016-freeze-implemented-rfc-records.md).

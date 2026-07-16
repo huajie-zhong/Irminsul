@@ -38,6 +38,13 @@ def test_set_value_canonical_order() -> None:
     assert out.index("audience:") < out.index("status:")
 
 
+def test_set_value_does_not_wrap_long_scalar_with_trailing_space() -> None:
+    path = "docs/50-decisions/0009-implement-rfc-0018-decision-followups-and-maintenance-queue.md"
+    out = set_value(DOC, "resolved_by", path)
+    assert f"resolved_by: {path}\n" in out
+    assert not any(line.endswith(" ") for line in out.splitlines())
+
+
 def test_add_to_list_creates_and_appends() -> None:
     once = add_to_list(DOC, "implements", "0018-x")
     assert "implements:" in once

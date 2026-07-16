@@ -3,9 +3,17 @@ id: 0030-rfc-requirements-and-scenarios
 title: "Requirements and scenarios as review contracts"
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: implemented
+affects:
+- change
+- checks
+- docgraph
+- frontmatter
+resolved_by: docs/50-decisions/0016-freeze-implemented-rfc-records.md
+required_updates: []
+frozen_hash: "sha256:18a7a5d430b906ca367351966cdeab2de114c5e343a673179ad9aa77d1d7b645"
 ---
 
 # RFC 0030: Requirements and scenarios as review contracts
@@ -165,3 +173,8 @@ whether that disposition is credible; Irminsul makes the decision visible.
 - Whether GIVEN is supported as an optional scenario keyword.
 - Whether the explicit no-new-behavior disposition needs a structured marker or a
   canonical sentence recognized by the parser.
+
+## Resolution
+
+Implemented before 2026-07-15 and recorded by
+[`ADR-0016`](../../50-decisions/0016-freeze-implemented-rfc-records.md).

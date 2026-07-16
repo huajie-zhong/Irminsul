@@ -25,6 +25,9 @@ tests:
   - tests/test_checks_boundary.py
   - tests/test_checks_doc_reality.py
   - tests/test_checks_doc_refs.py
+  - tests/test_checks_rfc_lifecycle_integrity.py
+implements:
+  - 0035-rfc-lifecycle-integrity-and-frozen-records
 ---
 
 # Checks
@@ -39,6 +42,7 @@ Checks consume a [DocGraph](docgraph.md) and return `Finding` records with sever
 | `links` | Internal markdown links resolve; external/anchor-only skipped | error |
 | `schema-leak` | No type/schema definitions inside `docs/20-components/` (they live in code, not docs) | error |
 | `prose-file-reference` | Local `.md` references in prose must be real links or explicitly ignored | error |
+| `rfc-lifecycle-integrity` | Implemented RFC seals, premature implementation evidence, and draft/live lifecycle drift | error / warning |
 
 Soft deterministic checks warn rather than block. For example, `foundation-readiness` warns when a `00-foundation/` or `10-architecture/` doc still contains literal scaffold placeholder phrases — a signal the project never ran [`irminsul seed`](seed.md) to capture real intent. Another, `doc-refs`, warns when a `depends_on` entry names a doc id that doesn't exist in the graph — a dangling edge would otherwise silently weaken orphan detection and the other consumers of strong dependencies; the [refs query](refs.md) helps locate the intended doc. A third, `phantom-layer`, flags a directory whose only doc is its INDEX as navigation rot — at `warning` when that INDEX is `status: stable`, downgraded to `info` when it is `status: draft`, since a draft INDEX marks a layer deliberately under construction (the state every freshly scaffolded layer starts in) rather than abandoned navigation. And `change-binding` keeps declared change intent honest: an accepted RFC must declare `affects` explicitly, every declared component id must resolve, and when a diff range is available the declared scope is compared against the components that actually own the changed source (see the [change lifecycle](change.md)). `requirement-grammar` validates the requirement/scenario structure of behavior-changing RFCs — stable unique ids, SHALL/MUST behavior text, WHEN/THEN scenarios, a supported evidence class, or the explicit no-new-behavior disposition; the same findings that warn here block `change transition ... accepted`, because acceptance freezes the contract to implement.
 
@@ -49,6 +53,15 @@ Checks are registered in `HARD_REGISTRY` and `SOFT_REGISTRY` keyed by name. The 
 In JSON output (`--format json`) every finding carries two machine-actionable fields for agents. `data` is a structured decomposition of the finding — always with a kebab-case `problem` key and string values — or `null` where no decomposition exists; the `frontmatter`, `coverage`, and `links` checks populate it. `fixable` is `true` exactly when `irminsul fix` would plan a remediation for *that* finding, in which case the finding also carries a ready-to-run `fix_command`.
 
 Both halves of that claim are load-bearing, and each constrains an implementation detail. Because `irminsul fix --check` only selects checks active under *its own* profile, the emitted `fix_command` repeats the profile the finding was reported under (`irminsul fix --profile all-available --check supersession`) — otherwise a finding surfaced by `--profile all-available` would advertise a command that silently no-ops under `fix`'s default `configured` profile. And because some remediations are `requires_confirm` (they rewrite load-bearing metadata or prose), the command appends `--confirm` when any of the fixes it would plan is held back without it. Fixability is also per *finding*, not per doc: a check's `fixes()` discriminates on the finding's category, so an unfixable finding (a dangling `resolved_by`, a missing reverse `supersedes` pointer) stays `fixable: false` even when the same doc carries a fixable finding of another category.
+
+## RFC lifecycle integrity
+
+`rfc-lifecycle-integrity` is a hard-profile check with mixed severity
+([RFC 0035](../80-evolution/rfcs/0035-rfc-lifecycle-integrity-and-frozen-records.md)).
+It errors when a sealed implemented RFC changes, a non-implemented RFC carries a
+seal, or an `implements:` backlink contradicts the RFC state. Missing seals on
+legacy implemented RFCs and stable live docs linking draft RFCs are warnings so
+repositories can migrate without weakening actual freeze violations.
 
 ## Scope & Limitations
 

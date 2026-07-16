@@ -172,6 +172,7 @@ def test_finalize_apply_end_to_end_and_idempotent(repo: Path) -> None:
     rfc = graph2.nodes[_RFC]
     assert rfc.frontmatter.rfc_state is not None
     assert rfc.frontmatter.rfc_state.value == "implemented"
+    assert rfc.frontmatter.frozen_hash is not None
 
     # Second run against the identical implemented RFC plans no writes.
     plan2 = plan_finalize(graph2, config, repo, _RFC, bindings=_BINDINGS, env={})

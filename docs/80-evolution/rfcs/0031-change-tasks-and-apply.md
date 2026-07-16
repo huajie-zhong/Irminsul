@@ -3,9 +3,17 @@ id: 0031-change-tasks-and-apply
 title: "Change tasks and implementation evidence"
 audience: explanation
 tier: 2
-status: draft
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: implemented
+affects:
+- change
+- checks
+- context
+- docgraph
+resolved_by: docs/50-decisions/0016-freeze-implemented-rfc-records.md
+required_updates: []
+frozen_hash: "sha256:b69264495999767932d91720b74ca118e559165a39b4e89cbaacd57b6dd7ade9"
 ---
 
 # RFC 0031: Change tasks and implementation evidence
@@ -146,3 +154,8 @@ it does not add an autonomous executor.
   canonical surface.
 - How a multi-PR implementation supplies and preserves its complete comparison
   range without committing a stale file list.
+
+## Resolution
+
+Implemented before 2026-07-15 and recorded by
+[`ADR-0016`](../../50-decisions/0016-freeze-implemented-rfc-records.md).

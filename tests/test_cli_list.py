@@ -195,3 +195,18 @@ def test_lifecycle_queue_quotes_suggested_context_path() -> None:
 
     item = _to_queue_item(finding)
     assert item.suggested_command == 'irminsul context "docs/20-components/doc with spaces.md"'
+
+
+def test_lifecycle_queue_prioritizes_frozen_record_violation() -> None:
+    finding = Finding(
+        check="rfc-lifecycle-integrity",
+        category="frozen-content-changed",
+        severity=Severity.error,
+        message="implemented RFC changed after it was frozen",
+        path=Path("docs/80-evolution/rfcs/0034-example.md"),
+        doc_id="0034-example",
+    )
+
+    item = _to_queue_item(finding)
+    assert item.priority == 1
+    assert item.kind == "supersede"

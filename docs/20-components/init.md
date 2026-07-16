@@ -12,6 +12,8 @@ tests:
   - tests/test_init.py
   - tests/test_init_detector.py
   - tests/test_init_docs_only.py
+implements:
+  - 0035-rfc-lifecycle-integrity-and-frozen-records
 ---
 
 # Init scaffolder
@@ -31,6 +33,9 @@ The scaffold is born compliant with its own configured checks: every layer (incl
 `detector.detect_languages()` checks for marker files (`pyproject.toml`, `package.json`+`tsconfig.json`, etc.) — cheap heuristics, fast and resilient to weird repo shapes. `detect_source_roots()` filters each detected language's `source_root_candidates` to those that exist on disk, falling back to `["src"]` if nothing matches.
 
 By default, init refuses to overwrite existing files; pass `--force` to replace them. `--fresh` normally errors if code signals already exist, and `--allow-existing-code` makes that intent explicit.
+
+The generated `irminsul.toml` enables `rfc-lifecycle-integrity` in its hard
+profile so implemented RFCs are sealed consistently from the first lifecycle.
 
 ## Scope & Limitations
 
