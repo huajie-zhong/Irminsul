@@ -39,10 +39,11 @@ just this one. Follow each step in order; do not skip ahead.
    If the manifest is missing or its generated section is stale, run
    `irminsul regen agents-md` and proceed.
 
-1. **Locate context before editing.** Run `irminsul context <target>`,
-   `irminsul context --topic <query>`, or `irminsul context --changed` to
-   locate ownership, dependencies, tests, and relevant findings for the work
-   ahead.
+1. **Locate context before editing.** Run
+   `irminsul context --before-edit <target...>` to package ownership,
+   dependencies, tests, active RFCs, and relevant findings for the work ahead.
+   Use the path, topic, and changed modes directly when a focused power-tool
+   query is more appropriate.
 
 2. **Update the foundation before the implementation.** If the request changes
    project direction, update the foundation docs or create an RFC before
@@ -81,8 +82,9 @@ just this one. Follow each step in order; do not skip ahead.
    `supersedes` on the new doc and run `irminsul fix` to update the old doc's
    metadata.
 
-8. **Run checks before returning work.** Before final response, run
-   `irminsul check --profile hard`; for larger work, also run
+8. **Validate after editing.** Run `irminsul context --after-edit`, resolve its
+   hard-validation errors and deterministic next actions, then run
+   `irminsul check --profile hard` as the final gate. For larger work, also run
    `irminsul check --profile configured` and `irminsul list undocumented`.
 
 9. **Report remaining signal.** Report any remaining warnings, skipped checks,

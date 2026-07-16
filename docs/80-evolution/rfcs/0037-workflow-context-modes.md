@@ -9,6 +9,7 @@ rfc_state: draft
 affects:
   - cli
   - context
+  - orient
 ---
 
 # RFC 0037: Workflow-oriented context modes
@@ -65,6 +66,10 @@ an owner, and report whether the repository passes the hard gate.
 - **WHEN** a changed source path resolves to a component
 - **THEN** the response reports the owner, declared tests, active RFCs, scoped findings, and whether its doc changed too
 
+#### Scenario: Declared test changes
+- **WHEN** a changed path is explicitly listed in one or more component `tests` fields
+- **THEN** the response routes that path to those components instead of labeling it undocumented
+
 #### Scenario: Hard finding is outside an owned result
 - **WHEN** a configured hard check reports an error that is not scoped to an owned changed path
 - **THEN** the workflow-level validation still reports that the hard gate failed
@@ -97,6 +102,11 @@ the same owner are merged deterministically. `--after-edit` is an intent alias f
 changed-path lookup plus repository-level hard validation; it does not save a
 before-edit snapshot or guess what an agent intended to change.
 
+Workflow aliases default to the hard finding profile because hard validation is
+their promised contract and they are expected to run frequently. Callers can opt
+into `--profile configured` or `--profile all-available` for the broader audit;
+ordinary context lookups retain their existing configured-profile default.
+
 An active change is an RFC whose canonical state is `draft` or `accepted` and
 whose explicit `affects` list contains the owning document id. Requirement ids
 and titles come from the existing parsed requirements index. This version does
@@ -113,6 +123,7 @@ reasons so an agent can act without parsing presentation text.
 - `T2` Add the before-edit and after-edit CLI aliases with strict combination rules. (component: cli)
 - `T3` Add workflow validation, deterministic next actions, and versioned JSON/plain output. (req: emit-deterministic-next-actions)
 - `T4` Document the intended edit loop without hiding the existing power tools. (component: context)
+- `T5` Teach the workflow aliases first in the orientation command vocabulary. (component: orient)
 
 ## Drawbacks
 
