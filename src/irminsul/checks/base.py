@@ -29,6 +29,12 @@ class Finding:
     check: str
     severity: Severity
     message: str
+    #: Stable identity of the message template this finding was built from,
+    #: shaped `<check-name>/<kind-slug>` (e.g. `links/broken-link`). One code
+    #: per distinct message template a check emits, not per occurrence — it
+    #: survives wording changes across releases, unlike the free-text
+    #: `message`. Looked up by `irminsul explain <code>`.
+    code: str
     path: Path | None = None
     doc_id: str | None = None
     line: int | None = None
@@ -51,6 +57,10 @@ class Fix:
 class Check(Protocol):
     name: ClassVar[str]
     default_severity: ClassVar[Severity]
+    #: Every code this check can emit, mapped to a one-to-two-sentence
+    #: explanation of what the finding kind means and how to fix it. Keyed by
+    #: the full `<check-name>/<kind-slug>` code. Read by `irminsul explain`.
+    explanations: ClassVar[dict[str, str]]
 
     def run(self, graph: DocGraph) -> list[Finding]: ...
 
@@ -112,6 +122,7 @@ def finding_records(findings: list[Finding], commands: list[str | None]) -> list
     for finding, command in zip(findings, commands, strict=True):
         record: dict[str, object] = {
             "check": finding.check,
+            "code": finding.code,
             "severity": finding.severity.value,
             "message": finding.message,
             "path": finding.path.as_posix() if finding.path else None,

@@ -9,6 +9,7 @@ import pytest
 from git import Repo
 
 from irminsul.checks.base import Finding, Severity
+from irminsul.checks.frontmatter import CODE_MISSING_FRONTMATTER
 from irminsul.config import IrminsulConfig, Paths
 from irminsul.delta import (
     DeltaError,
@@ -24,7 +25,13 @@ def _finding(
     path: str = "docs/a.md",
     severity: Severity = Severity.error,
 ) -> Finding:
-    return Finding(check="frontmatter", severity=severity, message=message, path=Path(path))
+    return Finding(
+        check="frontmatter",
+        code=CODE_MISSING_FRONTMATTER,
+        severity=severity,
+        message=message,
+        path=Path(path),
+    )
 
 
 def test_compute_delta_filters_matching_fingerprints() -> None:

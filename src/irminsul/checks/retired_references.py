@@ -57,6 +57,13 @@ class _LinkedLabel:
     destination: str
 
 
+CODE_INACTIVE_RETIREMENT = "retired-references/inactive-retirement"
+CODE_RETIREMENT_STILL_LIVE = "retired-references/retirement-still-live"
+CODE_AMBIGUOUS_RETIREMENT = "retired-references/ambiguous-retirement"
+CODE_RETIRED_REFERENCE = "retired-references/retired-reference"
+CODE_UNMATCHED_GENERATED_MARKER = "retired-references/unmatched-generated-marker"
+
+
 class RetiredReferencesCheck:
     name: ClassVar[str] = "retired-references"
     # The check emits both: stale guidance and an unmatched generated marker are
@@ -64,6 +71,31 @@ class RetiredReferencesCheck:
     # the blocking one, matching `RfcLifecycleIntegrityCheck`, the other
     # mixed-severity hard check.
     default_severity: ClassVar[Severity] = Severity.error
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_INACTIVE_RETIREMENT: (
+            "A `retires` declaration is inactive because its owner is not a stable ADR. "
+            "Move the declarations to the stable ADR that approved the retirement."
+        ),
+        CODE_RETIREMENT_STILL_LIVE: (
+            "A retired CLI identity is still present in the current derived surface. "
+            "Remove the tombstone if the command was restored, or remove the live "
+            "command if the retirement still governs."
+        ),
+        CODE_AMBIGUOUS_RETIREMENT: (
+            "The same retired phrase is declared by more than one ADR. Keep one "
+            "authoritative tombstone."
+        ),
+        CODE_RETIRED_REFERENCE: (
+            "Current guidance references a phrase, symbol, or concept an ADR has "
+            "declared retired. Follow the retirement's guidance and remove or replace "
+            "the reference."
+        ),
+        CODE_UNMATCHED_GENERATED_MARKER: (
+            "A generated-region start marker has no matching end marker, which would "
+            "leave everything below it unaudited. Close the region with the end marker "
+            "or remove the start marker."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.repo_root is None or graph.config is None:
@@ -122,6 +154,7 @@ def _retirement_registry(
             findings.append(
                 Finding(
                     check=RetiredReferencesCheck.name,
+                    code=CODE_INACTIVE_RETIREMENT,
                     severity=Severity.warning,
                     category="inactive-retirement",
                     message=(
@@ -152,6 +185,7 @@ def _retirement_registry(
                     findings.append(
                         Finding(
                             check=RetiredReferencesCheck.name,
+                            code=CODE_RETIREMENT_STILL_LIVE,
                             severity=Severity.warning,
                             category="retirement-still-live",
                             message=(
@@ -207,6 +241,7 @@ def _retirement_registry(
             findings.append(
                 Finding(
                     check=RetiredReferencesCheck.name,
+                    code=CODE_AMBIGUOUS_RETIREMENT,
                     severity=Severity.warning,
                     category="ambiguous-retirement",
                     message=(
@@ -524,6 +559,7 @@ def _auditable_line(
 def _unmatched_marker_finding(source: _GuidanceSource) -> Finding:
     return Finding(
         check=RetiredReferencesCheck.name,
+        code=CODE_UNMATCHED_GENERATED_MARKER,
         # An error for the same reason the stale-guidance finding is one: the
         # marker's effect is to stop this hard check reading the rest of the
         # file, and a suppression nobody declared has to fail rather than warn.
@@ -552,6 +588,7 @@ def _retired_reference_finding(
 ) -> Finding:
     return Finding(
         check=RetiredReferencesCheck.name,
+        code=CODE_RETIRED_REFERENCE,
         # An error, not a warning: ADR-0022 nominates this audit as the thing
         # that makes stale guidance fail, and CI runs no `--strict`. A warning
         # here reports and never blocks, which is what let a retired command

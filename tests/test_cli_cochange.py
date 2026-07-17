@@ -86,7 +86,7 @@ def test_cochange_fires_when_claimed_source_changes_without_doc(tmp_path: Path) 
 
     result = runner.invoke(app, ["check", "--diff", base, "--path", str(repo_root)])
     assert result.exit_code == 0  # warning, not error
-    assert "[co-change]" in result.stdout
+    assert "[co-change/unreflected-change]" in result.stdout
     assert "docs/20-components/alpha.md" in result.stdout
     assert "app/alpha.py" in result.stdout
     assert "0 errors, 1 warning" in result.stdout
@@ -124,7 +124,7 @@ def test_cochange_groups_files_into_one_finding_per_doc(tmp_path: Path) -> None:
 
     result = runner.invoke(app, ["check", "--diff", base, "--path", str(repo_root)])
     assert result.exit_code == 0
-    assert result.stdout.count("[co-change]") == 1
+    assert result.stdout.count("[co-change/unreflected-change]") == 1
     assert "app/alpha.py, app/beta.py" in result.stdout
     assert "0 errors, 1 warning" in result.stdout
 
@@ -175,7 +175,7 @@ def test_cochange_strict_promotes_to_exit_1(tmp_path: Path) -> None:
 
     result = runner.invoke(app, ["check", "--diff", base, "--strict", "--path", str(repo_root)])
     assert result.exit_code == 1
-    assert "[co-change]" in result.stdout
+    assert "[co-change/unreflected-change]" in result.stdout
 
 
 def test_cochange_findings_in_json_output(tmp_path: Path) -> None:
@@ -210,7 +210,8 @@ def test_cochange_with_github_format(tmp_path: Path) -> None:
     annotations = [line for line in lines if line.startswith("::")]
     assert len(annotations) == 1
     assert annotations[0].startswith(
-        "::warning file=docs/20-components/alpha.md,title=irminsul co-change::"
+        "::warning file=docs/20-components/alpha.md,title=irminsul co-change,"
+        "code=co-change/unreflected-change::"
     )
     assert "app/alpha.py" in annotations[0]
     assert "0 errors, 1 warning" in lines[-1]

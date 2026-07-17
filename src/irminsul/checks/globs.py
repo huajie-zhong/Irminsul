@@ -435,6 +435,18 @@ def _is_excluded(parts: tuple[str, ...]) -> bool:
     return PurePosixPath(parts[-1]).suffix in {".pyc", ".pyo"}
 
 
+CODE_MISSING_SOURCE_ROOT = "globs/missing-source-root"
+CODE_BROKEN_SYMLINK = "globs/broken-symlink"
+CODE_SOURCE_ROOT_ESCAPE = "globs/source-root-escape"
+CODE_EMPTY_DESCRIBES_PATTERN = "globs/empty-describes-pattern"
+CODE_AMBIGUOUS_SOURCE_DISPLAY = "globs/ambiguous-source-display"
+
+_ISSUE_KIND_TO_CODE = {
+    "broken-symlink": CODE_BROKEN_SYMLINK,
+    "source-root-escape": CODE_SOURCE_ROOT_ESCAPE,
+}
+
+
 def _ambiguous_display_findings(source_files: list[tuple[Path, str]]) -> list[Finding]:
     """Warn when two source files share one display path.
 
@@ -471,6 +483,7 @@ def _ambiguous_display_findings(source_files: list[tuple[Path, str]]) -> list[Fi
         out.append(
             Finding(
                 check=GlobsCheck.name,
+                code=CODE_AMBIGUOUS_SOURCE_DISPLAY,
                 severity=Severity.warning,
                 category="ambiguous-source-display",
                 message=(f"source display path '{display}' names {len(paths)} files: {collisions}"),
@@ -491,6 +504,30 @@ def _ambiguous_display_findings(source_files: list[tuple[Path, str]]) -> list[Fi
 class GlobsCheck:
     name: ClassVar[str] = "globs"
     default_severity: ClassVar[Severity] = Severity.error
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_MISSING_SOURCE_ROOT: (
+            "A configured `paths.source_roots` entry does not exist on disk. Fix the path "
+            "in `irminsul.toml` or create the directory."
+        ),
+        CODE_BROKEN_SYMLINK: (
+            "A symlink under a source root has no readable target. Fix or remove the symlink."
+        ),
+        CODE_SOURCE_ROOT_ESCAPE: (
+            "A symlink under a source root resolves outside the configured root, which "
+            "would let source discovery walk arbitrary filesystem locations. Point the "
+            "symlink back inside the source root, or remove it."
+        ),
+        CODE_EMPTY_DESCRIBES_PATTERN: (
+            "A doc's `describes` glob matched zero files. Fix the glob, or remove the "
+            "claim if the source no longer exists."
+        ),
+        CODE_AMBIGUOUS_SOURCE_DISPLAY: (
+            "Two source files under the configured roots share one display path, so "
+            "`describes` patterns and `claims[].evidence` entries cannot say which file "
+            "they mean. Narrow or rename the configured source roots so each file has "
+            "one display path."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None or graph.repo_root is None:
@@ -505,6 +542,7 @@ class GlobsCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_MISSING_SOURCE_ROOT,
                     severity=Severity.warning,
                     message=f"source root '{root}' does not exist",
                 )
@@ -514,6 +552,7 @@ class GlobsCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=_ISSUE_KIND_TO_CODE[issue.kind],
                     severity=(
                         Severity.error if issue.kind == "source-root-escape" else Severity.warning
                     ),
@@ -532,6 +571,7 @@ class GlobsCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_EMPTY_DESCRIBES_PATTERN,
                             severity=Severity.error,
                             message=(f"describes pattern '{pattern}' matched zero files"),
                             path=node.path,

@@ -31,6 +31,15 @@ _CAT_DANGLING_RESOLVED_BY = "dangling-resolved-by"
 _CAT_MISSING_BACKLINK = "missing-backlink"
 _CAT_RETAINED_QUESTIONS = "retained-unresolved-questions"
 _CAT_STALE_TARGET_DATE = "stale-target-date"
+_CAT_DEPRECATED_RFC_STATE = "deprecated-rfc-state"
+
+CODE_DEPRECATED_RFC_STATE = f"rfc-resolution/{_CAT_DEPRECATED_RFC_STATE}"
+CODE_STATUS_NOT_STABLE = f"rfc-resolution/{_CAT_STATUS_NOT_STABLE}"
+CODE_MISSING_SECTION = f"rfc-resolution/{_CAT_MISSING_SECTION}"
+CODE_DANGLING_RESOLVED_BY = f"rfc-resolution/{_CAT_DANGLING_RESOLVED_BY}"
+CODE_MISSING_BACKLINK = f"rfc-resolution/{_CAT_MISSING_BACKLINK}"
+CODE_RETAINED_QUESTIONS = f"rfc-resolution/{_CAT_RETAINED_QUESTIONS}"
+CODE_STALE_TARGET_DATE = f"rfc-resolution/{_CAT_STALE_TARGET_DATE}"
 
 # Terminal states and the scaffolding section a resolved RFC of that state must
 # carry. The fix inserts the first listed heading; the check accepts any.
@@ -45,6 +54,38 @@ _TERMINAL_SECTIONS: dict[RfcStateEnum, tuple[str, ...]] = {
 class RfcResolutionCheck:
     name: ClassVar[str] = "rfc-resolution"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_DEPRECATED_RFC_STATE: (
+            "This `rfc_state` value is a deprecated alias (RFC 0029). Set the canonical "
+            "state; `irminsul fix --confirm` can do this."
+        ),
+        CODE_STATUS_NOT_STABLE: (
+            "A resolved RFC's `rfc_state` implies a terminal outcome but `status` is not "
+            "`stable`. Set `status: stable`."
+        ),
+        CODE_MISSING_SECTION: (
+            "A resolved RFC is missing the scaffolding section its state requires "
+            "(Resolution, Rejection Rationale, or Withdrawal Rationale). Add it."
+        ),
+        CODE_DANGLING_RESOLVED_BY: (
+            "An accepted/implemented RFC's `resolved_by` points at a path with no "
+            "matching doc in the graph. Check the path — it must be a repo-relative "
+            "POSIX path to an existing decision doc."
+        ),
+        CODE_MISSING_BACKLINK: (
+            "The decision doc named by `resolved_by` does not link back to the RFC. Add "
+            "a markdown link to the RFC in the decision doc body."
+        ),
+        CODE_RETAINED_QUESTIONS: (
+            "An RFC retains an '## Unresolved Questions' section in a state where it "
+            "should be empty (accepted/implemented) or should have been cleared "
+            "(withdrawn). Remove the section or fold the questions elsewhere."
+        ),
+        CODE_STALE_TARGET_DATE: (
+            "An in-flight RFC's `target_decision_date` is in the past. Decide, "
+            "withdraw, or update `target_decision_date`."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         today = clock.today(graph.now)
@@ -80,6 +121,7 @@ class RfcResolutionCheck:
         canonical = canonical_rfc_state(state)
         return Finding(
             check=self.name,
+            code=CODE_DEPRECATED_RFC_STATE,
             category="deprecated-rfc-state",
             severity=Severity.warning,
             message=(
@@ -189,6 +231,7 @@ class RfcResolutionCheck:
                     path=node.path,
                     doc_id=node.id,
                     suggestion="set status: stable",
+                    code=CODE_STATUS_NOT_STABLE,
                     category=_CAT_STATUS_NOT_STABLE,
                 )
             )
@@ -212,6 +255,7 @@ class RfcResolutionCheck:
                         "check the path; resolved_by is a repo-relative POSIX "
                         "path to an existing decision doc"
                     ),
+                    code=CODE_DANGLING_RESOLVED_BY,
                     category=_CAT_DANGLING_RESOLVED_BY,
                 )
             )
@@ -232,6 +276,7 @@ class RfcResolutionCheck:
                             f"add a markdown link to {node.path.as_posix()} "
                             f"in the decision doc body"
                         ),
+                        code=CODE_MISSING_BACKLINK,
                         category=_CAT_MISSING_BACKLINK,
                     )
                 )
@@ -248,6 +293,7 @@ class RfcResolutionCheck:
                         "add a '## Resolution' section pointing to the "
                         "decision doc and summarising the outcome"
                     ),
+                    code=CODE_MISSING_SECTION,
                     category=_CAT_MISSING_SECTION,
                 )
             )
@@ -265,6 +311,7 @@ class RfcResolutionCheck:
                     path=node.path,
                     doc_id=node.id,
                     suggestion=("remove the section or list explicit required update work"),
+                    code=CODE_RETAINED_QUESTIONS,
                     category=_CAT_RETAINED_QUESTIONS,
                 )
             )
@@ -285,6 +332,7 @@ class RfcResolutionCheck:
                     path=node.path,
                     doc_id=node.id,
                     suggestion="set status: stable once the rejection rationale is recorded",
+                    code=CODE_STATUS_NOT_STABLE,
                     category=_CAT_STATUS_NOT_STABLE,
                 )
             )
@@ -306,6 +354,7 @@ class RfcResolutionCheck:
                     path=node.path,
                     doc_id=node.id,
                     suggestion=("add a section explaining why the proposal was rejected"),
+                    code=CODE_MISSING_SECTION,
                     category=_CAT_MISSING_SECTION,
                 )
             )
@@ -325,6 +374,7 @@ class RfcResolutionCheck:
                     path=node.path,
                     doc_id=node.id,
                     suggestion="set status: stable",
+                    code=CODE_STATUS_NOT_STABLE,
                     category=_CAT_STATUS_NOT_STABLE,
                 )
             )
@@ -342,6 +392,7 @@ class RfcResolutionCheck:
                     path=node.path,
                     doc_id=node.id,
                     suggestion=("add a section recording why the proposal was withdrawn"),
+                    code=CODE_MISSING_SECTION,
                     category=_CAT_MISSING_SECTION,
                 )
             )
@@ -359,6 +410,7 @@ class RfcResolutionCheck:
                         "remove the section or fold remaining questions into "
                         "the withdrawal rationale"
                     ),
+                    code=CODE_RETAINED_QUESTIONS,
                     category=_CAT_RETAINED_QUESTIONS,
                 )
             )
@@ -381,6 +433,7 @@ class RfcResolutionCheck:
                         path=node.path,
                         doc_id=node.id,
                         suggestion=("decide, withdraw, or update target_decision_date"),
+                        code=CODE_STALE_TARGET_DATE,
                         category=_CAT_STALE_TARGET_DATE,
                     )
                 )
