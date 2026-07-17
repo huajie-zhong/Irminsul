@@ -108,3 +108,31 @@ def test_corrupt_baseline_fails_loudly(fixture_repo: Callable[[str], Path]) -> N
     code, out = _check(repo)
     assert code == 2
     assert "baseline" in out
+
+
+def test_stale_suppression_info_cannot_be_baselined(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("good")
+    doc = repo / "docs" / "20-components" / "composer.md"
+    doc.write_text(
+        doc.read_text(encoding="utf-8")
+        + '\n<!-- irminsul:ignore prose-file-reference reason="paid debt" -->\n',
+        encoding="utf-8",
+    )
+
+    assert _check(repo, "--update-baseline")[0] == 0
+    baseline = json.loads((repo / ".irminsul-baseline.json").read_text(encoding="utf-8"))
+    assert all(
+        finding["message"]
+        != "line suppression no longer hides an unlinked local Markdown reference"
+        for finding in baseline["findings"]
+    )
+
+    code, out = _check(repo, "--format", "json")
+    assert code == 0
+    data = json.loads(out)
+    assert any(
+        finding["data"] == {"problem": "stale-suppression", "scope": "line"}
+        for finding in data["findings"]
+    )

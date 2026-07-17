@@ -72,6 +72,27 @@ def _inside_any(pos: int, spans: list[range]) -> bool:
     return any(pos in span for span in spans)
 
 
+def _first_unlinked_local_md(line: str) -> str | None:
+    link_spans = _line_link_spans(line)
+    for match in _LOCAL_MD_RE.finditer(line):
+        if not _inside_any(match.start(), link_spans):
+            return match.group(1)
+    return None
+
+
+def _without_ignore_comment(line: str, marker: re.Match[str]) -> str:
+    comment_start = line.rfind("<!--", 0, marker.start())
+    comment_end = line.find("-->", marker.end())
+    if (
+        comment_start != -1
+        and comment_end != -1
+        and "-->" not in line[comment_start : marker.start()]
+        and "<!--" not in line[marker.end() : comment_end]
+    ):
+        return line[:comment_start] + line[comment_end + 3 :]
+    return line[: marker.start()] + line[marker.end() :]
+
+
 def _docs_root(graph: DocGraph) -> str:
     assert graph.config is not None
     return graph.config.paths.docs_root.strip("/\\")
@@ -190,6 +211,7 @@ class ProseFileReferenceCheck:
             in_fence = False
             in_ignore_block = False
             ignore_block_start: int | None = None
+            ignore_block_used = False
             for lineno, line in enumerate(node.body.splitlines(), start=1):
                 if _FENCE_RE.match(line):
                     in_fence = not in_fence
@@ -199,7 +221,9 @@ class ProseFileReferenceCheck:
                 if _IGNORE_START_RE.search(line):
                     in_ignore_block = True
                     ignore_block_start = lineno
+                    ignore_block_used = False
                     if _IGNORE_END_RE.search(line):
+                        out.append(_stale_suppression(node, lineno, scope="block"))
                         in_ignore_block = False
                         ignore_block_start = None
                     continue
@@ -219,17 +243,32 @@ class ProseFileReferenceCheck:
                                 ),
                             )
                         )
+                    elif not ignore_block_used and ignore_block_start is not None:
+                        out.append(_stale_suppression(node, ignore_block_start, scope="block"))
                     in_ignore_block = False
                     ignore_block_start = None
+                    ignore_block_used = False
                     continue
-                if in_ignore_block or _IGNORE_RE.search(line):
+                if in_ignore_block:
+                    ignore_match = _IGNORE_RE.search(line)
+                    content_line = (
+                        _without_ignore_comment(line, ignore_match)
+                        if ignore_match is not None
+                        else line
+                    )
+                    if _first_unlinked_local_md(content_line) is not None:
+                        ignore_block_used = True
                     continue
 
-                link_spans = _line_link_spans(line)
-                for match in _LOCAL_MD_RE.finditer(line):
-                    if _inside_any(match.start(), link_spans):
-                        continue
-                    target = match.group(1)
+                ignore_match = _IGNORE_RE.search(line)
+                if ignore_match is not None:
+                    unsuppressed_line = _without_ignore_comment(line, ignore_match)
+                    if _first_unlinked_local_md(unsuppressed_line) is None:
+                        out.append(_stale_suppression(node, lineno, scope="line"))
+                    continue
+
+                target = _first_unlinked_local_md(line)
+                if target is not None:
                     out.append(
                         Finding(
                             check=self.name,
@@ -245,7 +284,6 @@ class ProseFileReferenceCheck:
                             ),
                         )
                     )
-                    break
             if in_ignore_block and ignore_block_start is not None:
                 out.append(
                     Finding(
@@ -260,6 +298,25 @@ class ProseFileReferenceCheck:
                 )
 
         return out
+
+
+def _stale_suppression(
+    node: DocNode,
+    line: int,
+    *,
+    scope: str,
+) -> Finding:
+    return Finding(
+        check=ProseFileReferenceCheck.name,
+        severity=Severity.info,
+        category="stale-suppression",
+        message=(f"{scope} suppression no longer hides an unlinked local Markdown reference"),
+        path=node.path,
+        doc_id=node.id,
+        line=line,
+        suggestion="Remove the stale prose-file-reference suppression marker",
+        data={"problem": "stale-suppression", "scope": scope},
+    )
 
 
 class ClaimProvenanceCheck:
