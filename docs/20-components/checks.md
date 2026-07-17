@@ -101,6 +101,12 @@ repositories can migrate without weakening actual freeze violations.
 
 The shared source walker applies built-in noise exclusions, repository-local `.gitignore`, and configured include/exclude patterns before any check or report sees a file. Directory symlinks are not traversed. A file symlink is inventoried under its lexical path only when its resolved target remains within the resolved configured source root; an escaping target is an error, while a broken target is a warning. Explicit external or symlinked source roots remain supported because the configured root itself defines the containment boundary.
 
+An RFC with no `rfc_state` produces the non-blocking `pre-lifecycle-rfc` warning
+instead of disappearing from lifecycle accounting. The finding identifies the RFC
+and points to `irminsul change migrate <id>`; it remains until a human classifies
+the record. The check does not infer a state from document status or repository
+evidence.
+
 ## Scope & Limitations
 
 Checks do not apply fixes — findings are advisory output only; call `irminsul fix` to remediate. They do not evaluate prose quality or writing style. They do not modify source files or docs, and source discovery never follows directory symlinks.

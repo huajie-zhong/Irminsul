@@ -144,6 +144,7 @@ _PRIORITY_MAP: dict[str, int] = {
     "implementation-evidence-before-finalization": 1,
     "missing-frozen-hash": 6,
     "stable-doc-links-draft-rfc": 7,
+    "pre-lifecycle-rfc": 6,
 }
 
 _KIND_MAP: dict[str, str] = {
@@ -157,6 +158,7 @@ _KIND_MAP: dict[str, str] = {
     "implementation-evidence-before-finalization": "finalize",
     "missing-frozen-hash": "freeze",
     "stable-doc-links-draft-rfc": "review-state",
+    "pre-lifecycle-rfc": "migrate",
 }
 
 
@@ -176,11 +178,14 @@ def _to_queue_item(f: Finding) -> _QueueItem:
     target = f.path.as_posix() if f.path else "<repo>"
     related = f.doc_id or ""
     reason = f.message
-    cmd = (
-        f"irminsul context {_quote_path(target)}"
-        if target != "<repo>"
-        else "irminsul list lifecycle"
-    )
+    if cat == "pre-lifecycle-rfc" and related:
+        cmd = f"irminsul change migrate {related}"
+    else:
+        cmd = (
+            f"irminsul context {_quote_path(target)}"
+            if target != "<repo>"
+            else "irminsul list lifecycle"
+        )
     return _QueueItem(
         priority=priority,
         kind=kind,

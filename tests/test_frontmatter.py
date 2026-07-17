@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from irminsul.frontmatter import (
     RFC_STATE_TRANSITIONS,
     DocFrontmatter,
+    LifecycleMigrationBasisEnum,
     ParsedDoc,
     ParseFailure,
     RetirementKindEnum,
@@ -194,6 +195,39 @@ def test_rfc_state_implemented_with_resolved_by_parses() -> None:
     }
     fm = DocFrontmatter.model_validate(payload)
     assert fm.rfc_state == RfcStateEnum.implemented
+
+
+def test_lifecycle_migration_provenance_is_typed() -> None:
+    fm = DocFrontmatter.model_validate(
+        _good_payload()
+        | {
+            "rfc_state": "implemented",
+            "resolved_by": "docs/50-decisions/0001-adr.md",
+            "lifecycle_migration": {
+                "source": "pre-lifecycle",
+                "basis": "human-implementation-attestation",
+            },
+        }
+    )
+    assert fm.lifecycle_migration is not None
+    assert (
+        fm.lifecycle_migration.basis == LifecycleMigrationBasisEnum.human_implementation_attestation
+    )
+
+
+def test_migrated_implemented_state_requires_attestation_basis() -> None:
+    with pytest.raises(ValidationError, match="implementation-attestation"):
+        DocFrontmatter.model_validate(
+            _good_payload()
+            | {
+                "rfc_state": "implemented",
+                "resolved_by": "docs/50-decisions/0001-adr.md",
+                "lifecycle_migration": {
+                    "source": "pre-lifecycle",
+                    "basis": "human-classification",
+                },
+            }
+        )
 
 
 def test_frozen_hash_requires_full_lowercase_sha256() -> None:

@@ -119,3 +119,17 @@ def test_stable_live_doc_linking_draft_rfc_is_a_warning(tmp_path: Path) -> None:
     )
     finding = next(f for f in _findings(repo) if f.category == "stable-doc-links-draft-rfc")
     assert finding.severity.value == "warning"
+
+
+def test_pre_lifecycle_rfc_is_a_migration_warning(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    path = _write_rfc(repo, state="draft")
+    path.write_text(
+        path.read_text(encoding="utf-8").replace("rfc_state: draft\n", ""), encoding="utf-8"
+    )
+
+    finding = next(f for f in _findings(repo) if f.category == "pre-lifecycle-rfc")
+
+    assert finding.severity.value == "warning"
+    assert finding.data == {"problem": "pre-lifecycle-rfc", "rfc": "0001-example"}
+    assert "change migrate 0001-example" in (finding.suggestion or "")

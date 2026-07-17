@@ -107,6 +107,7 @@ automatically once any doc declares one.
 | `0017-standardize-adr-structure` | [ADR-0017: Standardize ADR structure without deriving lifecycle state](50-decisions/0017-standardize-adr-structure.md) | adr | 2 | Require a reviewable ADR shape while keeping RFC lifecycle state in structured metadata. |
 | `0018-audit-stale-prose-suppressions` | [ADR-0018: Audit stale prose suppressions](50-decisions/0018-audit-stale-prose-suppressions.md) | adr | 2 | Report obsolete prose-file-reference exceptions without making them baseline-suppressible or automatically removing them. |
 | `0019-audit-retired-references` | [ADR-0019: Audit retired references from decision-owned tombstones](50-decisions/0019-audit-retired-references.md) | adr | 2 | Keep retirement provenance in stable ADRs and audit current guidance with deterministic exact matching. |
+| `0020-migrate-pre-lifecycle-rfcs-explicitly` | [ADR-0020: Migrate pre-lifecycle RFCs explicitly](50-decisions/0020-migrate-pre-lifecycle-rfcs-explicitly.md) | adr | 2 | Preserve historical RFC truth through explicit, evidence-backed lifecycle classification. |
 | `0021-derive-rfc-relationship-graphs` | [ADR-0021: Derive RFC relationship graphs](50-decisions/0021-derive-rfc-relationship-graphs.md) | adr | 2 | Derive lifecycle-aware RFC relationships from forward declarations without mutating frozen predecessors. |
 | `50-decisions` | [Architecture decisions](50-decisions/INDEX.md) | reference | 2 |  |
 
@@ -168,6 +169,7 @@ automatically once any doc declares one.
 | `0038-context-content-excerpts` | [Deterministic content excerpts in context packets](80-evolution/rfcs/0038-context-content-excerpts.md) | explanation | 2 |  |
 | `0039-stale-prose-suppressions` | [Detect stale prose file-reference suppressions](80-evolution/rfcs/0039-stale-prose-suppressions.md) | explanation | 2 |  |
 | `0040-retired-reference-audit` | [Detect references to retired commands and concepts](80-evolution/rfcs/0040-retired-reference-audit.md) | explanation | 2 |  |
+| `0041-pre-lifecycle-rfc-migration` | [Migrate pre-lifecycle RFCs without inferring intent](80-evolution/rfcs/0041-pre-lifecycle-rfc-migration.md) | explanation | 2 |  |
 | `0042-rfc-dependency-and-supersession-graphs` | [RFC dependency and supersession graphs](80-evolution/rfcs/0042-rfc-dependency-and-supersession-graphs.md) | explanation | 2 |  |
 | `80-evolution` | [Evolution](80-evolution/INDEX.md) | reference | 4 |  |
 | `patterns` | [Evolution Patterns](80-evolution/patterns.md) | explanation | 2 |  |

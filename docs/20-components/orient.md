@@ -33,6 +33,7 @@ inventory:
       - change finalize
       - change impact
       - change transition
+      - change migrate
       - change verify
       - init
       - init-docs-only

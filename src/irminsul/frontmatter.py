@@ -94,6 +94,15 @@ class RetirementKindEnum(StrEnum):
     concept = "concept"
 
 
+class LifecycleMigrationSourceEnum(StrEnum):
+    pre_lifecycle = "pre-lifecycle"
+
+
+class LifecycleMigrationBasisEnum(StrEnum):
+    human_classification = "human-classification"
+    human_implementation_attestation = "human-implementation-attestation"
+
+
 class RequiredUpdateEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -128,6 +137,13 @@ class RetirementEntry(BaseModel):
         if self.kind == RetirementKindEnum.concept and self.surface_identity is not None:
             raise ValueError("surface_identity is only valid for cli-command retirements")
         return self
+
+
+class LifecycleMigration(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: LifecycleMigrationSourceEnum
+    basis: LifecycleMigrationBasisEnum
 
 
 class Claim(BaseModel):
@@ -197,6 +213,7 @@ class DocFrontmatter(BaseModel):
     summary: str | None = None
     required_updates: list[RequiredUpdateEntry] | None = None
     frozen_hash: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
+    lifecycle_migration: LifecycleMigration | None = None
     implements: list[str] = Field(default_factory=list)
     inventory: list[InventoryEntry] = Field(default_factory=list)
     retires: list[RetirementEntry] = Field(default_factory=list)
@@ -224,6 +241,16 @@ class DocFrontmatter(BaseModel):
             and not self.resolved_by
         ):
             raise ValueError(f"resolved_by is required when rfc_state is {self.rfc_state.value}")
+        if self.lifecycle_migration is not None:
+            implementation_attested = (
+                self.lifecycle_migration.basis
+                == LifecycleMigrationBasisEnum.human_implementation_attestation
+            )
+            if implementation_attested != (self.rfc_state == RfcStateEnum.implemented):
+                raise ValueError(
+                    "human-implementation-attestation requires rfc_state implemented, "
+                    "and migrated implemented RFCs require that attestation basis"
+                )
         if self.target_decision_date is not None:
             try:
                 _dt.date.fromisoformat(self.target_decision_date)
