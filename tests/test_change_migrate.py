@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from irminsul.change.migrate import (
+    _decision_blockers,
     get_candidate,
     inventory_candidates,
     inventory_to_json,
@@ -228,6 +229,42 @@ def test_accepted_migration_uses_explicit_authorized_inputs(tmp_path: Path) -> N
     assert parsed.frontmatter.required_updates == []
     assert parsed.frontmatter.resolved_by == decision
     assert "## Resolution" in path.read_text(encoding="utf-8")
+
+
+def test_accepted_migration_normalizes_windows_resolved_by_paths(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    path = _write_rfc(repo, requirements=True)
+    decision = _write_adr(repo)
+    graph, config = _graph(repo)
+    windows_decision = decision.replace("/", "\\")
+
+    assert (
+        _decision_blockers(
+            graph,
+            graph.nodes["0001-legacy"],
+            decision,
+            windows_decision,
+            decision,
+        )
+        == []
+    )
+
+    plan = plan_migration(
+        graph,
+        config,
+        "0001-legacy",
+        "accepted",
+        resolved_by=windows_decision,
+        affects=["widget"],
+        no_required_updates=True,
+    )
+
+    assert plan.blockers == ()
+    assert plan.fix is not None
+    apply_fixes(repo, [plan.fix], dry_run=False, confirm=True)
+    assert "[`0001-legacy-decision`](../../50-decisions/0001-legacy-decision.md)" in path.read_text(
+        encoding="utf-8"
+    )
 
 
 def test_rejected_migration_requires_and_records_reason(tmp_path: Path) -> None:

@@ -340,7 +340,11 @@ def _decision_blockers(
     existing: str | None,
 ) -> list[Blocker]:
     path = node.path.as_posix()
-    if existing is not None and supplied is not None and supplied != existing:
+    if (
+        existing is not None
+        and supplied is not None
+        and supplied.replace("\\", "/") != existing.replace("\\", "/")
+    ):
         raise ChangeError("RFC already declares a different resolved_by path", code=2)
     if effective is None:
         return [
@@ -479,13 +483,14 @@ def _migration_transform(
         if target == RfcStateEnum.rejected:
             updated = _append_terminal_section(updated, "Rejection Rationale", reason or "")
         elif target in {RfcStateEnum.accepted, RfcStateEnum.implemented}:
+            normalized_resolved_by = (resolved_by or "").replace("\\", "/")
             relative = posixpath.relpath(
-                resolved_by or "",
+                normalized_resolved_by,
                 node.path.parent.as_posix(),
             )
             body = (
                 "Lifecycle state was classified during pre-lifecycle migration. "
-                f"See [`{Path(resolved_by or '').stem}`]({relative})."
+                f"See [`{Path(normalized_resolved_by).stem}`]({relative})."
             )
             updated = _append_terminal_section(updated, "Resolution", body)
         if target == RfcStateEnum.implemented:
