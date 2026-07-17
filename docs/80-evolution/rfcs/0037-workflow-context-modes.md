@@ -78,9 +78,10 @@ an owner, and report whether the repository passes the hard gate.
 ID: emit-deterministic-next-actions
 Provenance: code
 
-Workflow responses MUST emit ordered command-and-reason next actions derived
-from explicit report state. They MUST be stateless and non-interactive, and MUST
-not add ranking, token budgeting, excerpt selection, or hidden session state.
+The workflow-mode implementation in this RFC MUST emit ordered
+command-and-reason next actions derived from explicit report state. It MUST be
+stateless and non-interactive, and this slice MUST not add ranking, token
+budgeting, excerpt selection, or hidden session state.
 
 #### Scenario: Active change is present
 - **WHEN** a workflow result includes an active RFC

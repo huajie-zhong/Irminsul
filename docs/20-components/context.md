@@ -122,12 +122,32 @@ to either call to drive the loop from a script; the workflow fields
 (`workflow`, `validation`, `active_changes`, `next_actions`) are additive over
 the ordinary context JSON.
 
+## Content excerpts
+
+Workflow packets include authored content by default: the owning document's
+first substantive prose block, its structured claim text, and requirement prose
+from active RFCs that explicitly affect it. Each excerpt identifies its category,
+source doc/path, title, inclusion reason, and whether it was truncated, so an
+agent can use the content without guessing why it appeared.
+
+`--include` accepts a comma-separated selection of `owner`, `claims`,
+`requirements`, and `dependencies`; `all` selects every category and `none`
+suppresses content. Primitive path/topic/changed lookups remain metadata-only
+unless this flag is supplied. `dependencies` means direct authored `depends_on`
+relationships and is not part of the workflow default.
+
+Selection is fixed rather than ranked: owner, claims in authored order, active
+RFCs by path with requirements in authored order, then dependencies by path.
+Each excerpt is limited to 20 lines and 1,200 characters, and each owner result
+contains at most eight excerpts. The JSON `content.omitted` map reports eligible
+items left out by that cap.
+
 ## Scope & Limitations
 
 Topic search is plain substring matching, not fuzzy search. `--changed` and
 `--after-edit` depend on `git status --porcelain` via the shared
 `irminsul.git.changes` helper (also used by the [change lifecycle](change.md) for
 its local diff baseline); outside a git worktree they report the git error
-instead of guessing. Workflow modes do not include document excerpts, rank
-relationships, apply token budgets, or persist session state; those are separate
+instead of guessing. Content extraction does not rank relationships, estimate
+tokens, perform semantic search, or persist session state; those remain separate
 retrieval concerns.

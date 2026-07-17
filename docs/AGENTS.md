@@ -163,6 +163,7 @@ automatically once any doc declares one.
 | `0035-rfc-lifecycle-integrity-and-frozen-records` | [RFC lifecycle integrity and frozen implemented records](80-evolution/rfcs/0035-rfc-lifecycle-integrity-and-frozen-records.md) | explanation | 2 |  |
 | `0036-source-discovery-policy` | [Source discovery policy](80-evolution/rfcs/0036-source-discovery-policy.md) | explanation | 2 |  |
 | `0037-workflow-context-modes` | [Workflow-oriented context modes](80-evolution/rfcs/0037-workflow-context-modes.md) | explanation | 2 |  |
+| `0038-context-content-excerpts` | [Deterministic content excerpts in context packets](80-evolution/rfcs/0038-context-content-excerpts.md) | explanation | 2 |  |
 | `0042-rfc-dependency-and-supersession-graphs` | [RFC dependency and supersession graphs](80-evolution/rfcs/0042-rfc-dependency-and-supersession-graphs.md) | explanation | 2 |  |
 | `80-evolution` | [Evolution](80-evolution/INDEX.md) | reference | 4 |  |
 | `patterns` | [Evolution Patterns](80-evolution/patterns.md) | explanation | 2 |  |
