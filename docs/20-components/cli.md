@@ -65,7 +65,7 @@ On Windows, both console-script entry points configure stdout and stderr as UTF-
 Common command paths:
 
 - `irminsul init` — scaffold a new codebase. Delegates to [`init`](init.md).
-- `irminsul check` — build the [DocGraph](docgraph.md) and run checks selected by `--profile`. Exits 1 on any error finding. `--diff <base>` adds [co-change](checks.md) enforcement: a warning for every owning doc whose claimed source files changed in `<base>...HEAD` without it.
+- `irminsul check` — build the [DocGraph](docgraph.md) and run checks selected by `--profile`. Exits 1 on any error finding. `--diff <base>` adds [co-change](checks.md) enforcement: a warning for every owning doc whose claimed source files changed in `<base>...HEAD` without it. `--delta` (or `--delta-base <rev>`, defaulting to `HEAD`) reports only findings introduced relative to a base rev — see the [baseline component](baseline.md#delta-mode-check-delta) for the mechanism.
 - `irminsul context` — build the [DocGraph](docgraph.md) and delegate task-specific navigation lookup to [`context`](context.md). `--before-edit <path...>` and `--after-edit` expose the common stateless editing loop with bounded authored excerpts; `--include` expands or suppresses content categories, while the path, topic, changed, and change-status modes remain available as power tools.
 - `irminsul status` — summarize document inventory, source ownership, and configured findings through the [`status`](status.md) report.
 
@@ -76,7 +76,7 @@ Findings print one per line, sorted by severity then path. Severity colors are r
 `irminsul check --profile` accepts `hard`, `configured`, and `all-available`. `hard` runs configured hard checks, `configured` adds configured deterministic warning checks, and `all-available` runs every implemented deterministic check.
 
 The CLI is intentionally thin: every subcommand resolves config, builds a graph, calls into a registry of work, and prints. Logic lives in the modules it dispatches to.
-<!-- anchor: src/irminsul/cli.py#check @sha256:c78429e96b77 -->
+<!-- anchor: src/irminsul/cli.py#check @sha256:3707bacd8083 -->
 
 
 ## Scope & Limitations

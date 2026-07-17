@@ -437,6 +437,7 @@ def _findings_to_json(
     counts: dict[Severity, int],
     commands: list[str | None],
     baseline: dict[str, object] | None = None,
+    delta: dict[str, object] | None = None,
 ) -> str:
     import json
 
@@ -451,6 +452,8 @@ def _findings_to_json(
     }
     if baseline is not None:
         payload["baseline"] = baseline
+    if delta is not None:
+        payload["delta"] = delta
     return json.dumps(payload, indent=2)
 
 
@@ -528,19 +531,44 @@ def _run_registered_checks(
     graph: DocGraph,
     *,
     tier: str,
+    announce: bool = True,
 ) -> list[Finding]:
     findings: list[Finding] = []
     for check_name in check_names:
         cls = registry.get(check_name)
         if cls is None:
-            typer.echo(
-                typer.style(
-                    f"note: {tier} check '{check_name}' not yet implemented; skipping.",
-                    fg="yellow",
+            if announce:
+                typer.echo(
+                    typer.style(
+                        f"note: {tier} check '{check_name}' not yet implemented; skipping.",
+                        fg="yellow",
+                    )
                 )
-            )
             continue
         findings.extend(cls().run(graph))
+    return findings
+
+
+def _run_configured_checks(
+    profile: Profile,
+    config: IrminsulConfig,
+    graph: DocGraph,
+    *,
+    announce: bool = True,
+) -> list[Finding]:
+    """Hard + soft findings for one profile/graph pair — the unit `--delta`
+    runs twice (once for the working tree, once for the base-rev checkout)."""
+    findings: list[Finding] = []
+    findings.extend(
+        _run_registered_checks(
+            _hard_check_names(profile, config), HARD_REGISTRY, graph, tier="hard", announce=announce
+        )
+    )
+    findings.extend(
+        _run_registered_checks(
+            _soft_check_names(profile, config), SOFT_REGISTRY, graph, tier="soft", announce=announce
+        )
+    )
     return findings
 
 
@@ -616,6 +644,23 @@ def check(
         bool,
         typer.Option("--no-baseline", help="Ignore an existing baseline file for this run."),
     ] = False,
+    delta: Annotated[
+        bool,
+        typer.Option(
+            "--delta",
+            help=(
+                "Report only findings introduced relative to a base rev "
+                "(default HEAD; see --delta-base)."
+            ),
+        ),
+    ] = False,
+    delta_base: Annotated[
+        str | None,
+        typer.Option(
+            "--delta-base",
+            help="Base git rev for --delta. Passing this implies --delta. Defaults to HEAD.",
+        ),
+    ] = None,
 ) -> None:
     """Run the configured checks. Errors exit non-zero."""
     if fmt not in ("plain", "json", "github"):
@@ -632,6 +677,13 @@ def check(
         typer.echo(
             typer.style("--update-baseline and --no-baseline are mutually exclusive", fg="red")
         )
+        raise typer.Exit(code=2)
+
+    if delta_base is not None:
+        delta = True
+
+    if delta and update_baseline:
+        typer.echo(typer.style("--delta and --update-baseline are mutually exclusive", fg="red"))
         raise typer.Exit(code=2)
 
     now_date: _dt.date | None = None
@@ -685,17 +737,7 @@ def check(
 
     graph = build_graph(repo_root, config, now=now_date, diff_changed_paths=co_change_paths)
 
-    findings: list[Finding] = []
-    findings.extend(
-        _run_registered_checks(
-            _hard_check_names(profile, config), HARD_REGISTRY, graph, tier="hard"
-        )
-    )
-    findings.extend(
-        _run_registered_checks(
-            _soft_check_names(profile, config), SOFT_REGISTRY, graph, tier="soft"
-        )
-    )
+    findings = _run_configured_checks(profile, config, graph)
 
     if co_change_paths is not None:
         from irminsul.checks.co_change import run_co_change
@@ -704,38 +746,68 @@ def check(
 
     findings = sort_findings(findings)
 
-    from irminsul.baseline import BaselineError, apply_baseline, load_baseline, write_baseline
-
-    baseline_file = repo_root / config.paths.baseline
-    if update_baseline:
-        count = write_baseline(baseline_file, findings)
-        typer.echo(
-            typer.style(
-                f"baseline: wrote {count} finding(s) to {config.paths.baseline}", fg="green"
-            )
-        )
-        raise typer.Exit(code=0)
-
     baseline_status: dict[str, object] = {
         "applied": False,
         "path": None,
         "suppressed": 0,
         "stale": 0,
     }
-    if not no_baseline and baseline_file.is_file():
+    delta_status: dict[str, object] | None = None
+
+    if delta:
+        from irminsul.delta import DeltaError, compute_delta, pristine_checkout
+
+        delta_base_rev = delta_base or "HEAD"
         try:
-            fingerprints = load_baseline(baseline_file)
-        except BaselineError as e:
+            with pristine_checkout(repo_root, delta_base_rev) as base_root:
+                base_graph = build_graph(
+                    base_root, config, now=now_date, diff_changed_paths=co_change_paths
+                )
+                base_findings = _run_configured_checks(profile, config, base_graph, announce=False)
+        except DeltaError as e:
             typer.echo(typer.style(str(e), fg="red"))
             raise typer.Exit(code=2) from None
-        application = apply_baseline(findings, fingerprints)
-        findings = application.remaining
-        baseline_status = {
+
+        delta_result = compute_delta(findings, base_findings)
+        findings = delta_result.new
+        delta_status = {
             "applied": True,
-            "path": config.paths.baseline,
-            "suppressed": application.suppressed,
-            "stale": application.stale,
+            "base": delta_base_rev,
+            "new": len(delta_result.new),
+            "pre_existing_suppressed": delta_result.pre_existing,
         }
+    else:
+        from irminsul.baseline import (
+            BaselineError,
+            apply_baseline,
+            load_baseline,
+            write_baseline,
+        )
+
+        baseline_file = repo_root / config.paths.baseline
+        if update_baseline:
+            count = write_baseline(baseline_file, findings)
+            typer.echo(
+                typer.style(
+                    f"baseline: wrote {count} finding(s) to {config.paths.baseline}", fg="green"
+                )
+            )
+            raise typer.Exit(code=0)
+
+        if not no_baseline and baseline_file.is_file():
+            try:
+                fingerprints = load_baseline(baseline_file)
+            except BaselineError as e:
+                typer.echo(typer.style(str(e), fg="red"))
+                raise typer.Exit(code=2) from None
+            application = apply_baseline(findings, fingerprints)
+            findings = application.remaining
+            baseline_status = {
+                "applied": True,
+                "path": config.paths.baseline,
+                "suppressed": application.suppressed,
+                "stale": application.stale,
+            }
 
     counts = summarize(findings)
     fail = counts[Severity.error] > 0 or (strict and counts[Severity.warning] > 0)
@@ -747,6 +819,7 @@ def check(
                 counts,
                 fix_commands(findings, graph, profile=profile.value),
                 baseline=baseline_status,
+                delta=delta_status,
             )
         )
     elif fmt == "github":
@@ -756,7 +829,15 @@ def check(
     else:
         for finding in findings:
             _print_finding(finding)
-        if baseline_status["applied"]:
+        if delta_status is not None:
+            typer.echo(
+                typer.style(
+                    f"{delta_status['new']} new finding(s) vs {delta_status['base']} "
+                    f"({delta_status['pre_existing_suppressed']} pre-existing suppressed)",
+                    fg="cyan",
+                )
+            )
+        elif baseline_status["applied"]:
             stale = baseline_status["stale"]
             stale_note = (
                 f" ({stale} stale entr{'y' if stale == 1 else 'ies'};"
