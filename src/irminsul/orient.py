@@ -69,6 +69,10 @@ _COMMANDS: tuple[tuple[str, str], ...] = (
         "orient on one RFC: lifecycle state, evidence, blockers, and the next action",
     ),
     (
+        "irminsul change graph [<rfc-id>] --format json",
+        "inspect RFC dependencies, replacements, cycles, and lifecycle contradictions",
+    ),
+    (
         "irminsul new rfc <title>",
         "start a change: reports repository binding readiness, then scaffolds the RFC",
     ),

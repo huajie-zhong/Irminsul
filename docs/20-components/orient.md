@@ -26,6 +26,7 @@ inventory:
       - list undocumented
       - list lifecycle
       - change status
+      - change graph
       - new rfc
     omit:
       - anchors

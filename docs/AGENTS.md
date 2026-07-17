@@ -105,6 +105,7 @@ automatically once any doc declares one.
 | `0015-govern-mcp-tool-surface` | [ADR-0015: Govern the MCP tool surface as a watched surface](50-decisions/0015-govern-mcp-tool-surface.md) | adr | 2 | Govern the MCP tool set with a dedicated `mcp` extractor and a watched `inventory:` block in mcp-server.md (internal consistency), rather than a generic-regex rule or a two-surface CLI-parity check. |
 | `0016-freeze-implemented-rfc-records` | [ADR-0016: Freeze implemented RFC records](50-decisions/0016-freeze-implemented-rfc-records.md) | adr | 2 | Seal implemented RFCs with an enforced full-file SHA-256 and treat extensions as new RFCs. |
 | `0017-standardize-adr-structure` | [ADR-0017: Standardize ADR structure without deriving lifecycle state](50-decisions/0017-standardize-adr-structure.md) | adr | 2 | Require a reviewable ADR shape while keeping RFC lifecycle state in structured metadata. |
+| `0021-derive-rfc-relationship-graphs` | [ADR-0021: Derive RFC relationship graphs](50-decisions/0021-derive-rfc-relationship-graphs.md) | adr | 2 | Derive lifecycle-aware RFC relationships from forward declarations without mutating frozen predecessors. |
 | `50-decisions` | [Architecture decisions](50-decisions/INDEX.md) | reference | 2 |  |
 
 ### 60-operations
@@ -160,6 +161,7 @@ automatically once any doc declares one.
 | `0033-derived-layered-impact` | [Derived change impact and semantic-review clues](80-evolution/rfcs/0033-derived-layered-impact.md) | explanation | 2 |  |
 | `0034-binding-readiness-and-agent-lifecycle` | [Binding readiness and the governed agent lifecycle surface](80-evolution/rfcs/0034-binding-readiness-and-agent-lifecycle.md) | explanation | 2 |  |
 | `0035-rfc-lifecycle-integrity-and-frozen-records` | [RFC lifecycle integrity and frozen implemented records](80-evolution/rfcs/0035-rfc-lifecycle-integrity-and-frozen-records.md) | explanation | 2 |  |
+| `0042-rfc-dependency-and-supersession-graphs` | [RFC dependency and supersession graphs](80-evolution/rfcs/0042-rfc-dependency-and-supersession-graphs.md) | explanation | 2 |  |
 | `80-evolution` | [Evolution](80-evolution/INDEX.md) | reference | 4 |  |
 | `patterns` | [Evolution Patterns](80-evolution/patterns.md) | explanation | 2 |  |
 | `rfcs` | [RFCs](80-evolution/rfcs/INDEX.md) | reference | 2 |  |

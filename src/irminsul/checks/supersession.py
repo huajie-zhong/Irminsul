@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from irminsul.checks.base import Finding, Fix, Severity
-from irminsul.docgraph import DocGraph
+from irminsul.docgraph import DocGraph, DocNode
 from irminsul.frontmatter import StatusEnum
 from irminsul.frontmatter_edit import set_value
 
@@ -39,6 +39,8 @@ class SupersessionCheck:
         out: list[Finding] = []
 
         for new_doc in graph.nodes.values():
+            if _is_rfc(new_doc):
+                continue
             for old_id in new_doc.frontmatter.supersedes:
                 old = graph.nodes.get(old_id)
                 if old is None:
@@ -52,6 +54,8 @@ class SupersessionCheck:
                             category=_CAT_UNKNOWN_SUPERSEDES,
                         )
                     )
+                    continue
+                if _is_rfc(old):
                     continue
 
                 if old.frontmatter.status != StatusEnum.deprecated:
@@ -89,6 +93,8 @@ class SupersessionCheck:
 
         # Reverse direction: orphaned superseded_by pointers.
         for node in graph.nodes.values():
+            if _is_rfc(node):
+                continue
             sb = node.frontmatter.superseded_by
             if sb is None:
                 continue
@@ -104,6 +110,8 @@ class SupersessionCheck:
                         category=_CAT_UNKNOWN_SUPERSEDED_BY,
                     )
                 )
+                continue
+            if _is_rfc(target):
                 continue
             if node.id not in target.frontmatter.supersedes:
                 out.append(
@@ -137,9 +145,11 @@ class SupersessionCheck:
 
         out: list[Fix] = []
         for new_doc in graph.nodes.values():
+            if _is_rfc(new_doc):
+                continue
             for old_id in new_doc.frontmatter.supersedes:
                 old = graph.nodes.get(old_id)
-                if old is None:
+                if old is None or _is_rfc(old):
                     continue
                 key = (old.path, old.id)
 
@@ -192,3 +202,8 @@ def _frontmatter_setter(key: str, value: str) -> Callable[[str], str]:
         return set_value(text, key, value)
 
     return apply
+
+
+def _is_rfc(node: DocNode) -> bool:
+    path = f"/{node.path.as_posix()}"
+    return "/80-evolution/rfcs/" in path and node.path.name != "INDEX.md"

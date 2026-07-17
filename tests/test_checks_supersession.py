@@ -71,3 +71,30 @@ def test_orphaned_superseded_by_errors() -> None:
 
     findings = SupersessionCheck().run(graph)
     assert any(f.severity == Severity.error and "ghost" in f.message for f in findings)
+
+
+def test_rfc_supersession_is_left_to_relation_graph(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("rfc-relations")
+    config = load(find_config(repo))
+    graph = build_graph(repo, config)
+
+    assert SupersessionCheck().run(graph) == []
+
+
+def test_generic_supersession_does_not_rewrite_rfc_target(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("rfc-relations")
+    component = repo / "docs" / "20-components" / "component.md"
+    component.write_text(
+        component.read_text(encoding="utf-8").replace(
+            "describes: []", "describes: []\nsupersedes: [0001-base]"
+        ),
+        encoding="utf-8",
+    )
+    config = load(find_config(repo))
+    graph = build_graph(repo, config)
+
+    assert SupersessionCheck().run(graph) == []
