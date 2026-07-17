@@ -72,8 +72,12 @@ def test_orient_plain(tmp_path: Path) -> None:
     assert "docs root: docs" in result.output
     assert "20-components" in result.output
     assert "entry docs: docs/README.md, docs/GLOSSARY.md" in result.output
+    assert "irminsul context <path>" in result.output
     assert "irminsul context --changed" in result.output
+    assert "after editing" in result.output
     assert "irminsul check --profile=hard --format json" in result.output
+    assert "irminsul status --format json" in result.output
+    assert "irminsul change graph [<rfc-id>] --format json" in result.output
 
 
 def test_orient_json(tmp_path: Path) -> None:
@@ -106,6 +110,10 @@ def test_orient_json_against_fixture_repo() -> None:
     assert data["doc_totals"]["total"] == 1
     assert data["entry_docs"] == []
     assert any(hint["command"] == "irminsul fix" for hint in data["commands"])
+    assert any(
+        hint["command"] == "irminsul change graph [<rfc-id>] --format json"
+        for hint in data["commands"]
+    )
 
 
 def test_orient_rejects_unknown_format(tmp_path: Path) -> None:

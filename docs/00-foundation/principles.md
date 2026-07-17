@@ -15,7 +15,7 @@ Irminsul exists because most documentation rots, and the reason it rots is struc
 
 Irminsul is built on a specific view of the modern development environment:
 
-1. **LLMs are the primary consumers.** LLM agents are now the most frequent "readers" of documentation. They are exceptionally good at processing volume but exceptionally bad at resolving contradiction.
+1. **Agents operate; humans authorize.** Agents are the primary operators and direct consumers of repository knowledge; humans interact with that knowledge primarily through agents and remain the authority for intent and approval.
 2. **Rot is the primary failure mode.** The issue isn't that documentation is hard to write; it's that it is impossible to keep accurate as code evolves. "Silent rot"—where docs and code diverge—is the deadliest threat to LLM-driven workflows because it triggers invisible hallucinations.
 3. **Principle-first bootstrapping.** A project may begin before code exists. The first useful user input is a well-expressed principle, idea, or belief about what should be built; Irminsul turns that foundation into docs that guide later AI-assisted implementation.
 4. **The Harness Principle.** LLMs follow rules most of the time, but they fail silently and confidently. To make LLM-driven development safe, the system must provide **Hard Checks** (deterministic checks). When a check fails, it provides a clear signal that allows the LLM to self-correct without human intervention.
