@@ -47,4 +47,5 @@ In-flight proposals. See [`80-evolution`](../INDEX.md) for the RFC lifecycle.
 - [`0034-binding-readiness-and-agent-lifecycle`](0034-binding-readiness-and-agent-lifecycle.md) — Lifecycle readiness reports and a governed read-only agent surface
 - [`0035-rfc-lifecycle-integrity-and-frozen-records`](0035-rfc-lifecycle-integrity-and-frozen-records.md) — Freeze implemented RFC history and expose lifecycle-state contradictions
 - [`0036-source-discovery-policy`](0036-source-discovery-policy.md) — Honor repository-local ignores and explicit source filters while containing symlink traversal
+- [`0037-workflow-context-modes`](0037-workflow-context-modes.md) — Stateless before-edit and after-edit context orchestration for agents
 - [`0042-rfc-dependency-and-supersession-graphs`](0042-rfc-dependency-and-supersession-graphs.md) — Lifecycle-aware RFC dependency and supersession graphs

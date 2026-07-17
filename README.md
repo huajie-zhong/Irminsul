@@ -36,7 +36,8 @@ The loop: orient, locate the owning docs, edit code and docs in the same commit,
 | Command | What it does |
 |---------|--------------|
 | `irminsul orient` | First call in a session: one-shot repo orientation — what this repo is, the layer map, where to start |
-| `irminsul context --changed` (or `--topic <q>`, `<path>`) | Owning docs, tests, dependencies, and findings for the current edit set, a topic, or a path |
+| `irminsul context --before-edit <path...>` / `--after-edit` | Package owners, tests, active RFCs, requirements, findings, and deterministic next actions around an edit |
+| `irminsul context --changed` (or `--topic <q>`, `<path>`) | Focused ownership, dependency, and finding queries for the current edit set, a topic, or a path |
 | `irminsul status` | Repository-wide docs inventory, source ownership, and finding totals |
 | `irminsul refs <doc-id>` / `irminsul refs --symbol <name>` | Backlinks for a doc, or the docs that own/reference a symbol |
 | `irminsul surface {cli,http,exports,env-vars}` | Derive a code surface from source on demand — never written to disk, so it cannot drift |

@@ -37,6 +37,7 @@ def _make_context_repo(tmp_path: Path, *, configured_soft: bool = True) -> Path:
     src = repo / "src" / "mylib"
     src.mkdir(parents=True)
     (src / "core.py").write_text("from mylib import helper\n\ndef run(): pass\n", encoding="utf-8")
+    (src / "core_extra.py").write_text("def run_more(): pass\n", encoding="utf-8")
     (src / "helper.py").write_text("def help(): pass\n", encoding="utf-8")
 
     tests = repo / "tests"
@@ -59,6 +60,7 @@ def _make_context_repo(tmp_path: Path, *, configured_soft: bool = True) -> Path:
                 "  - helper",
                 "describes:",
                 "  - src/mylib/core.py",
+                "  - src/mylib/core_extra.py",
                 "tests:",
                 "  - tests/test_core.py",
                 "---",
@@ -94,7 +96,7 @@ def _make_context_repo(tmp_path: Path, *, configured_soft: bool = True) -> Path:
         ),
         encoding="utf-8",
     )
-    (docs / "a-core-note.md").write_text(
+    (docs / "core-note.md").write_text(
         "\n".join(
             [
                 "---",
@@ -113,6 +115,40 @@ def _make_context_repo(tmp_path: Path, *, configured_soft: bool = True) -> Path:
         encoding="utf-8",
     )
     return repo
+
+
+def _add_active_rfc(repo: Path) -> None:
+    rfcs = repo / "docs" / "80-evolution" / "rfcs"
+    rfcs.mkdir(parents=True)
+    (rfcs / "0001-retry.md").write_text(
+        "\n".join(
+            [
+                "---",
+                "id: 0001-retry",
+                'title: "Retry semantics"',
+                "audience: explanation",
+                "tier: 2",
+                "status: draft",
+                "describes: []",
+                "rfc_state: draft",
+                "affects:",
+                "  - core",
+                "---",
+                "",
+                "# Retry semantics",
+                "",
+                "## Requirements",
+                "",
+                "### Requirement: Bounded retries",
+                "ID: bounded-retries",
+                "Provenance: code",
+                "",
+                "The client MUST stop after the configured retry limit.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
 
 
 def _git(repo: Path, *args: str) -> None:
@@ -152,6 +188,127 @@ def test_context_doc_path_plain_returns_doc_metadata(tmp_path: Path) -> None:
     assert "source claims: src/mylib/core.py" in result.output
     assert "tests: tests/test_core.py" in result.output
     assert "depends_on: helper (docs/20-components/helper.md)" in result.output
+
+
+def test_context_before_edit_groups_paths_and_surfaces_active_change(tmp_path: Path) -> None:
+    repo = _make_context_repo(tmp_path)
+    _add_active_rfc(repo)
+
+    result = runner.invoke(
+        app,
+        [
+            "context",
+            "--before-edit",
+            "src/mylib/core.py",
+            "src/mylib/core_extra.py",
+            "--format",
+            "json",
+            "--path",
+            str(repo),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["mode"] == "path"
+    assert data["workflow"] == "before-edit"
+    assert data["validation"]["hard_checks_passed"] is True
+    [context] = data["results"]
+    assert context["input"] == ["src/mylib/core.py", "src/mylib/core_extra.py"]
+    assert context["owner"]["id"] == "core"
+    assert context["source_claims"] == ["src/mylib/core.py", "src/mylib/core_extra.py"]
+    assert context["active_changes"] == [
+        {
+            "id": "0001-retry",
+            "title": "Retry semantics",
+            "path": "docs/80-evolution/rfcs/0001-retry.md",
+            "state": "draft",
+            "requirements": [{"id": "bounded-retries", "title": "Bounded retries"}],
+        }
+    ]
+    assert data["next_actions"] == [
+        {
+            "command": "irminsul change status 0001-retry",
+            "reason": "Active RFC explicitly affects component 'core'.",
+        },
+        {
+            "command": "irminsul context --after-edit",
+            "reason": "Validate the working tree and affected repository knowledge after editing.",
+        },
+    ]
+    assert all(
+        finding["check"] != "orphans" for item in data["results"] for finding in item["findings"]
+    )
+
+
+def test_context_before_edit_plain_encodes_workflow(tmp_path: Path) -> None:
+    repo = _make_context_repo(tmp_path)
+    _add_active_rfc(repo)
+
+    result = runner.invoke(
+        app,
+        ["context", "--before-edit", "src/mylib/core.py", "--path", str(repo)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Workflow: before-edit" in result.output
+    assert "0001-retry [draft]" in result.output
+    assert "requirements: bounded-retries" in result.output
+    assert "irminsul context --after-edit" in result.output
+
+
+def test_context_after_edit_runs_global_hard_validation(tmp_path: Path) -> None:
+    repo = _make_context_repo(tmp_path)
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "dev@example.com")
+    _git(repo, "config", "user.name", "Dev")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "initial")
+    (repo / "docs" / "20-components" / "broken.md").write_text(
+        "# Missing frontmatter\n", encoding="utf-8"
+    )
+
+    result = runner.invoke(
+        app,
+        ["context", "--after-edit", "--format", "json", "--path", str(repo)],
+    )
+
+    assert result.exit_code == 1, result.output
+    data = json.loads(result.output)
+    assert data["mode"] == "changed"
+    assert data["workflow"] == "after-edit"
+    assert data["results"] == []
+    assert data["validation"]["hard_checks_passed"] is False
+    assert data["validation"]["errors"] > 0
+    assert data["next_actions"][-1] == {
+        "command": "irminsul check --profile hard",
+        "reason": "The repository hard gate has errors to resolve.",
+    }
+    assert all(
+        action["command"] != "irminsul list undocumented --all" for action in data["next_actions"]
+    )
+
+
+def test_context_after_edit_routes_declared_test_changes(tmp_path: Path) -> None:
+    repo = _make_context_repo(tmp_path)
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "dev@example.com")
+    _git(repo, "config", "user.name", "Dev")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "initial")
+    (repo / "tests" / "test_core.py").write_text("def test_core_more(): pass\n", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["context", "--after-edit", "--format", "json", "--path", str(repo)],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["unmatched"] == []
+    [context] = data["results"]
+    assert context["owner"]["id"] == "core"
+    assert context["input"] == ["tests/test_core.py"]
 
 
 def test_context_topic_sorts_exact_id_first(tmp_path: Path) -> None:
@@ -346,6 +503,30 @@ def test_context_rejects_invalid_combinations(tmp_path: Path) -> None:
 
     assert result.exit_code == 2
     assert "choose exactly one input mode" in result.output
+
+    missing_before_target = runner.invoke(app, ["context", "--before-edit", "--path", str(repo)])
+    assert missing_before_target.exit_code == 2
+    assert "--before-edit requires one or more paths" in missing_before_target.output
+
+    after_with_target = runner.invoke(
+        app,
+        ["context", "--after-edit", "src/mylib/core.py", "--path", str(repo)],
+    )
+    assert after_with_target.exit_code == 2
+    assert "--after-edit cannot be combined" in after_with_target.output
+
+    multiple_without_workflow = runner.invoke(
+        app,
+        [
+            "context",
+            "src/mylib/core.py",
+            "src/mylib/helper.py",
+            "--path",
+            str(repo),
+        ],
+    )
+    assert multiple_without_workflow.exit_code == 2
+    assert "multiple paths require the --before-edit workflow" in multiple_without_workflow.output
 
 
 def test_context_missing_path_is_nonzero(tmp_path: Path) -> None:

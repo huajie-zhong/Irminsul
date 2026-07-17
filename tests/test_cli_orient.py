@@ -72,6 +72,8 @@ def test_orient_plain(tmp_path: Path) -> None:
     assert "docs root: docs" in result.output
     assert "20-components" in result.output
     assert "entry docs: docs/README.md, docs/GLOSSARY.md" in result.output
+    assert "irminsul context --before-edit <path...>" in result.output
+    assert "irminsul context --after-edit" in result.output
     assert "irminsul context <path>" in result.output
     assert "irminsul context --changed" in result.output
     assert "after editing" in result.output

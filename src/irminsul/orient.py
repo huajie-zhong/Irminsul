@@ -25,6 +25,14 @@ _ENTRY_DOC_NAMES = ("AGENTS.md", "README.md", "CONTRIBUTING.md", "GLOSSARY.md")
 # guidance is intent, which only a human can curate.
 _COMMANDS: tuple[tuple[str, str], ...] = (
     (
+        "irminsul context --before-edit <path...>",
+        "start an edit: package owners, tests, active RFCs, requirements, and findings",
+    ),
+    (
+        "irminsul context --after-edit",
+        "finish an edit: inspect changed paths, affected knowledge, and hard validation",
+    ),
+    (
         "irminsul context <path>",
         "before editing a known file: find its owning doc, tests, dependencies, and findings",
     ),
