@@ -21,6 +21,22 @@ from irminsul.git.changes import GitChangesError, working_tree_changed_paths
 ContextMode = Literal["path", "topic", "changed"]
 ContextProfile = Literal["hard", "configured", "all-available"]
 WorkflowStage = Literal["before-edit", "after-edit"]
+ContentCategory = Literal["owner", "claims", "requirements", "dependencies"]
+
+CONTENT_CATEGORY_ORDER: tuple[ContentCategory, ...] = (
+    "owner",
+    "claims",
+    "requirements",
+    "dependencies",
+)
+DEFAULT_WORKFLOW_CONTENT: tuple[ContentCategory, ...] = (
+    "owner",
+    "claims",
+    "requirements",
+)
+_MAX_CONTENT_EXCERPTS = 8
+_MAX_EXCERPT_LINES = 20
+_MAX_EXCERPT_CHARS = 1_200
 
 
 class ContextError(Exception):
@@ -81,6 +97,23 @@ class NextAction:
 
 
 @dataclass(frozen=True)
+class ContentExcerpt:
+    category: ContentCategory
+    doc_id: str
+    path: str
+    title: str
+    text: str
+    reason: str
+    truncated: bool
+
+
+@dataclass(frozen=True)
+class ContextContent:
+    included: list[ContentExcerpt]
+    omitted: dict[str, int]
+
+
+@dataclass(frozen=True)
 class ContextResult:
     input: list[str]
     owner: DocRef
@@ -93,6 +126,7 @@ class ContextResult:
     findings: list[FindingSummary]
     hints: list[str]
     active_changes: list[ActiveChange] = field(default_factory=list)
+    content: ContextContent | None = None
     doc_co_changed: bool = True
 
 
@@ -158,6 +192,7 @@ def build_context_report(
     changed: bool = False,
     profile: ContextProfile = "configured",
     workflow: WorkflowStage | None = None,
+    content_categories: Iterable[ContentCategory] | None = None,
 ) -> ContextReport:
     """Build task-specific navigation context from the current doc graph."""
     paths = tuple(target_paths) if target_paths is not None else None
@@ -183,6 +218,13 @@ def build_context_report(
         raise ContextError("after-edit requires changed-path mode", code=2)
     if workflow not in (None, "before-edit", "after-edit"):
         raise ContextError(f"unknown context workflow: {workflow}", code=2)
+
+    if content_categories is None:
+        categories = DEFAULT_WORKFLOW_CONTENT if workflow is not None else ()
+        include_content = workflow is not None
+    else:
+        categories = _normalize_content_categories(content_categories)
+        include_content = True
 
     graph = build_graph(repo_root, config)
 
@@ -212,6 +254,7 @@ def build_context_report(
             item,
             findings,
             include_active_changes=include_workflow,
+            content_categories=categories if include_content else None,
         )
         for item in pending
     ]
@@ -251,6 +294,35 @@ def context_report_should_fail(report: ContextReport) -> bool:
 
 def context_report_to_json(report: ContextReport) -> str:
     return json.dumps(_report_to_dict(report), indent=2)
+
+
+def parse_content_categories(raw: str) -> tuple[ContentCategory, ...]:
+    values = [value.strip().lower() for value in raw.split(",") if value.strip()]
+    if not values:
+        raise ContextError("--include requires one or more content categories", code=2)
+    if "all" in values:
+        if len(values) != 1:
+            raise ContextError("--include all cannot be combined with other categories", code=2)
+        return CONTENT_CATEGORY_ORDER
+    if "none" in values:
+        if len(values) != 1:
+            raise ContextError("--include none cannot be combined with other categories", code=2)
+        return ()
+    return _normalize_content_categories(values)
+
+
+def _normalize_content_categories(
+    categories: Iterable[str],
+) -> tuple[ContentCategory, ...]:
+    selected = set(categories)
+    unknown = sorted(selected - set(CONTENT_CATEGORY_ORDER))
+    if unknown:
+        expected = ", ".join(CONTENT_CATEGORY_ORDER)
+        raise ContextError(
+            f"unknown --include categories: {', '.join(unknown)}; expected {expected}",
+            code=2,
+        )
+    return tuple(category for category in CONTENT_CATEGORY_ORDER if category in selected)
 
 
 def format_context_plain(report: ContextReport) -> str:
@@ -595,10 +667,17 @@ def _build_result(
     all_findings: list[Finding],
     *,
     include_active_changes: bool = False,
+    content_categories: tuple[ContentCategory, ...] | None = None,
 ) -> ContextResult:
     node = pending.node
     source_claims = list(pending.source_claims) or list(node.frontmatter.describes)
     relevant_findings = _relevant_findings(all_findings, node, pending.inputs)
+    active_changes = (
+        _active_changes(graph, node)
+        if include_active_changes
+        or (content_categories is not None and "requirements" in content_categories)
+        else []
+    )
     return ContextResult(
         input=list(pending.inputs),
         owner=_doc_ref(node),
@@ -620,7 +699,12 @@ def _build_result(
         ],
         findings=[_finding_summary(finding) for finding in relevant_findings],
         hints=_hints(node, relevant_findings),
-        active_changes=_active_changes(graph, node) if include_active_changes else [],
+        active_changes=active_changes if include_active_changes else [],
+        content=(
+            _build_context_content(graph, node, active_changes, content_categories)
+            if content_categories is not None
+            else None
+        ),
         doc_co_changed=pending.doc_co_changed,
     )
 
@@ -652,6 +736,160 @@ def _active_changes(graph: DocGraph, owner: DocNode) -> list[ActiveChange]:
             )
         )
     return out
+
+
+def _build_context_content(
+    graph: DocGraph,
+    owner: DocNode,
+    active_changes: list[ActiveChange],
+    categories: tuple[ContentCategory, ...],
+) -> ContextContent:
+    candidates: dict[ContentCategory, list[ContentExcerpt]] = {
+        category: [] for category in categories
+    }
+
+    if "owner" in candidates:
+        excerpt = _document_excerpt(
+            owner,
+            category="owner",
+            reason=f"Owns the requested path through document '{owner.id}'.",
+        )
+        if excerpt is not None:
+            candidates["owner"].append(excerpt)
+
+    if "claims" in candidates:
+        for claim in owner.frontmatter.claims:
+            text, truncated = _bound_excerpt(claim.claim)
+            if not text:
+                continue
+            candidates["claims"].append(
+                ContentExcerpt(
+                    category="claims",
+                    doc_id=owner.id,
+                    path=owner.path.as_posix(),
+                    title=f"Claim {claim.id} ({claim.kind})",
+                    text=text,
+                    reason="Structured claim declared by the owning document.",
+                    truncated=truncated,
+                )
+            )
+
+    if "requirements" in candidates:
+        for change in active_changes:
+            section = graph.requirements.get(change.id)
+            node = graph.nodes.get(change.id)
+            if section is None or node is None:
+                continue
+            for requirement in section.requirements:
+                text, truncated = _bound_excerpt(requirement.text)
+                if not text:
+                    continue
+                label = requirement.req_id or requirement.title
+                candidates["requirements"].append(
+                    ContentExcerpt(
+                        category="requirements",
+                        doc_id=node.id,
+                        path=node.path.as_posix(),
+                        title=f"Requirement {label}: {requirement.title}",
+                        text=text,
+                        reason=(f"Active RFC '{change.id}' explicitly affects owner '{owner.id}'."),
+                        truncated=truncated,
+                    )
+                )
+
+    if "dependencies" in candidates:
+        dependencies = [
+            graph.nodes[doc_id] for doc_id in owner.frontmatter.depends_on if doc_id in graph.nodes
+        ]
+        for dependency in sorted(dependencies, key=lambda item: item.path.as_posix()):
+            excerpt = _document_excerpt(
+                dependency,
+                category="dependencies",
+                reason=f"Owning document '{owner.id}' declares depends_on '{dependency.id}'.",
+            )
+            if excerpt is not None:
+                candidates["dependencies"].append(excerpt)
+
+    included: list[ContentExcerpt] = []
+    omitted: dict[str, int] = {}
+    for category in CONTENT_CATEGORY_ORDER:
+        if category not in candidates:
+            continue
+        available = candidates[category]
+        remaining = max(_MAX_CONTENT_EXCERPTS - len(included), 0)
+        selected = available[:remaining]
+        included.extend(selected)
+        omitted[category] = len(available) - len(selected)
+
+    return ContextContent(included=included, omitted=omitted)
+
+
+def _document_excerpt(
+    node: DocNode,
+    *,
+    category: Literal["owner", "dependencies"],
+    reason: str,
+) -> ContentExcerpt | None:
+    extracted = _first_substantive_block(node.body)
+    if extracted is None:
+        return None
+    heading, raw_text = extracted
+    text, truncated = _bound_excerpt(raw_text)
+    if not text:
+        return None
+    return ContentExcerpt(
+        category=category,
+        doc_id=node.id,
+        path=node.path.as_posix(),
+        title=heading or node.frontmatter.title,
+        text=text,
+        reason=reason,
+        truncated=truncated,
+    )
+
+
+def _first_substantive_block(body: str) -> tuple[str | None, str] | None:
+    heading: str | None = None
+    content: list[str] = []
+    in_comment = False
+    for raw_line in body.splitlines():
+        stripped = raw_line.strip()
+        if in_comment:
+            if "-->" in stripped:
+                in_comment = False
+            continue
+        if stripped.startswith("<!--"):
+            if "-->" not in stripped:
+                in_comment = True
+            continue
+        if stripped.startswith("#") and stripped.lstrip("#").startswith(" "):
+            if content:
+                break
+            heading = stripped.lstrip("#").strip()
+            continue
+        if not stripped:
+            if content:
+                break
+            continue
+        content.append(raw_line.rstrip())
+    if not content:
+        return None
+    return heading, "\n".join(content)
+
+
+def _bound_excerpt(text: str) -> tuple[str, bool]:
+    normalized = text.strip()
+    if not normalized:
+        return "", False
+
+    lines = normalized.splitlines()
+    selected = lines[:_MAX_EXCERPT_LINES]
+    bounded = "\n".join(selected).strip()
+    truncated = len(lines) > _MAX_EXCERPT_LINES
+    if len(bounded) > _MAX_EXCERPT_CHARS:
+        bounded = bounded[: _MAX_EXCERPT_CHARS - 3].rstrip() + "..."
+        truncated = True
+    return bounded, truncated
 
 
 def _workflow_validation(
@@ -845,6 +1083,8 @@ def _result_to_dict(
         payload["active_changes"] = [
             _active_change_to_dict(change) for change in result.active_changes
         ]
+    if result.content is not None:
+        payload["content"] = _content_to_dict(result.content)
     return payload
 
 
@@ -871,6 +1111,24 @@ def _validation_to_dict(validation: WorkflowValidation) -> dict[str, object]:
 
 def _next_action_to_dict(action: NextAction) -> dict[str, str]:
     return {"command": action.command, "reason": action.reason}
+
+
+def _content_to_dict(content: ContextContent) -> dict[str, object]:
+    return {
+        "included": [
+            {
+                "category": excerpt.category,
+                "doc_id": excerpt.doc_id,
+                "path": excerpt.path,
+                "title": excerpt.title,
+                "text": excerpt.text,
+                "reason": excerpt.reason,
+                "truncated": excerpt.truncated,
+            }
+            for excerpt in content.included
+        ],
+        "omitted": content.omitted,
+    }
 
 
 def _unmatched_to_dict(item: UnmatchedPath) -> dict[str, object]:
@@ -926,6 +1184,21 @@ def _format_result(result: ContextResult, *, include_workflow: bool = False) -> 
                 lines.append(f"      requirements: {_format_list(requirement_ids)}")
         else:
             lines.append("  active changes: -")
+    if result.content is not None:
+        lines.append("  content:")
+        if result.content.included:
+            for excerpt in result.content.included:
+                suffix = " [truncated]" if excerpt.truncated else ""
+                lines.append(f"    [{excerpt.category}] {excerpt.title} ({excerpt.path}){suffix}")
+                lines.append(f"      reason: {excerpt.reason}")
+                lines.extend(f"      {line}" for line in excerpt.text.splitlines())
+        else:
+            lines.append("    (none)")
+        omitted = [
+            f"{category}={count}" for category, count in result.content.omitted.items() if count
+        ]
+        if omitted:
+            lines.append(f"    omitted: {', '.join(omitted)}")
     if not result.doc_co_changed:
         lines.append("  co-change: owning doc not updated in this change")
     if result.findings:
