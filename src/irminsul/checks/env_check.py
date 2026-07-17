@@ -48,9 +48,19 @@ def _collect_transitive_declared(node: DocNode, graph: DocGraph) -> set[str]:
     return declared
 
 
+CODE_STALE_DECLARATION = "requires-env/stale-declaration"
+
+
 class EnvCheck:
     name: ClassVar[str] = "requires-env"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_STALE_DECLARATION: (
+            "A `requires_env` entry is declared but the code it describes no longer "
+            "reads that env var. Remove the stale declaration, or check the `describes` "
+            "glob if the var is read elsewhere."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None or graph.repo_root is None:
@@ -88,6 +98,7 @@ class EnvCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_STALE_DECLARATION,
                         severity=Severity.warning,
                         message=f"env var '{key}' declared in requires_env but not found in code (stale)",
                         path=node.path,

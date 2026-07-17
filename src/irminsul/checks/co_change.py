@@ -18,6 +18,7 @@ from irminsul.checks.uniqueness import most_specific_claims, resolve_claims
 from irminsul.docgraph import DocGraph, DocNode
 
 CHECK_NAME: Final = "co-change"
+CODE_UNREFLECTED_CHANGE: Final = "co-change/unreflected-change"
 
 
 def run_co_change(graph: DocGraph, changed: frozenset[str]) -> list[Finding]:
@@ -56,6 +57,7 @@ def run_co_change(graph: DocGraph, changed: frozenset[str]) -> list[Finding]:
         out.append(
             Finding(
                 check=CHECK_NAME,
+                code=CODE_UNREFLECTED_CHANGE,
                 severity=Severity.warning,
                 path=node.path,
                 doc_id=node.id,

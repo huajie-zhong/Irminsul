@@ -23,9 +23,11 @@ def _finding(
     message: str = "missing required field 'audience'",
     path: str | None = "docs/20-components/a.md",
     line: int | None = 3,
+    code: str = "frontmatter/missing-field",
 ) -> Finding:
     return Finding(
         check=check,
+        code=code,
         severity=severity,
         message=message,
         path=Path(path) if path is not None else None,

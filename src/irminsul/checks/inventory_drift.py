@@ -37,9 +37,55 @@ def _item_remover(kind: str, item: str) -> Callable[[str], str]:
     return apply
 
 
+CODE_NO_EXTRACTOR = "inventory-drift/no-extractor"
+CODE_NO_SOURCE_GLOB = "inventory-drift/no-source-glob"
+CODE_ITEM_NOT_FOUND = "inventory-drift/item-not-found"
+CODE_UNDECLARED_LIVE_ITEM = "inventory-drift/undeclared-live-item"
+CODE_STALE_OMIT = "inventory-drift/stale-omit"
+CODE_UNFINGERPRINTABLE = "inventory-drift/unfingerprintable"
+CODE_FINGERPRINT_UNRESOLVED = "inventory-drift/fingerprint-unresolved"
+CODE_FINGERPRINT_DRIFT = "inventory-drift/fingerprint-drift"
+
+
 class InventoryDriftCheck:
     name: ClassVar[str] = "inventory-drift"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_NO_EXTRACTOR: (
+            "An `inventory:` entry names a kind with no registered extractor. Use a "
+            "known kind (cli, http, exports, env-vars, mcp), or declare a generic rule "
+            "in irminsul.toml."
+        ),
+        CODE_NO_SOURCE_GLOB: (
+            "An `inventory:` entry has no `source` glob and the doc declares no "
+            "`describes` to extract from. Add a `source` glob to the entry."
+        ),
+        CODE_ITEM_NOT_FOUND: (
+            "An inventory `items` entry no longer exists in the code it describes. "
+            "Remove it, fix its identity, or check the `source` glob."
+        ),
+        CODE_UNDECLARED_LIVE_ITEM: (
+            "A `complete: true` (watched) inventory entry has a live identity that is "
+            "neither listed in `items` nor `omit`. Document it or add it to `omit`."
+        ),
+        CODE_STALE_OMIT: (
+            "An inventory `omit` entry names an identity that is no longer in the live "
+            "surface. Remove it from `omit`."
+        ),
+        CODE_UNFINGERPRINTABLE: (
+            "A fingerprinted inventory item has no resolvable code symbol, so it can't "
+            "be fingerprinted. Remove its fingerprint, or use a kind that resolves "
+            "symbols."
+        ),
+        CODE_FINGERPRINT_UNRESOLVED: (
+            "A fingerprinted inventory item's symbol could not be resolved. Check the "
+            "source path, or remove its fingerprint."
+        ),
+        CODE_FINGERPRINT_DRIFT: (
+            "A fingerprinted inventory item's code shape changed since it was pinned. "
+            "Re-read its docs, then run `irminsul anchors --re-pin`."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None or graph.repo_root is None:
@@ -56,6 +102,7 @@ class InventoryDriftCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_NO_EXTRACTOR,
                             severity=Severity.info,
                             message=(
                                 f"inventory kind '{entry.kind}' has no extractor "
@@ -73,6 +120,7 @@ class InventoryDriftCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_NO_SOURCE_GLOB,
                             severity=Severity.info,
                             message=(
                                 f"inventory ({entry.kind}) has no 'source' and the doc "
@@ -115,6 +163,7 @@ class InventoryDriftCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_ITEM_NOT_FOUND,
                         severity=self.default_severity,
                         message=(
                             f"inventory lists {entry.kind} '{item}' but it was "
@@ -137,6 +186,7 @@ class InventoryDriftCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_UNDECLARED_LIVE_ITEM,
                             severity=self.default_severity,
                             message=(
                                 f"{entry.kind} '{identity}' exists in code but the "
@@ -157,6 +207,7 @@ class InventoryDriftCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_STALE_OMIT,
                         severity=self.default_severity,
                         message=(
                             f"inventory omits {entry.kind} '{omitted}' but it is not "
@@ -177,6 +228,7 @@ class InventoryDriftCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_UNFINGERPRINTABLE,
                         severity=Severity.info,
                         message=(
                             f"{entry.kind} '{identity}' cannot be fingerprinted "
@@ -197,6 +249,7 @@ class InventoryDriftCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_FINGERPRINT_UNRESOLVED,
                         severity=Severity.info,
                         message=(
                             f"{entry.kind} '{identity}' fingerprint could not be "
@@ -212,6 +265,7 @@ class InventoryDriftCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_FINGERPRINT_DRIFT,
                         severity=self.default_severity,
                         message=(
                             f"{entry.kind} '{identity}' changed since its fingerprint "

@@ -187,6 +187,7 @@ def test_list_lifecycle_queue_uses_required_update_categories() -> None:
 def test_lifecycle_queue_quotes_suggested_context_path() -> None:
     finding = Finding(
         check="decision-updates",
+        code="decision-updates/missing-backlink",
         category="missing-backlink",
         severity=Severity.warning,
         message="required update doc is missing a backlink",
@@ -201,6 +202,7 @@ def test_lifecycle_queue_quotes_suggested_context_path() -> None:
 def test_lifecycle_queue_prioritizes_frozen_record_violation() -> None:
     finding = Finding(
         check="rfc-lifecycle-integrity",
+        code="rfc-lifecycle-integrity/frozen-content-changed",
         category="frozen-content-changed",
         severity=Severity.error,
         message="implemented RFC changed after it was frozen",

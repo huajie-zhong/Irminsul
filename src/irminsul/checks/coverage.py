@@ -8,10 +8,23 @@ from typing import ClassVar
 from irminsul.checks.base import Finding, Severity
 from irminsul.docgraph import DocGraph
 
+CODE_MISSING_TESTS_ENTRY = "coverage/missing-tests-entry"
+CODE_TESTS_PATH_MISSING = "coverage/tests-path-missing"
+
 
 class CoverageCheck:
     name: ClassVar[str] = "coverage"
     default_severity: ClassVar[Severity] = Severity.error
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_MISSING_TESTS_ENTRY: (
+            "A tier-3 doc with a `describes` claim has no `tests:` entries. Add "
+            "`tests: [path/to/test_file.py]` to frontmatter."
+        ),
+        CODE_TESTS_PATH_MISSING: (
+            "A frontmatter `tests:` entry points at a path that does not exist. Create "
+            "the test file, or update/remove the entry."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         out: list[Finding] = []
@@ -30,6 +43,7 @@ class CoverageCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_MISSING_TESTS_ENTRY,
                         severity=self.default_severity,
                         message="tier-3 doc has no 'tests:' entries in frontmatter",
                         path=node.path,
@@ -49,6 +63,7 @@ class CoverageCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_TESTS_PATH_MISSING,
                             severity=self.default_severity,
                             message=f"tests: entry '{test_path}' does not exist",
                             path=node.path,

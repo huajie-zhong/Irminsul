@@ -9,10 +9,46 @@ from irminsul.docgraph import DocGraph, DocNode
 from irminsul.frontmatter import RfcStateEnum, StatusEnum, canonical_rfc_state
 from irminsul.rfc_freeze import compute_frozen_hash, seal_text
 
+CODE_PRE_LIFECYCLE_RFC = "rfc-lifecycle-integrity/pre-lifecycle-rfc"
+CODE_MISSING_FROZEN_HASH = "rfc-lifecycle-integrity/missing-frozen-hash"
+CODE_FROZEN_CONTENT_CHANGED = "rfc-lifecycle-integrity/frozen-content-changed"
+CODE_PREMATURE_FROZEN_HASH = "rfc-lifecycle-integrity/premature-frozen-hash"
+CODE_IMPLEMENTATION_EVIDENCE_BEFORE_FINALIZATION = (
+    "rfc-lifecycle-integrity/implementation-evidence-before-finalization"
+)
+CODE_STABLE_DOC_LINKS_DRAFT_RFC = "rfc-lifecycle-integrity/stable-doc-links-draft-rfc"
+
 
 class RfcLifecycleIntegrityCheck:
     name: ClassVar[str] = "rfc-lifecycle-integrity"
     default_severity: ClassVar[Severity] = Severity.error
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_PRE_LIFECYCLE_RFC: (
+            "An RFC under 80-evolution/rfcs/ has no structured `rfc_state`. Run "
+            "`irminsul change migrate <id>` to inspect and classify it."
+        ),
+        CODE_MISSING_FROZEN_HASH: (
+            "An implemented RFC has no `frozen_hash` content seal. Run `irminsul fix "
+            "--check rfc-lifecycle-integrity --confirm`."
+        ),
+        CODE_FROZEN_CONTENT_CHANGED: (
+            "An implemented RFC's content changed after it was frozen. Restore the "
+            "frozen record and propose the extension in a new RFC."
+        ),
+        CODE_PREMATURE_FROZEN_HASH: (
+            "A non-implemented RFC carries a `frozen_hash` seal reserved for "
+            "implemented RFCs. Remove `frozen_hash`, or finalize the RFC through the "
+            "lifecycle."
+        ),
+        CODE_IMPLEMENTATION_EVIDENCE_BEFORE_FINALIZATION: (
+            "A doc declares `implements:` an RFC that is not yet implemented. Finalize "
+            "the accepted RFC, or remove the premature implementation evidence."
+        ),
+        CODE_STABLE_DOC_LINKS_DRAFT_RFC: (
+            "A stable, live doc links to a still-draft RFC. Verify the behavior is "
+            "shipped and finalize the RFC, or stop presenting it as live."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         rfc_nodes = _rfc_nodes(graph)
@@ -83,6 +119,7 @@ class RfcLifecycleIntegrityCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_IMPLEMENTATION_EVIDENCE_BEFORE_FINALIZATION,
                             category="implementation-evidence-before-finalization",
                             severity=Severity.error,
                             message=(
@@ -112,6 +149,7 @@ class RfcLifecycleIntegrityCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_STABLE_DOC_LINKS_DRAFT_RFC,
                         category="stable-doc-links-draft-rfc",
                         severity=Severity.warning,
                         message=f"stable live documentation links draft RFC '{rfc_id}'",
@@ -173,6 +211,7 @@ def _finding(
 ) -> Finding:
     return Finding(
         check=RfcLifecycleIntegrityCheck.name,
+        code=f"{RfcLifecycleIntegrityCheck.name}/{category}",
         category=category,
         severity=severity,
         message=message,

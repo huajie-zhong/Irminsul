@@ -63,12 +63,12 @@ def test_check_now_overrides_today_for_stale_reaper(tmp_path: Path) -> None:
         ["check", "--profile", "configured", "--path", str(repo), "--now", future],
     )
     assert aged.exit_code == 0, aged.output
-    assert "[stale-reaper]" in aged.output
+    assert "[stale-reaper/stale-deprecated-doc]" in aged.output
 
     # Without the override the doc was committed "today" and is not stale.
     current = runner.invoke(app, ["check", "--profile", "configured", "--path", str(repo)])
     assert current.exit_code == 0, current.output
-    assert "[stale-reaper]" not in current.output
+    assert "[stale-reaper/stale-deprecated-doc]" not in current.output
 
 
 def test_check_now_rejects_invalid_date(tmp_path: Path) -> None:

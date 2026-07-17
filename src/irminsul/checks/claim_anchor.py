@@ -16,10 +16,38 @@ from irminsul.anchors import parse_anchors, resolve
 from irminsul.checks.base import Finding, Severity
 from irminsul.docgraph import DocGraph
 
+CODE_MISSING_FILE = "claim-anchor/missing-file"
+CODE_MISSING_SYMBOL = "claim-anchor/missing-symbol"
+CODE_UNREADABLE = "claim-anchor/unreadable"
+CODE_UNPINNED = "claim-anchor/unpinned"
+CODE_PINNED_DRIFT = "claim-anchor/pinned-drift"
+
 
 class ClaimAnchorCheck:
     name: ClassVar[str] = "claim-anchor"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_MISSING_FILE: (
+            "An `<!-- anchor: ... -->` marker points at a file that does not exist. Fix "
+            "the anchor path or remove the marker."
+        ),
+        CODE_MISSING_SYMBOL: (
+            "An anchor's symbol was not found in its target file. Fix the symbol name or "
+            "remove the marker."
+        ),
+        CODE_UNREADABLE: (
+            "An anchor's target file could not be read or parsed, so the claim can't be "
+            "verified. Fix the source file's syntax or the anchor path."
+        ),
+        CODE_UNPINNED: (
+            "An anchor has never been pinned to a code hash. Run `irminsul anchors "
+            "--re-pin` to establish a baseline."
+        ),
+        CODE_PINNED_DRIFT: (
+            "The anchored code changed since the claim was last pinned. Re-read the "
+            "prose, then run `irminsul anchors --re-pin`."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.repo_root is None:
@@ -35,6 +63,7 @@ class ClaimAnchorCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_MISSING_FILE,
                             severity=Severity.error,
                             message=f"anchor target file '{anchor.path}' does not exist",
                             path=node.path,
@@ -47,6 +76,7 @@ class ClaimAnchorCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_MISSING_SYMBOL,
                             severity=Severity.error,
                             message=f"anchor symbol '{anchor.symbol}' not found in '{anchor.path}'",
                             path=node.path,
@@ -59,6 +89,7 @@ class ClaimAnchorCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_UNREADABLE,
                             severity=Severity.warning,
                             message=(
                                 f"anchor target '{anchor.path}' could not be read or parsed; "
@@ -76,6 +107,7 @@ class ClaimAnchorCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_UNPINNED,
                             severity=Severity.info,
                             message=f"anchor on '{target}' is unpinned",
                             path=node.path,
@@ -88,6 +120,7 @@ class ClaimAnchorCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_PINNED_DRIFT,
                             severity=Severity.warning,
                             message=(
                                 f"'{target}' changed since this claim was pinned; "

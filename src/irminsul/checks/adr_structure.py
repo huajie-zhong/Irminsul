@@ -32,9 +32,28 @@ _DECISION_PLACEHOLDERS = frozenset(
 )
 
 
+CODE_MISSING_SECTION = "adr-structure/missing-section"
+CODE_DUPLICATE_SECTION = "adr-structure/duplicate-section"
+CODE_EMPTY_DECISION = "adr-structure/empty-decision"
+
+
 class AdrStructureCheck:
     name: ClassVar[str] = "adr-structure"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_MISSING_SECTION: (
+            "An ADR is missing one of its required sections (Status, Context, Decision, "
+            "Alternatives Considered, Consequences). Add it."
+        ),
+        CODE_DUPLICATE_SECTION: (
+            "An ADR has more than one heading for the same required section. Combine "
+            "the content into a single section."
+        ),
+        CODE_EMPTY_DECISION: (
+            "An ADR's '## Decision' section is empty or only a placeholder. Record the "
+            "concrete decision in active voice."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         out: list[Finding] = []
@@ -54,6 +73,7 @@ class AdrStructureCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_EMPTY_DECISION,
                         category="empty-decision",
                         severity=self.default_severity,
                         message="ADR has an empty or placeholder-only '## Decision' section",
@@ -77,6 +97,7 @@ class AdrStructureCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_MISSING_SECTION,
                         category="missing-section",
                         severity=self.default_severity,
                         message=f"ADR is missing a '{display}' section",
@@ -90,6 +111,7 @@ class AdrStructureCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_DUPLICATE_SECTION,
                         category="duplicate-section",
                         severity=self.default_severity,
                         message=f"ADR has more than one '{display}' section",

@@ -427,7 +427,7 @@ def _print_finding(finding: Finding) -> None:
     color, bold = _SEVERITY_STYLE[finding.severity]
     severity_str = typer.style(finding.severity.value.ljust(7), fg=color, bold=bold)
     location = _format_location(finding)
-    typer.echo(f"{location}  {severity_str}  [{finding.check}]  {finding.message}")
+    typer.echo(f"{location}  {severity_str}  [{finding.code}]  {finding.message}")
     if finding.suggestion:
         typer.echo(typer.style(f"      → {finding.suggestion}", dim=True))
 
@@ -479,6 +479,7 @@ def _github_annotation(finding: Finding) -> str:
     if finding.line is not None:
         props.append(f"line={finding.line}")
     props.append("title=" + _escape_github_property(f"irminsul {finding.check}"))
+    props.append("code=" + _escape_github_property(finding.code))
     data = finding.message
     if finding.suggestion:
         data = f"{data} — {finding.suggestion}"
@@ -1083,6 +1084,58 @@ def refs_command(
     except RefsError as exc:
         typer.echo(typer.style(str(exc), fg="red"))
         raise typer.Exit(code=exc.code) from exc
+
+
+def _check_summary(cls: type[Check]) -> str:
+    """First line of the check's module docstring, or "" if it has none."""
+    module = sys.modules.get(cls.__module__)
+    doc: str | None = getattr(module, "__doc__", None) if module else None
+    if not doc:
+        return ""
+    return doc.strip().splitlines()[0]
+
+
+def _explainable_checks() -> dict[str, type[Check]]:
+    return {**HARD_REGISTRY, **SOFT_REGISTRY}
+
+
+def _list_all_codes() -> None:
+    for check_name, cls in sorted(_explainable_checks().items()):
+        if not cls.explanations:
+            continue
+        typer.echo(typer.style(f"[{check_name}]", fg="cyan", bold=True))
+        for known_code in sorted(cls.explanations):
+            typer.echo(f"  {known_code}")
+
+
+@app.command("explain")
+def explain_command(
+    code: Annotated[
+        str | None,
+        typer.Argument(help="Finding code to explain, e.g. links/broken-link."),
+    ] = None,
+) -> None:
+    """Explain a finding code: what it means and how to fix it.
+
+    With no code, or an unknown code, lists every known code grouped by check.
+    """
+    if code is not None:
+        for check_name, cls in sorted(_explainable_checks().items()):
+            explanation = cls.explanations.get(code)
+            if explanation is None:
+                continue
+            typer.echo(typer.style(code, fg="cyan", bold=True))
+            summary = _check_summary(cls)
+            typer.echo(f"check: {check_name}" + (f" — {summary}" if summary else ""))
+            typer.echo()
+            typer.echo(explanation)
+            return
+        typer.echo(typer.style(f"unknown code '{code}'", fg="red"))
+        typer.echo()
+        _list_all_codes()
+        raise typer.Exit(code=1)
+
+    _list_all_codes()
 
 
 @app.command()
