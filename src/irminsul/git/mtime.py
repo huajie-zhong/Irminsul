@@ -10,10 +10,11 @@ instead of erroring on tarball checkouts or shallow clones.
 from __future__ import annotations
 
 import datetime as _dt
+import re
 from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from git import InvalidGitRepositoryError, NoSuchPathError, Repo
 
@@ -103,6 +104,93 @@ def git_root_for(path: Path) -> Path | None:
     return None
 
 
+_LOG_HEADER_RE = re.compile(r"^([0-9a-f]{40,64}) (\d+)$")
+
+_bulk_cache: dict[Path, dict[str, GitTime]] = {}
+
+
+def _parse_bulk_log(raw: str) -> dict[str, GitTime]:
+    """Parse `git log --name-only -z --format='%H %ct'` output into a
+    path -> latest-GitTime map.
+
+    With `-z`, each commit header is NUL-terminated, and (when the commit has
+    a file list) so is each file name; the first file name additionally
+    carries a leading `\\n` left over from the header/file-list separator that
+    plain (non -z) `git log` prints as a blank line. Splitting the whole
+    stream on NUL and stripping that leading `\\n` recovers header vs. file
+    tokens unambiguously — a header token always matches the strict
+    `<hex sha> <digits>` shape, which a real path cannot.
+    """
+    times: dict[str, GitTime] = {}
+    current: GitTime | None = None
+    for token in raw.split("\0"):
+        if not token:
+            continue
+        if token[0] == "\n":
+            path = token[1:]
+            if path and current is not None:
+                times.setdefault(path, current)
+            continue
+        header = _LOG_HEADER_RE.match(token)
+        if header is not None:
+            when = _dt.datetime.fromtimestamp(int(header.group(2)), tz=_dt.UTC)
+            current = GitTime(sha=header.group(1), when=when)
+            continue
+        if current is not None:
+            times.setdefault(token, current)
+    return times
+
+
+def bulk_last_commit_times(repo_root: Path) -> dict[str, GitTime]:
+    """One `git log` pass over `repo_root`: repo-relative POSIX path -> its
+    latest GitTime, replacing one `last_commit_time` call per path with a
+    single subprocess for the whole repo.
+
+    Walking newest-first, the first commit that lists a path is that path's
+    most recent touch — matching `last_commit_time`'s per-path answer for
+    ordinary commits. Merge commits carry no file list under plain
+    `--name-only` (same as everyday `git log`), so a path whose only recent
+    change came from a merge's own conflict resolution resolves to its latest
+    non-merge ancestor instead — an accepted tradeoff for the O(1)-subprocess
+    win.
+
+    Cached per repo root for the life of the process: opening and closing a
+    `Repo` just to check "did HEAD move" is itself far costlier than the
+    `git log` call it would guard, so a plain process-lifetime cache (as
+    opposed to one keyed on HEAD sha) is the one that's actually cheap on
+    every lookup, not just the first.
+    """
+    key = repo_root.resolve()
+    cached = _bulk_cache.get(key)
+    if cached is not None:
+        return cached
+
+    with _open_repo(repo_root) as repo:
+        if repo is None:
+            _bulk_cache[key] = {}
+            return _bulk_cache[key]
+        try:
+            raw = repo.git.log("--name-only", "-z", "--format=%H %ct")
+        except Exception:
+            _bulk_cache[key] = {}
+            return _bulk_cache[key]
+
+    times = _parse_bulk_log(raw)
+    _bulk_cache[key] = times
+    return times
+
+
+def _bulk_lookup(repo_root: Path, path: Path) -> GitTime:
+    rel = path
+    if path.is_absolute():
+        try:
+            rel = path.relative_to(repo_root)
+        except ValueError:
+            return _NO_TIME
+    key = PurePosixPath(*rel.parts).as_posix()
+    return bulk_last_commit_times(repo_root).get(key, _NO_TIME)
+
+
 def last_commit_time_any_repo(path: Path, docs_root: Path) -> GitTime | None:
     """Like last_commit_time but handles cross-repo absolute paths.
 
@@ -121,7 +209,7 @@ def last_commit_time_any_repo(path: Path, docs_root: Path) -> GitTime | None:
         root = git_root_for(path)
         if root is None:
             return None
-        return last_commit_time(root, path)
+        return _bulk_lookup(root, path)
 
     nested_root = git_root_for(path)
     if (
@@ -129,8 +217,8 @@ def last_commit_time_any_repo(path: Path, docs_root: Path) -> GitTime | None:
         or nested_root == docs_root
         or nested_root.resolve() == docs_root.resolve()
     ):
-        return last_commit_time(docs_root, path)
-    return last_commit_time(nested_root, path)
+        return _bulk_lookup(docs_root, path)
+    return _bulk_lookup(nested_root, path)
 
 
 def diff_name_only(repo_root: Path, base_ref: str, head_ref: str) -> frozenset[str] | None:
