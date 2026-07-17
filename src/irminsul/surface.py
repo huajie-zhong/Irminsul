@@ -13,7 +13,7 @@ from pathlib import Path
 import typer
 from pathspec import GitIgnoreSpec
 
-from irminsul.checks.globs import walk_source_files
+from irminsul.checks.globs import walk_configured_source_files
 from irminsul.config import IrminsulConfig
 from irminsul.inventory import get_extractor
 from irminsul.inventory.base import SurfaceItem
@@ -29,7 +29,7 @@ def derive_surface(
     extractor = get_extractor(kind, config)
     if extractor is None:
         return []
-    files, _ = walk_source_files(repo_root, config.paths.source_roots)
+    files = walk_configured_source_files(repo_root, config).files
     if source:
         spec = GitIgnoreSpec.from_lines([source])
         files = [(p, d) for p, d in files if spec.match_file(d)]

@@ -11,15 +11,16 @@ the full documentation tree, the doc-system rules, and the editing protocol.
 
 ## The agent loop
 
-1. Before editing, run `irminsul context --changed` to find the docs that own
-   the files you are about to touch, plus their tests and dependencies.
-2. Make the change. Keep doc updates **in the same commit** as the code they
+1. At the start of a session, run `irminsul orient` and read `docs/AGENTS.md`.
+2. Before editing, run `irminsul context <path>` for the files you intend to
+   touch, or `irminsul context --topic <query>` while locating them.
+3. Make the change. Keep doc updates **in the same commit** as the code they
    describe.
-3. After editing, run `irminsul context --changed` again to confirm ownership
+4. After editing, run `irminsul context --changed` to confirm ownership
    and surface any findings your edit introduced.
-4. Run `irminsul fix` to apply deterministic remediations for mechanical
+5. Run `irminsul fix` to apply deterministic remediations for mechanical
    findings.
-5. Run `irminsul check --profile=hard` before committing; it must exit 0.
+6. Run `irminsul check --profile=hard` before committing; it must exit 0.
 
 `context`, `check`, and friends support `--format json` for machine-readable
 output.

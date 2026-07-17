@@ -26,6 +26,9 @@ as a gitignored subfolder, and `paths.source_roots` points into it
 
 - `.gitignore` in the docs repo contains `/code/` so the clone never leaks
   into the private history.
+- The configured `code/src` root remains explicit even though the outer repo
+  ignores `/code/`; source filtering uses the nested code repository's nearest
+  `.gitignore` files for paths inside that root.
 - `describes:` claims use the path through the subfolder
   (`code/src/module.py`), and the ownership, source-file coverage, and drift
   checks resolve them normally.

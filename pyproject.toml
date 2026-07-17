@@ -51,8 +51,8 @@ dev = [
 ]
 
 [project.scripts]
-irminsul = "irminsul.cli:app"
-irm = "irminsul.cli:app"
+irminsul = "irminsul.cli:main"
+irm = "irminsul.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/huajie-zhong/irminsul"

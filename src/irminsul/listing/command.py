@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 import typer
 
 from irminsul.checks.base import Finding, Severity, finding_records, fix_commands
-from irminsul.checks.globs import walk_source_files
+from irminsul.checks.globs import walk_configured_source_files
 from irminsul.checks.orphans import OrphansCheck
 from irminsul.checks.stale_reaper import StaleReaperCheck
 from irminsul.checks.uniqueness import OMISSION_SKIP, UniquenessCheck, resolve_claims
@@ -84,7 +84,7 @@ def list_undocumented(repo_root: Path, *, fmt: str, all_files: bool = False) -> 
         return
 
     graph = build_graph(repo_root, config)
-    source_files, _missing = walk_source_files(repo_root, config.paths.source_roots)
+    source_files = walk_configured_source_files(repo_root, config).files
     claims = resolve_claims(graph, source_files)
     unclaimed = sorted(
         display

@@ -392,10 +392,10 @@ def _surface_impact(
     An extractor that raises costs its kind's identities, so the failure is
     reported rather than swallowed: a kind is never silently empty.
     """
-    from irminsul.checks.globs import walk_source_files
+    from irminsul.checks.globs import walk_configured_source_files
     from irminsul.inventory import get_extractor
 
-    files, _missing = walk_source_files(repo_root, config.paths.source_roots)
+    files = walk_configured_source_files(repo_root, config).files
     changed_files = [(abs_path, display) for abs_path, display in files if display in changed]
     if not changed_files:
         return

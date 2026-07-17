@@ -21,10 +21,12 @@ inventory:
       - refs
       - surface
       - check
+      - status
       - fix
       - list undocumented
       - list lifecycle
       - change status
+      - change graph
       - new rfc
     omit:
       - anchors
@@ -63,7 +65,7 @@ surface, check, and fix commands as power tools.
 
 ## The JSON contract
 
-Every agent-facing read command — `orient`, plus the existing `context`, `refs`, `surface`, `check`, `list`, and the `anchors` report — supports `--format json`. Every JSON report carries a top-level `version` field (currently `1`) so consumers can detect contract changes mechanically. `orient` is the recommended first call; its `commands` field teaches the rest of the vocabulary, so an agent that knows only `irminsul orient --format json` can discover the entire workflow loop from the output.
+Every agent-facing read command — `orient`, plus the existing `context`, `refs`, `surface`, `check`, `list`, and the `anchors` report — supports `--format json`. Their JSON shapes are command-specific; consumers must not assume fields that a command does not document. Versioned envelopes are currently provided by some reports, not as a universal CLI contract. `orient` is the recommended first call; its `commands` field teaches the rest of the vocabulary, so an agent that knows only `irminsul orient --format json` can discover the entire workflow loop from the output.
 
 ## Scope & Limitations
 

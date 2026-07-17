@@ -36,6 +36,8 @@ By default, init refuses to overwrite existing files; pass `--force` to replace 
 
 The generated `irminsul.toml` enables `rfc-lifecycle-integrity` in its hard
 profile so implemented RFCs are sealed consistently from the first lifecycle.
+It also writes discoverable source-policy defaults: empty include/exclude lists
+and `honor_gitignore = true`.
 
 ## Scope & Limitations
 

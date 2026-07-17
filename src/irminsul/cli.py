@@ -1,12 +1,10 @@
-"""Irminsul command-line entry point.
-
-Two scripts in `pyproject.toml` (`irminsul` and `irm`) both bind to `app`.
-"""
+"""Irminsul command-line entry point."""
 
 from __future__ import annotations
 
 import datetime as _dt
 import glob
+import sys
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -50,6 +48,26 @@ app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
 )
+
+
+def _configure_console_encoding(
+    streams: tuple[object, ...] | None = None,
+    *,
+    platform: str | None = None,
+) -> None:
+    current_platform = sys.platform if platform is None else platform
+    if current_platform != "win32":
+        return
+    targets = (sys.stdout, sys.stderr) if streams is None else streams
+    for stream in targets:
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8")
+
+
+def main() -> None:
+    _configure_console_encoding()
+    app()
 
 
 class Profile(StrEnum):
@@ -1229,10 +1247,10 @@ def anchors_command(
     graph = build_graph(repo_root, config)
 
     if re_pin:
-        from irminsul.checks.globs import walk_source_files
+        from irminsul.checks.globs import walk_configured_source_files
         from irminsul.inventory.fingerprint import repin_node
 
-        source_files, _ = walk_source_files(repo_root, config.paths.source_roots)
+        source_files = walk_configured_source_files(repo_root, config).files
         anchors_written = 0
         surfaces_written = 0
         for node in graph.nodes.values():
@@ -1280,6 +1298,12 @@ class TransitionTarget(StrEnum):
     rejected = "rejected"
 
 
+class RelationSelection(StrEnum):
+    all = "all"
+    dependency = "dependency"
+    supersession = "supersession"
+
+
 @_change_app.command("status")
 def change_status(
     change_id: Annotated[str, typer.Argument(help="RFC id, number, or repo-relative path.")],
@@ -1306,6 +1330,47 @@ def change_status(
         raise typer.Exit(code=exc.code) from exc
     typer.echo(
         change_report_to_json(report) if fmt == "json" else format_change_status_plain(report)
+    )
+
+
+@_change_app.command("graph")
+def change_graph(
+    change_id: Annotated[
+        str | None,
+        typer.Argument(help="Optional RFC id, number, or repo-relative path."),
+    ] = None,
+    relation: Annotated[
+        RelationSelection,
+        typer.Option("--relation", help="Relationship kind: all, dependency, or supersession."),
+    ] = RelationSelection.all,
+    fmt: Annotated[str, typer.Option("--format", help="Output format: plain or json.")] = "plain",
+    path: Annotated[Path, typer.Option("--path")] = Path("."),
+) -> None:
+    """Show the repository RFC relation graph or one connected component."""
+    from irminsul.change.relations import (
+        build_relation_graph,
+        format_relation_graph_plain,
+        relation_graph_to_json,
+    )
+    from irminsul.change.report import ChangeError
+
+    if fmt not in ("plain", "json"):
+        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+        raise typer.Exit(code=2)
+
+    repo_root, config = _load_repo(path)
+    try:
+        report = build_relation_graph(
+            repo_root,
+            config,
+            focus=change_id,
+            relation=relation.value,
+        )
+    except ChangeError as exc:
+        typer.echo(typer.style(str(exc), fg="red"))
+        raise typer.Exit(code=exc.code) from exc
+    typer.echo(
+        relation_graph_to_json(report) if fmt == "json" else format_relation_graph_plain(report)
     )
 
 

@@ -33,12 +33,16 @@ _COMMANDS: tuple[tuple[str, str], ...] = (
         "finish an edit: inspect changed paths, affected knowledge, and hard validation",
     ),
     (
-        "irminsul context --topic <query>",
-        "find the docs that cover a topic before starting work",
+        "irminsul context <path>",
+        "before editing a known file: find its owning doc, tests, dependencies, and findings",
     ),
     (
-        "irminsul context <path>",
-        "look up the owning doc, tests, and dependencies for one file",
+        "irminsul context --topic <query>",
+        "before locating files: find the docs that cover a topic",
+    ),
+    (
+        "irminsul context --changed",
+        "after editing: inspect ownership, tests, dependencies, and findings for this worktree",
     ),
     (
         "irminsul refs <doc-or-symbol>",
@@ -51,6 +55,10 @@ _COMMANDS: tuple[tuple[str, str], ...] = (
     (
         "irminsul check --profile=hard --format json",
         "verify the docs tree before committing; error findings block CI",
+    ),
+    (
+        "irminsul status --format json",
+        "audit repository-wide documentation health, source ownership, and finding totals",
     ),
     (
         "irminsul fix",
@@ -67,6 +75,10 @@ _COMMANDS: tuple[tuple[str, str], ...] = (
     (
         "irminsul change status <rfc-id>",
         "orient on one RFC: lifecycle state, evidence, blockers, and the next action",
+    ),
+    (
+        "irminsul change graph [<rfc-id>] --format json",
+        "inspect RFC dependencies, replacements, cycles, and lifecycle contradictions",
     ),
     (
         "irminsul new rfc <title>",
