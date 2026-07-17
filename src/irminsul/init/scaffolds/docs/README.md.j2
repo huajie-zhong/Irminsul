@@ -22,7 +22,7 @@ The documentation is organized by Layer (specificity) and Tier (maintenance poli
 
 - **Code Mapping:** Every component doc in `20-components/` contains a `describes:` frontmatter field mapping it to source files.
 - **Stability:** Refer to the `status:` field (draft | stable | deprecated) to understand the reliability of a document.
-- **Discovery:** Run `irminsul context <path>` for a source or doc path, or `irminsul context --changed` before working through current git changes.
+- **Discovery:** Start with `irminsul orient`, run `irminsul context <path>` before editing a known source or doc path, and use `irminsul context --changed` after editing.
 
 ## Editing Rules (Anti-Rot Protocol)
 

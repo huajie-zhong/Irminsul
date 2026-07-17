@@ -214,9 +214,9 @@ Each doc's tier dictates its enforcement policy.
 ## Protocol
 
 Before editing docs, follow the agent lifecycle protocol: read this
-manifest, run `irminsul context` to locate ownership, tests, dependencies,
+manifest, run `irminsul context <path>` to locate ownership, tests, dependencies,
 and findings, create or update RFCs and ADRs for direction or behavior
-changes, keep component docs and generated references current, and run
+changes, keep the affected component and workflow docs current, and run
 `irminsul check --profile hard` before returning work.
 
 The full lifecycle work order lives at

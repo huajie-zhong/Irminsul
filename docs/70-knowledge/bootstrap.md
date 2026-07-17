@@ -13,20 +13,17 @@ tests:
 
 To adopt this system on a new or existing codebase, in order:
 
-- [ ] Create the `/docs` directory tree (see layers)
-- [ ] Write [`00-foundation/principles.md`](../00-foundation/principles.md) (even just a paragraph)
-- [ ] Write [`10-architecture/overview.md`](../10-architecture/overview.md) with a C4 L1 diagram
-- [ ] Set up [`GLOSSARY.md`](../GLOSSARY.md) with whatever terms come to mind first
-- [ ] Pick a renderer (MkDocs Material is the lowest-friction default)
-- [ ] Add the frontmatter validator as a pre-commit hook
-- [ ] Add the link checker to CI
-- [ ] Set up `adr-tools` and write ADR-0001 capturing the decision to use this system
-- [ ] Add CODEOWNERS entries for the docs directory
-- [ ] Wire up reference-layer auto-generation for at least one schema
-- [ ] Add the Change Triplet check to PR template
-- [ ] Generate the first health dashboard
+- [ ] Install Irminsul and run `irminsul init` (or `irminsul init --fresh` before code exists)
+- [ ] Run `irminsul orient` and read the generated [agent navigation manifest](../AGENTS.md)
+- [ ] Replace the prompts in [`00-foundation/principles.md`](../00-foundation/principles.md) with the project's intent
+- [ ] Describe the system boundary in [`10-architecture/overview.md`](../10-architecture/overview.md)
+- [ ] Add component docs whose `describes` and `tests` fields claim the current source and tests
+- [ ] Record consequential design choices with `irminsul new adr`
+- [ ] Run `irminsul context <path>` before changing an owned source path
+- [ ] Run `irminsul check --profile hard` and commit the scaffolded CI workflow
+- [ ] Review `irminsul list undocumented`, then enable suitable soft checks as the baseline becomes trustworthy
 
-You can stop after the first three steps and still be ahead of 90% of codebases. The rest is incremental hardening.
+You can start with the generated skeleton, foundation, architecture overview, and hard profile. Source-ownership mapping and advisory checks can be tightened incrementally as the repository is mapped.
 
 ## Scope & Limitations
 

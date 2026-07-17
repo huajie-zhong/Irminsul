@@ -13,10 +13,10 @@ describes: []
 
 Concrete recommendations for external tools. None of these are load-bearing — substitute equivalents freely.
 
-- **Renderer:** MkDocs with the Material theme, or Docusaurus. Both support frontmatter, plugins, and produce static sites.
+- **Optional renderer:** GitHub and IDE Markdown previews require no setup. For a published site, point MkDocs, Docusaurus, or another renderer at the portable docs tree; Irminsul does not ship or configure one.
 - **Diagrams:** Mermaid for everything that fits its grammar (sequence, flowchart, ER, state). PlantUML or Excalidraw for the rest. Always source-controlled, never image-only.
 - **API reference:** OpenAPI generated from code, rendered with Redoc or Swagger UI.
-- **Schema reference:** `mkdocstrings` (Python), `typedoc` (TS), `protoc-gen-doc` (Protobuf), or hand-rolled scripts.
+- **Code-derived reference:** Prefer `irminsul surface` for supported CLI, HTTP, export, environment-variable, and MCP surfaces. Use language-specific generators for other surfaces without committing the result as canonical prose.
 - **ADR management:** `adr-tools` CLI or `log4brains`.
 - **Linting:** `markdownlint` for syntax, `Vale` for prose style.
 - **Link checking:** `lychee` (fast Rust-based) for both internal and external.
@@ -26,7 +26,7 @@ Concrete recommendations for external tools. None of these are load-bearing — 
 
 ## Packaging the System for Reuse
 
-The doc system itself — validators, drift detectors, renderer config, ADR templates, frontmatter schema, CI workflows — is codebase-agnostic. It lives in its own repository (Irminsul) and is consumed by codebases as a dependency, never copy-pasted into each one. The actual *docs* must live with the code; the *tooling* should not.
+The doc system itself — validators, drift detectors, ADR templates, frontmatter schema, and scaffolded CI workflows — is codebase-agnostic. It lives in Irminsul and is consumed by codebases as a dependency rather than copied into each one. Docs are normally co-located with code; the supported private-docs topologies preserve filesystem access when repository ownership requires separation.
 
 ### The Distinction That Matters
 
@@ -34,15 +34,15 @@ The doc system itself — validators, drift detectors, renderer config, ADR temp
 |---|---|
 | Frontmatter schema definition | Actual frontmatter in each doc |
 | Glob / source ownership coverage / uniqueness checkers | Doc files claiming source paths |
-| Renderer config (MkDocs, Docusaurus) | The `/docs` folder content |
+| On-demand surface extractors | The `/docs` folder content |
 | Diátaxis layer skeleton | Codebase-specific glossary |
 | ADR / RFC templates | Actual ADRs and RFCs |
 | GitHub Actions workflow definitions | `irminsul.toml` config |
 | Pre-commit hook definitions | Repo-specific overrides |
 
-### Why Co-Location of Docs Is Non-Negotiable
+### Why Co-Location Is the Default
 
-The Change Triplet (code + tests + docs in one PR) requires single-repo atomicity. If docs live in a separate repo, every code change becomes two PRs across two repos with manual coordination — they will desynchronize within weeks. Drift detection by mtime requires single git history. Coverage checks (every source file claimed by some doc) require trivial filesystem access to source. None of this works across repo boundaries without painful sync infrastructure that breaks more often than it works.
+The Change Triplet (code + tests + docs in one PR) is simplest in one repository: review is atomic, history is shared, and source-ownership checks have direct filesystem access. Separate private docs are still supported when the code checkout is available through a configured source root. That topology cannot make two repositories atomic, so its coordination limits remain explicit.
 
 ### Why Centralization of Tooling Is the Multiplier
 
@@ -68,37 +68,7 @@ Decision Table:
 
 ### Topology of the Two-Repo Setup
 
-The "code public + docs private" row in the decision table above requires clarification because "code is in a separate repo" is ambiguous:
-
-| Sense of "elsewhere" | Supported in v0.2.0 |
-|---|---|
-| **Elsewhere in git ownership** — code lives in a different GitHub/GitLab repo (public, private, or a different org) | ✅ Yes — `irminsul init-docs-only` |
-| **Elsewhere on the filesystem** — code lives at a sibling path like `../my-public-code/` without being inside the docs repo | ❌ No — deferred to Sprint 3 (Topology B) |
-
-#### Topology A (v0.2.0) — code nested inside docs repo
-
-The code repo is cloned as a **gitignored subfolder** inside the docs repo. CI checks it out as a secondary `actions/checkout@v4` step.
-
-```
-docs-private-repo/              ← this repo (private)
-├── docs/
-├── irminsul.toml               ← source_roots = ["my-public-code/src"]
-├── .gitignore                  ← /my-public-code/  ← added by init-docs-only
-└── my-public-code/             ← gitignored clone of the public repo
-    └── src/
-        └── ...
-```
-
-Use `irminsul init-docs-only --code-repo acme/my-public-code` to scaffold this topology. The command:
-1. Writes the docs skeleton and `irminsul.toml` with `source_roots = ["my-public-code/src"]`.
-2. Appends `/my-public-code/` to `.gitignore`.
-3. Renders CI workflows with a dual `actions/checkout@v4` step (docs at `.`, code at `my-public-code/`).
-
-#### Topology B (deferred to Sprint 3) — code at a sibling path
-
-The code would live at `../my-public-code/` — outside the docs repo entirely. This is **not supported** in v0.2.0.
-
-**Why:** `walk_source_files` (`src/irminsul/checks/globs.py`) and `_to_repo_relative` (`src/irminsul/docgraph.py`) both call `path.relative_to(repo_root)`, which raises `ValueError` when the path is outside `repo_root`. Lifting that assumption requires a refactor of the path layer and is planned for Sprint 3 as a `--source-root-prefix` option.
+The canonical setup, limitations, path semantics, and CI examples for nested and sibling code checkouts live in [Private docs for a public code repo](../30-workflows/private-docs.md). Keeping that operational detail in one place prevents the supported topology from drifting between architecture and workflow docs.
 
 ### Adopting on a New Codebase
 

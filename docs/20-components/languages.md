@@ -15,13 +15,13 @@ tests:
 
 A `LanguageProfile` is a pure-data record:
 
-- `name` — the registry key (`"python"`, `"typescript"`)
+- `name` — the registry key (`"python"`, `"typescript"`, `"go"`, or `"rust"`)
 - `source_root_candidates` — directories the [init detector](init.md) checks when scaffolding a new codebase
 - `schema_leak_patterns` — compiled regex patterns the [schema-leak check](checks.md) applies line-by-line to docs under the protected glob
 
 Patterns are anchored at start-of-line (with leading whitespace allowed) so casual prose mentions don't trigger findings — only lines that look like definitions match.
 
-Python and TypeScript profiles are included. Adding Go or Rust requires creating a profile and registering it in `LANGUAGE_REGISTRY` — no core changes.
+Python, TypeScript, Go, and Rust profiles are included. Adding another language requires creating a profile and registering it in `LANGUAGE_REGISTRY` — no core changes.
 
 ## Scope & Limitations
 
