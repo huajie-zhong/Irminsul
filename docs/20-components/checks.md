@@ -27,6 +27,7 @@ tests:
   - tests/test_checks_doc_refs.py
   - tests/test_checks_adr_structure.py
   - tests/test_checks_rfc_lifecycle_integrity.py
+  - tests/test_walk_source_files.py
 implements:
   - 0023-adr-template-structure
   - 0035-rfc-lifecycle-integrity-and-frozen-records
@@ -39,7 +40,7 @@ Checks consume a [DocGraph](docgraph.md) and return `Finding` records with sever
 | Example check | What it enforces | Severity |
 |---------------|------------------|----------|
 | `frontmatter` | Required fields present, enums valid, id matches filename rule, no duplicate ids | error |
-| `globs` | Every `describes` pattern resolves to ≥1 source file | error |
+| `globs` | Every `describes` pattern resolves under the configured source policy; unsafe symlink escapes are rejected | error / warning |
 | `uniqueness` | Each source file claimed by exactly one most-specific doc; ties are silent duplication | error / warning |
 | `links` | Internal markdown links resolve; external/anchor-only skipped | error |
 | `schema-leak` | No type/schema definitions inside `docs/20-components/` (they live in code, not docs) | error |
@@ -73,6 +74,10 @@ seal, or an `implements:` backlink contradicts the RFC state. Missing seals on
 legacy implemented RFCs and stable live docs linking draft RFCs are warnings so
 repositories can migrate without weakening actual freeze violations.
 
+## Source inventory and glob resolution
+
+The shared source walker applies built-in noise exclusions, repository-local `.gitignore`, and configured include/exclude patterns before any check or report sees a file. Directory symlinks are not traversed. A file symlink is inventoried under its lexical path only when its resolved target remains within the resolved configured source root; an escaping target is an error, while a broken target is a warning. Explicit external or symlinked source roots remain supported because the configured root itself defines the containment boundary.
+
 ## Scope & Limitations
 
-Checks do not apply fixes — findings are advisory output only; call `irminsul fix` to remediate. They do not evaluate prose quality or writing style. They do not modify source files or docs.
+Checks do not apply fixes — findings are advisory output only; call `irminsul fix` to remediate. They do not evaluate prose quality or writing style. They do not modify source files or docs, and source discovery never follows directory symlinks.

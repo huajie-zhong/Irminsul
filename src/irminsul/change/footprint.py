@@ -13,7 +13,7 @@ from pathlib import Path, PurePosixPath
 
 from pathspec import GitIgnoreSpec
 
-from irminsul.checks.globs import is_source_path, source_root_prefixes, walk_source_files
+from irminsul.checks.globs import is_configured_source_path, walk_configured_source_files
 from irminsul.checks.uniqueness import resolve_claims
 from irminsul.config import IrminsulConfig, docs_root_prefix
 from irminsul.docgraph import DocGraph, DocNode
@@ -61,9 +61,8 @@ def touched_components(
     """
     assert graph.repo_root is not None
     repo_root = graph.repo_root
-    source_files, _missing = walk_source_files(repo_root, config.paths.source_roots)
+    source_files = walk_configured_source_files(repo_root, config).files
     on_disk = {display for _, display in source_files}
-    prefixes = source_root_prefixes(repo_root, config.paths.source_roots)
 
     changed_source: list[tuple[Path, str]] = [
         (abs_path, display) for abs_path, display in source_files if display in changed_paths
@@ -71,7 +70,7 @@ def touched_components(
     changed_source.extend(
         (repo_root / path, path)
         for path in sorted(changed_paths)
-        if path not in on_disk and is_source_path(path, prefixes)
+        if path not in on_disk and is_configured_source_path(repo_root, config, path)
     )
     claims_by_file = resolve_claims(graph, changed_source)
 

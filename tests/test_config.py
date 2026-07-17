@@ -22,6 +22,9 @@ def test_defaults_are_valid() -> None:
     cfg = IrminsulConfig()
     assert cfg.paths.docs_root == "docs"
     assert "src" in cfg.paths.source_roots
+    assert cfg.paths.source_includes == []
+    assert cfg.paths.source_excludes == []
+    assert cfg.paths.honor_gitignore is True
     assert set(cfg.checks.hard) == set(HARD_CHECKS)
     assert set(cfg.checks.soft_deterministic) == set(SOFT_DETERMINISTIC_CHECKS)
     assert cfg.checks.terminology_overload.rules == []
@@ -41,6 +44,9 @@ project_name = "demo"
 [paths]
 docs_root = "documentation"
 source_roots = ["app"]
+source_includes = ["app/**/*.py"]
+source_excludes = ["app/generated/**"]
+honor_gitignore = false
 
 [checks]
 hard = ["frontmatter", "globs"]
@@ -50,6 +56,9 @@ hard = ["frontmatter", "globs"]
     assert cfg.project_name == "demo"
     assert cfg.paths.docs_root == "documentation"
     assert cfg.paths.source_roots == ["app"]
+    assert cfg.paths.source_includes == ["app/**/*.py"]
+    assert cfg.paths.source_excludes == ["app/generated/**"]
+    assert cfg.paths.honor_gitignore is False
     assert cfg.checks.hard == ["frontmatter", "globs"]
 
 

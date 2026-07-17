@@ -63,6 +63,9 @@ class Paths(BaseModel):
 
     docs_root: str = "docs"
     source_roots: list[str] = Field(default_factory=lambda: ["src", "app", "lib"])
+    source_includes: list[str] = Field(default_factory=list)
+    source_excludes: list[str] = Field(default_factory=list)
+    honor_gitignore: bool = True
     baseline: str = ".irminsul-baseline.json"
 
 

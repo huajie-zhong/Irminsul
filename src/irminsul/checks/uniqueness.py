@@ -20,7 +20,7 @@ from typing import ClassVar
 from pathspec import GitIgnoreSpec
 
 from irminsul.checks.base import Finding, Severity
-from irminsul.checks.globs import walk_source_files
+from irminsul.checks.globs import walk_configured_source_files
 from irminsul.docgraph import DocGraph, DocNode
 
 # Files that are usually noise from a doc-coverage standpoint. Keeping the
@@ -95,7 +95,7 @@ class UniquenessCheck:
         if graph.config is None or graph.repo_root is None:
             return []
 
-        source_files, _missing = walk_source_files(graph.repo_root, graph.config.paths.source_roots)
+        source_files = walk_configured_source_files(graph.repo_root, graph.config).files
 
         claims_by_file = resolve_claims(graph, source_files)
 

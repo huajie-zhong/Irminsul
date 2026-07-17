@@ -27,7 +27,7 @@ from irminsul.change.report import (
 )
 from irminsul.checks.base import Fix
 from irminsul.checks.decision_updates import DecisionUpdatesCheck
-from irminsul.checks.globs import walk_source_files
+from irminsul.checks.globs import walk_configured_source_files
 from irminsul.checks.uniqueness import resolve_claims
 from irminsul.config import IrminsulConfig
 from irminsul.docgraph import DocGraph, DocNode
@@ -322,7 +322,7 @@ def _plan_promotions(
     rfc_path = node.path.as_posix()
     declared = list(node.frontmatter.affects or [])
 
-    source_files, _missing = walk_source_files(repo_root, config.paths.source_roots)
+    source_files = walk_configured_source_files(repo_root, config).files
     display_index = {display: (abs_path, display) for abs_path, display in source_files}
 
     for req in requirements:

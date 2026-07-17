@@ -67,6 +67,9 @@ def test_init_scaffold_config_includes_only_useful_default_knobs(tmp_path: Path)
     assert "CoverageCheck" not in toml
     assert "tiers" not in parsed
     assert "rules" not in parsed.get("checks", {}).get("terminology_overload", {})
+    assert parsed["paths"]["source_includes"] == []
+    assert parsed["paths"]["source_excludes"] == []
+    assert parsed["paths"]["honor_gitignore"] is True
 
 
 def test_init_fresh_no_interactive_creates_source_root(tmp_path: Path) -> None:
