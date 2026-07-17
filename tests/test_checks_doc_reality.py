@@ -8,10 +8,12 @@ from pathlib import Path
 from git import Repo
 
 from irminsul.checks.doc_reality import (
+    _IGNORE_RE,
     AgentsManifestCheck,
     ClaimProvenanceCheck,
     ProseFileReferenceCheck,
     TerminologyOverloadCheck,
+    _without_ignore_comment,
 )
 from irminsul.config import load
 from irminsul.docgraph import build_graph
@@ -28,6 +30,14 @@ def _write_config(repo: Path, *, coverage_rule: bool = False) -> None:
             'suggestion = "Say source ownership coverage"\n'
         )
     (repo / "irminsul.toml").write_text(base, encoding="utf-8")
+
+
+def test_without_ignore_comment_preserves_unrelated_html_comments() -> None:
+    line = "<!-- comment 1 --> irminsul:ignore prose-file-reference <!-- comment 2 -->"
+    marker = _IGNORE_RE.search(line)
+
+    assert marker is not None
+    assert _without_ignore_comment(line, marker) == "<!-- comment 1 -->  <!-- comment 2 -->"
 
 
 def _write_doc(

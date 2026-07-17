@@ -83,7 +83,12 @@ def _first_unlinked_local_md(line: str) -> str | None:
 def _without_ignore_comment(line: str, marker: re.Match[str]) -> str:
     comment_start = line.rfind("<!--", 0, marker.start())
     comment_end = line.find("-->", marker.end())
-    if comment_start != -1 and comment_end != -1:
+    if (
+        comment_start != -1
+        and comment_end != -1
+        and "-->" not in line[comment_start : marker.start()]
+        and "<!--" not in line[marker.end() : comment_end]
+    ):
         return line[:comment_start] + line[comment_end + 3 :]
     return line[: marker.start()] + line[marker.end() :]
 
