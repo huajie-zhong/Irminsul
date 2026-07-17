@@ -317,7 +317,7 @@ def _normalize_content_categories(
     selected = set(categories)
     unknown = sorted(selected - set(CONTENT_CATEGORY_ORDER))
     if unknown:
-        expected = ", ".join((*CONTENT_CATEGORY_ORDER, "all", "none"))
+        expected = ", ".join(CONTENT_CATEGORY_ORDER)
         raise ContextError(
             f"unknown --include categories: {', '.join(unknown)}; expected {expected}",
             code=2,
@@ -851,8 +851,17 @@ def _document_excerpt(
 def _first_substantive_block(body: str) -> tuple[str | None, str] | None:
     heading: str | None = None
     content: list[str] = []
+    in_comment = False
     for raw_line in body.splitlines():
         stripped = raw_line.strip()
+        if in_comment:
+            if "-->" in stripped:
+                in_comment = False
+            continue
+        if stripped.startswith("<!--"):
+            if "-->" not in stripped:
+                in_comment = True
+            continue
         if stripped.startswith("#") and stripped.lstrip("#").startswith(" "):
             if content:
                 break
@@ -861,8 +870,6 @@ def _first_substantive_block(body: str) -> tuple[str | None, str] | None:
         if not stripped:
             if content:
                 break
-            continue
-        if stripped.startswith("<!--") and stripped.endswith("-->"):
             continue
         content.append(raw_line.rstrip())
     if not content:

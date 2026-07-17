@@ -371,6 +371,8 @@ def test_context_include_none_and_unknown_category(tmp_path: Path) -> None:
     )
     assert invalid_result.exit_code == 2
     assert "unknown --include categories" in invalid_result.output
+    assert "all" not in invalid_result.output
+    assert "none" not in invalid_result.output
 
 
 def test_context_content_reports_fixed_count_omissions(tmp_path: Path) -> None:

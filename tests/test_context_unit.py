@@ -17,6 +17,7 @@ from irminsul.config import IrminsulConfig, find_config, load
 from irminsul.context import (
     ContextError,
     _bound_excerpt,
+    _first_substantive_block,
     build_context_report,
     context_report_should_fail,
     context_report_to_json,
@@ -182,3 +183,9 @@ def test_content_excerpt_bounds_lines_and_characters() -> None:
     assert len(char_bounded) == 1_200
     assert char_bounded.endswith("...")
     assert char_truncated is True
+
+
+def test_first_substantive_block_skips_multiline_html_comments() -> None:
+    excerpt = _first_substantive_block("<!--\nmetadata\n-->\n# Heading\nVisible prose.\n")
+
+    assert excerpt == ("Heading", "Visible prose.")
