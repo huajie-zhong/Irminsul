@@ -6,6 +6,18 @@ tier: 2
 status: stable
 describes: []
 summary: Remove the Tier 1 ("Generated") tier and the 40-reference layer; non-derivable reference lives in its owning layer, derivable surfaces stay on-demand.
+retires:
+  - id: generated-tier
+    kind: concept
+    matches:
+      - Tier 1
+    guidance: Use T2 for stable facts; derivable surfaces remain transient and uncommitted.
+  - id: reference-layer
+    kind: concept
+    matches:
+      - 40-reference/
+      - dedicated reference layer
+    guidance: Keep non-derivable reference with its owning component and derive code surfaces on demand.
 ---
 
 # ADR-0014: Retire Tier 1 and the reference layer

@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import frontmatter as _pyfm
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 
 class AudienceEnum(StrEnum):
@@ -89,12 +89,45 @@ class RequiredUpdateKindEnum(StrEnum):
     review = "review"
 
 
+class RetirementKindEnum(StrEnum):
+    cli_command = "cli-command"
+    concept = "concept"
+
+
 class RequiredUpdateEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     path: str = Field(min_length=1)
     reason: str = ""
     kind: RequiredUpdateKindEnum = RequiredUpdateKindEnum.update
+
+
+class RetirementEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1, pattern=r"^[a-z0-9][a-z0-9-]*$")
+    kind: RetirementKindEnum
+    surface_identity: str | None = Field(default=None, min_length=1)
+    matches: list[str] = Field(min_length=1)
+    guidance: str = Field(min_length=1)
+
+    @field_validator("matches")
+    @classmethod
+    def _validate_matches(cls, value: list[str]) -> list[str]:
+        normalized = [" ".join(match.split()) for match in value]
+        if any(not match for match in normalized):
+            raise ValueError("retirement matches must not be blank")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("retirement matches must be unique")
+        return normalized
+
+    @model_validator(mode="after")
+    def _validate_surface_identity(self) -> RetirementEntry:
+        if self.kind == RetirementKindEnum.cli_command and self.surface_identity is None:
+            raise ValueError("surface_identity is required for cli-command retirements")
+        if self.kind == RetirementKindEnum.concept and self.surface_identity is not None:
+            raise ValueError("surface_identity is only valid for cli-command retirements")
+        return self
 
 
 class Claim(BaseModel):
@@ -166,6 +199,7 @@ class DocFrontmatter(BaseModel):
     frozen_hash: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
     implements: list[str] = Field(default_factory=list)
     inventory: list[InventoryEntry] = Field(default_factory=list)
+    retires: list[RetirementEntry] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate_structured_claims(self) -> DocFrontmatter:
@@ -175,6 +209,16 @@ class DocFrontmatter(BaseModel):
         )
         if duplicate_ids:
             raise ValueError(f"duplicate claim id(s): {duplicate_ids}")
+        retirement_ids = [entry.id for entry in self.retires]
+        duplicate_retirement_ids = sorted(
+            {
+                retirement_id
+                for retirement_id in retirement_ids
+                if retirement_ids.count(retirement_id) > 1
+            }
+        )
+        if duplicate_retirement_ids:
+            raise ValueError(f"duplicate retirement id(s): {duplicate_retirement_ids}")
         if (
             self.rfc_state in (RfcStateEnum.accepted, RfcStateEnum.implemented)
             and not self.resolved_by

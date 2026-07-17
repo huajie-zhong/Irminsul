@@ -55,6 +55,7 @@ SOFT_DETERMINISTIC_CHECKS = (
     "change-binding",
     "requirement-grammar",
     "adr-structure",
+    "retired-references",
 )
 
 

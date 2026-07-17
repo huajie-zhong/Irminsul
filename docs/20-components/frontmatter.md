@@ -28,6 +28,28 @@ Every doc atom carries a YAML frontmatter block matching Appendix B of the [Doc 
 
 The RFC lifecycle fields live here too ([RFC 0029](../80-evolution/rfcs/0029-bound-change-loop.md)): `rfc_state` has four canonical values (`draft`, `accepted`, `implemented`, `rejected`) plus deprecated aliases (`open`, `fcp`, `withdrawn`) that `canonical_rfc_state()` resolves during the deprecation window; `RFC_STATE_TRANSITIONS` is the single table of legal next states. `resolved_by` is required for both `accepted` and `implemented`. `affects` declares the component ids a proposal intends to change (`[]` means intentionally none) and `direction` marks foundation impact as `extends` or `revises`.
 
+Stable ADRs can own retirement tombstones through `retires`
+([RFC 0040](../80-evolution/rfcs/0040-retired-reference-audit.md)). Each entry has a
+stable kebab-case `id`, `kind: cli-command|concept`, one or more exact `matches`,
+and actionable `guidance`. CLI entries also require `surface_identity`, using
+the identity returned by `irminsul surface cli` without the executable name:
+
+```yaml
+retires:
+  - id: old-publish-command
+    kind: cli-command
+    surface_identity: publish
+    matches:
+      - acme publish
+    guidance: Use the governed release workflow instead.
+```
+
+The schema validates the record shape and uniqueness within a doc. The
+`retired-references` check decides whether the owner is an authoritative stable
+ADR, detects a CLI identity that has become live again, and audits current
+guidance. A current historical mention is explicit only when the exact phrase is
+linked to the owning ADR.
+
 The write side lives in `src/irminsul/frontmatter_edit.py`: round-trip helpers (`set_value`, `add_to_list`, `remove_inventory_item`) that the deterministic [fix](new-list-regen.md) actions share so every rewrite re-emits keys in canonical order, leaves the body untouched, and is idempotent.
 
 ## Frozen RFC records

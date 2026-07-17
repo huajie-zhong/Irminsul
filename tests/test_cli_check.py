@@ -122,6 +122,19 @@ def test_check_configured_runs_configured_soft_checks(
     assert "[supersession]" in result.stdout
 
 
+def test_check_configured_reports_retired_references(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("soft-retired-references")
+
+    result = runner.invoke(app, ["check", "--profile", "configured", "--path", str(repo)])
+
+    assert result.exit_code == 0, result.stdout
+    assert "[retired-references]" in result.stdout
+    assert "demo publish" in result.stdout
+    assert "0001-retire-publish.md" in result.stdout
+
+
 def test_check_strict_fails_on_warnings(fixture_repo: Callable[[str], Path]) -> None:
     repo = fixture_repo("soft-supersession")
     result = runner.invoke(
