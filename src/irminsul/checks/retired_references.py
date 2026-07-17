@@ -265,9 +265,13 @@ def _guidance_sources(graph: DocGraph) -> list[_GuidanceSource]:
     for path in sorted(current_files, key=lambda item: item.as_posix()):
         absolute = graph.repo_root / path
         if absolute.is_file():
+            try:
+                relative = path.relative_to(graph.repo_root)
+            except ValueError:
+                relative = path
             sources.append(
                 _GuidanceSource(
-                    path=path,
+                    path=relative,
                     doc_id=None,
                     lines=tuple(enumerate(absolute.read_text(encoding="utf-8").splitlines(), 1)),
                 )

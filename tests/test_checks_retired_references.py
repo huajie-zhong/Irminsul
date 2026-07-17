@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from irminsul.checks.retired_references import RetiredReferencesCheck
+from irminsul.checks.retired_references import RetiredReferencesCheck, _guidance_sources
 from irminsul.config import load
 from irminsul.docgraph import build_graph
 
@@ -14,6 +14,31 @@ def _write_config(repo: Path) -> None:
         'project_name = "retirements"\n[paths]\ndocs_root = "docs"\nsource_roots = ["src"]\n',
         encoding="utf-8",
     )
+
+
+def test_guidance_sources_normalize_absolute_docs_root_paths(tmp_path: Path) -> None:
+    docs_root = tmp_path / "docs"
+    docs_root.mkdir()
+    (docs_root / "GLOSSARY.md").write_text("Glossary.\n", encoding="utf-8")
+    (tmp_path / "irminsul.toml").write_text(
+        "\n".join(
+            [
+                'project_name = "retirements"',
+                "[paths]",
+                f'docs_root = "{docs_root.as_posix()}"',
+                'source_roots = ["src"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    graph = build_graph(tmp_path, load(tmp_path / "irminsul.toml"))
+
+    glossary = next(
+        source for source in _guidance_sources(graph) if source.path.name == "GLOSSARY.md"
+    )
+    assert glossary.path == Path("docs/GLOSSARY.md")
 
 
 def _write_doc(
