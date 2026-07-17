@@ -16,7 +16,7 @@ These are the failure modes the system exists to prevent. Naming them helps you 
 - **Duplication-by-Paraphrase.** Same fact stated three different ways. Creates the **Contradiction Trap** that triggers hallucinations ([Assumption 1](principles.md#strategic-assumptions)).
 - **The Tribal Slack.** Critical decisions made in DMs and Slack threads, never written into ADRs. Violates **Principle 2 (Provenance)**.
 - **Doc-as-Changelog.** Component docs that read "We used to do X, then we tried Y, now we do Z." History lives in ADRs; docs should describe present reality only.
-- **The Phantom Claim.** Source files with no matching `describes` claim, or broad claims whose apparent ownership disappears under the most-specific-match rule. The coverage and uniqueness checks make both states visible.
+- **Ambiguous Documentation Ownership.** Code can evolve without a clear accountable document. Some files have no documented owner; others appear covered by multiple documents, obscuring which one is authoritative.
 - **Architecture-Astronaut Diagrams.** A single diagram trying to show everything. C4 levels exist to prevent this — pick a zoom level and stop.
 - **Schema Sprawl.** Type definitions appearing in three docs. Prevented by **Principle 4 (Code as Ultimate Truth)**, the `schema-leak` check, and deriving surfaces on demand (`irminsul surface`).
 - **The Inscrutable Acronym.** Domain acronyms used everywhere with no glossary entry. The glossary-discipline checker catches this.
