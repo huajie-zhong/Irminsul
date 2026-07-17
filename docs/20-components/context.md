@@ -48,6 +48,80 @@ Workflow JSON keeps the underlying lookup `mode` (`path` or `changed`) and adds
 actions are explicit command-and-reason pairs derived from report state, not an
 interactive session or an AI recommendation.
 
+## How the two modes pair
+
+The aliases encode a stateless inspect–edit–verify loop. Nothing is written to
+disk between the calls; each run re-derives its answer from the current graph
+and git status, so the loop is safe to re-enter and cannot drift.
+
+| | `--before-edit <path...>` | `--after-edit` |
+|---|---|---|
+| Input | paths you name, resolved through `path` mode | staged/unstaged/untracked paths, via `changed` mode |
+| Owner routing | doc paths match directly; source paths match the most specific `describes` glob | same, plus files listed in a doc's `tests:` route to that doc |
+| Default profile | `hard` | `hard` |
+| Exit code | non-zero only if a named path has no owner | non-zero when hard validation reports errors |
+| Purpose | load the packet **before** you touch code | prove the working tree is still consistent **after** |
+
+Both modes attach the deterministic next step. `--before-edit` always closes
+with a pointer to `--after-edit`; `--after-edit` adds a `co-change` reminder and
+a `irminsul context <owner-doc>` action for any source file whose owning doc was
+not edited in the same change, plus `irminsul check --profile hard` when hard
+validation fails. Active draft/accepted RFCs whose `affects` list names an owner
+surface in both modes with a `irminsul change status <id>` action.
+
+## Example: the edit loop end to end
+
+Suppose an agent is about to change `src/irminsul/context.py`. It packages the
+owning knowledge first:
+
+```console
+$ irminsul context --before-edit src/irminsul/context.py
+Workflow: before-edit
+
+owner: context (docs/20-components/context.md)
+  input: src/irminsul/context.py
+  source claims: src/irminsul/context.py
+  tests: tests/test_cli_context.py, tests/test_context_unit.py
+  depends_on: checks (...), config (...), docgraph (...)
+  depended-on-by: cli (...), mcp-server (...)
+  active changes:
+    0037-workflow-context-modes [draft] (docs/80-evolution/rfcs/0037-workflow-context-modes.md)
+      requirements: package-pre-edit-context, validate-post-edit-impact, ...
+  findings: (none)
+
+Hard validation: passed (0 errors, 0 warnings)
+Next actions:
+  irminsul change status 0037-workflow-context-modes
+    reason: Active RFC explicitly affects component 'context'.
+  irminsul context --after-edit
+    reason: Validate the working tree and affected repository knowledge after editing.
+```
+
+The agent now knows which doc owns the file, which tests guard it, that an
+active RFC affects it, and exactly what to run next. After editing the code —
+but forgetting to update the owning doc — it runs the paired verify:
+
+```console
+$ irminsul context --after-edit
+Workflow: after-edit
+
+owner: context (docs/20-components/context.md)
+  input: src/irminsul/context.py
+  co-change: owning doc not updated in this change
+  findings: (none)
+
+Hard validation: passed (0 errors, 0 warnings)
+Next actions:
+  irminsul context docs/20-components/context.md
+    reason: Owning document 'context' was not updated in this change.
+```
+
+`after-edit` exits non-zero if hard validation reports errors, so the same
+command doubles as a gate in a pre-commit hook or CI step. Add `--format json`
+to either call to drive the loop from a script; the workflow fields
+(`workflow`, `validation`, `active_changes`, `next_actions`) are additive over
+the ordinary context JSON.
+
 ## Scope & Limitations
 
 Topic search is plain substring matching, not fuzzy search. `--changed` and
