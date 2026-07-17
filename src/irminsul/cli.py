@@ -1,12 +1,10 @@
-"""Irminsul command-line entry point.
-
-Two scripts in `pyproject.toml` (`irminsul` and `irm`) both bind to `app`.
-"""
+"""Irminsul command-line entry point."""
 
 from __future__ import annotations
 
 import datetime as _dt
 import glob
+import sys
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -50,6 +48,26 @@ app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
 )
+
+
+def _configure_console_encoding(
+    streams: tuple[object, ...] | None = None,
+    *,
+    platform: str | None = None,
+) -> None:
+    current_platform = sys.platform if platform is None else platform
+    if current_platform != "win32":
+        return
+    targets = (sys.stdout, sys.stderr) if streams is None else streams
+    for stream in targets:
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8")
+
+
+def main() -> None:
+    _configure_console_encoding()
+    app()
 
 
 class Profile(StrEnum):
