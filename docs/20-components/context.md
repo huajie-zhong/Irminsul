@@ -22,7 +22,7 @@ tests:
 The command supports exactly one input mode:
 
 - `irminsul context <path>` for a source or doc path
-- `irminsul context --topic <query>` for deterministic substring search over doc id, title, path, `describes`, and `tests`
+- `irminsul context --topic <query>` for deterministic tokenized search over doc id, title, path, `describes`, `tests`, `tags`, and `summary`: every whitespace-separated term in the query must appear as a substring somewhere in that set (terms may hit different fields), so multi-word queries no longer need to match as one literal phrase
 - `irminsul context --changed` for staged, unstaged, and untracked git files
 - `irminsul context --change <rfc-id>` as an alias for the [change lifecycle](change.md) status report, so an agent oriented around one RFC gets the same evidence view without switching command groups
 
@@ -143,7 +143,7 @@ items left out by that cap.
 
 ## Scope & Limitations
 
-Topic search is plain substring matching, not fuzzy search. `--changed` and
+Topic search is deterministic per-term substring matching (every term must hit, in any field), not fuzzy or semantic search; matches rank by exact-id match, then whole-phrase hit, then how many distinct fields the terms covered. `--changed` and
 `--after-edit` depend on `git status --porcelain` via the shared
 `irminsul.git.changes` helper (also used by the [change lifecycle](change.md) for
 its local diff baseline); outside a git worktree they report the git error
