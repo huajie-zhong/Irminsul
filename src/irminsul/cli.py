@@ -828,7 +828,12 @@ def context_command(
     ] = False,
     topic: Annotated[
         str | None,
-        typer.Option("--topic", help="Find docs by deterministic substring search."),
+        typer.Option(
+            "--topic",
+            help=(
+                "Find docs by quoted topic keywords; every whitespace-separated term must match."
+            ),
+        ),
     ] = None,
     changed: Annotated[
         bool,

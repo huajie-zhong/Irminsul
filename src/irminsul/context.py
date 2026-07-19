@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -447,19 +448,20 @@ def _pending_for_topic(graph: DocGraph, topic: str) -> list[_PendingResult]:
     if not query:
         raise ContextError("topic query cannot be empty", code=2)
 
-    query_lower = query.lower()
-    terms = tuple(query_lower.split())
+    terms = tuple(query.lower().split())
+    normalized_query = " ".join(terms)
+    normalized_phrase = _normalize_topic_phrase(normalized_query) or normalized_query
     matches = [
         match
         for node in graph.nodes.values()
-        if (match := _match_topic(node, terms, query_lower)) is not None
+        if (match := _match_topic(node, terms, normalized_phrase)) is not None
     ]
     if not matches:
         return []
 
     matches.sort(
         key=lambda match: (
-            0 if match.node.id.lower() == query_lower else 1,
+            0 if _normalize_topic_phrase(match.node.id) == normalized_phrase else 1,
             0 if match.exact_phrase else 1,
             -match.fields_hit,
             match.node.path.as_posix(),
@@ -575,25 +577,33 @@ class _TopicMatch:
 
 def _topic_haystack(node: DocNode) -> dict[str, str]:
     return {
-        "id": node.id,
-        "title": node.frontmatter.title,
-        "path": node.path.as_posix(),
-        "describes": " ".join(node.frontmatter.describes),
-        "tests": " ".join(node.frontmatter.tests),
-        "tags": " ".join(node.frontmatter.tags),
-        "summary": node.frontmatter.summary or "",
+        "id": node.id.lower(),
+        "title": node.frontmatter.title.lower(),
+        "path": node.path.as_posix().lower(),
+        "describes": " ".join(node.frontmatter.describes).lower(),
+        "tests": " ".join(node.frontmatter.tests).lower(),
+        "tags": " ".join(node.frontmatter.tags).lower(),
+        "summary": (node.frontmatter.summary or "").lower(),
     }
 
 
-def _match_topic(node: DocNode, terms: tuple[str, ...], query_lower: str) -> _TopicMatch | None:
+def _normalize_topic_phrase(value: str) -> str:
+    return re.sub(r"[\W_]+", " ", value.lower()).strip()
+
+
+def _match_topic(
+    node: DocNode, terms: tuple[str, ...], normalized_phrase: str
+) -> _TopicMatch | None:
     haystack = _topic_haystack(node)
     fields_hit: set[str] = set()
     for term in terms:
-        term_fields = [field for field, text in haystack.items() if term in text.lower()]
+        term_fields = [field for field, text in haystack.items() if term in text]
         if not term_fields:
             return None
         fields_hit.update(term_fields)
-    exact_phrase = any(query_lower in text.lower() for text in haystack.values())
+    exact_phrase = any(
+        normalized_phrase in _normalize_topic_phrase(text) for text in haystack.values()
+    )
     return _TopicMatch(node=node, exact_phrase=exact_phrase, fields_hit=len(fields_hit))
 
 

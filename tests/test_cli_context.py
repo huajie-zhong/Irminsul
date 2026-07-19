@@ -818,6 +818,67 @@ def test_context_topic_multi_word_ranks_phrase_hit_then_field_breadth(tmp_path: 
     assert [item["owner"]["id"] for item in data["results"]] == ["combo", "widget", "pipeline"]
 
 
+def test_context_topic_normalizes_whitespace_without_changing_ranking(tmp_path: Path) -> None:
+    repo = _make_topic_repo(tmp_path)
+
+    normal = runner.invoke(
+        app,
+        ["context", "--topic", "widget pipeline", "--format", "json", "--path", str(repo)],
+    )
+    spaced = runner.invoke(
+        app,
+        ["context", "--topic", "widget  pipeline", "--format", "json", "--path", str(repo)],
+    )
+
+    assert normal.exit_code == 0, normal.output
+    assert spaced.exit_code == 0, spaced.output
+    normal_ids = [item["owner"]["id"] for item in json.loads(normal.output)["results"]]
+    spaced_ids = [item["owner"]["id"] for item in json.loads(spaced.output)["results"]]
+    assert spaced_ids == normal_ids
+
+
+def test_context_topic_ranks_separator_equivalent_id_first(tmp_path: Path) -> None:
+    repo = _make_topic_repo(tmp_path)
+    doc = repo / "docs" / "20-components" / "widget-pipeline.md"
+    doc.write_text(
+        "\n".join(
+            [
+                "---",
+                "id: widget-pipeline",
+                'title: "Assembly flow"',
+                "audience: explanation",
+                "tier: 3",
+                "status: stable",
+                "describes: []",
+                "---",
+                "",
+                "# Assembly flow",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        ["context", "--topic", "widget pipeline", "--format", "json", "--path", str(repo)],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["results"][0]["owner"]["id"] == "widget-pipeline"
+
+
+def test_context_topic_help_describes_quoted_keyword_search() -> None:
+    result = runner.invoke(app, ["context", "--help"], terminal_width=160)
+
+    assert result.exit_code == 0, result.output
+    assert "quoted topic" in result.output
+    assert "keywords; every" in result.output
+    assert "whitespace-separated term" in result.output
+    assert "must match" in result.output
+
+
 def test_context_unmatched_hint_points_at_list_undocumented_all() -> None:
     report = context_module.ContextReport(
         version=1,
