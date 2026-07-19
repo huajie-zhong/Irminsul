@@ -7,11 +7,12 @@ Defaults match the shape described in Part XII of `Irminsul-reference.md`.
 
 from __future__ import annotations
 
+import difflib
 import tomllib
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationInfo, field_validator
 
 CONFIG_FILENAME = "irminsul.toml"
 
@@ -170,12 +171,24 @@ class Checks(BaseModel):
 
     @field_validator("hard", "soft_deterministic")
     @classmethod
-    def _no_unknown_checks(cls, v: list[str]) -> list[str]:
-        known = set(HARD_CHECKS) | set(OPT_IN_HARD_CHECKS) | set(SOFT_DETERMINISTIC_CHECKS)
-        unknown = [c for c in v if c not in known]
-        if unknown:
-            raise ValueError(f"unknown check name(s): {unknown}")
-        return v
+    def _no_unknown_checks(cls, v: list[str], info: ValidationInfo) -> list[str]:
+        valid = sorted(
+            set(HARD_CHECKS) | set(OPT_IN_HARD_CHECKS)
+            if info.field_name == "hard"
+            else set(SOFT_DETERMINISTIC_CHECKS)
+        )
+        unknown = [c for c in v if c not in valid]
+        if not unknown:
+            return v
+        entries = []
+        for name in unknown:
+            match = difflib.get_close_matches(name, valid, n=1)
+            hint = f" (did you mean '{match[0]}'?)" if match else ""
+            entries.append(f"'{name}'{hint}")
+        raise ValueError(
+            f"unknown check name(s) in checks.{info.field_name}: {', '.join(entries)}. "
+            f"Valid checks.{info.field_name} names: {', '.join(valid)}."
+        )
 
 
 class Overrides(BaseModel):
@@ -202,13 +215,37 @@ class IrminsulConfig(BaseModel):
     languages: Languages = Field(default_factory=Languages)
 
 
+class ConfigError(Exception):
+    """User-facing `irminsul.toml` validation error."""
+
+    def __init__(self, message: str, *, code: int = 2) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+def _format_validation_error(path: Path, exc: ValidationError) -> str:
+    parts: list[str] = []
+    for err in exc.errors():
+        loc = ".".join(str(x) for x in err["loc"]) or "<root>"
+        detail = err.get("ctx", {}).get("error")
+        parts.append(f"{loc}: {detail if detail is not None else err['msg']}")
+    return f"{path}: " + "; ".join(parts)
+
+
 def load(path: Path) -> IrminsulConfig:
-    """Load an `irminsul.toml` file. Returns defaults if the file is missing."""
+    """Load an `irminsul.toml` file. Returns defaults if the file is missing.
+
+    Raises `ConfigError` (not the raw Pydantic `ValidationError`) so callers
+    get a message worth showing a user rather than a traceback.
+    """
     if not path.exists():
         return IrminsulConfig()
     with path.open("rb") as f:
         data = tomllib.load(f)
-    return IrminsulConfig.model_validate(data)
+    try:
+        return IrminsulConfig.model_validate(data)
+    except ValidationError as e:
+        raise ConfigError(_format_validation_error(path, e)) from e
 
 
 def find_config(start: Path) -> Path:
