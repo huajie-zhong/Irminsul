@@ -135,6 +135,86 @@ def _make_context_repo(
     return repo
 
 
+def _make_topic_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "topic"
+    repo.mkdir()
+    (repo / "irminsul.toml").write_text(
+        "\n".join(
+            [
+                'project_name = "topic"',
+                "[paths]",
+                'docs_root = "docs"',
+                'source_roots = ["src"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    docs = repo / "docs" / "20-components"
+    docs.mkdir(parents=True)
+    (docs / "widget.md").write_text(
+        "\n".join(
+            [
+                "---",
+                "id: widget",
+                'title: "Widget assembly"',
+                "audience: explanation",
+                "tier: 3",
+                "status: stable",
+                "summary: Deterministic pipeline for building widgets.",
+                "describes: []",
+                "---",
+                "",
+                "# Widget assembly",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (docs / "pipeline.md").write_text(
+        "\n".join(
+            [
+                "---",
+                "id: pipeline",
+                'title: "Batch runner"',
+                "audience: explanation",
+                "tier: 3",
+                "status: stable",
+                "summary: Executes each stage in order.",
+                "tags:",
+                "  - widget",
+                "describes: []",
+                "---",
+                "",
+                "# Batch runner",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (docs / "combo.md").write_text(
+        "\n".join(
+            [
+                "---",
+                "id: combo",
+                'title: "Combo doc"',
+                "audience: explanation",
+                "tier: 3",
+                "status: stable",
+                "summary: Uses a widget pipeline for staging.",
+                "describes: []",
+                "---",
+                "",
+                "# Combo doc",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return repo
+
+
 def _add_active_rfc(repo: Path) -> None:
     rfcs = repo / "docs" / "80-evolution" / "rfcs"
     rfcs.mkdir(parents=True)
@@ -693,6 +773,110 @@ def test_context_no_topic_matches_returns_empty_json(tmp_path: Path) -> None:
     assert data["mode"] == "topic"
     assert data["results"] == []
     assert data["unmatched"] == []
+
+
+def test_context_topic_multi_word_matches_terms_across_fields(tmp_path: Path) -> None:
+    repo = _make_topic_repo(tmp_path)
+
+    result = runner.invoke(
+        app,
+        ["context", "--topic", "widget pipeline", "--format", "json", "--path", str(repo)],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    # "pipeline" doc only carries "widget" via its tags and "pipeline" via its
+    # id/path, so it only matches when terms are allowed to hit different fields.
+    assert "pipeline" in {item["owner"]["id"] for item in data["results"]}
+
+
+def test_context_topic_multi_word_missing_term_returns_none(tmp_path: Path) -> None:
+    repo = _make_topic_repo(tmp_path)
+
+    result = runner.invoke(
+        app,
+        ["context", "--topic", "widget zzz-nope", "--format", "json", "--path", str(repo)],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["results"] == []
+
+
+def test_context_topic_multi_word_ranks_phrase_hit_then_field_breadth(tmp_path: Path) -> None:
+    repo = _make_topic_repo(tmp_path)
+
+    result = runner.invoke(
+        app,
+        ["context", "--topic", "widget pipeline", "--format", "json", "--path", str(repo)],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    # "combo" wins on its literal "widget pipeline" phrase hit in summary;
+    # "widget" then outranks "pipeline" on distinct-field breadth (4 vs 3).
+    assert [item["owner"]["id"] for item in data["results"]] == ["combo", "widget", "pipeline"]
+
+
+def test_context_topic_normalizes_whitespace_without_changing_ranking(tmp_path: Path) -> None:
+    repo = _make_topic_repo(tmp_path)
+
+    normal = runner.invoke(
+        app,
+        ["context", "--topic", "widget pipeline", "--format", "json", "--path", str(repo)],
+    )
+    spaced = runner.invoke(
+        app,
+        ["context", "--topic", "widget  pipeline", "--format", "json", "--path", str(repo)],
+    )
+
+    assert normal.exit_code == 0, normal.output
+    assert spaced.exit_code == 0, spaced.output
+    normal_ids = [item["owner"]["id"] for item in json.loads(normal.output)["results"]]
+    spaced_ids = [item["owner"]["id"] for item in json.loads(spaced.output)["results"]]
+    assert spaced_ids == normal_ids
+
+
+def test_context_topic_ranks_separator_equivalent_id_first(tmp_path: Path) -> None:
+    repo = _make_topic_repo(tmp_path)
+    doc = repo / "docs" / "20-components" / "widget-pipeline.md"
+    doc.write_text(
+        "\n".join(
+            [
+                "---",
+                "id: widget-pipeline",
+                'title: "Assembly flow"',
+                "audience: explanation",
+                "tier: 3",
+                "status: stable",
+                "describes: []",
+                "---",
+                "",
+                "# Assembly flow",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        ["context", "--topic", "widget pipeline", "--format", "json", "--path", str(repo)],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["results"][0]["owner"]["id"] == "widget-pipeline"
+
+
+def test_context_topic_help_describes_quoted_keyword_search() -> None:
+    result = runner.invoke(app, ["context", "--help"], terminal_width=160)
+
+    assert result.exit_code == 0, result.output
+    assert "quoted topic" in result.output
+    assert "keywords; every" in result.output
+    assert "whitespace-separated term" in result.output
+    assert "must match" in result.output
 
 
 def test_context_unmatched_hint_points_at_list_undocumented_all() -> None:
