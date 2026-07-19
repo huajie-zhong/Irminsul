@@ -2,6 +2,7 @@
 
 from irminsul.git.mtime import (
     GitTime,
+    bulk_last_commit_times,
     has_history,
     is_shallow,
     last_commit_time,
@@ -10,6 +11,7 @@ from irminsul.git.mtime import (
 
 __all__ = [
     "GitTime",
+    "bulk_last_commit_times",
     "has_history",
     "is_shallow",
     "last_commit_time",
