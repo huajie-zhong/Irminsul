@@ -30,6 +30,7 @@ inventory:
       - new rfc
     omit:
       - anchors
+      - explain
       - change finalize
       - change impact
       - change transition

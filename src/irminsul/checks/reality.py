@@ -14,9 +14,19 @@ _SPECULATIVE_RE = re.compile(
 )
 
 
+CODE_SPECULATIVE_LANGUAGE = "reality/speculative-language"
+
+
 class RealityCheck:
     name: ClassVar[str] = "reality"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_SPECULATIVE_LANGUAGE: (
+            "A tier-3 living doc uses speculative language (planned, roadmap, future, "
+            "v1.2, ...). Move future plans to an RFC or roadmap doc; living docs describe "
+            "what is true now."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         out: list[Finding] = []
@@ -29,6 +39,7 @@ class RealityCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_SPECULATIVE_LANGUAGE,
                             severity=self.default_severity,
                             message=f"speculative keyword '{m.group()}' in living doc",
                             path=node.path,

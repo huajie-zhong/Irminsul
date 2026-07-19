@@ -69,9 +69,23 @@ def _resolve_target_path(doc: DocNode, target: str) -> Path:
     return Path(*parts)
 
 
+CODE_BROKEN_LINK = "links/broken-link"
+CODE_UNKNOWN_ANCHOR = "links/unknown-anchor"
+
+
 class LinksCheck:
     name: ClassVar[str] = "links"
     default_severity: ClassVar[Severity] = Severity.error
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_BROKEN_LINK: (
+            "A relative markdown link does not resolve to an existing file in the repo. "
+            "Fix the link target or remove the link."
+        ),
+        CODE_UNKNOWN_ANCHOR: (
+            "A `#heading` link fragment has no matching heading in the target doc "
+            "(same-doc or cross-doc). Fix the anchor slug or the heading it points at."
+        ),
+    }
 
     def __init__(self) -> None:
         self._md = MarkdownIt("commonmark")
@@ -98,6 +112,7 @@ class LinksCheck:
                         out.append(
                             Finding(
                                 check=self.name,
+                                code=CODE_UNKNOWN_ANCHOR,
                                 severity=Severity.error,
                                 message=(
                                     f"unknown anchor: '#{anchor}' has no matching "
@@ -117,6 +132,7 @@ class LinksCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_BROKEN_LINK,
                             severity=Severity.error,
                             message=f"broken link: '{href}' (resolved to '{target_rel}')",
                             path=node.path,
@@ -144,6 +160,7 @@ class LinksCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_UNKNOWN_ANCHOR,
                             severity=Severity.error,
                             message=(
                                 f"unknown anchor in '{target_rel}': "

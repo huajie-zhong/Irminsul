@@ -39,6 +39,7 @@ def requirement_grammar_findings(
     def finding(category: str, message: str, line: int, suggestion: str) -> Finding:
         return Finding(
             check=check_name,
+            code=f"{check_name}/{category}",
             category=category,
             severity=Severity.warning,
             message=message,
@@ -203,6 +204,7 @@ def task_grammar_findings(
     def finding(category: str, message: str, line: int, suggestion: str) -> Finding:
         return Finding(
             check=check_name,
+            code=f"{check_name}/{category}",
             category=category,
             severity=Severity.warning,
             message=message,
@@ -277,9 +279,84 @@ def task_grammar_findings(
     return out
 
 
+_CATEGORY_EXPLANATIONS: dict[str, str] = {
+    "mixed-disposition": (
+        "A requirements section has both an explicit no-new-behavior disposition and "
+        "requirement blocks. Remove the disposition sentence or the requirement blocks."
+    ),
+    "empty-requirements": (
+        "A requirements section declares neither a requirement nor an explicit "
+        "no-new-behavior disposition. Add `### Requirement:` blocks or the sentence "
+        "'No new behavioral requirements: ...'."
+    ),
+    "missing-id": ("A requirement has no `ID:` line. Add a stable kebab-case id."),
+    "invalid-id": (
+        "A requirement's id is not a kebab-case slug. Use lowercase letters, digits, "
+        "and dashes, starting with a letter."
+    ),
+    "duplicate-id": (
+        "A requirement id is already used elsewhere in the RFC. Requirement ids must "
+        "be unique within the RFC."
+    ),
+    "missing-provenance": (
+        "A requirement has no `Provenance:` line. Declare the evidence obligation: "
+        "code, adr, or citation."
+    ),
+    "invalid-provenance": (
+        "A requirement's `Provenance:` value is not one of the supported classes. Use "
+        "`code`, `adr`, or `citation`."
+    ),
+    "missing-behavior": (
+        "A requirement contains no SHALL or MUST behavior text. State the behavioral "
+        "promise with SHALL or MUST."
+    ),
+    "missing-scenario": (
+        "A requirement has no named scenario. Add at least one `#### Scenario:` block "
+        "with WHEN and THEN."
+    ),
+    "incomplete-scenario": (
+        "A scenario is missing its WHEN condition or its THEN outcome. Every scenario needs both."
+    ),
+    "task-missing-id": (
+        "A task list item has no backticked task id. Start the item with a stable id, "
+        "e.g. `` - `T1` Wire the client. (req: sso-login) ``."
+    ),
+    "task-multiple-references": (
+        "A task carries more than one `(req: ...)`/`(component: ...)` reference. A "
+        "task references at most one."
+    ),
+    "task-misplaced-reference": (
+        "A task has text after its `(req: ...)`/`(component: ...)` reference. Put the "
+        "reference last."
+    ),
+    "task-empty-reference": (
+        "A task's reference names no target. Reference a requirement id or a declared "
+        "component id, or drop the parentheses."
+    ),
+    "empty-tasks": (
+        "A `## Tasks` section declares no parseable task item. Add items of the form "
+        "`` - `T1` Do the thing. (req: <requirement id>) ``, or remove the section."
+    ),
+    "task-duplicate-id": (
+        "A task id is already used elsewhere in the RFC. Task ids must be unique within the RFC."
+    ),
+    "task-unresolved-req": (
+        "A task's `(req: ...)` reference names a requirement id not declared in this "
+        "RFC's `## Requirements` section. Fix the reference."
+    ),
+    "task-unresolved-component": (
+        "A task's `(component: ...)` reference names a component not declared in the "
+        "RFC's `affects`. Reference a component id listed in `affects`."
+    ),
+}
+
+
 class RequirementGrammarCheck:
     name: ClassVar[str] = "requirement-grammar"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        f"requirement-grammar/{category}": text for category, text in _CATEGORY_EXPLANATIONS.items()
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         docs_root = (

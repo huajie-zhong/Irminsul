@@ -26,9 +26,24 @@ def _has_wildcard(pattern: str) -> bool:
     return any(c in pattern for c in _WILDCARD_CHARS)
 
 
+CODE_WILDCARD_WITH_CHILDREN = "parent-child/wildcard-with-children"
+CODE_INDEX_TOO_LONG = "parent-child/index-too-long"
+
+
 class ParentChildCheck:
     name: ClassVar[str] = "parent-child"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_WILDCARD_WITH_CHILDREN: (
+            "A parent INDEX has on-disk sibling docs but still declares a wildcard "
+            "`describes` pattern, risking silent overlap with the children's claims. "
+            "Enumerate exact files, or drop the claim and let the children cover it."
+        ),
+        CODE_INDEX_TOO_LONG: (
+            "An INDEX.md body exceeds the configured line threshold. INDEX is meant to "
+            "be navigation, not exposition — move long-form content into a sibling doc."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None:
@@ -56,6 +71,7 @@ class ParentChildCheck:
                         out.append(
                             Finding(
                                 check=self.name,
+                                code=CODE_WILDCARD_WITH_CHILDREN,
                                 severity=Severity.error,
                                 message=(
                                     f"parent INDEX with children must not use wildcard "
@@ -76,6 +92,7 @@ class ParentChildCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_INDEX_TOO_LONG,
                         severity=Severity.warning,
                         message=(
                             f"INDEX body is {line_count} lines (threshold "

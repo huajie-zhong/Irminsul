@@ -55,9 +55,35 @@ class _LinkedLabel:
     destination: str
 
 
+CODE_INACTIVE_RETIREMENT = "retired-references/inactive-retirement"
+CODE_RETIREMENT_STILL_LIVE = "retired-references/retirement-still-live"
+CODE_AMBIGUOUS_RETIREMENT = "retired-references/ambiguous-retirement"
+CODE_RETIRED_REFERENCE = "retired-references/retired-reference"
+
+
 class RetiredReferencesCheck:
     name: ClassVar[str] = "retired-references"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_INACTIVE_RETIREMENT: (
+            "A `retires` declaration is inactive because its owner is not a stable ADR. "
+            "Move the declarations to the stable ADR that approved the retirement."
+        ),
+        CODE_RETIREMENT_STILL_LIVE: (
+            "A retired CLI identity is still present in the current derived surface. "
+            "Remove the tombstone if the command was restored, or remove the live "
+            "command if the retirement still governs."
+        ),
+        CODE_AMBIGUOUS_RETIREMENT: (
+            "The same retired phrase is declared by more than one ADR. Keep one "
+            "authoritative tombstone."
+        ),
+        CODE_RETIRED_REFERENCE: (
+            "Current guidance references a phrase, symbol, or concept an ADR has "
+            "declared retired. Follow the retirement's guidance and remove or replace "
+            "the reference."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.repo_root is None or graph.config is None:
@@ -108,6 +134,7 @@ def _retirement_registry(
             findings.append(
                 Finding(
                     check=RetiredReferencesCheck.name,
+                    code=CODE_INACTIVE_RETIREMENT,
                     severity=Severity.warning,
                     category="inactive-retirement",
                     message=(
@@ -138,6 +165,7 @@ def _retirement_registry(
                     findings.append(
                         Finding(
                             check=RetiredReferencesCheck.name,
+                            code=CODE_RETIREMENT_STILL_LIVE,
                             severity=Severity.warning,
                             category="retirement-still-live",
                             message=(
@@ -188,6 +216,7 @@ def _retirement_registry(
             findings.append(
                 Finding(
                     check=RetiredReferencesCheck.name,
+                    code=CODE_AMBIGUOUS_RETIREMENT,
                     severity=Severity.warning,
                     category="ambiguous-retirement",
                     message=(
@@ -438,6 +467,7 @@ def _retired_reference_finding(
 ) -> Finding:
     return Finding(
         check=RetiredReferencesCheck.name,
+        code=CODE_RETIRED_REFERENCE,
         severity=Severity.warning,
         category="retired-reference",
         message=(f"current guidance references retired {rule.entry.kind.value} '{rule.phrase}'"),
