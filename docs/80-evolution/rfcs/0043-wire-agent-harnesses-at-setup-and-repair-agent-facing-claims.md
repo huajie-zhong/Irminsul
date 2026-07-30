@@ -12,6 +12,7 @@ affects:
 - context
 - cli
 - mcp-server
+- new-list-regen
 - check-pipeline
 resolved_by: docs/50-decisions/0022-scaffold-agent-harness-wiring-statically.md
 required_updates:
@@ -226,6 +227,11 @@ current nested form cannot express a third flag without another branch.
 - `T5` Request the annotation format from the Action by default and document it. (component: check-pipeline)
 - `T6` Report written files on live fix runs and add versioned JSON output. (component: cli)
 - `T7` Record the scaffolded registration as the primary wiring path and the manual command as the fallback. (component: mcp-server)
+
+`T5` and `T7` are documentation-only by construction: the annotation format already
+existed in the CLI and only the Action invocation and its prose were missing, and the
+server's tool set is unchanged — only which wiring path is primary. Neither owns a source
+change, so both surface as unbound review clues rather than as evidence.
 
 ## Drawbacks
 
