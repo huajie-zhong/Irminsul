@@ -116,3 +116,14 @@ def test_pristine_checkout_no_git_repo_raises(tmp_path: Path) -> None:
     with pytest.raises(DeltaError):
         with pristine_checkout(tmp_path, "HEAD"):
             pass
+
+
+def test_pristine_checkout_yields_a_fully_resolved_root(tmp_path: Path) -> None:
+    """The yielded root becomes `build_graph`'s `repo_root`, and the doc walk
+    produces resolved paths. If the system temp dir is a symlink (macOS) or an
+    8.3 short name (Windows), an unresolved root makes `relative_to` raise for
+    every doc found — a failure invisible on Linux, where /tmp is a real dir."""
+    _init_repo(tmp_path)
+
+    with pristine_checkout(tmp_path, "HEAD") as base_root:
+        assert base_root == base_root.resolve()
