@@ -536,8 +536,11 @@ def test_fix_command_is_runnable_under_the_profile_that_reported_it(
     result = _run(command, repo)
     assert result.exit_code == 0, result.output
     assert "not active under profile" not in result.output
-    assert "status: deprecated" in result.output
+    assert "docs/20-components/old-system.md" in result.output
     assert "updated 1 file(s)" in result.output
+    # A live run reports the file it wrote, so assert the remediation on disk.
+    old_doc = repo / "docs" / "20-components" / "old-system.md"
+    assert "status: deprecated" in old_doc.read_text(encoding="utf-8")
 
 
 def test_fix_command_carries_confirm_for_confirm_gated_checks(

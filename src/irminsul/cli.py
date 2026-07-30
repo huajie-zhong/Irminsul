@@ -26,6 +26,7 @@ from irminsul.checks import (
 )
 from irminsul.config import ConfigError, IrminsulConfig, find_config, load
 from irminsul.docgraph import DocGraph, build_graph
+from irminsul.fix import FixResult
 from irminsul.git.mtime import diff_name_only, has_history
 from irminsul.init.command import (
     detect_code_signals,
@@ -1100,6 +1101,31 @@ def refs_command(
         raise typer.Exit(code=exc.code) from exc
 
 
+def _fix_result_to_json(result: FixResult | None, *, dry_run: bool) -> str:
+    """The versioned JSON shape of a fix run.
+
+    `written` is empty on a dry run by construction; `planned` is what the run
+    would attempt. A `None` result means nothing was harvested, which is a
+    success with empty collections rather than an error.
+    """
+    import json
+
+    def _fix_records(fixes: list[Fix]) -> list[dict[str, str]]:
+        return [{"path": f.path.as_posix(), "description": f.description} for f in fixes]
+
+    return json.dumps(
+        {
+            "version": 1,
+            "dry_run": dry_run,
+            "written": [p.as_posix() for p in result.written] if result else [],
+            "planned": _fix_records(result.planned) if result else [],
+            "held": _fix_records(result.held) if result else [],
+            "errors": list(result.errors) if result else [],
+        },
+        indent=2,
+    )
+
+
 @app.command()
 def fix(
     profile: Annotated[
@@ -1121,6 +1147,7 @@ def fix(
         str | None,
         typer.Option("--check", help="Harvest fixes from a single check by name."),
     ] = None,
+    fmt: Annotated[str, typer.Option("--format", help="Output format: plain or json.")] = "plain",
     path: Annotated[
         Path,
         typer.Option(
@@ -1131,6 +1158,10 @@ def fix(
 ) -> None:
     """Apply deterministic remediations for fixable findings."""
     from irminsul.fix import apply_fixes
+
+    if fmt not in ("plain", "json"):
+        typer.echo(typer.style(f"unknown --format '{fmt}'; expected plain or json", fg="red"))
+        raise typer.Exit(code=2)
 
     repo_root = path.resolve()
     config = _load_config(repo_root)
@@ -1145,7 +1176,10 @@ def fix(
     if check_name is not None:
         selected = [(name, registry) for name, registry in selected if name == check_name]
         if not selected:
-            typer.echo(f"check '{check_name}' is not active under profile '{profile.value}'")
+            if fmt == "json":
+                typer.echo(_fix_result_to_json(None, dry_run=dry_run))
+            else:
+                typer.echo(f"check '{check_name}' is not active under profile '{profile.value}'")
             raise typer.Exit(code=0)
     for name, registry in selected:
         cls = registry.get(name)
@@ -1158,12 +1192,27 @@ def fix(
             fixes.extend(maybe_fixes(check_findings, graph))
 
     if not fixes:
-        typer.echo("no automatic fixes available")
+        if fmt == "json":
+            typer.echo(_fix_result_to_json(None, dry_run=dry_run))
+        else:
+            typer.echo("no automatic fixes available")
         raise typer.Exit(code=0)
 
     result = apply_fixes(repo_root, fixes, dry_run=dry_run, confirm=confirm)
-    for planned in result.planned:
-        typer.echo(f"  {planned.path.as_posix()}: {planned.description}")
+
+    if fmt == "json":
+        typer.echo(_fix_result_to_json(result, dry_run=dry_run))
+        raise typer.Exit(code=1 if result.errors else 0)
+
+    # A dry run reports what it would attempt; a live run reports what actually
+    # changed. `apply_fixes` groups fixes by path and skips a path whose content
+    # is unchanged, so listing `planned` after a live run overstates the result.
+    if dry_run:
+        for planned in result.planned:
+            typer.echo(f"  {planned.path.as_posix()}: {planned.description}")
+    else:
+        for written in result.written:
+            typer.echo(f"  {written.as_posix()}")
     for held in result.held:
         typer.echo(typer.style(f"  held: {held.path.as_posix()}: {held.description}", fg="yellow"))
 
