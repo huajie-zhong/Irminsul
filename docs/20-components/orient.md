@@ -56,7 +56,7 @@ The report contains:
 - the project name and docs root
 - each top-level layer directory that contains docs, with its doc count
 - doc totals, broken down by frontmatter `status`
-- the entry docs that exist on disk under the docs root ([`AGENTS.md`](../AGENTS.md), [`README.md`](../README.md), [`CONTRIBUTING.md`](../CONTRIBUTING.md), [`GLOSSARY.md`](../GLOSSARY.md))
+- the entry docs that exist on disk, as repo-relative paths: the root harness router ([`AGENTS.md`](../../AGENTS.md)) first, then the docs-root entries ([`AGENTS.md`](../AGENTS.md), [`README.md`](../README.md), [`CONTRIBUTING.md`](../CONTRIBUTING.md), [`GLOSSARY.md`](../GLOSSARY.md)). Only the router is probed at the repo root — other conventional names would duplicate their docs-root counterparts, and harness-proprietary names do not belong in a harness-neutral report.
 - the configured hard and soft deterministic check names
 - a curated command vocabulary: which command to run when, phrased for an agent working the edit-verify loop
 

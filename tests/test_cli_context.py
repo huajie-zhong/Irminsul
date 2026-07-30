@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -274,6 +275,55 @@ def test_context_source_path_json_returns_owner_tests_and_dependencies(tmp_path:
     assert context["tests"] == ["tests/test_core.py"]
     assert [doc["id"] for doc in context["depends_on"]] == ["helper"]
     assert "irminsul check --profile hard" in context["hints"]
+
+
+def test_context_hints_offer_fix_for_fixable_finding(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("soft-glossary")
+
+    result = runner.invoke(
+        app,
+        [
+            "context",
+            "docs/20-components/composer.md",
+            "--profile",
+            "configured",
+            "--format",
+            "json",
+            "--path",
+            str(repo),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    [context] = json.loads(result.output)["results"]
+    assert context["hints"] == [
+        "irminsul fix --profile configured --check glossary-discipline --confirm",
+        "irminsul check --profile hard",
+    ]
+
+
+def test_context_hints_are_gate_only_without_fixable_finding(tmp_path: Path) -> None:
+    repo = _make_context_repo(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "context",
+            "src/mylib/core.py",
+            "--profile",
+            "hard",
+            "--format",
+            "json",
+            "--path",
+            str(repo),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    [context] = json.loads(result.output)["results"]
+    assert context["hints"] == ["irminsul check --profile hard"]
 
 
 def test_context_doc_path_plain_returns_doc_metadata(tmp_path: Path) -> None:
