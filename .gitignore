@@ -66,3 +66,6 @@ src/irminsul/_version.py
 .env
 .env.local
 .env.*.local
+
+# Agent harness scratch. `.claude/skills/` and `.claude/settings.local.json` are tracked.
+.claude/worktrees/
