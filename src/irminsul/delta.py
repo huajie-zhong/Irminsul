@@ -71,7 +71,11 @@ def pristine_checkout(repo_root: Path, rev: str) -> Generator[Path, None, None]:
             "--delta needs one to check out --delta-base"
         ) from e
 
-    scratch_parent = Path(tempfile.mkdtemp(prefix="irminsul-delta-"))
+    # Resolve the temp root: the system temp dir is a symlink on macOS
+    # (/var -> /private/var) and can be an 8.3 short name on Windows, while the
+    # doc walk yields fully resolved paths. An unresolved root here makes
+    # `parse_doc`'s `relative_to(repo_root)` raise for every doc it finds.
+    scratch_parent = Path(tempfile.mkdtemp(prefix="irminsul-delta-")).resolve()
     scratch_dir = scratch_parent / "base"
     try:
         try:
