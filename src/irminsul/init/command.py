@@ -8,6 +8,7 @@ either from the interactive prompts or from sensible defaults.
 from __future__ import annotations
 
 import datetime as _dt
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,6 +25,44 @@ _GITHUB_USER_PLACEHOLDER = "huajie-zhong"
 
 _SCAFFOLDS_DIR = Path(__file__).parent / "scaffolds"
 _WORKFLOWS_DIR = Path(__file__).parent / "workflows"
+
+# Agent-harness wiring. Held as constants rather than as Jinja templates under
+# `scaffolds/`: neither file carries a project-specific value, and the built
+# wheel contains no dot-prefixed files today, so hidden-template inclusion under
+# the configured package root is unverified — a silently excluded template would
+# fail at release time rather than at test time (ADR-0022).
+_MCP_CONFIG_PATH = Path(".mcp.json")
+_SKILL_PATH = Path(".claude") / "skills" / "irminsul" / "SKILL.md"
+
+# Bare console script and a relative path, so the file is committable and
+# byte-identical on every platform. An absolute or virtual-environment path
+# would be machine-specific.
+_MCP_CONFIG: dict[str, Any] = {
+    "mcpServers": {
+        "irminsul": {
+            "command": "irminsul",
+            "args": ["mcp", "--path", "."],
+        }
+    }
+}
+
+_MCP_MANUAL_COMMAND = "claude mcp add irminsul -- irminsul mcp --path ."
+
+# A trigger, not a copy. The command vocabulary is served live by `irminsul
+# orient` and the work order lives in the agent protocol doc; restating either
+# here would be a third copy in a format no check can read (ADR-0022).
+_SKILL_BODY = """---
+name: irminsul
+description: Use when editing code in a repo with an irminsul.toml at the root.
+---
+
+Run `irminsul orient` first. It reports the docs tree, the configured checks, and
+which command to run when.
+
+Follow the work order in `docs/90-meta/agent-protocol.md`.
+
+Before committing, `irminsul check --profile=hard` must exit 0.
+"""
 
 _CODE_SIGNAL_FILES = (
     "pyproject.toml",
@@ -287,25 +326,67 @@ def generate_agents_manifest(target_root: Path, *, force: bool = False) -> list[
     return [rel_path]
 
 
+def write_harness_files(target_root: Path, *, force: bool = False) -> tuple[list[Path], list[Path]]:
+    """Write the agent-harness wiring. Returns `(written, skipped)`.
+
+    Both files are unpoliced by design: neither is derived from anything, so a
+    drift check would compare a constant against itself, and its cost would fall
+    on adopters who legitimately delete either file (ADR-0022). Applies the same
+    skip-if-exists policy as `write_scaffold`, because an existing registration
+    may hold servers the adopter needs.
+    """
+    payloads: list[tuple[Path, str]] = [
+        (_MCP_CONFIG_PATH, json.dumps(_MCP_CONFIG, indent=2) + "\n"),
+        (_SKILL_PATH, _SKILL_BODY),
+    ]
+
+    written: list[Path] = []
+    skipped: list[Path] = []
+    for output_rel, content in payloads:
+        out_abs = target_root / output_rel
+        if out_abs.exists() and not force:
+            skipped.append(output_rel)
+            continue
+        out_abs.parent.mkdir(parents=True, exist_ok=True)
+        out_abs.write_text(content, encoding="utf-8")
+        written.append(output_rel)
+
+    return written, skipped
+
+
 def _scaffold_with_agent_wiring(
     target_root: Path, answers: InitAnswers, *, force: bool
 ) -> list[Path]:
     """Render the scaffold, then wire the repo for agent harnesses.
 
-    Writes `docs/AGENTS.md` (the navigation manifest) via the regen machinery.
-    The root `AGENTS.md` pointer is part of the scaffold templates; if one
-    already exists it is skipped (with a note) unless `force` is given.
+    Writes `docs/AGENTS.md` (the navigation manifest) via the regen machinery,
+    then the harness wiring (`.mcp.json`, the harness skill). The root
+    `AGENTS.md` pointer is part of the scaffold templates. Any of these that
+    already exists is skipped, with a note, unless `force` is given.
     """
     root_manifest_preexisting = (target_root / "AGENTS.md").exists()
     written = write_scaffold(target_root, answers, force=force)
     written.extend(generate_agents_manifest(target_root, force=force))
-    if root_manifest_preexisting and not force:
+    harness_written, harness_skipped = write_harness_files(target_root, force=force)
+    written.extend(harness_written)
+
+    preexisting = [Path("AGENTS.md")] if root_manifest_preexisting else []
+    preexisting.extend(harness_skipped)
+    if preexisting and not force:
+        names = ", ".join(p.as_posix() for p in preexisting)
         typer.echo(
             typer.style(
-                "note: AGENTS.md already exists at the repo root; leaving it untouched.",
+                f"note: already present, left untouched: {names}",
                 fg="yellow",
             )
         )
+        if _MCP_CONFIG_PATH in harness_skipped:
+            typer.echo(
+                typer.style(
+                    f"      to register the MCP server manually: {_MCP_MANUAL_COMMAND}",
+                    fg="yellow",
+                )
+            )
     return written
 
 
@@ -320,8 +401,9 @@ def print_next_steps(answers: InitAnswers, written: list[Path]) -> None:
     typer.echo("  2. Edit docs/10-architecture/overview.md")
     typer.echo("  3. Add CODEOWNERS coverage for /docs (project-specific; not auto-generated).")
     typer.echo(
-        "  4. Point your coding agent at AGENTS.md (repo root) — "
-        "it routes to docs/AGENTS.md and the agent loop."
+        "  4. Point your coding agent at AGENTS.md (repo root) — it routes to "
+        "docs/AGENTS.md and the agent loop. .mcp.json registers the MCP server; "
+        "it needs `pip install 'irminsul[mcp]'`."
     )
     typer.echo("  5. git add . && git commit -m 'Adopt Irminsul'")
     typer.echo("  6. Push — CI enforces from PR #1.")
@@ -390,8 +472,9 @@ def _print_docs_only_next_steps(answers: InitAnswers, written: list[Path]) -> No
     typer.echo("  2. Edit docs/00-foundation/principles.md")
     typer.echo("  3. Edit docs/10-architecture/overview.md")
     typer.echo(
-        "  4. Point your coding agent at AGENTS.md (repo root) — "
-        "it routes to docs/AGENTS.md and the agent loop."
+        "  4. Point your coding agent at AGENTS.md (repo root) — it routes to "
+        "docs/AGENTS.md and the agent loop. .mcp.json registers the MCP server; "
+        "it needs `pip install 'irminsul[mcp]'`."
     )
     typer.echo("  5. git add . && git commit -m 'Adopt Irminsul (docs-only)'")
     typer.echo("  6. Push — CI enforces from PR #1.")

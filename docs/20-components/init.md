@@ -28,6 +28,15 @@ The no-code path distinguishes setup intent:
 
 Templates live as Jinja files under `src/irminsul/init/scaffolds/` (`docs/` tree + `irminsul.toml`) and `src/irminsul/init/workflows/` (CI workflows). Output paths mirror the template path with `.j2` stripped.
 
+Agent-harness wiring is written after the templates, from module constants rather than templates:
+
+```text
+.mcp.json                              registers the read-only MCP server
+.claude/skills/irminsul/SKILL.md       a trigger routing an agent to `irminsul orient`
+```
+
+The registration wires the [MCP server](mcp-server.md); the skill points at orientation and the [agent protocol](../90-meta/agent-protocol.md) without restating either. Neither file carries a project-specific value, so neither needs substitution, and holding them as constants avoids depending on hidden-file inclusion in the built wheel — which no scaffold template currently exercises. Both follow the same skip-if-exists policy as the templates: an existing registration may hold servers the adopter needs, so it is left byte-identical and the manual registration command is printed instead. Neither file is governed by a check, because neither is derived from anything ([ADR-0022](../50-decisions/0022-scaffold-agent-harness-wiring-statically.md)).
+
 The scaffold is born compliant with its own configured checks: every layer (including `00-foundation/`, `10-architecture/`, and `80-evolution/rfcs/`) ships a navigation INDEX so sibling docs are never orphans, the tier-3 layer INDEXes carry a Scope & Limitations section, and the INDEX of each not-yet-filled layer is `status: draft`, which the `phantom-layer` check treats as under-construction rather than navigation rot. A freshly initialized repo reports zero errors and zero warnings under the configured check profile.
 
 `detector.detect_languages()` checks for marker files (`pyproject.toml`, `package.json`+`tsconfig.json`, etc.) — cheap heuristics, fast and resilient to weird repo shapes. `detect_source_roots()` filters each detected language's `source_root_candidates` to those that exist on disk, falling back to `["src"]` if nothing matches.
@@ -41,4 +50,6 @@ and `honor_gitignore = true`.
 
 ## Scope & Limitations
 
-Init scaffolds doc/config/CI structure only — it does not scaffold application code or generate implementation stubs. It does not configure IDEs, editors, or local tooling beyond pre-commit hooks. It does not provision remote services such as GitHub repositories or CI runners.
+Init scaffolds doc/config/CI structure and agent-harness wiring only — it does not scaffold application code or generate implementation stubs. Harness wiring is limited to a project MCP registration and a harness skill; it configures no IDE or editor settings, and nothing outside the target repository — a harness that keeps its server registration in a user-global file is deliberately not wired, because adoption has no business writing outside the repo. It does not provision remote services such as GitHub repositories or CI runners.
+
+Because the harness files are static constants with no drift check, a later change to the server's invocation will not mechanically flag already-adopted repositories.

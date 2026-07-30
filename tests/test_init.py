@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -41,6 +42,8 @@ def test_init_no_interactive_creates_expected_tree(tmp_path: Path) -> None:
         "docs/90-meta/agent-protocol.md",
         ".github/workflows/docs-pr.yml",
         ".github/workflows/docs-nightly.yml",
+        ".mcp.json",
+        ".claude/skills/irminsul/SKILL.md",
     ]
     for rel in expected:
         assert (target / rel).is_file(), f"missing scaffold output: {rel}"
@@ -320,7 +323,7 @@ def test_init_does_not_clobber_existing_root_agents_md(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.stdout
 
     assert custom.read_text(encoding="utf-8") == "# my hand-written agent notes\n"
-    assert "already exists at the repo root" in result.stdout
+    assert "already present, left untouched: AGENTS.md" in result.stdout
 
 
 def test_init_does_not_clobber_existing_docs_agents_md(tmp_path: Path) -> None:
@@ -336,6 +339,71 @@ def test_init_does_not_clobber_existing_docs_agents_md(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.stdout
 
     assert custom.read_text(encoding="utf-8") == "# my curated manifest\n"
+
+
+def test_init_writes_resolvable_mcp_registration(tmp_path: Path) -> None:
+    target = tmp_path / "demo"
+    target.mkdir()
+    (target / "src").mkdir()  # code signal
+
+    result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
+    assert result.exit_code == 0, result.stdout
+
+    config = json.loads((target / ".mcp.json").read_text(encoding="utf-8"))
+    entry = config["mcpServers"]["irminsul"]
+    assert entry == {"command": "irminsul", "args": ["mcp", "--path", "."]}
+    # Portable by contract: no absolute, virtual-environment, or drive-letter path.
+    assert ":" not in entry["command"]
+    assert all(":" not in arg for arg in entry["args"])
+
+
+def test_init_writes_trigger_only_skill(tmp_path: Path) -> None:
+    target = tmp_path / "demo"
+    target.mkdir()
+    (target / "src").mkdir()  # code signal
+
+    result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
+    assert result.exit_code == 0, result.stdout
+
+    skill = (target / ".claude" / "skills" / "irminsul" / "SKILL.md").read_text(encoding="utf-8")
+    assert skill.startswith("---\nname: irminsul\n")
+    assert "irminsul orient" in skill
+    assert "docs/90-meta/agent-protocol.md" in skill
+    # A trigger, not a copy: it must not restate the command vocabulary.
+    assert "irminsul refs" not in skill
+    assert "irminsul context --topic" not in skill
+
+
+def test_init_does_not_clobber_existing_mcp_registration(tmp_path: Path) -> None:
+    target = tmp_path / "demo"
+    target.mkdir()
+    (target / "src").mkdir()  # code signal
+    existing = target / ".mcp.json"
+    original = '{"mcpServers": {"somethingelse": {"command": "other", "args": ["serve"]}}}\n'
+    existing.write_text(original, encoding="utf-8")
+
+    result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
+    assert result.exit_code == 0, result.stdout
+
+    assert existing.read_text(encoding="utf-8") == original
+    assert "already present, left untouched: .mcp.json" in result.stdout
+    assert "claude mcp add irminsul -- irminsul mcp --path ." in result.stdout
+    # The skill is independent of the registration and still lands.
+    assert (target / ".claude" / "skills" / "irminsul" / "SKILL.md").is_file()
+
+
+def test_init_force_rewrites_harness_files(tmp_path: Path) -> None:
+    target = tmp_path / "demo"
+    target.mkdir()
+    (target / "src").mkdir()  # code signal
+    existing = target / ".mcp.json"
+    existing.write_text("{}\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["init", "--no-interactive", "--force", "--path", str(target)])
+    assert result.exit_code == 0, result.stdout
+
+    config = json.loads(existing.read_text(encoding="utf-8"))
+    assert "irminsul" in config["mcpServers"]
 
 
 def test_init_force_overwrites_existing_files(tmp_path: Path) -> None:
