@@ -138,7 +138,7 @@ def test_tutorial_audience_exempt(tmp_path: Path) -> None:
 
 _MCP_SRC = """\
 def create_server(root):
-    server = FastMCP("x")
+    server = MCPServer("x")
 
     @server.tool()
     def alpha() -> str:
