@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -447,27 +448,34 @@ def _pending_for_topic(graph: DocGraph, topic: str) -> list[_PendingResult]:
     if not query:
         raise ContextError("topic query cannot be empty", code=2)
 
-    query_lower = query.lower()
-    matches = [node for node in graph.nodes.values() if _node_matches_topic(node, query_lower)]
+    terms = tuple(query.lower().split())
+    normalized_query = " ".join(terms)
+    normalized_phrase = _normalize_topic_phrase(normalized_query) or normalized_query
+    matches = [
+        match
+        for node in graph.nodes.values()
+        if (match := _match_topic(node, terms, normalized_phrase)) is not None
+    ]
     if not matches:
         return []
 
-    matches = sorted(
-        matches,
-        key=lambda node: (
-            0 if node.id.lower() == query_lower else 1,
-            node.path.as_posix(),
-            node.frontmatter.title.lower(),
-            node.id,
-        ),
+    matches.sort(
+        key=lambda match: (
+            0 if _normalize_topic_phrase(match.node.id) == normalized_phrase else 1,
+            0 if match.exact_phrase else 1,
+            -match.fields_hit,
+            match.node.path.as_posix(),
+            match.node.frontmatter.title.lower(),
+            match.node.id,
+        )
     )
     return [
         _PendingResult(
-            node=node,
+            node=match.node,
             inputs=(query,),
-            source_claims=tuple(node.frontmatter.describes),
+            source_claims=tuple(match.node.frontmatter.describes),
         )
-        for node in matches
+        for match in matches
     ]
 
 
@@ -560,15 +568,43 @@ def _existing_repo_relative(repo_root: Path, raw_path: Path) -> Path:
     return Path(PurePosixPath(*rel.parts))
 
 
-def _node_matches_topic(node: DocNode, query_lower: str) -> bool:
-    haystack = [
-        node.id,
-        node.frontmatter.title,
-        node.path.as_posix(),
-        *node.frontmatter.describes,
-        *node.frontmatter.tests,
-    ]
-    return any(query_lower in item.lower() for item in haystack)
+@dataclass(frozen=True)
+class _TopicMatch:
+    node: DocNode
+    exact_phrase: bool
+    fields_hit: int
+
+
+def _topic_haystack(node: DocNode) -> dict[str, str]:
+    return {
+        "id": node.id.lower(),
+        "title": node.frontmatter.title.lower(),
+        "path": node.path.as_posix().lower(),
+        "describes": " ".join(node.frontmatter.describes).lower(),
+        "tests": " ".join(node.frontmatter.tests).lower(),
+        "tags": " ".join(node.frontmatter.tags).lower(),
+        "summary": (node.frontmatter.summary or "").lower(),
+    }
+
+
+def _normalize_topic_phrase(value: str) -> str:
+    return re.sub(r"[\W_]+", " ", value.lower()).strip()
+
+
+def _match_topic(
+    node: DocNode, terms: tuple[str, ...], normalized_phrase: str
+) -> _TopicMatch | None:
+    haystack = _topic_haystack(node)
+    fields_hit: set[str] = set()
+    for term in terms:
+        term_fields = [field for field, text in haystack.items() if term in text]
+        if not term_fields:
+            return None
+        fields_hit.update(term_fields)
+    exact_phrase = any(
+        normalized_phrase in _normalize_topic_phrase(text) for text in haystack.values()
+    )
+    return _TopicMatch(node=node, exact_phrase=exact_phrase, fields_hit=len(fields_hit))
 
 
 def _claim_specs(graph: DocGraph) -> tuple[_ClaimSpec, ...]:

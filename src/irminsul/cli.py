@@ -24,7 +24,7 @@ from irminsul.checks import (
     sort_findings,
     summarize,
 )
-from irminsul.config import IrminsulConfig, find_config, load
+from irminsul.config import ConfigError, IrminsulConfig, find_config, load
 from irminsul.docgraph import DocGraph, build_graph
 from irminsul.git.mtime import diff_name_only, has_history
 from irminsul.init.command import (
@@ -68,6 +68,14 @@ def _configure_console_encoding(
 def main() -> None:
     _configure_console_encoding()
     app()
+
+
+def _load_config(repo_root: Path) -> IrminsulConfig:
+    try:
+        return load(find_config(repo_root))
+    except ConfigError as exc:
+        typer.echo(typer.style(str(exc), fg="red"))
+        raise typer.Exit(code=exc.code) from exc
 
 
 class Profile(StrEnum):
@@ -123,7 +131,7 @@ def _offer_seed_after_fresh_init(target: Path, *, interactive: bool) -> None:
     if not typer.confirm("Capture your project's principle, idea, and belief now?", default=False):
         typer.echo("Hint: run `irminsul seed` whenever you're ready.")
         return
-    config = load(find_config(target))
+    config = _load_config(target)
     answers = gather_answers_interactive(config.project_name, show_intro=False)
     result = run_seed(target, config, answers)
     typer.echo()
@@ -383,7 +391,7 @@ def seed(
 ) -> None:
     """Capture the project's principle, idea, and belief into the foundation layer."""
     repo_root = path.resolve()
-    config = load(find_config(repo_root))
+    config = _load_config(repo_root)
 
     if json_file is not None:
         answers = gather_answers_from_json(json_file, project_name=config.project_name)
@@ -531,20 +539,21 @@ def _run_registered_checks(
     graph: DocGraph,
     *,
     tier: str,
-    announce: bool = True,
 ) -> list[Finding]:
     findings: list[Finding] = []
     for check_name in check_names:
         cls = registry.get(check_name)
         if cls is None:
-            if announce:
-                typer.echo(
-                    typer.style(
-                        f"note: {tier} check '{check_name}' not yet implemented; skipping.",
-                        fg="yellow",
-                    )
-                )
-            continue
+            # Config validation already rejects names outside the known-name
+            # tuples in config.py, and those tuples are meant to mirror this
+            # registry exactly. Reaching this means the two drifted apart —
+            # a codebase bug, not a user config error — so fail loudly rather
+            # than silently skip the check.
+            raise AssertionError(
+                f"{tier} check '{check_name}' passed config validation but has no "
+                "registered Check class; config.py's known-name tuples and "
+                "checks/__init__.py's registries have drifted apart"
+            )
         findings.extend(cls().run(graph))
     return findings
 
@@ -553,20 +562,18 @@ def _run_configured_checks(
     profile: Profile,
     config: IrminsulConfig,
     graph: DocGraph,
-    *,
-    announce: bool = True,
 ) -> list[Finding]:
     """Hard + soft findings for one profile/graph pair — the unit `--delta`
     runs twice (once for the working tree, once for the base-rev checkout)."""
     findings: list[Finding] = []
     findings.extend(
         _run_registered_checks(
-            _hard_check_names(profile, config), HARD_REGISTRY, graph, tier="hard", announce=announce
+            _hard_check_names(profile, config), HARD_REGISTRY, graph, tier="hard"
         )
     )
     findings.extend(
         _run_registered_checks(
-            _soft_check_names(profile, config), SOFT_REGISTRY, graph, tier="soft", announce=announce
+            _soft_check_names(profile, config), SOFT_REGISTRY, graph, tier="soft"
         )
     )
     return findings
@@ -697,8 +704,7 @@ def check(
             raise typer.Exit(code=2) from None
 
     repo_root = path.resolve()
-    config_path = find_config(repo_root)
-    config = load(config_path)
+    config = _load_config(repo_root)
 
     if diff is not None and base_ref is not None:
         typer.echo(typer.style("--diff and --base-ref/--head-ref are mutually exclusive", fg="red"))
@@ -763,7 +769,7 @@ def check(
                 base_graph = build_graph(
                     base_root, config, now=now_date, diff_changed_paths=co_change_paths
                 )
-                base_findings = _run_configured_checks(profile, config, base_graph, announce=False)
+                base_findings = _run_configured_checks(profile, config, base_graph)
         except DeltaError as e:
             typer.echo(typer.style(str(e), fg="red"))
             raise typer.Exit(code=2) from None
@@ -882,7 +888,7 @@ def status_command(
         raise typer.Exit(code=2)
 
     repo_root = path.resolve()
-    config = load(find_config(repo_root))
+    config = _load_config(repo_root)
     report = build_status_report(repo_root, config)
     typer.echo(status_report_to_json(report) if fmt == "json" else format_status_plain(report))
 
@@ -909,7 +915,12 @@ def context_command(
     ] = False,
     topic: Annotated[
         str | None,
-        typer.Option("--topic", help="Find docs by deterministic substring search."),
+        typer.Option(
+            "--topic",
+            help=(
+                "Find docs by quoted topic keywords; every whitespace-separated term must match."
+            ),
+        ),
     ] = None,
     changed: Annotated[
         bool,
@@ -967,7 +978,7 @@ def context_command(
         raise typer.Exit(code=2)
 
     repo_root = path.resolve()
-    config = load(find_config(repo_root))
+    config = _load_config(repo_root)
     requested_targets = list(targets or [])
 
     if change is not None:
@@ -1143,7 +1154,7 @@ def refs_command(
         raise typer.Exit(code=2)
 
     repo_root = path.resolve()
-    config = load(find_config(repo_root))
+    config = _load_config(repo_root)
     graph = build_graph(repo_root, config)
 
     try:
@@ -1199,8 +1210,7 @@ def fix(
     from irminsul.fix import apply_fixes
 
     repo_root = path.resolve()
-    config_path = find_config(repo_root)
-    config = load(config_path)
+    config = _load_config(repo_root)
     graph = build_graph(repo_root, config)
 
     fixes: list[Fix] = []
@@ -1925,7 +1935,7 @@ def new_adr(
     from irminsul.new.command import NewSpec, write_new
 
     repo_root = path.resolve()
-    config = load(find_config(repo_root))
+    config = _load_config(repo_root)
     spec = NewSpec(kind="adr", title=title, extra={})
     try:
         dest = write_new(repo_root, spec, config, force=force)
@@ -1967,7 +1977,7 @@ def new_component(
     from irminsul.new.command import NewSpec, normalize_claim_path, write_new
 
     repo_root = path.resolve()
-    config = load(find_config(repo_root))
+    config = _load_config(repo_root)
     describes_rel = [normalize_claim_path(repo_root, value) for value in describes or []]
     tests_rel = [normalize_claim_path(repo_root, value) for value in tests or []]
     for rel in [*describes_rel, *tests_rel]:
@@ -2061,7 +2071,7 @@ def new_rfc(
     from irminsul.new.command import NewSpec, write_new
 
     repo_root = path.resolve()
-    config = load(find_config(repo_root))
+    config = _load_config(repo_root)
 
     readiness = build_binding_readiness_report(repo_root, config)
     if not readiness.ready or readiness.clues or readiness.repository_debt:
@@ -2157,7 +2167,7 @@ app.add_typer(_regen_app)
 
 def _load_repo(path: Path) -> tuple[Path, IrminsulConfig]:
     repo_root = path.resolve()
-    config = load(find_config(repo_root))
+    config = _load_config(repo_root)
     return repo_root, config
 
 

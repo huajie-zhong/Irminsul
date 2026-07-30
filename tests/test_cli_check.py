@@ -113,6 +113,25 @@ def test_check_format_unknown_exits_two(
     assert result.exit_code == 2
 
 
+def test_check_unknown_check_name_exits_two_with_suggestion(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("bad-check-name")
+    result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(repo)])
+    assert result.exit_code == 2
+    assert "checks.hard" in result.output
+    assert "'unqueness'" in result.output
+    assert "did you mean 'uniqueness'?" in result.output
+
+
+def test_check_good_fixture_config_still_loads(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("good")
+    result = runner.invoke(app, ["check", "--profile", "configured", "--path", str(repo)])
+    assert result.exit_code == 0, result.stdout
+
+
 def test_check_configured_runs_configured_soft_checks(
     fixture_repo: Callable[[str], Path],
 ) -> None:
