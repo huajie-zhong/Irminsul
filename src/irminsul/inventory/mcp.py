@@ -1,9 +1,9 @@
 """McpToolExtractor — static MCP tool surface from Python source.
 
 AST-walks `.py` files (never imports them) and collects every function decorated
-with ``@<server>.tool(...)`` — the FastMCP tool registrations in
+with ``@<server>.tool(...)`` — the MCP tool registrations in
 `mcp_server.py`. The tool's identity is its function name, which is exactly the
-tool name FastMCP exposes. Symmetric with the other extractors: adding the kind
+tool name the server exposes. Symmetric with the other extractors: adding the kind
 is "add a file here," and the surface becomes queryable via `irminsul surface mcp`
 and governable via a watched `inventory:` block (RFC 0028).
 """
@@ -52,7 +52,11 @@ class McpToolExtractor:
 
 
 def _is_tool_decorator(dec: ast.expr) -> bool:
-    """Match ``@<x>.tool`` and ``@<x>.tool(...)`` (FastMCP's registration)."""
+    """Match ``@<x>.tool`` and ``@<x>.tool(...)`` (the MCP registration form).
+
+    Keyed on the attribute name, not the server class, so it is unaffected by an
+    SDK rename such as FastMCP -> MCPServer.
+    """
     if isinstance(dec, ast.Call):
         dec = dec.func
     return isinstance(dec, ast.Attribute) and dec.attr == "tool"

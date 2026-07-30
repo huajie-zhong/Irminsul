@@ -66,7 +66,7 @@ ENV_TS = "const a = process.env.C_VAR;\nconst b = process.env['D_VAR'];\n"
 
 MCP_SRC = """\
 def create_server(repo_root):
-    server = FastMCP("x")
+    server = MCPServer("x")
 
     @server.tool()
     def orient() -> str:

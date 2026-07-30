@@ -118,6 +118,19 @@ def test_topic_mode_matches_and_misses(fixture_repo: FixtureRepo) -> None:
     assert not context_report_should_fail(miss)
 
 
+def test_topic_mode_multi_word_query_matches_terms_across_fields(fixture_repo: FixtureRepo) -> None:
+    repo = fixture_repo("good")
+    config = _config(repo)
+
+    # "composer" only appears in composer.md's id/title/path; "test" only
+    # appears there via its `tests:` entry. Each term hits a different field.
+    hit = build_context_report(repo, config, topic="composer test")
+    assert [result.owner.id for result in hit.results] == ["composer"]
+
+    miss = build_context_report(repo, config, topic="composer no-such-term")
+    assert miss.results == []
+
+
 def test_exactly_one_input_mode_is_required(fixture_repo: FixtureRepo) -> None:
     repo = fixture_repo("good")
     config = _config(repo)

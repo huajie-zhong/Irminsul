@@ -10,6 +10,7 @@ from irminsul.config import (
     CONFIG_FILENAME,
     HARD_CHECKS,
     SOFT_DETERMINISTIC_CHECKS,
+    ConfigError,
     IrminsulConfig,
     Paths,
     docs_root_prefix,
@@ -65,14 +66,37 @@ hard = ["frontmatter", "globs"]
 def test_unknown_check_rejected(tmp_path: Path) -> None:
     p = tmp_path / CONFIG_FILENAME
     p.write_text('[checks]\nhard = ["bogus-check"]\n')
-    with pytest.raises(Exception):
+    with pytest.raises(ConfigError):
         load(p)
+
+
+def test_unknown_check_names_offending_entry_and_list(tmp_path: Path) -> None:
+    p = tmp_path / CONFIG_FILENAME
+    p.write_text('[checks]\nhard = ["frontmatter", "unqueness"]\n')
+    with pytest.raises(ConfigError) as excinfo:
+        load(p)
+    message = str(excinfo.value)
+    assert excinfo.value.code == 2
+    assert "checks.hard" in message
+    assert "'unqueness'" in message
+    assert "did you mean 'uniqueness'?" in message
+
+
+def test_unknown_check_in_soft_deterministic_names_that_list(tmp_path: Path) -> None:
+    p = tmp_path / CONFIG_FILENAME
+    p.write_text('[checks]\nsoft_deterministic = ["orphan"]\n')
+    with pytest.raises(ConfigError) as excinfo:
+        load(p)
+    message = str(excinfo.value)
+    assert "checks.soft_deterministic" in message
+    assert "'orphan'" in message
+    assert "did you mean 'orphans'?" in message
 
 
 def test_unknown_top_level_key_rejected(tmp_path: Path) -> None:
     p = tmp_path / CONFIG_FILENAME
     p.write_text("mystery_field = 42\n")
-    with pytest.raises(Exception):
+    with pytest.raises(ConfigError):
         load(p)
 
 
@@ -86,11 +110,11 @@ def test_removed_llm_config_keys_rejected(tmp_path: Path) -> None:
     p = tmp_path / CONFIG_FILENAME
 
     p.write_text('[llm]\nprovider = "anthropic"\n')
-    with pytest.raises(Exception, match="llm"):
+    with pytest.raises(ConfigError, match="llm"):
         load(p)
 
     p.write_text(f'[checks]\n{removed_checks_field} = ["overlap"]\n')
-    with pytest.raises(Exception, match=removed_checks_field):
+    with pytest.raises(ConfigError, match=removed_checks_field):
         load(p)
 
 
