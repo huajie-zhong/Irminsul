@@ -197,9 +197,34 @@ def _normalize_heading(heading: str) -> str:
     return normalized
 
 
+CODE_UNLINKED_REFERENCE = "prose-file-reference/unlinked-reference"
+CODE_IGNORE_END_WITHOUT_START = "prose-file-reference/ignore-end-without-start"
+CODE_IGNORE_START_WITHOUT_END = "prose-file-reference/ignore-start-without-end"
+CODE_STALE_SUPPRESSION = "prose-file-reference/stale-suppression"
+
+
 class ProseFileReferenceCheck:
     name: ClassVar[str] = "prose-file-reference"
     default_severity: ClassVar[Severity] = Severity.error
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_UNLINKED_REFERENCE: (
+            "A local `.md` filename is named in prose without a Markdown link. Convert it "
+            "to a link, or suppress the line with an `irminsul:ignore prose-file-reference` "
+            "comment if it's intentionally a bare mention."
+        ),
+        CODE_IGNORE_END_WITHOUT_START: (
+            "An `irminsul:ignore-end prose-file-reference` marker has no matching "
+            "ignore-start. Remove it or add the matching start marker."
+        ),
+        CODE_IGNORE_START_WITHOUT_END: (
+            "An `irminsul:ignore-start prose-file-reference` marker is never closed. Add "
+            "the matching `irminsul:ignore-end prose-file-reference` marker."
+        ),
+        CODE_STALE_SUPPRESSION: (
+            "An ignore marker no longer hides an unlinked local Markdown reference — the "
+            "prose it was protecting has since changed. Remove the stale suppression."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         out: list[Finding] = []
@@ -232,6 +257,7 @@ class ProseFileReferenceCheck:
                         out.append(
                             Finding(
                                 check=self.name,
+                                code=CODE_IGNORE_END_WITHOUT_START,
                                 severity=self.default_severity,
                                 message="ignore-end without matching ignore-start",
                                 path=node.path,
@@ -272,6 +298,7 @@ class ProseFileReferenceCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_UNLINKED_REFERENCE,
                             severity=self.default_severity,
                             message=(f"local markdown reference '{target}' is not a Markdown link"),
                             path=node.path,
@@ -288,6 +315,7 @@ class ProseFileReferenceCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_IGNORE_START_WITHOUT_END,
                         severity=self.default_severity,
                         message="ignore-start without matching ignore-end",
                         path=node.path,
@@ -308,6 +336,7 @@ def _stale_suppression(
 ) -> Finding:
     return Finding(
         check=ProseFileReferenceCheck.name,
+        code=CODE_STALE_SUPPRESSION,
         severity=Severity.info,
         category="stale-suppression",
         message=(f"{scope} suppression no longer hides an unlinked local Markdown reference"),
@@ -319,9 +348,54 @@ def _stale_suppression(
     )
 
 
+CODE_EVIDENCE_NOT_REPO_RELATIVE = "claim-provenance/evidence-not-repo-relative"
+CODE_EVIDENCE_PATH_MISSING = "claim-provenance/evidence-path-missing"
+CODE_EVIDENCE_STATE_MISMATCH = "claim-provenance/evidence-state-mismatch"
+CODE_UNKNOWN_CLAIM_REF = "claim-provenance/unknown-claim-ref"
+CODE_RISKY_PROSE_UNCLAIMED = "claim-provenance/risky-prose-unclaimed"
+CODE_STRUCTURED_SECTION_UNCLAIMED = "claim-provenance/structured-section-unclaimed"
+CODE_EVIDENCE_DRIFT = "claim-provenance/evidence-drift"
+CODE_PLANNED_CLAIM_RESOLVED = "claim-provenance/planned-claim-resolved"
+
+
 class ClaimProvenanceCheck:
     name: ClassVar[str] = "claim-provenance"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_EVIDENCE_NOT_REPO_RELATIVE: (
+            "A claim's evidence path is absolute. Evidence must be a repo-relative path."
+        ),
+        CODE_EVIDENCE_PATH_MISSING: (
+            "A claim's evidence path does not exist in the repo. Point it at existing "
+            "source, config, CI, or doc evidence."
+        ),
+        CODE_EVIDENCE_STATE_MISMATCH: (
+            "A claim has no evidence appropriate for its declared state (planned, "
+            "implemented, available, enabled, external). Add evidence of the right kind, "
+            "or change the claim's state."
+        ),
+        CODE_UNKNOWN_CLAIM_REF: (
+            "A `claim:<id>` marker in the doc body references an id not declared in "
+            "frontmatter. Add the matching frontmatter claim or remove the marker."
+        ),
+        CODE_RISKY_PROSE_UNCLAIMED: (
+            "A paragraph makes a high-risk enforcement/automation claim (blocks, "
+            "guarantees, auto-generates, ...) without a structured `claim:<id>` "
+            "reference. Add a frontmatter claim and reference it."
+        ),
+        CODE_STRUCTURED_SECTION_UNCLAIMED: (
+            "A structured section (e.g. 'Mechanical Enforcement') has no `claim:<id>` "
+            "marker backing its assertions. Add at least one relevant claim reference."
+        ),
+        CODE_EVIDENCE_DRIFT: (
+            "A claim's evidence changed after the doc was last committed. Review whether "
+            "the claim is still true and update the doc."
+        ),
+        CODE_PLANNED_CLAIM_RESOLVED: (
+            "A 'planned' claim cites an RFC that has since reached a resolved state. "
+            "Update the claim's state to match reality, or reword/remove it."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None or graph.repo_root is None:
@@ -354,6 +428,7 @@ class ClaimProvenanceCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_EVIDENCE_NOT_REPO_RELATIVE,
                             severity=Severity.error,
                             message=(
                                 f"claim '{claim.id}' evidence must be repo-relative: '{evidence}'"
@@ -368,6 +443,7 @@ class ClaimProvenanceCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_EVIDENCE_PATH_MISSING,
                             severity=Severity.error,
                             message=f"claim '{claim.id}' evidence path does not exist: '{evidence}'",
                             path=node.path,
@@ -380,6 +456,7 @@ class ClaimProvenanceCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_EVIDENCE_STATE_MISMATCH,
                         severity=Severity.error,
                         message=(
                             f"claim '{claim.id}' has no evidence appropriate for "
@@ -437,6 +514,7 @@ class ClaimProvenanceCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_UNKNOWN_CLAIM_REF,
                             severity=Severity.warning,
                             message=f"unknown structured claim reference: 'claim:{claim_id}'",
                             path=node.path,
@@ -457,6 +535,7 @@ class ClaimProvenanceCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_RISKY_PROSE_UNCLAIMED,
                     severity=Severity.warning,
                     message="high-risk enforcement or automation prose lacks a structured claim reference",
                     path=node.path,
@@ -478,6 +557,7 @@ class ClaimProvenanceCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_STRUCTURED_SECTION_UNCLAIMED,
                     severity=Severity.warning,
                     message=f"section '{section.heading}' needs a structured claim reference",
                     path=node.path,
@@ -514,6 +594,7 @@ class ClaimProvenanceCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_EVIDENCE_DRIFT,
                     severity=Severity.warning,
                     message=(
                         f"claim '{claim.id}' cites evidence changed after the doc: '{latest_path}'"
@@ -548,6 +629,7 @@ class ClaimProvenanceCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_PLANNED_CLAIM_RESOLVED,
                         severity=Severity.warning,
                         message=(
                             f"planned claim '{claim.id}' cites resolved RFC "
@@ -612,9 +694,19 @@ class ClaimProvenanceCheck:
         ) and not self._is_source_evidence(graph, path)
 
 
+CODE_AMBIGUOUS_TERM = "terminology-overload/ambiguous-term"
+
+
 class TerminologyOverloadCheck:
     name: ClassVar[str] = "terminology-overload"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_AMBIGUOUS_TERM: (
+            "A configured overloaded term appears without one of its explicit "
+            "disambiguating phrases. Use one of the configured explicit phrases, or "
+            "reword to remove the ambiguity."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None:
@@ -640,6 +732,7 @@ class TerminologyOverloadCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_AMBIGUOUS_TERM,
                             severity=self.default_severity,
                             message=f"'{rule.term}' is ambiguous here",
                             path=node.path,
@@ -651,9 +744,33 @@ class TerminologyOverloadCheck:
         return out
 
 
+CODE_MANIFEST_MISSING = "agents-manifest/manifest-missing"
+CODE_MISSING_GENERATED_MARKERS = "agents-manifest/missing-generated-markers"
+CODE_GENERATED_SECTION_DRIFT = "agents-manifest/generated-section-drift"
+CODE_MISSING_REQUIRED_HEADING = "agents-manifest/missing-required-heading"
+
+
 class AgentsManifestCheck:
     name: ClassVar[str] = "agents-manifest"
     default_severity: ClassVar[Severity] = Severity.error
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_MANIFEST_MISSING: (
+            "The repo has opted into `agents-manifest` (it's listed in `checks.hard`) but "
+            "`docs/AGENTS.md` does not exist. Run `irminsul regen agents-md`."
+        ),
+        CODE_MISSING_GENERATED_MARKERS: (
+            "The manifest is missing its generated-section start/end markers. Run "
+            "`irminsul regen agents-md`."
+        ),
+        CODE_GENERATED_SECTION_DRIFT: (
+            "The manifest's generated section no longer matches what the current doc "
+            "graph would produce. Run `irminsul regen agents-md`."
+        ),
+        CODE_MISSING_REQUIRED_HEADING: (
+            "The manifest is missing a required heading (Foundations or Protocol). Run "
+            "`irminsul regen agents-md`, or add the section manually."
+        ),
+    }
 
     _REQUIRED_HEADINGS: ClassVar[tuple[str, ...]] = ("Foundations", "Protocol")
 
@@ -674,6 +791,7 @@ class AgentsManifestCheck:
             return [
                 Finding(
                     check=self.name,
+                    code=CODE_MANIFEST_MISSING,
                     severity=self.default_severity,
                     message=f"agent manifest '{rel_path.as_posix()}' is missing",
                     path=rel_path,
@@ -690,6 +808,7 @@ class AgentsManifestCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_MISSING_GENERATED_MARKERS,
                     severity=self.default_severity,
                     message=(
                         f"agent manifest '{rel_path.as_posix()}' is missing the "
@@ -706,6 +825,7 @@ class AgentsManifestCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_GENERATED_SECTION_DRIFT,
                         severity=self.default_severity,
                         message=(
                             f"agent manifest '{rel_path.as_posix()}' generated section "
@@ -721,6 +841,7 @@ class AgentsManifestCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_MISSING_REQUIRED_HEADING,
                         severity=self.default_severity,
                         message=(
                             f"agent manifest '{rel_path.as_posix()}' is missing the "

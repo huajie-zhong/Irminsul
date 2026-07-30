@@ -38,6 +38,7 @@ inventory:
       - fix
       - surface
       - anchors
+      - explain
       - mcp
       - change status
       - change verify

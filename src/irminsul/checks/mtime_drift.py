@@ -16,10 +16,24 @@ from irminsul.checks.globs import walk_configured_source_files
 from irminsul.docgraph import DocGraph
 from irminsul.git.mtime import GitTime, last_commit_time_any_repo
 
+CODE_NO_GIT_HISTORY = "mtime-drift/no-git-history"
+CODE_DRIFT_DETECTED = "mtime-drift/drift-detected"
+
 
 class MtimeDriftCheck:
     name: ClassVar[str] = "mtime-drift"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_NO_GIT_HISTORY: (
+            "A cross-repo source file a doc claims has no git history, so drift can't be "
+            "checked. Ensure the code repo has a `.git` directory at its root."
+        ),
+        CODE_DRIFT_DETECTED: (
+            "A doc's claimed source was committed more recently than the doc itself, past "
+            "the configured drift threshold. Update the doc body to re-align with the "
+            "source changes."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None or graph.repo_root is None:
@@ -51,6 +65,7 @@ class MtimeDriftCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_NO_GIT_HISTORY,
                             severity=Severity.error,
                             message=f"cross-repo source file has no git history: '{display}' — cannot check mtime drift",
                             path=node.path,
@@ -75,6 +90,7 @@ class MtimeDriftCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_DRIFT_DETECTED,
                         severity=Severity.warning,
                         message=(
                             f"source last touched {latest.when.date().isoformat()}; "

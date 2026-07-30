@@ -320,9 +320,38 @@ def _is_excluded(parts: tuple[str, ...]) -> bool:
     return PurePosixPath(parts[-1]).suffix in {".pyc", ".pyo"}
 
 
+CODE_MISSING_SOURCE_ROOT = "globs/missing-source-root"
+CODE_BROKEN_SYMLINK = "globs/broken-symlink"
+CODE_SOURCE_ROOT_ESCAPE = "globs/source-root-escape"
+CODE_EMPTY_DESCRIBES_PATTERN = "globs/empty-describes-pattern"
+
+_ISSUE_KIND_TO_CODE = {
+    "broken-symlink": CODE_BROKEN_SYMLINK,
+    "source-root-escape": CODE_SOURCE_ROOT_ESCAPE,
+}
+
+
 class GlobsCheck:
     name: ClassVar[str] = "globs"
     default_severity: ClassVar[Severity] = Severity.error
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_MISSING_SOURCE_ROOT: (
+            "A configured `paths.source_roots` entry does not exist on disk. Fix the path "
+            "in `irminsul.toml` or create the directory."
+        ),
+        CODE_BROKEN_SYMLINK: (
+            "A symlink under a source root has no readable target. Fix or remove the symlink."
+        ),
+        CODE_SOURCE_ROOT_ESCAPE: (
+            "A symlink under a source root resolves outside the configured root, which "
+            "would let source discovery walk arbitrary filesystem locations. Point the "
+            "symlink back inside the source root, or remove it."
+        ),
+        CODE_EMPTY_DESCRIBES_PATTERN: (
+            "A doc's `describes` glob matched zero files. Fix the glob, or remove the "
+            "claim if the source no longer exists."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None or graph.repo_root is None:
@@ -337,6 +366,7 @@ class GlobsCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_MISSING_SOURCE_ROOT,
                     severity=Severity.warning,
                     message=f"source root '{root}' does not exist",
                 )
@@ -346,6 +376,7 @@ class GlobsCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=_ISSUE_KIND_TO_CODE[issue.kind],
                     severity=(
                         Severity.error if issue.kind == "source-root-escape" else Severity.warning
                     ),
@@ -362,6 +393,7 @@ class GlobsCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_EMPTY_DESCRIBES_PATTERN,
                             severity=Severity.error,
                             message=(f"describes pattern '{pattern}' matched zero files"),
                             path=node.path,

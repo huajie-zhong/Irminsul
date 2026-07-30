@@ -62,6 +62,9 @@ def specificity(pattern: str) -> tuple[int, int, int]:
 # One `describes` claim on a source file: (doc, pattern, specificity score).
 Claim = tuple[DocNode, str, tuple[int, int, int]]
 
+CODE_DUPLICATE_CLAIM = "uniqueness/duplicate-claim"
+CODE_UNDOCUMENTED_FILE = "uniqueness/undocumented-file"
+
 
 def resolve_claims(graph: DocGraph, source_files: list[tuple[Path, str]]) -> dict[str, list[Claim]]:
     """Map each claimed source display path to its (doc, pattern, specificity) claims.
@@ -90,6 +93,16 @@ def most_specific_claims(claims: list[Claim]) -> list[Claim]:
 class UniquenessCheck:
     name: ClassVar[str] = "uniqueness"
     default_severity: ClassVar[Severity] = Severity.error
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_DUPLICATE_CLAIM: (
+            "Two or more docs claim the same source file at the same specificity, which is "
+            "silent duplication. Narrow one claim's `describes` glob, or remove it."
+        ),
+        CODE_UNDOCUMENTED_FILE: (
+            "A source file sits in a doc-covered directory but no doc's `describes` claims "
+            "it. Add it to an existing doc's `describes`, or create a new doc for it."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None or graph.repo_root is None:
@@ -111,6 +124,7 @@ class UniquenessCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_DUPLICATE_CLAIM,
                         severity=Severity.error,
                         path=Path(source_file),
                         message=(
@@ -135,6 +149,7 @@ class UniquenessCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_UNDOCUMENTED_FILE,
                     severity=Severity.warning,
                     path=Path(source_file),
                     message=(

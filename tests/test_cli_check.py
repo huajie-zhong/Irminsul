@@ -27,7 +27,7 @@ def test_check_bad_frontmatter_exits_one_with_findings(
     repo = fixture_repo("bad-frontmatter")
     result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(repo)])
     assert result.exit_code == 1
-    assert "[frontmatter]" in result.stdout
+    assert "[frontmatter/" in result.stdout
     assert "missing frontmatter" in result.stdout
 
 
@@ -37,7 +37,7 @@ def test_check_bad_globs_exits_one_and_names_pattern(
     repo = fixture_repo("bad-globs")
     result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(repo)])
     assert result.exit_code == 1
-    assert "[globs]" in result.stdout
+    assert "[globs/" in result.stdout
     assert "app/missing/*.py" in result.stdout
 
 
@@ -96,6 +96,7 @@ def test_check_format_json_finding_schema(
     data = json.loads(result.stdout)
     for finding in data["findings"]:
         assert "check" in finding
+        assert "code" in finding
         assert "severity" in finding
         assert "message" in finding
         assert "path" in finding
@@ -103,6 +104,7 @@ def test_check_format_json_finding_schema(
         assert "line" in finding
         assert "suggestion" in finding
         assert "category" in finding
+        assert finding["code"].startswith(f"{finding['check']}/")
 
 
 def test_check_format_unknown_exits_two(
@@ -138,7 +140,7 @@ def test_check_configured_runs_configured_soft_checks(
     repo = fixture_repo("soft-supersession")
     result = runner.invoke(app, ["check", "--profile", "configured", "--path", str(repo)])
     assert result.exit_code == 0, result.stdout
-    assert "[supersession]" in result.stdout
+    assert "[supersession/" in result.stdout
 
 
 def test_check_configured_reports_retired_references(
@@ -149,7 +151,7 @@ def test_check_configured_reports_retired_references(
     result = runner.invoke(app, ["check", "--profile", "configured", "--path", str(repo)])
 
     assert result.exit_code == 0, result.stdout
-    assert "[retired-references]" in result.stdout
+    assert "[retired-references/" in result.stdout
     assert "demo publish" in result.stdout
     assert "0001-retire-publish.md" in result.stdout
 
@@ -160,14 +162,14 @@ def test_check_strict_fails_on_warnings(fixture_repo: Callable[[str], Path]) -> 
         app, ["check", "--profile", "configured", "--strict", "--path", str(repo)]
     )
     assert result.exit_code == 1
-    assert "[supersession]" in result.stdout
+    assert "[supersession/" in result.stdout
 
 
 def test_check_strict_does_not_enable_soft_checks(fixture_repo: Callable[[str], Path]) -> None:
     repo = fixture_repo("soft-supersession")
     result = runner.invoke(app, ["check", "--profile", "hard", "--strict", "--path", str(repo)])
     assert result.exit_code == 0, result.stdout
-    assert "[supersession]" not in result.stdout
+    assert "[supersession/" not in result.stdout
 
 
 def test_check_all_available_runs_unconfigured_deterministic_checks(
@@ -176,7 +178,7 @@ def test_check_all_available_runs_unconfigured_deterministic_checks(
     repo = fixture_repo("soft-boundary")
     result = runner.invoke(app, ["check", "--profile", "all-available", "--path", str(repo)])
     assert result.exit_code == 0, result.stdout
-    assert "[boundary]" in result.stdout
+    assert "[boundary/" in result.stdout
 
 
 def test_check_now_flag_rejects_garbage(fixture_repo: Callable[[str], Path]) -> None:
@@ -302,7 +304,7 @@ def test_check_unresolvable_base_ref_warns_and_still_reports_findings(
     assert "skipping diff-aware checks" in result.output
     # Exit code is driven by the findings, not by the failed ref resolution.
     assert result.exit_code == 1
-    assert "[frontmatter]" in result.stdout
+    assert "[frontmatter/" in result.stdout
     assert "missing frontmatter" in result.stdout
 
 

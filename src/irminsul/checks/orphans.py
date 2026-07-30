@@ -16,10 +16,18 @@ from irminsul.checks.base import Finding, Severity
 from irminsul.docgraph import DocGraph
 from irminsul.frontmatter import AudienceEnum
 
+CODE_ORPHAN_DOC = "orphans/orphan-doc"
+
 
 class OrphansCheck:
     name: ClassVar[str] = "orphans"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_ORPHAN_DOC: (
+            "No doc links to, or structurally claims, this doc. Add a link from a parent "
+            "doc, put the file in a folder with an INDEX.md, or remove the doc."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         # Folders that have an INDEX.md auto-own their direct siblings.
@@ -46,6 +54,7 @@ class OrphansCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_ORPHAN_DOC,
                     severity=Severity.warning,
                     message=f"orphan: no doc links to or claims '{node.id}'",
                     path=node.path,

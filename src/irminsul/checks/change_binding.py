@@ -22,10 +22,34 @@ from irminsul.config import docs_root_prefix
 from irminsul.docgraph import DocGraph, DocNode
 from irminsul.frontmatter import RfcStateEnum, canonical_rfc_state
 
+CODE_MISSING_AFFECTS = "change-binding/missing-affects"
+CODE_UNKNOWN_COMPONENT = "change-binding/unknown-component"
+CODE_TOUCHED_BUT_UNDECLARED = "change-binding/touched-but-undeclared"
+CODE_DECLARED_BUT_UNTOUCHED = "change-binding/declared-but-untouched"
+
 
 class ChangeBindingCheck:
     name: ClassVar[str] = "change-binding"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_MISSING_AFFECTS: (
+            "An accepted or implemented RFC does not declare `affects`. Declare the "
+            "component ids it changes, or `affects: []` for no owned source."
+        ),
+        CODE_UNKNOWN_COMPONENT: (
+            "An `affects` entry does not match any doc id in the graph. Correct the component id."
+        ),
+        CODE_TOUCHED_BUT_UNDECLARED: (
+            "The diff touches a component's owned source, but no accepted RFC declares "
+            "it in `affects`. Add the component to the RFC's `affects`, or record why "
+            "the change is out of scope."
+        ),
+        CODE_DECLARED_BUT_UNTOUCHED: (
+            "An accepted RFC declares a component in `affects` but the diff contains no "
+            "owned source change for it. Implementation may not have started yet; "
+            "reconcile `affects` before finalization."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None or graph.repo_root is None:
@@ -59,6 +83,7 @@ class ChangeBindingCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_MISSING_AFFECTS,
                     category="missing-affects",
                     severity=Severity.warning,
                     message=(
@@ -77,6 +102,7 @@ class ChangeBindingCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_UNKNOWN_COMPONENT,
                         category="unknown-component",
                         severity=Severity.warning,
                         message=(
@@ -117,6 +143,7 @@ class ChangeBindingCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_TOUCHED_BUT_UNDECLARED,
                     category="touched-but-undeclared",
                     severity=Severity.warning,
                     message=(
@@ -138,6 +165,7 @@ class ChangeBindingCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_DECLARED_BUT_UNTOUCHED,
                         category="declared-but-untouched",
                         severity=Severity.info,
                         message=(
