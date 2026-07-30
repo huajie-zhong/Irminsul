@@ -26,9 +26,9 @@ How `irminsul check` flows from CLI invocation to exit code.
 
 5. **Collect and sort findings** — all findings are merged and sorted by severity (errors first) then by path.
 
-6. **Render output** — findings print one per line to stdout in `path  severity  [check]  message` format. Severity colors: red (error), yellow (warning), cyan (info). `--format json` emits a JSON array instead.
+6. **Render output** — findings print one per line to stdout in `path  severity  [check]  message` format. Severity colors: red (error), yellow (warning), cyan (info). `--format json` emits a JSON array instead. `--format github` emits GitHub Actions workflow commands (`::error file=…,line=…,title=…::message`) so each finding lands as an annotation on its own line in the pull-request diff, and still prints the summary line. The composite Action requests this format by default; its `format` input overrides it.
 
-7. **Exit code** — exits 1 if any finding has `severity == error`; exits 0 otherwise. The `--strict` flag promotes warnings to errors.
+7. **Exit code** — exits 1 if any finding has `severity == error`; exits 0 otherwise. The `--strict` flag promotes warnings to errors. The exit code is identical for every output format, so the choice of format is presentational only.
 
 ## Scope & Limitations
 
