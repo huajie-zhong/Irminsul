@@ -1,7 +1,7 @@
 """Tests for the MCP server module (`irminsul mcp`).
 
 The plain `*_json` functions are exercised directly against fixture repos; the
-FastMCP wiring test is skipped when the optional `mcp` extra is not installed.
+server wiring test is skipped when the optional `mcp` extra is not installed.
 """
 
 from __future__ import annotations
@@ -326,10 +326,10 @@ def test_binding_readiness_json_shape() -> None:
     assert isinstance(data["blockers"], list)
 
 
-# --- FastMCP wiring ---
+# --- MCPServer wiring ---
 
 
-def test_fastmcp_server_registers_expected_tools() -> None:
+def test_mcp_server_registers_expected_tools() -> None:
     pytest.importorskip("mcp")
     import asyncio
 
