@@ -5,8 +5,8 @@ Two layers, deliberately separated:
 - Plain ``*_json`` functions take ``(repo_root, config, ...)`` and return the
   exact JSON strings the CLI's ``--format json`` already produces. They do not
   depend on the MCP SDK and are what tests exercise.
-- :func:`create_server` wraps them in a FastMCP stdio server. It is the only
-  place the optional ``mcp`` package is imported (install via
+- :func:`create_server` wraps them in an ``MCPServer`` stdio server. It is the
+  only place the optional ``mcp`` package is imported (install via
   ``pip install 'irminsul[mcp]'``).
 
 The server is strictly read-only: no tool writes files. Config is re-read on
@@ -43,7 +43,7 @@ from irminsul.refs import (
 from irminsul.surface import derive_surface, surface_items_to_json
 
 if TYPE_CHECKING:  # pragma: no cover - typing only; `mcp` is an optional extra
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server import MCPServer
 
 CHECK_PROFILES = ("hard", "configured")
 
@@ -210,16 +210,16 @@ def binding_readiness_json(repo_root: Path, config: IrminsulConfig) -> str:
     return binding_readiness_to_json(build_binding_readiness_report(repo_root, config))
 
 
-def create_server(repo_root: Path) -> FastMCP:
-    """Build the FastMCP stdio server exposing the read-only tool set."""
-    from mcp.server.fastmcp import FastMCP
+def create_server(repo_root: Path) -> MCPServer:
+    """Build the MCPServer stdio server exposing the read-only tool set."""
+    from mcp.server import MCPServer
 
     root = repo_root.resolve()
 
     def _config() -> IrminsulConfig:
         return load(find_config(root))
 
-    server = FastMCP("irminsul", instructions=SERVER_INSTRUCTIONS)
+    server = MCPServer("irminsul", instructions=SERVER_INSTRUCTIONS)
 
     @server.tool()
     def orient() -> str:

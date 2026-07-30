@@ -39,7 +39,10 @@ dependencies = [
 
 [project.optional-dependencies]
 mcp = [
-    "mcp>=1.2",
+    # mcp 2.0 replaced `mcp.server.fastmcp.FastMCP` with `mcp.server.MCPServer`;
+    # `mcp_server.py` targets the 2.x API. Bounded below the next major so a
+    # future breaking release fails at resolution rather than at import.
+    "mcp>=2,<3",
 ]
 dev = [
     "pytest>=8.0",
@@ -47,7 +50,10 @@ dev = [
     "ruff>=0.5",
     "mypy>=1.10",
     "pre-commit>=3.7",
-    "mcp>=1.2",
+    # mcp 2.0 replaced `mcp.server.fastmcp.FastMCP` with `mcp.server.MCPServer`;
+    # `mcp_server.py` targets the 2.x API. Bounded below the next major so a
+    # future breaking release fails at resolution rather than at import.
+    "mcp>=2,<3",
 ]
 
 [project.scripts]
@@ -72,6 +78,11 @@ packages = ["src/irminsul"]
 line-length = 100
 target-version = "py312"
 src = ["src", "tests"]
+# Ruff governs code, not documentation. From 0.16 it also formats Python inside
+# markdown fences, which would put every snippet in `docs/` — including sealed
+# RFC records that must stay byte-for-byte frozen — under a formatter whose
+# output changes between releases.
+extend-exclude = ["docs"]
 
 [tool.ruff.lint]
 select = [
