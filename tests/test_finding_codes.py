@@ -22,7 +22,7 @@ from git import Repo
 
 from irminsul.checks import HARD_REGISTRY, SOFT_REGISTRY, Check, Finding
 from irminsul.checks.external_links import _save_cache
-from irminsul.config import find_config, load
+from irminsul.config import ConfigError, find_config, load
 from irminsul.docgraph import build_graph
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "repos"
@@ -296,7 +296,12 @@ def all_findings(tmp_path_factory: pytest.TempPathFactory) -> list[Finding]:
         toml = repo_dir / "irminsul.toml"
         if not toml.exists():
             continue
-        config = load(toml)
+        try:
+            config = load(toml)
+        except ConfigError:
+            # Some fixtures carry a deliberately invalid config to exercise
+            # config rejection itself; they yield no findings by construction.
+            continue
         graph = build_graph(repo_dir.resolve(), config)
         for cls in REGISTRY.values():
             findings.extend(cls().run(graph))
