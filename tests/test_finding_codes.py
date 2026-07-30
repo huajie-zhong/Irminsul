@@ -212,6 +212,46 @@ def _mtime_drift_repo(root: Path) -> Path:
     return root
 
 
+def _claim_provenance_repo(root: Path) -> Path:
+    """Evidence committed after the claiming doc, in a protected layer.
+
+    Like `mtime-drift` and `stale-reaper`, the only kind this check fires in the
+    shared corpus needs live git history, so it cannot rely on this project's
+    own checkout: CI clones at depth 1, where every path shares one commit time
+    and no drift is observable. Claims are only audited in `00-foundation/` and
+    `10-architecture/`, and only on `status: stable` docs.
+    """
+    repo = _git_repo(root)
+    src = root / "app" / "gate.py"
+    src.parent.mkdir(parents=True)
+    src.write_text("def gate(): pass\n", encoding="utf-8")
+    doc = root / "docs" / "00-foundation" / "enforcement.md"
+    doc.parent.mkdir(parents=True)
+    doc.write_text(
+        "---\nid: enforcement\ntitle: Enforcement\naudience: explanation\ntier: 2\n"
+        "status: stable\ndescribes: []\nclaims:\n"
+        "  - id: gate-exists\n"
+        "    state: implemented\n"
+        "    kind: invariant\n"
+        "    claim: The gate remains enforced.\n"
+        "    evidence:\n"
+        "      - app/gate.py\n"
+        "---\n\n# Enforcement\n\nSee claim `gate-exists`.\n",
+        encoding="utf-8",
+    )
+    (root / "irminsul.toml").write_text(
+        'project_name = "codes-claim-provenance"\n'
+        '[paths]\ndocs_root = "docs"\nsource_roots = ["app"]\n'
+        '[checks]\nsoft_deterministic = ["claim-provenance"]\n',
+        encoding="utf-8",
+    )
+    old = _dt.datetime(2020, 1, 1, tzinfo=_dt.UTC)
+    _commit(repo, ["docs/00-foundation/enforcement.md", "irminsul.toml"], "doc", when=old)
+    _commit(repo, ["app/gate.py"], "evidence")
+    repo.close()
+    return root
+
+
 def _stale_reaper_repo(root: Path) -> Path:
     repo = _git_repo(root)
     doc = root / "docs" / "20-components" / "widget.md"
@@ -239,6 +279,7 @@ def _stale_reaper_repo(root: Path) -> Path:
 # history, a mocked network cache, or an explicit hard-check opt-in.
 _SPECIAL_REPO_BUILDERS: dict[str, Callable[[Path], Path]] = {
     "agents-manifest": _agents_manifest_repo,
+    "claim-provenance": _claim_provenance_repo,
     "external-links": _external_links_repo,
     "inventory-drift": _inventory_drift_repo,
     "liar": _liar_repo,
