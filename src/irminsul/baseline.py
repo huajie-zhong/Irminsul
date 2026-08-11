@@ -36,7 +36,10 @@ def fingerprint(check: str, path: str, message: str) -> str:
     return hashlib.sha256(f"{check}|{path}|{message}".encode()).hexdigest()
 
 
-def _finding_fingerprint(finding: Finding) -> str:
+def finding_fingerprint(finding: Finding) -> str:
+    """Fingerprint of a `Finding` — the same identity `fingerprint()` computes
+    from raw fields, shared with `irminsul.delta` so a "new" finding means the
+    same thing under `--delta` as it does under the baseline ratchet."""
     path = finding.path.as_posix() if finding.path is not None else ""
     return fingerprint(finding.check, path, finding.message)
 
@@ -137,7 +140,7 @@ def apply_baseline(findings: list[Finding], fingerprints: set[str]) -> BaselineA
         if finding.severity is Severity.info:
             remaining.append(finding)
             continue
-        fp = _finding_fingerprint(finding)
+        fp = finding_fingerprint(finding)
         if fp in fingerprints:
             suppressed += 1
             matched.add(fp)
