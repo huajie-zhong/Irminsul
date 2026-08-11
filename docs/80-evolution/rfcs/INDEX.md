@@ -53,3 +53,4 @@ In-flight proposals. See [`80-evolution`](../INDEX.md) for the RFC lifecycle.
 - [`0040-retired-reference-audit`](0040-retired-reference-audit.md) — Detect current guidance that still presents retired commands or concepts
 - [`0041-pre-lifecycle-rfc-migration`](0041-pre-lifecycle-rfc-migration.md) — Inventory and explicitly classify RFCs created before structured lifecycle metadata
 - [`0042-rfc-dependency-and-supersession-graphs`](0042-rfc-dependency-and-supersession-graphs.md) — Lifecycle-aware RFC dependency and supersession graphs
+- [`0044-cross-repo-delta`](0044-cross-repo-delta.md) — Declared-and-verified topology and a split graph anchor so `check --delta` works across a repository boundary
