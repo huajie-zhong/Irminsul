@@ -761,10 +761,16 @@ def check(
     delta_status: dict[str, object] | None = None
 
     if delta:
-        from irminsul.delta import DeltaError, compute_delta, pristine_checkout
+        from irminsul.delta import (
+            DeltaError,
+            compute_delta,
+            pristine_checkout,
+            verify_single_repo_topology,
+        )
 
         delta_base_rev = delta_base or "HEAD"
         try:
+            verify_single_repo_topology(repo_root, config)
             with pristine_checkout(repo_root, delta_base_rev) as base_root:
                 base_graph = build_graph(
                     base_root, config, now=now_date, diff_changed_paths=co_change_paths

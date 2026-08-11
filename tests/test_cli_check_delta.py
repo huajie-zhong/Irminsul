@@ -167,6 +167,85 @@ def test_delta_without_git_history_exits_loudly(fixture_repo: Callable[[str], Pa
     assert "git repository" in out
 
 
+def _seed_repo(root: Path) -> None:
+    """Init a repo and release its handles — see the note in `test_delta.py`."""
+    _init_repo(root).close()
+
+
+def _write_config(repo: Path, name: str) -> None:
+    (repo / "irminsul.toml").write_text(
+        f'project_name = "{name}"\n[paths]\ndocs_root = "docs"\nsource_roots = ["src"]\n',
+        encoding="utf-8",
+    )
+
+
+def test_delta_refuses_the_nested_docs_topology(tmp_path: Path) -> None:
+    """Code repo primary, docs/ its own gitignored repo. A worktree checkout of
+    the outer repo carries no docs at all, so without the guard the base run
+    finds nothing and every finding survives as new — a wrong answer with a
+    nonzero exit and no warning."""
+    repo = tmp_path / "public-repo"
+    (repo / "src").mkdir(parents=True)
+    (repo / "src" / "core.py").write_text("def f():\n    return 1\n", encoding="utf-8")
+    (repo / ".gitignore").write_text("/docs/\n", encoding="utf-8")
+    _write_config(repo, "nested-docs")
+    _seed_repo(repo)
+
+    components = repo / "docs" / "20-components"
+    components.mkdir(parents=True)
+    (components / "INDEX.md").write_text("# Components\n", encoding="utf-8")
+    _seed_repo(repo / "docs")
+
+    code, out = _check(repo, "--profile", "hard", "--delta")
+    assert code == 2
+    assert "cross-repo" in out
+    assert "'docs'" in out
+
+
+def test_delta_refuses_the_nested_code_topology(tmp_path: Path) -> None:
+    """Docs repo primary, code cloned in as a gitignored subfolder."""
+    repo = tmp_path / "docs-repo"
+    code_root = repo / "code" / "src"
+    code_root.mkdir(parents=True)
+    (code_root / "core.py").write_text("def f():\n    return 1\n", encoding="utf-8")
+    _seed_repo(repo / "code")
+
+    (repo / ".gitignore").write_text("/code/\n", encoding="utf-8")
+    (repo / "irminsul.toml").write_text(
+        'project_name = "nested-code"\n[paths]\ndocs_root = "docs"\nsource_roots = ["code/src"]\n',
+        encoding="utf-8",
+    )
+    components = repo / "docs" / "20-components"
+    components.mkdir(parents=True)
+    (components / "INDEX.md").write_text("# Components\n", encoding="utf-8")
+    _seed_repo(repo)
+
+    code, out = _check(repo, "--profile", "hard", "--delta")
+    assert code == 2
+    assert "cross-repo" in out
+    assert "'code/src'" in out
+
+
+def test_plain_check_still_works_in_a_cross_repo_topology(tmp_path: Path) -> None:
+    """The guard is scoped to --delta: the message tells users to drop the flag,
+    so plain `check` must keep working on the same tree."""
+    repo = tmp_path / "public-repo"
+    (repo / "src").mkdir(parents=True)
+    (repo / "src" / "core.py").write_text("def f():\n    return 1\n", encoding="utf-8")
+    (repo / ".gitignore").write_text("/docs/\n", encoding="utf-8")
+    _write_config(repo, "nested-docs")
+    _seed_repo(repo)
+
+    components = repo / "docs" / "20-components"
+    components.mkdir(parents=True)
+    (components / "INDEX.md").write_text("# Components\n", encoding="utf-8")
+    _seed_repo(repo / "docs")
+
+    code, out = _check(repo, "--profile", "hard")
+    assert code != 2
+    assert "cross-repo" not in out
+
+
 def test_delta_cleans_up_scratch_worktree(fixture_repo: Callable[[str], Path]) -> None:
     repo = fixture_repo("good")
     git_repo = _init_repo(repo)

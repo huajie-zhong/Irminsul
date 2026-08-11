@@ -9,7 +9,14 @@ import pytest
 from git import Repo
 
 from irminsul.checks.base import Finding, Severity
-from irminsul.delta import DeltaError, compute_delta, pristine_checkout
+from irminsul.config import IrminsulConfig, Paths
+from irminsul.delta import (
+    DeltaError,
+    compute_delta,
+    cross_repo_trees,
+    pristine_checkout,
+    verify_single_repo_topology,
+)
 
 
 def _finding(
@@ -118,12 +125,111 @@ def test_pristine_checkout_no_git_repo_raises(tmp_path: Path) -> None:
             pass
 
 
+def _config(*, docs_root: str = "docs", source_roots: list[str] | None = None) -> IrminsulConfig:
+    return IrminsulConfig(paths=Paths(docs_root=docs_root, source_roots=source_roots or ["src"]))
+
+
+def _seed_repo(root: Path) -> None:
+    """Init a repo and release its handles. The topology tests only need the
+    `.git` entry to exist; holding the `Repo` open leaks a git subprocess whose
+    later collection raises ResourceWarning, which `filterwarnings = ["error"]`
+    turns into a failure in an unrelated test."""
+    _init_repo(root).close()
+
+
+def _tree(root: Path, rel: str) -> Path:
+    path = root / rel
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def test_cross_repo_trees_empty_when_everything_is_one_repo(tmp_path: Path) -> None:
+    _seed_repo(tmp_path)
+    _tree(tmp_path, "docs")
+    _tree(tmp_path, "src")
+
+    assert cross_repo_trees(tmp_path, _config()) == []
+
+
+def test_cross_repo_trees_flags_a_nested_code_repo(tmp_path: Path) -> None:
+    """Docs repo primary, code cloned in as a gitignored subfolder with its own
+    history: `git worktree add` on the docs repo cannot produce `code/src`."""
+    _seed_repo(tmp_path)
+    _tree(tmp_path, "docs")
+    _seed_repo(_tree(tmp_path, "code"))
+    _tree(tmp_path, "code/src")
+
+    assert cross_repo_trees(tmp_path, _config(source_roots=["code/src"])) == ["code/src"]
+
+
+def test_cross_repo_trees_flags_a_nested_docs_repo(tmp_path: Path) -> None:
+    """Code repo primary, docs/ is its own gitignored repo — the severe case:
+    the base checkout has no docs at all, so every finding reads as new."""
+    _seed_repo(tmp_path)
+    _tree(tmp_path, "src")
+    _seed_repo(_tree(tmp_path, "docs"))
+
+    assert cross_repo_trees(tmp_path, _config()) == ["docs"]
+
+
+def test_cross_repo_trees_flags_a_sibling_source_root(tmp_path: Path) -> None:
+    repo_root = _tree(tmp_path, "repo")
+    _seed_repo(repo_root)
+    _tree(repo_root, "docs")
+    _seed_repo(_tree(tmp_path, "code"))
+    _tree(tmp_path, "code/src")
+
+    assert cross_repo_trees(repo_root, _config(source_roots=["../code/src"])) == ["../code/src"]
+
+
+def test_cross_repo_trees_skips_a_root_missing_on_disk(tmp_path: Path) -> None:
+    """A configured root that does not exist says nothing about topology; the
+    source walk already reports it as a missing root."""
+    _seed_repo(tmp_path)
+    _tree(tmp_path, "docs")
+
+    assert cross_repo_trees(tmp_path, _config(source_roots=["nope"])) == []
+
+
+def test_cross_repo_trees_ignores_an_unconfigured_nested_repo(tmp_path: Path) -> None:
+    """Only configured roots are inspected, so a vendored checkout that happens
+    to carry its own .git never trips the guard."""
+    _seed_repo(tmp_path)
+    _tree(tmp_path, "docs")
+    _tree(tmp_path, "src")
+    _seed_repo(_tree(tmp_path, "vendor/third-party"))
+
+    assert cross_repo_trees(tmp_path, _config()) == []
+
+
+def test_verify_single_repo_topology_passes_for_one_repo(tmp_path: Path) -> None:
+    _seed_repo(tmp_path)
+    _tree(tmp_path, "docs")
+    _tree(tmp_path, "src")
+
+    verify_single_repo_topology(tmp_path, _config())
+
+
+def test_verify_single_repo_topology_raises_naming_the_offending_root(tmp_path: Path) -> None:
+    _seed_repo(tmp_path)
+    _tree(tmp_path, "src")
+    _seed_repo(_tree(tmp_path, "docs"))
+
+    with pytest.raises(DeltaError) as excinfo:
+        verify_single_repo_topology(tmp_path, _config())
+
+    message = str(excinfo.value)
+    assert "cross-repo" in message
+    assert "'docs'" in message
+    assert "without --delta" in message
+
+
 def test_pristine_checkout_yields_a_fully_resolved_root(tmp_path: Path) -> None:
     """The yielded root becomes `build_graph`'s `repo_root`, and the doc walk
     produces resolved paths. If the system temp dir is a symlink (macOS) or an
     8.3 short name (Windows), an unresolved root makes `relative_to` raise for
     every doc found — a failure invisible on Linux, where /tmp is a real dir."""
-    _init_repo(tmp_path)
+    _seed_repo(tmp_path)
 
     with pristine_checkout(tmp_path, "HEAD") as base_root:
         assert base_root == base_root.resolve()

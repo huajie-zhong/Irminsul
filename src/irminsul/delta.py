@@ -20,11 +20,16 @@ from collections.abc import Generator
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from git import GitCommandError, InvalidGitRepositoryError, NoSuchPathError, Repo
 
 from irminsul.baseline import finding_fingerprint
 from irminsul.checks.base import Finding
+from irminsul.git.mtime import git_root_for
+
+if TYPE_CHECKING:
+    from irminsul.config import IrminsulConfig
 
 
 class DeltaError(Exception):
@@ -53,6 +58,55 @@ def compute_delta(worktree_findings: list[Finding], base_findings: list[Finding]
         else:
             new.append(finding)
     return DeltaResult(new=new, pre_existing=pre_existing)
+
+
+def cross_repo_trees(repo_root: Path, config: IrminsulConfig) -> list[str]:
+    """Configured trees owned by a git repository other than `repo_root`'s.
+
+    `git worktree add` checks out tracked files only, so a tree that belongs to
+    a nested or sibling repository is simply absent from the base checkout: the
+    gitignored code subfolder when the docs repo is primary, or the whole docs
+    repo when the code repo is primary. Checked per configured root rather than
+    by scanning the tree, so an unrelated vendored checkout never trips it.
+
+    A configured root that is missing on disk is skipped — the source walk
+    already reports it, and its absence says nothing about topology.
+    """
+    own_root = git_root_for(repo_root)
+    if own_root is None:
+        return []
+    own_resolved = own_root.resolve()
+    outside: list[str] = []
+    for rel in (config.paths.docs_root, *config.paths.source_roots):
+        tree = (repo_root / rel).resolve()
+        if not tree.is_dir():
+            continue
+        owner = git_root_for(tree)
+        if owner is None or owner.resolve() != own_resolved:
+            outside.append(rel)
+    return outside
+
+
+def verify_single_repo_topology(repo_root: Path, config: IrminsulConfig) -> None:
+    """Raise `DeltaError` when `--delta` would silently compare against a tree
+    the base checkout cannot contain.
+
+    Without this the base run finds nothing under those roots, so every finding
+    over them survives as "new" — the exact inversion of what `--delta`
+    promises, delivered with a nonzero exit and no warning.
+    """
+    outside = cross_repo_trees(repo_root, config)
+    if not outside:
+        return
+    roots = ", ".join(repr(r) for r in outside)
+    raise DeltaError(
+        f"--delta does not support cross-repo topologies yet: {roots} "
+        f"belong(s) to a different git repository than {repo_root}. "
+        "`git worktree add` checks out tracked files only, so the base "
+        "checkout would omit them and every finding over them would be "
+        "reported as new. Re-run `check` without --delta, and use mtime-drift "
+        "as the cross-repository signal."
+    )
 
 
 @contextmanager
