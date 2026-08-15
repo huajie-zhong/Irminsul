@@ -41,6 +41,9 @@ coverage.xml
 .mypy_cache/
 .ruff_cache/
 
+# Agent scratch worktrees; transient, never committed.
+.claude/worktrees/
+
 # Editors
 .vscode/
 .idea/
