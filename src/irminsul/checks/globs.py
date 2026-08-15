@@ -236,7 +236,7 @@ def source_root_prefixes(repo_root: Path, source_roots: list[str]) -> list[str]:
     """Repo-relative POSIX prefixes of the source roots that live inside the repo.
 
     An empty string means the repo root itself. Roots outside the repo (the
-    sibling code repo of Topology A/B) are omitted: a repo-relative diff path
+    code repo of the siblings layout) are omitted: a repo-relative diff path
     can never fall under them, and their on-disk files already carry a
     source-root-relative display from `walk_source_files`.
     """

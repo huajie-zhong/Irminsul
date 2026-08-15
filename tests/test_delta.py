@@ -130,7 +130,7 @@ def _config(*, docs_root: str = "docs", source_roots: list[str] | None = None) -
 
 
 def _seed_repo(root: Path) -> None:
-    """Init a repo and release its handles. The topology tests only need the
+    """Init a repo and release its handles. The layout tests only need the
     `.git` entry to exist; holding the `Repo` open leaks a git subprocess whose
     later collection raises ResourceWarning, which `filterwarnings = ["error"]`
     turns into a failure in an unrelated test."""
@@ -151,35 +151,33 @@ def test_cross_repo_trees_empty_when_everything_is_one_repo(tmp_path: Path) -> N
     assert cross_repo_trees(tmp_path, _config()) == []
 
 
-def test_cross_repo_trees_flags_a_nested_code_repo(tmp_path: Path) -> None:
-    """Docs repo primary, code cloned in as a gitignored subfolder with its own
-    history: `git worktree add` on the docs repo cannot produce `code/src`."""
-    _seed_repo(tmp_path)
-    _tree(tmp_path, "docs")
-    _seed_repo(_tree(tmp_path, "code"))
-    _tree(tmp_path, "code/src")
+def test_cross_repo_trees_flags_the_siblings_layout(tmp_path: Path) -> None:
+    """The docs repo and the code repo are separate repositories under one
+    parent, so `git worktree add` on the docs repo cannot produce the code
+    tree that `source_roots` reach through `../`."""
+    docs_root = _tree(tmp_path, "workspace/docs")
+    _seed_repo(docs_root)
+    _tree(docs_root, "docs")
+    _seed_repo(_tree(tmp_path, "workspace/code"))
+    _tree(tmp_path, "workspace/code/src")
 
-    assert cross_repo_trees(tmp_path, _config(source_roots=["code/src"])) == ["code/src"]
-
-
-def test_cross_repo_trees_flags_a_nested_docs_repo(tmp_path: Path) -> None:
-    """Code repo primary, docs/ is its own gitignored repo — the severe case:
-    the base checkout has no docs at all, so every finding reads as new."""
-    _seed_repo(tmp_path)
-    _tree(tmp_path, "src")
-    _seed_repo(_tree(tmp_path, "docs"))
-
-    assert cross_repo_trees(tmp_path, _config()) == ["docs"]
+    assert cross_repo_trees(docs_root, _config(source_roots=["../code/src"])) == ["../code/src"]
 
 
-def test_cross_repo_trees_flags_a_sibling_source_root(tmp_path: Path) -> None:
-    repo_root = _tree(tmp_path, "repo")
-    _seed_repo(repo_root)
-    _tree(repo_root, "docs")
-    _seed_repo(_tree(tmp_path, "code"))
-    _tree(tmp_path, "code/src")
+def test_cross_repo_trees_flags_every_offending_root(tmp_path: Path) -> None:
+    """Ownership is decided per configured root, so a layout with more than one
+    sibling source root names them all rather than stopping at the first."""
+    docs_root = _tree(tmp_path, "workspace/docs")
+    _seed_repo(docs_root)
+    _tree(docs_root, "docs")
+    _seed_repo(_tree(tmp_path, "workspace/code"))
+    _tree(tmp_path, "workspace/code/src")
+    _tree(tmp_path, "workspace/code/lib")
 
-    assert cross_repo_trees(repo_root, _config(source_roots=["../code/src"])) == ["../code/src"]
+    assert cross_repo_trees(docs_root, _config(source_roots=["../code/src", "../code/lib"])) == [
+        "../code/src",
+        "../code/lib",
+    ]
 
 
 def test_cross_repo_trees_skips_a_root_missing_on_disk(tmp_path: Path) -> None:
@@ -211,16 +209,18 @@ def test_verify_single_repo_topology_passes_for_one_repo(tmp_path: Path) -> None
 
 
 def test_verify_single_repo_topology_raises_naming_the_offending_root(tmp_path: Path) -> None:
-    _seed_repo(tmp_path)
-    _tree(tmp_path, "src")
-    _seed_repo(_tree(tmp_path, "docs"))
+    docs_root = _tree(tmp_path, "workspace/docs")
+    _seed_repo(docs_root)
+    _tree(docs_root, "docs")
+    _seed_repo(_tree(tmp_path, "workspace/code"))
+    _tree(tmp_path, "workspace/code/src")
 
     with pytest.raises(DeltaError) as excinfo:
-        verify_single_repo_topology(tmp_path, _config())
+        verify_single_repo_topology(docs_root, _config(source_roots=["../code/src"]))
 
     message = str(excinfo.value)
-    assert "cross-repo" in message
-    assert "'docs'" in message
+    assert "siblings layout" in message
+    assert "'../code/src'" in message
     assert "without --delta" in message
 
 

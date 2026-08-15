@@ -64,13 +64,13 @@ def cross_repo_trees(repo_root: Path, config: IrminsulConfig) -> list[str]:
     """Configured trees owned by a git repository other than `repo_root`'s.
 
     `git worktree add` checks out tracked files only, so a tree that belongs to
-    a nested or sibling repository is simply absent from the base checkout: the
-    gitignored code subfolder when the docs repo is primary, or the whole docs
-    repo when the code repo is primary. Checked per configured root rather than
-    by scanning the tree, so an unrelated vendored checkout never trips it.
+    another repository is simply absent from the base checkout. In the siblings
+    layout that is the code repo `source_roots` reach through `../`. Checked per
+    configured root rather than by scanning the tree, so an unrelated vendored
+    checkout never trips it.
 
     A configured root that is missing on disk is skipped — the source walk
-    already reports it, and its absence says nothing about topology.
+    already reports it, and its absence says nothing about the layout.
     """
     own_root = git_root_for(repo_root)
     if own_root is None:
@@ -91,16 +91,21 @@ def verify_single_repo_topology(repo_root: Path, config: IrminsulConfig) -> None
     """Raise `DeltaError` when `--delta` would silently compare against a tree
     the base checkout cannot contain.
 
-    Without this the base run finds nothing under those roots, so every finding
-    over them survives as "new" — the exact inversion of what `--delta`
-    promises, delivered with a nonzero exit and no warning.
+    Of the two supported layouts this guards exactly one: `siblings`, where the
+    code repo is a separate git repository that `git worktree add` cannot
+    reproduce. Without the guard the base run finds nothing under those roots,
+    so every finding over them survives as "new" — the exact inversion of what
+    `--delta` promises, delivered with a nonzero exit and no warning.
+
+    Teaching `--delta` to compare across the sibling boundary is open work; the
+    seam is here, and it is the only place the refusal is decided.
     """
     outside = cross_repo_trees(repo_root, config)
     if not outside:
         return
     roots = ", ".join(repr(r) for r in outside)
     raise DeltaError(
-        f"--delta does not support cross-repo topologies yet: {roots} "
+        f"--delta does not support the siblings layout yet: {roots} "
         f"belong(s) to a different git repository than {repo_root}. "
         "`git worktree add` checks out tracked files only, so the base "
         "checkout would omit them and every finding over them would be "
