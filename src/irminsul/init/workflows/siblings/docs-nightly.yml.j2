@@ -1,0 +1,44 @@
+name: docs-nightly
+
+# Configured deterministic warnings run nightly, catching drift that the
+# blocking hard profile does not gate on (orphans, staleness, mtime drift).
+#
+# Siblings layout: both repos are checked out under one parent directory so
+# that `source_roots` resolve through `../`, and irminsul runs from the docs
+# checkout. Nightly is where the cross-repository signal lives — mtime drift
+# compares this repo's doc history against the code repo's own history.
+
+on:
+  schedule:
+    - cron: "23 6 * * *"   # daily at 06:23 UTC
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: {{ docs_checkout_path }}
+          fetch-depth: 0
+{% if code_repo_spec %}
+      - uses: actions/checkout@v4
+        with:
+          repository: {{ code_repo_spec }}
+          path: {{ code_checkout_path }}
+          fetch-depth: 0
+{% else %}
+      # TODO: the code repo was configured as a local path, so its GitHub
+      # coordinate is unknown. Fill in `repository:` below.
+      - uses: actions/checkout@v4
+        with:
+          repository: OWNER/CODE-REPO
+          path: {{ code_checkout_path }}
+          fetch-depth: 0
+{% endif %}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install irminsul
+      - run: irminsul check --profile=configured
+        working-directory: {{ docs_checkout_path }}

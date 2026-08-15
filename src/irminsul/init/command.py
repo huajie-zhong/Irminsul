@@ -1,17 +1,26 @@
-"""`irminsul init` / `irminsul init-docs-only` — scaffold a new codebase.
+"""`irminsul init` — scaffold a new codebase.
 
-Walks the Jinja templates under `init/scaffolds/` and `init/workflows/` and
-writes them out into the target repo, substituting in the answers gathered
+Walks the Jinja templates under `init/scaffolds/` and `init/workflows/<topology>/`
+and writes them out into the target repo, substituting in the answers gathered
 either from the interactive prompts or from sensible defaults.
+
+Two repository layouts are supported, and `Topology` names them:
+
+- `same-repo` — `docs/` is a plain subfolder of the code repo.
+- `siblings` — a docs repo and a code repo sit side by side under a common
+  parent directory, so `source_roots` point out through `../`.
 """
 
 from __future__ import annotations
 
 import datetime as _dt
+import posixpath
 from collections.abc import Mapping
 from dataclasses import dataclass
-from pathlib import Path
+from enum import StrEnum
+from pathlib import Path, PurePosixPath
 from typing import Any
+from urllib.parse import urlsplit
 
 import typer
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
@@ -25,6 +34,11 @@ _GITHUB_USER_PLACEHOLDER = "huajie-zhong"
 _SCAFFOLDS_DIR = Path(__file__).parent / "scaffolds"
 _WORKFLOWS_DIR = Path(__file__).parent / "workflows"
 
+#: Directory the sibling repos are checked out under in generated CI.
+CI_WORKSPACE = "workspace"
+#: Path the docs repo is checked out to in generated sibling CI.
+CI_DOCS_PATH = f"{CI_WORKSPACE}/docs"
+
 _CODE_SIGNAL_FILES = (
     "pyproject.toml",
     "setup.py",
@@ -36,6 +50,13 @@ _CODE_SIGNAL_FILES = (
 _CODE_SIGNAL_DIRS = ("src", "app", "lib")
 
 
+class Topology(StrEnum):
+    """The repository layouts Irminsul scaffolds and supports."""
+
+    same_repo = "same-repo"
+    siblings = "siblings"
+
+
 @dataclass(frozen=True)
 class InitAnswers:
     project_name: str
@@ -43,9 +64,10 @@ class InitAnswers:
     source_roots: list[str]
     github_user: str
     today: str
-    # Two-repo fields (None for single-repo init)
+    topology: Topology = Topology.same_repo
+    # Siblings-only fields (None for the same-repo layout).
     code_repo_spec: str | None = None
-    code_subfolder: str | None = None
+    code_dir: str | None = None
 
 
 def detect_code_signals(repo_root: Path) -> bool:
@@ -54,30 +76,67 @@ def detect_code_signals(repo_root: Path) -> bool:
     return any((repo_root / name).is_dir() for name in _CODE_SIGNAL_DIRS)
 
 
-def parse_code_repo(value: str) -> tuple[str | None, str]:
-    """Return (github_spec, subfolder_name). github_spec is None for local paths."""
-    if value.startswith(("./", "../", "/")) or "://" in value:
-        return None, Path(value).name or "code"
+def parse_code_repo(value: str, *, docs_root: Path) -> tuple[str | None, str]:
+    """Resolve `--code-repo` into `(github_spec, code_dir)` for the siblings layout.
+
+    `github_spec` is the `owner/repo` GitHub coordinate when the value names
+    one, and `None` for a local path — CI can only generate a checkout step for
+    the former. `code_dir` is the docs-repo-relative POSIX path of the sibling
+    code checkout, always of the form `../<name>`: "siblings" means one parent
+    directory holding both repos, so anything else is rejected here rather than
+    silently scaffolding a layout the tool does not support.
+    """
+    if "://" in value:
+        name = PurePosixPath(urlsplit(value).path.rstrip("/")).name
+        return None, _sibling_dir(f"../{name or 'code'}", docs_root, value)
+
     parts = value.split("/")
-    if len(parts) == 2 and all(parts):
-        return value, parts[1]
-    return None, Path(value).name or "code"
+    is_path = value.startswith(("./", "../", "~", "/")) or Path(value).is_absolute()
+    if not is_path and len(parts) == 2 and all(parts) and "." not in parts:
+        return value, _sibling_dir(f"../{parts[1]}", docs_root, value)
+
+    if not is_path and len(parts) == 1 and value not in {".", ".."}:
+        return None, _sibling_dir(f"../{value}", docs_root, value)
+
+    return None, _sibling_dir(value, docs_root, value)
 
 
-def update_gitignore(target_root: Path, subfolder: str) -> None:
-    """Idempotently append /<subfolder>/ to .gitignore with a marker comment."""
-    gitignore = target_root / ".gitignore"
-    entry = f"/{subfolder}/"
-    marker = "# Irminsul: external code subfolder"
+def _sibling_dir(candidate: str, docs_root: Path, original: str) -> str:
+    """Normalize `candidate` to `../<name>` or reject it.
 
-    if gitignore.exists():
-        content = gitignore.read_text(encoding="utf-8")
-        if entry in content:
-            return
-        sep = "\n" if content.endswith("\n") else "\n\n"
-        gitignore.write_text(content + sep + marker + "\n" + entry + "\n", encoding="utf-8")
-    else:
-        gitignore.write_text(marker + "\n" + entry + "\n", encoding="utf-8")
+    Rejection is the point: a path that lands inside the docs repo is the
+    deleted nested layout, and one further away than a sibling is a shape the
+    generated CI workspace cannot express.
+    """
+    docs_abs = docs_root.resolve()
+    code_abs = (docs_root / candidate).resolve()
+    if code_abs.parent == docs_abs.parent and code_abs != docs_abs:
+        return f"../{code_abs.name}"
+    raise typer.BadParameter(
+        f"{original!r} resolves to {code_abs}, which is not a sibling of the docs "
+        f"repo at {docs_abs}. The siblings layout puts both repos under one "
+        "parent directory — pass a GitHub 'owner/repo' or a path like '../code'.",
+        param_hint="--code-repo",
+    )
+
+
+def ci_code_checkout_path(code_dir: str) -> str:
+    """Where generated sibling CI checks the code repo out.
+
+    The docs repo is checked out at `workspace/docs`, so the code repo has to
+    land wherever `code_dir` points relative to it for `source_roots` to
+    resolve identically in CI and on a developer's machine.
+    """
+    return posixpath.normpath(posixpath.join(CI_DOCS_PATH, code_dir))
+
+
+def _posix_join(prefix: str, rel: str) -> str:
+    """Join a `code_dir` onto a detected source root, POSIX-normalized.
+
+    Detected roots come back in the host OS's separator; the config file and
+    every check speak POSIX.
+    """
+    return posixpath.join(prefix, PurePosixPath(*Path(rel).parts).as_posix())
 
 
 def gather_answers(
@@ -128,20 +187,25 @@ def gather_answers_fresh(
     )
 
 
-def gather_answers_docs_only(
+def gather_answers_siblings(
     *,
     repo_root: Path,
     interactive: bool,
     code_repo: str | None,
 ) -> InitAnswers:
-    """Gather answers for init-docs-only (two-repo / Topology A)."""
+    """Gather answers for the siblings layout.
+
+    One gatherer covers both a code repo that already exists and one that does
+    not exist yet: presence on disk is what decides whether languages and source
+    roots can be detected, so there is nothing for the caller to declare.
+    """
     today = _dt.date.today().isoformat()
     default_project_name = repo_root.resolve().name or "untitled"
 
     if interactive:
         if code_repo is None:
             code_repo = typer.prompt(
-                "Code repo (GitHub owner/repo or local path, e.g. acme/my-public-code)"
+                "Sibling code repo (GitHub owner/repo or path, e.g. acme/my-public-code)"
             )
         project_name = typer.prompt("Project name", default=default_project_name)
     else:
@@ -151,60 +215,15 @@ def gather_answers_docs_only(
             )
         project_name = default_project_name
 
-    github_spec, subfolder = parse_code_repo(code_repo)
+    github_spec, code_dir = parse_code_repo(code_repo, docs_root=repo_root)
 
-    # Detect source roots from subfolder if it already exists on disk
-    subfolder_path = repo_root / subfolder
-    if subfolder_path.is_dir():
-        languages = detect_languages(subfolder_path) or ["python"]
-        source_roots = [f"{subfolder}/{r}" for r in detect_source_roots(subfolder_path, languages)]
-    else:
-        languages = ["python"]
-        source_roots = [f"{subfolder}/src"]
-
-    return InitAnswers(
-        project_name=project_name,
-        languages=languages,
-        source_roots=source_roots,
-        github_user=_GITHUB_USER_PLACEHOLDER,
-        today=today,
-        code_repo_spec=github_spec,
-        code_subfolder=subfolder,
-    )
-
-
-def gather_answers_fresh_docs_only(
-    *,
-    repo_root: Path,
-    interactive: bool,
-    code_repo: str | None,
-) -> InitAnswers:
-    """Gather answers for a future-code private-docs/public-code fresh start."""
-    today = _dt.date.today().isoformat()
-    default_project_name = repo_root.resolve().name or "untitled"
-
-    if interactive:
-        if code_repo is None:
-            code_repo = typer.prompt(
-                "Code repo (GitHub owner/repo or local path, e.g. acme/my-public-code)"
-            )
-        project_name = typer.prompt("Project name", default=default_project_name)
-    else:
-        if code_repo is None:
-            raise typer.BadParameter(
-                "--code-repo is required for fresh docs-only topology", param_hint="--code-repo"
-            )
-        project_name = default_project_name
-
-    github_spec, subfolder = parse_code_repo(code_repo)
-
-    subfolder_path = repo_root / subfolder
-    if subfolder_path.is_dir():
-        languages = detect_languages(subfolder_path)
-        source_roots = [f"{subfolder}/{r}" for r in detect_source_roots(subfolder_path, languages)]
+    code_path = repo_root / code_dir
+    if code_path.is_dir():
+        languages = detect_languages(code_path)
+        source_roots = [_posix_join(code_dir, r) for r in detect_source_roots(code_path, languages)]
     else:
         languages = []
-        source_roots = [f"{subfolder}/src"]
+        source_roots = [_posix_join(code_dir, "src")]
 
     return InitAnswers(
         project_name=project_name,
@@ -212,8 +231,9 @@ def gather_answers_fresh_docs_only(
         source_roots=source_roots,
         github_user=_GITHUB_USER_PLACEHOLDER,
         today=today,
+        topology=Topology.siblings,
         code_repo_spec=github_spec,
-        code_subfolder=subfolder,
+        code_dir=code_dir,
     )
 
 
@@ -228,8 +248,13 @@ def _render_template(template_path: Path, base_dir: Path, context: Mapping[str, 
     return template.render(**context)
 
 
-def _scaffold_pairs() -> list[tuple[Path, Path, Path]]:
-    """Return (template, base_dir, output_relative) tuples for every file written."""
+def _scaffold_pairs(topology: Topology) -> list[tuple[Path, Path, Path]]:
+    """Return (template, base_dir, output_relative) tuples for every file written.
+
+    The docs/config scaffold is shared; CI workflows are per-topology, because
+    the sibling gate needs two checkouts under a common parent and a
+    `working-directory`, which the composite Action cannot express.
+    """
     pairs: list[tuple[Path, Path, Path]] = []
     for tpl in sorted(_SCAFFOLDS_DIR.rglob("*.j2")):
         rel = tpl.relative_to(_SCAFFOLDS_DIR)
@@ -237,10 +262,11 @@ def _scaffold_pairs() -> list[tuple[Path, Path, Path]]:
         output_rel = rel.with_suffix("")  # foo.md.j2 → foo.md
         pairs.append((tpl, _SCAFFOLDS_DIR, output_rel))
 
-    for tpl in sorted(_WORKFLOWS_DIR.rglob("*.j2")):
-        rel = tpl.relative_to(_WORKFLOWS_DIR)
+    workflows_dir = _WORKFLOWS_DIR / topology.value
+    for tpl in sorted(workflows_dir.rglob("*.j2")):
+        rel = tpl.relative_to(workflows_dir)
         output_rel = Path(".github") / "workflows" / rel.with_suffix("")
-        pairs.append((tpl, _WORKFLOWS_DIR, output_rel))
+        pairs.append((tpl, workflows_dir, output_rel))
 
     return pairs
 
@@ -255,11 +281,15 @@ def write_scaffold(target_root: Path, answers: InitAnswers, *, force: bool = Fal
         "github_user": answers.github_user,
         "today": answers.today,
         "code_repo_spec": answers.code_repo_spec,
-        "code_subfolder": answers.code_subfolder,
+        "code_dir": answers.code_dir,
+        "docs_checkout_path": CI_DOCS_PATH,
+        "code_checkout_path": (
+            ci_code_checkout_path(answers.code_dir) if answers.code_dir else None
+        ),
     }
 
     written: list[Path] = []
-    for template_path, base_dir, output_rel in _scaffold_pairs():
+    for template_path, base_dir, output_rel in _scaffold_pairs(answers.topology):
         out_abs = target_root / output_rel
         if out_abs.exists() and not force:
             continue
@@ -341,39 +371,21 @@ def run_init_fresh(target_root: Path, *, interactive: bool, force: bool = False)
     print_next_steps(answers, written)
 
 
-def run_init_docs_only(
+def run_init_siblings(
     target_root: Path,
     *,
     interactive: bool,
     code_repo: str | None,
     force: bool = False,
 ) -> None:
-    answers = gather_answers_docs_only(
+    answers = gather_answers_siblings(
         repo_root=target_root, interactive=interactive, code_repo=code_repo
     )
     written = _scaffold_with_agent_wiring(target_root, answers, force=force)
-    if answers.code_subfolder:
-        update_gitignore(target_root, answers.code_subfolder)
-    _print_docs_only_next_steps(answers, written)
+    _print_siblings_next_steps(answers, written)
 
 
-def run_init_fresh_docs_only(
-    target_root: Path,
-    *,
-    interactive: bool,
-    code_repo: str | None,
-    force: bool = False,
-) -> None:
-    answers = gather_answers_fresh_docs_only(
-        repo_root=target_root, interactive=interactive, code_repo=code_repo
-    )
-    written = _scaffold_with_agent_wiring(target_root, answers, force=force)
-    if answers.code_subfolder:
-        update_gitignore(target_root, answers.code_subfolder)
-    _print_docs_only_next_steps(answers, written)
-
-
-def _print_docs_only_next_steps(answers: InitAnswers, written: list[Path]) -> None:
+def _print_siblings_next_steps(answers: InitAnswers, written: list[Path]) -> None:
     typer.echo()
     typer.echo(typer.style("Created:", fg="green", bold=True))
     for p in written:
@@ -382,16 +394,25 @@ def _print_docs_only_next_steps(answers: InitAnswers, written: list[Path]) -> No
     typer.echo(typer.style("Next steps:", fg="green", bold=True))
     if answers.code_repo_spec:
         typer.echo(
-            f"  1. Clone the code repo locally: "
-            f"git clone https://github.com/{answers.code_repo_spec} {answers.code_subfolder}"
+            f"  1. Clone the code repo beside this one: "
+            f"git clone https://github.com/{answers.code_repo_spec} {answers.code_dir}"
         )
     else:
-        typer.echo(f"  1. Clone or place the code repo at ./{answers.code_subfolder}/")
+        typer.echo(f"  1. Clone or place the code repo at {answers.code_dir}/")
     typer.echo("  2. Edit docs/00-foundation/principles.md")
     typer.echo("  3. Edit docs/10-architecture/overview.md")
     typer.echo(
         "  4. Point your coding agent at AGENTS.md (repo root) — "
         "it routes to docs/AGENTS.md and the agent loop."
     )
-    typer.echo("  5. git add . && git commit -m 'Adopt Irminsul (docs-only)'")
+    typer.echo("  5. git add . && git commit -m 'Adopt Irminsul (siblings)'")
     typer.echo("  6. Push — CI enforces from PR #1.")
+    if answers.code_repo_spec is None:
+        typer.echo()
+        typer.echo(
+            typer.style(
+                "note: the generated workflows cannot check out a code repo given as a "
+                "local path; fill in the `repository:` of the second checkout step.",
+                fg="yellow",
+            )
+        )
