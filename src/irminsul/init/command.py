@@ -281,7 +281,6 @@ def write_scaffold(target_root: Path, answers: InitAnswers, *, force: bool = Fal
         "github_user": answers.github_user,
         "today": answers.today,
         "code_repo_spec": answers.code_repo_spec,
-        "code_dir": answers.code_dir,
         "docs_checkout_path": CI_DOCS_PATH,
         "code_checkout_path": (
             ci_code_checkout_path(answers.code_dir) if answers.code_dir else None

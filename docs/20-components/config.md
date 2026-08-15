@@ -34,7 +34,7 @@ A loader walks up from the invocation directory looking for `irminsul.toml` so s
 
 Patterns match the normalized POSIX display path used by `describes:`. Same-repository files use repository-relative paths; files from an external source root use paths relative to that source root. Built-in cache/dot-path exclusions, `.gitignore`, and explicit excludes cannot be reversed by an include.
 
-Every configured root is deliberate. An enclosing repository rule that ignores the root directory does not hide it, which preserves private-docs layouts with a gitignored nested code checkout. More specific ignore rules for files inside the root still apply, using the nearest enclosing repository as the ignore boundary.
+Every configured root is deliberate. An enclosing repository rule that ignores the root directory does not hide it, so a root that some outer repository ignores is still inventoried once it is configured. More specific ignore rules for files inside the root still apply, using the nearest enclosing repository as the ignore boundary.
 
 `rfc-lifecycle-integrity` is a default hard check: it is inert in repositories
 without RFC lifecycle atoms and protects implemented RFC history when they exist.

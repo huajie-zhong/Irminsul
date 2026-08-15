@@ -198,10 +198,11 @@ def last_commit_time_any_repo(path: Path, docs_root: Path) -> GitTime | None:
     should emit an error Finding. Returns _NO_TIME when git exists but path has
     no commits (same as same-repo behaviour).
 
-    A path *inside* docs_root may still belong to a nested repository — e.g. a
-    private docs repo that the outer (public) code repo gitignores. The nearest
-    enclosing `.git` is authoritative so stale history from a former outer-repo
-    location cannot override the nested repository.
+    A path *inside* docs_root may still belong to a repository of its own — a
+    submodule or a vendored checkout carrying its own `.git`. Neither supported
+    layout (`same-repo`, `siblings`) requires this, but when it happens the
+    nearest enclosing `.git` is authoritative, so stale history from an outer
+    repository cannot override the inner one.
     """
     try:
         path.relative_to(docs_root)
