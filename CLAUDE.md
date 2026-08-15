@@ -62,7 +62,7 @@ irminsul regen agents-md                 # rebuild the docs/AGENTS.md manifest
 
 All checks subclass `Check` and return `list[Finding]` with `(check, severity, path, line, message, suggestion)`. Severity ordering and exit-code logic live in `cli.check`.
 
-**Cross-repo source files**. `walk_source_files()` (`src/irminsul/checks/globs.py`) returns `list[tuple[Path, str]]` — `(abs_path, display_posix)` — where `display_posix` is repo-relative for same-repo files but source-root-relative for files outside the docs repo. `src/irminsul/git/mtime.py` exposes `last_commit_time_any_repo()` which walks up from any absolute path to find its nearest `.git`, so `mtime-drift` works across sibling repos (Topology A/B). If a cross-repo source file has no `.git`, a Finding is emitted rather than silently skipping.
+**Cross-repo source files**. `walk_source_files()` (`src/irminsul/checks/globs.py`) returns `list[tuple[Path, str]]` — `(abs_path, display_posix)` — where `display_posix` is repo-relative for same-repo files but source-root-relative for files outside the docs repo. `src/irminsul/git/mtime.py` exposes `last_commit_time_any_repo()` which walks up from any absolute path to find its nearest `.git`, so `mtime-drift` works across sibling repos (the `siblings` layout). If a cross-repo source file has no `.git`, a Finding is emitted rather than silently skipping.
 
 **`parent-child` check** infers parent–child relationships from document paths; there is no `children:` frontmatter field.
 
@@ -70,7 +70,7 @@ All checks subclass `Check` and return `list[Finding]` with `(check, severity, p
 
 **Language profiles** (`src/irminsul/languages/`) are pure-data records (source-root candidates + schema-leak regexes) keyed by language name. Adding a language = adding a file here, no check changes.
 
-**Init scaffolder** (`src/irminsul/init/`) walks Jinja2 templates under `init/scaffolds/` and `init/workflows/` to bootstrap a new repo. Two modes: `init` (single-repo, the common case) and `init-docs-only` (Topology A: docs repo + sibling code repo cloned as gitignored subfolder). `detect_code_signals()` decides which to suggest.
+**Init scaffolder** (`src/irminsul/init/`) walks Jinja2 templates under `init/scaffolds/` and `init/workflows/` to bootstrap a new repo. Two layouts: `same-repo` (docs/ inside the code repo, the default) and `siblings` (`irminsul init --topology siblings --code-repo <spec>`, a docs repo beside a separate code repo). `detect_code_signals()` guards which one fits the target directory.
 
 **`context`, `refs`, `new`, `regen`, and `list`**. `irminsul context <path>|--topic <query>|--changed` (`src/irminsul/context.py`) returns ownership, tests, dependencies, relevant deterministic findings, and next command hints. `irminsul refs <doc-id|path>|--symbol <query>` (`src/irminsul/refs.py`) reports doc backlinks (strong `depends_on` plus weak markdown links) or symbol owners/references. `irminsul new {adr,component,rfc}` writes templated atoms from `src/irminsul/new/templates/`. `irminsul regen agents-md` (`src/irminsul/regen/agents_md.py`) is the only regen target — it rebuilds the `docs/AGENTS.md` navigation manifest. `irminsul list {orphans,stale,undocumented,lifecycle}` (`src/irminsul/listing/command.py`) wraps checks with custom filtering; each subcommand supports `--format plain|json`. The CLI also ships `seed` (PIB capture into the foundation layer), `surface` (derive cli/http/exports/env-var surfaces on demand), `anchors` (report or re-pin anchored prose claims), and `fix` (deterministic remediations).
 
