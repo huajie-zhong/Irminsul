@@ -773,7 +773,14 @@ def check(
             verify_single_repo_topology(repo_root, config)
             with pristine_checkout(repo_root, delta_base_rev) as base_root:
                 base_graph = build_graph(
-                    base_root, config, now=now_date, diff_changed_paths=co_change_paths
+                    base_root,
+                    config,
+                    now=now_date,
+                    diff_changed_paths=co_change_paths,
+                    # The scratch worktree is deleted on teardown; persistent
+                    # check state (the external-links cache) belongs in the
+                    # user's real repo, shared with the working-tree pass.
+                    state_root=repo_root,
                 )
                 base_findings = _run_configured_checks(profile, config, base_graph)
         except DeltaError as e:

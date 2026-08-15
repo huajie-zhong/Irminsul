@@ -30,6 +30,8 @@ A small set of top-level filenames are exempt from the frontmatter requirement: 
 
 Paths stored on `DocNode` are repo-relative and POSIX-normalized so they're stable as dict keys and human-readable on Windows.
 
+`build_graph` also accepts a `state_root` kwarg: the root for run-spanning on-disk state, such as the `external-links` HTTP cache. It defaults to the walked `repo_root` and differs only when the walked tree is disposable — [delta mode](baseline.md#delta-mode-check-delta)'s base pass walks a scratch `git worktree` while keeping `state_root` on the caller's real repository, so both passes of one run share a cache instead of re-fetching and discarding.
+
 `build_graph` accepts an optional `now` kwarg that's stored on `DocGraph.now` and read by date-sensitive checks (`stale-reaper`, `rfc-resolution`) through the `clock.today(graph.now)` helper. The `--now YYYY-MM-DD` flag on `irminsul check` threads through to here; without it the system date is used.
 
 Structured body sections are a graph concern, not a per-check regex ([RFC 0030](../80-evolution/rfcs/0030-rfc-requirements-and-scenarios.md)): `graph.requirements` holds the parsed `## Requirements` section (requirement blocks with stable ids, provenance, and WHEN/THEN scenarios, or the explicit no-new-behavior disposition) for every doc that has one, so the grammar check, transitions, and change reports share one line-accurate parser. Fenced code blocks are skipped, so a doc can quote the grammar without declaring requirements.

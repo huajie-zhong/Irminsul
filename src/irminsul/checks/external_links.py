@@ -4,7 +4,9 @@ Disabled by default (see `[checks.external_links] enabled = false` in the
 scaffolded config). When enabled:
 
 - Walks every doc body and collects http/https hrefs.
-- Loads a JSON cache from `cache_path` (default `.irminsul-cache/external-links.json`).
+- Loads a JSON cache from `cache_path` (default `.irminsul-cache/external-links.json`),
+  resolved against the graph's `state_root` so a `--delta` run's two passes share
+  one cache in the real repository rather than one per scratch checkout.
 - For each URL not cached or whose cache entry is older than `ttl_hours`,
   issues a HEAD request via `httpx.AsyncClient`. Falls back to a Range:0-0 GET
   when HEAD returns 405/403. Bounded concurrency via a semaphore (=10).
@@ -130,7 +132,10 @@ class ExternalLinksCheck:
         if not settings.enabled:
             return []
 
-        cache_path = graph.repo_root / settings.cache_path
+        # Resolved against `state_root`, not `repo_root`: under `--delta` the
+        # base pass walks a scratch worktree that is deleted on teardown, so a
+        # cache anchored there would miss every entry and then be thrown away.
+        cache_path = (graph.state_root or graph.repo_root) / settings.cache_path
         cache = _load_cache(cache_path)
 
         # Collect (node, url) pairs. Same url referenced from multiple docs gets

@@ -57,6 +57,15 @@ report carries a `delta` object (`applied`, `base`, `new`,
 `pre_existing_suppressed`) alongside (not instead of) the normal `baseline`
 object.
 
+Because the scratch checkout is disposable, run-spanning check state must not be
+anchored to it. `build_graph` takes a `state_root` alongside the root it walks:
+equal to it for an ordinary run, and pinned to the caller's real repository for
+the base pass. The `external-links` HTTP cache is the one such state today, so
+both passes of a `--delta` run read and write a single cache. Anchoring it to
+the walked root instead would make the base pass miss every entry, re-fetch
+every external URL over the network, and then write the results into a scratch
+directory about to be removed.
+
 `--delta` requires a single-repo topology, and refuses anything else rather
 than answering wrongly. `git worktree add` checks out tracked files only, so a
 configured tree owned by another git repository is simply absent from the base
