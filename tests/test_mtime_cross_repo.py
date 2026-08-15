@@ -1,4 +1,4 @@
-"""Tests for cross-repo git mtime support (Topology B)."""
+"""Tests for cross-repo git mtime support — the siblings layout."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Unit tests for walk_source_files — same-repo and cross-repo (Topology B)."""
+"""Unit tests for walk_source_files — the same-repo and siblings layouts."""
 
 from __future__ import annotations
 
