@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Enhancements
+- `irminsul init --topology same-repo|siblings` — one command scaffolds either supported repository layout. `--topology siblings` takes `--code-repo <owner/repo|path>`, writes `source_roots` reaching through `../`, and generates two-checkout CI (ADR-0022).
+
+### Removed
+- `irminsul init-docs-only` and `irminsul init --fresh --topology docs-only`, along with the two nested repository layouts they served — code cloned into a gitignored subfolder of the docs repo, and `docs/` as a nested private repo inside the code repo (ADR-0022). Only `same-repo` and `siblings` are supported; moving to `siblings` is a filesystem move plus a `source_roots` edit, and nothing automates it.
+
 ## v0.2.0 (2026-05-08)
 
 ### New checks (hard)
