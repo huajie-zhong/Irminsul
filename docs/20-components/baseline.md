@@ -57,11 +57,10 @@ report carries a `delta` object (`applied`, `base`, `new`,
 `pre_existing_suppressed`) alongside (not instead of) the normal `baseline`
 object.
 
-`--delta` requires a single-repo topology, and refuses anything else rather
-than answering wrongly. `git worktree add` checks out tracked files only, so a
-configured tree owned by another git repository is simply absent from the base
-checkout: the gitignored code subfolder when the docs repo is primary, or the
-whole of `docs/` when the code repo is primary (see
+`--delta` works in the `same-repo` layout and refuses the `siblings` layout
+rather than answering wrongly. `git worktree add` checks out tracked files
+only, so the sibling code repo that `source_roots` reach through `../` is
+simply absent from the base checkout (see
 [private docs](../30-workflows/private-docs.md)). The base run then finds
 nothing under that tree and every finding over it survives as new — the exact
 inversion of what `--delta` promises. `verify_single_repo_topology` compares
@@ -70,11 +69,12 @@ target repo's own, and exits 2 naming the offending roots before any checkout
 happens. Only configured roots are inspected, so a vendored checkout carrying
 its own `.git` never trips it.
 
-Teaching `--delta` to handle those topologies means anchoring the doc walk and
-the source walk to different roots, and accepting that a single `--delta-base`
-cannot name a point in a second repository's history — source would have to be
-held constant across both passes. Until then the guidance matches the rest of
-the diff-based views: run `check` without `--delta`, and use mtime drift as the
+Teaching `--delta` to compare across the sibling boundary means anchoring the
+doc walk and the source walk to different roots, and accepting that a single
+`--delta-base` cannot name a point in a second repository's history — source
+would have to be held constant across both passes. That design is open work,
+proposed but not shipped. Until then the guidance matches the rest of the
+diff-based views: run `check` without `--delta`, and use mtime drift as the
 cross-repository signal.
 
 ## Scope & Limitations

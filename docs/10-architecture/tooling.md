@@ -26,7 +26,7 @@ Concrete recommendations for external tools. None of these are load-bearing — 
 
 ## Packaging the System for Reuse
 
-The doc system itself — validators, drift detectors, ADR templates, frontmatter schema, and scaffolded CI workflows — is codebase-agnostic. It lives in Irminsul and is consumed by codebases as a dependency rather than copied into each one. Docs are normally co-located with code; the supported private-docs topologies preserve filesystem access when repository ownership requires separation.
+The doc system itself — validators, drift detectors, ADR templates, frontmatter schema, and scaffolded CI workflows — is codebase-agnostic. It lives in Irminsul and is consumed by codebases as a dependency rather than copied into each one. Docs are normally co-located with code; the sibling layout preserves filesystem access when repository ownership requires separation.
 
 ### The Distinction That Matters
 
@@ -42,7 +42,7 @@ The doc system itself — validators, drift detectors, ADR templates, frontmatte
 
 ### Why Co-Location Is the Default
 
-The Change Triplet (code + tests + docs in one PR) is simplest in one repository: review is atomic, history is shared, and source-ownership checks have direct filesystem access. Separate private docs are still supported when the code checkout is available through a configured source root. That topology cannot make two repositories atomic, so its coordination limits remain explicit.
+The Change Triplet (code + tests + docs in one PR) is simplest in one repository: review is atomic, history is shared, and source-ownership checks have direct filesystem access. Separate private docs are still supported when the code checkout is available through a configured source root. That layout cannot make two repositories atomic, so its coordination limits remain explicit.
 
 ### Why Centralization of Tooling Is the Multiplier
 
@@ -66,9 +66,11 @@ Decision Table:
 | Public | Private | Two repos, all-private docs | Public code where API stability > community participation |
 | Public | Public | Single repo | Pure community OSS |
 
-### Topology of the Two-Repo Setup
+### The Two Supported Repository Layouts
 
-The canonical setup, limitations, path semantics, and CI examples for nested and sibling code checkouts live in [Private docs for a public code repo](../30-workflows/private-docs.md). Keeping that operational detail in one place prevents the supported topology from drifting between architecture and workflow docs.
+Exactly two layouts are supported: `same-repo`, where `docs/` is a plain subfolder of the code repo, and `siblings`, where a parent workspace directory holds the code repo and the docs repo as two separate git repositories and `source_roots` reach out through `../`. [`ADR-0022`](../50-decisions/0022-reduce-supported-repository-topologies.md) records why the two nested layouts that preceded `siblings` were retired.
+
+The canonical setup, limitations, path semantics, and CI example for the sibling layout live in [Private docs for a public code repo](../30-workflows/private-docs.md). Keeping that operational detail in one place prevents the supported layout from drifting between architecture and workflow docs.
 
 ### Adopting on a New Codebase
 
@@ -86,12 +88,12 @@ For a fresh same-repo project with no code yet:
 3. Write the foundation and architecture docs.
 4. Commit. CI can run the system from PR #1.
 
-For an existing public-code + private-docs case:
+For public code + private docs:
 
-1. Create an empty docs-only private repo.
-2. Run `irminsul init-docs-only --code-repo owner/public-repo` inside it.
-3. Clone the public repo locally: `git clone https://github.com/owner/public-repo`.
+1. Create a workspace directory and a private docs repo inside it, beside where the code repo will live.
+2. Run `irminsul init --topology siblings --code-repo owner/public-repo` inside the docs repo.
+3. Clone the public repo beside it: `git clone https://github.com/owner/public-repo ../public-repo`.
 4. Write the foundation and architecture docs.
-5. Commit. CI checks out both repos on every PR.
+5. Commit. CI checks out both repos under a common parent on every PR.
 
-For fresh public-code + private-docs setup, use `irminsul init --fresh --topology docs-only --code-repo owner/future-public-repo`. The code repo checkout folder is gitignored and may be absent until the public repo exists.
+The same command covers a code repo that does not exist yet: the scaffold writes the `../` source root and the source walk warns about the missing tree until the clone lands.

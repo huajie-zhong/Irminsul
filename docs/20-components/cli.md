@@ -31,7 +31,6 @@ inventory:
       - context
       - status
     omit:
-      - init-docs-only
       - seed
       - orient
       - refs

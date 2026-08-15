@@ -36,7 +36,6 @@ inventory:
       - change migrate
       - change verify
       - init
-      - init-docs-only
       - list orphans
       - list stale
       - mcp
