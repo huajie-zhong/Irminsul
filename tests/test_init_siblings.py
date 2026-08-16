@@ -251,7 +251,21 @@ def test_siblings_rejects_fresh(tmp_path: Path) -> None:
 
 
 def test_code_repo_requires_the_siblings_topology(tmp_path: Path) -> None:
+    """`--code-repo` is meaningless outside the siblings layout, so it has to be
+    refused rather than ignored.
+
+    The target deliberately holds code signals: without them `init
+    --no-interactive` refuses for an unrelated reason, and the refusal happens
+    to exit 2 and to mention `--topology siblings`, so a test pointed at an
+    empty directory passes whether or not the guard exists. Here the run would
+    otherwise scaffold a same-repo layout successfully and silently drop
+    `--code-repo`, which is exactly the outcome the guard prevents. The
+    assertion is on the guard's own sentence for the same reason.
+    """
     target = tmp_path / "demo"
+    (target / "src").mkdir(parents=True)
+    (target / "pyproject.toml").write_text("[project]\nname='demo'\n", encoding="utf-8")
+
     result = runner.invoke(
         app,
         [
@@ -263,8 +277,8 @@ def test_code_repo_requires_the_siblings_topology(tmp_path: Path) -> None:
             str(target),
         ],
     )
-    assert result.exit_code == 2
-    assert "--topology siblings" in result.stdout
+    assert result.exit_code == 2, result.stdout
+    assert "`--code-repo` is only valid with `--topology siblings`." in result.stdout
     assert not (target / "irminsul.toml").exists()
 
 

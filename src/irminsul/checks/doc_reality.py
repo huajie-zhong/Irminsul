@@ -10,6 +10,7 @@ from typing import ClassVar
 from irminsul.checks.base import Finding, Severity
 from irminsul.checks.globs import (
     is_external_source_display,
+    is_source_path,
     resolve_display_path,
     source_root_prefixes,
 )
@@ -601,10 +602,38 @@ class ClaimProvenanceCheck:
         source_roots = graph.config.paths.source_roots
         for prefix in source_root_prefixes(graph.repo_root, source_roots):
             if not prefix:
-                return True
+                if self._is_repo_root_source(graph, path, path_posix):
+                    return True
+                continue
             if path_posix == prefix or path_posix.startswith(f"{prefix}/"):
                 return True
         return is_external_source_display(graph.repo_root, source_roots, path_posix)
+
+    def _is_repo_root_source(self, graph: DocGraph, path: Path, path_posix: str) -> bool:
+        """Whether a source root that *is* the repo root claims this path.
+
+        `source_roots = ["."]` is what `irminsul init` writes for a flat Go
+        repo, and its repo-relative prefix is the empty string, which every
+        path starts with. Answering "yes, everything" there is wrong in the one
+        direction that matters: the docs tree, `irminsul.toml`, the Action and
+        the CI workflows sit under the repo root too, and each of them is the
+        evidence some *other* claim state is defined by. `state: external` is
+        "process evidence and not source", so an unconditional yes made every
+        external claim unsatisfiable, and `implemented`/`available` stopped
+        being checked at all.
+
+        The exclusions are the ones the source walk and the sibling evidence
+        classifiers already own — the docs tree, the enablement files, and the
+        walk's dot-directory and bytecode exclusions — so the answer here
+        matches the set of files `walk_source_files` actually returns for a
+        repo-root source root.
+        """
+        docs_root = _docs_root(graph)
+        if path_posix == docs_root or path_posix.startswith(f"{docs_root}/"):
+            return False
+        if self._is_enabled_evidence(path):
+            return False
+        return is_source_path(path_posix, [""])
 
     def _is_component_doc_evidence(self, graph: DocGraph, path: Path) -> bool:
         docs_root = _docs_root(graph)

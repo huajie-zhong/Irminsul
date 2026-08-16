@@ -20,8 +20,13 @@ from irminsul.docgraph import build_graph
 from irminsul.regen.agents_md import regen_agents_md
 
 
-def _write_config(repo: Path, *, coverage_rule: bool = False) -> None:
-    base = 'project_name = "doc-reality"\n[paths]\ndocs_root = "docs"\nsource_roots = ["src"]\n'
+def _write_config(
+    repo: Path, *, coverage_rule: bool = False, source_roots: str = '["src"]'
+) -> None:
+    base = (
+        'project_name = "doc-reality"\n[paths]\ndocs_root = "docs"\n'
+        f"source_roots = {source_roots}\n"
+    )
     if coverage_rule:
         base += (
             "[[checks.terminology_overload.rules]]\n"
@@ -163,6 +168,92 @@ def test_claim_provenance_accepts_valid_claim_states(tmp_path: Path) -> None:
     )
 
     assert ClaimProvenanceCheck().run(_graph(tmp_path)) == []
+
+
+def test_claim_provenance_accepts_a_repo_root_source_root(tmp_path: Path) -> None:
+    """`irminsul init` writes `source_roots = ["."]` for a flat Go repo, whose
+    repo-relative prefix is the empty string — a prefix every path starts with.
+    Classifying by that prefix alone made every path source evidence, and
+    `state: external` is "process evidence that is *not* source", so no
+    external claim could be satisfied. The docs tree, `irminsul.toml`, the
+    Action and the workflows are not source even when the source root is the
+    repo root."""
+    _write_config(tmp_path, source_roots='["."]')
+    (tmp_path / "main.go").write_text("package main\n", encoding="utf-8")
+    (tmp_path / "action.yml").write_text("name: docs\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/60-operations/release.md",
+        doc_id="release",
+        body="The release runbook.",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/00-foundation/enforcement.md",
+        doc_id="enforcement",
+        body=(
+            "The runbook exists. <!-- claim:process-claim -->\n\n"
+            "The binary exists. <!-- claim:code-claim -->\n\n"
+            "CI enforces it. <!-- claim:gate-claim -->"
+        ),
+        frontmatter_extra=[
+            "claims:",
+            "  - id: process-claim",
+            "    state: external",
+            "    kind: local_tool",
+            "    claim: The runbook is documented.",
+            "    evidence:",
+            "      - docs/60-operations/release.md",
+            "  - id: code-claim",
+            "    state: implemented",
+            "    kind: check",
+            "    claim: Source exists.",
+            "    evidence:",
+            "      - main.go",
+            "  - id: gate-claim",
+            "    state: enabled",
+            "    kind: ci_gate",
+            "    claim: Action evidence exists.",
+            "    evidence:",
+            "      - action.yml",
+        ],
+    )
+
+    assert ClaimProvenanceCheck().run(_graph(tmp_path)) == []
+
+
+def test_repo_root_source_root_does_not_make_every_doc_implementation(tmp_path: Path) -> None:
+    """The mirror: widening "everything is source" would also stop
+    `implemented` and `available` from being checked at all."""
+    _write_config(tmp_path, source_roots='["."]')
+    (tmp_path / "main.go").write_text("package main\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/70-knowledge/notes.md",
+        doc_id="notes",
+        body="Background reading.",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/00-foundation/enforcement.md",
+        doc_id="enforcement",
+        body="The feature is built. <!-- claim:code-claim -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: code-claim",
+            "    state: implemented",
+            "    kind: check",
+            "    claim: Source exists.",
+            "    evidence:",
+            "      - docs/70-knowledge/notes.md",
+        ],
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert [f.message for f in findings] == [
+        "claim 'code-claim' has no evidence appropriate for state 'implemented'"
+    ]
 
 
 def test_claim_provenance_flags_state_inappropriate_evidence(tmp_path: Path) -> None:

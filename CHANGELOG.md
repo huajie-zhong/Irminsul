@@ -9,8 +9,8 @@
 
 ### Changed
 - **`retired-references` is now a hard check and its stale-guidance findings are errors**, so a reference to retired surface fails the gate without `--strict` (ADR-0022). Move it from `checks.soft_deterministic` to `checks.hard` in `irminsul.toml`. It now also audits ADRs (except against their own tombstones), the `AGENTS.md` / `CLAUDE.md` agent manifests, and frontmatter; the generated `regen agents-md` region and frozen RFC records stay out of range.
-
 - `retired-references` concept phrases now fold case only when the declaration is written entirely in lower case ("smart case"). A capitalised declaration is a proper name and is matched case-sensitively, so a short one such as `Topology A` no longer matches the ordinary English "whatever topology a project picks". A tombstone that wants both readings lists both spellings in `matches`.
+- `claim-provenance` no longer treats every path as source evidence when a configured source root is the repo root (`source_roots = ["."]`, what `irminsul init` writes for a flat Go repo). The docs tree, `irminsul.toml`, the Action and the CI workflows stay non-source, so `state: external` claims are satisfiable again and `implemented`/`available` claims are still checked.
 
 ### Removed
 - The `lettered-topologies` tombstone from ADR-0022. It policed a naming convention rather than a removed surface — the layouts themselves are already tombstoned as `docs-only topology` — and the lettered names are gone from the tree.
