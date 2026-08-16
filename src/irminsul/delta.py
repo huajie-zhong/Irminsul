@@ -61,7 +61,7 @@ def compute_delta(worktree_findings: list[Finding], base_findings: list[Finding]
 
 
 def cross_repo_trees(repo_root: Path, config: IrminsulConfig) -> list[str]:
-    """Configured source roots owned by a git repository other than `repo_root`'s.
+    """Configured trees owned by a git repository other than `repo_root`'s.
 
     `git worktree add` checks out tracked files only, so a tree that belongs to
     another repository is simply absent from the base checkout. In the siblings
@@ -69,12 +69,14 @@ def cross_repo_trees(repo_root: Path, config: IrminsulConfig) -> list[str]:
     configured root rather than by scanning the tree, so an unrelated vendored
     checkout never trips it.
 
-    Only `source_roots` are inspected. `docs_root` is always inside `repo_root` —
-    a `docs_root` that escapes it does not degrade, it fails outright in
-    `build_graph`'s `_to_repo_relative` — so the only way it could answer to a
-    different repository is a `.git` at or below `docs_root`, which is a
-    repository nested inside another's working tree. Neither supported layout
-    has one, and `--delta` treats every other such nesting as ordinary.
+    `docs_root` is inspected too, even though no supported layout puts it in
+    another repository. This is not layout policing: `--delta` is answering
+    "which findings are new", and a `docs_root` carrying its own `.git` — an
+    ordinary git submodule is enough — is absent from the base worktree exactly
+    the way a sibling code repo is, so every pre-existing finding in the docs
+    tree comes back as new. A refusal is recoverable; a confidently inverted
+    answer is not, and telling the two shapes apart costs one element in this
+    loop.
 
     A configured root that is missing on disk is skipped — the source walk
     already reports it, and its absence says nothing about the layout.
@@ -84,7 +86,7 @@ def cross_repo_trees(repo_root: Path, config: IrminsulConfig) -> list[str]:
         return []
     own_resolved = own_root.resolve()
     outside: list[str] = []
-    for rel in config.paths.source_roots:
+    for rel in (config.paths.docs_root, *config.paths.source_roots):
         tree = (repo_root / rel).resolve()
         if not tree.is_dir():
             continue
@@ -100,9 +102,11 @@ def verify_single_repo_topology(repo_root: Path, config: IrminsulConfig) -> None
 
     Of the two supported layouts this guards exactly one: `siblings`, where the
     code repo is a separate git repository that `git worktree add` cannot
-    reproduce. Without the guard the base run finds nothing under those roots,
-    so every finding over them survives as "new" — the exact inversion of what
-    `--delta` promises, delivered with a nonzero exit and no warning.
+    reproduce. It also catches a configured tree that answers to another
+    repository for reasons no layout chose — a docs submodule, say. Without the
+    guard the base run finds nothing under those roots, so every finding over
+    them survives as "new" — the exact inversion of what `--delta` promises,
+    delivered with a nonzero exit and no warning.
 
     Teaching `--delta` to compare across the sibling boundary is open work; the
     seam is here, and it is the only place the refusal is decided.
@@ -112,7 +116,7 @@ def verify_single_repo_topology(repo_root: Path, config: IrminsulConfig) -> None
         return
     roots = ", ".join(repr(r) for r in outside)
     raise DeltaError(
-        f"--delta does not support the siblings layout yet: {roots} "
+        f"--delta cannot compare across a repository boundary yet: {roots} "
         f"belong(s) to a different git repository than {repo_root}. "
         "`git worktree add` checks out tracked files only, so the base "
         "checkout would omit them and every finding over them would be "

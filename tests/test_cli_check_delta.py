@@ -196,7 +196,7 @@ def test_delta_refuses_the_siblings_layout(tmp_path: Path) -> None:
 
     code, out = _check(repo, "--profile", "hard", "--delta")
     assert code == 2
-    assert "siblings layout" in out
+    assert "cannot compare across a repository boundary" in out
     assert "'../code/src'" in out
 
 

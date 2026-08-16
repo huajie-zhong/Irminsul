@@ -200,18 +200,20 @@ def test_cross_repo_trees_ignores_an_unconfigured_nested_repo(tmp_path: Path) ->
     assert cross_repo_trees(tmp_path, _config()) == []
 
 
-def test_cross_repo_trees_inspects_source_roots_only(tmp_path: Path) -> None:
-    """`docs_root` is not enumerated. It is always inside `repo_root`, so the
-    only way it could answer to another repository is a `.git` at or below it —
-    a repo nested inside another's working tree, which no supported layout has.
-    `--delta` treats that like any other unsupported nesting: it runs."""
+def test_cross_repo_trees_flags_a_docs_tree_owned_by_another_repository(tmp_path: Path) -> None:
+    """`docs_root` is enumerated too. No supported layout puts it in its own
+    repository, but an ordinary git submodule does, and `git worktree add`
+    omits it from the base checkout exactly the way it omits a sibling code
+    repo — so every pre-existing finding in the docs tree would come back as
+    new. Refusing is recoverable; a confidently inverted answer is not."""
     _seed_repo(tmp_path)
     docs = _tree(tmp_path, "docs")
     _seed_repo(docs)
     _tree(tmp_path, "src")
 
-    assert cross_repo_trees(tmp_path, _config()) == []
-    verify_single_repo_topology(tmp_path, _config())
+    assert cross_repo_trees(tmp_path, _config()) == ["docs"]
+    with pytest.raises(DeltaError, match="cannot compare across a repository boundary"):
+        verify_single_repo_topology(tmp_path, _config())
 
 
 def test_verify_single_repo_topology_passes_for_one_repo(tmp_path: Path) -> None:
@@ -233,7 +235,7 @@ def test_verify_single_repo_topology_raises_naming_the_offending_root(tmp_path: 
         verify_single_repo_topology(docs_root, _config(source_roots=["../code/src"]))
 
     message = str(excinfo.value)
-    assert "siblings layout" in message
+    assert "cannot compare across a repository boundary" in message
     assert "'../code/src'" in message
     assert "without --delta" in message
 

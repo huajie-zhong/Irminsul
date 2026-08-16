@@ -91,10 +91,13 @@ directly.
 
 Keep `--delta`'s refusal in the siblings layout. `git worktree add` checks out
 tracked files only, so the sibling code repo is absent from the base checkout
-and every finding over it would survive as new. The guard now covers one case
-instead of three; teaching `--delta` to compare across the sibling boundary is
-open work tracked in
-[`RFC 0044`](../80-evolution/rfcs/0044-cross-repo-delta.md).
+and every finding over it would survive as new. Keep it for `docs_root` too,
+even though no supported layout puts the docs tree in its own repository: the
+guard is `--delta` refusing a question it cannot answer, not a detector for
+retired layouts, and an ordinary git submodule produces the same shape. Only
+configured trees are inspected, so an unrelated vendored checkout still never
+trips it. Teaching `--delta` to compare across the boundary is open work tracked
+in [`RFC 0044`](../80-evolution/rfcs/0044-cross-repo-delta.md).
 
 Stop using lettered topology names. `same-repo` and `siblings` describe the
 layout and cannot collide the way "Topology B" did. This is a naming rule, not a
