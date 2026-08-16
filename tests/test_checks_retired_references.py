@@ -578,3 +578,6 @@ def test_retired_references_is_a_hard_check() -> None:
 
     assert RetiredReferencesCheck.name in HARD_REGISTRY
     assert RetiredReferencesCheck.name not in SOFT_REGISTRY
+    # The check emits both severities; the declaration names the blocking one,
+    # matching RfcLifecycleIntegrityCheck, the other mixed-severity hard check.
+    assert RetiredReferencesCheck.default_severity.value == "error"

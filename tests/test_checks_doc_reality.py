@@ -193,6 +193,7 @@ def test_claim_provenance_accepts_a_repo_root_source_root(tmp_path: Path) -> Non
         doc_id="enforcement",
         body=(
             "The runbook exists. <!-- claim:process-claim -->\n\n"
+            "The tool is configured. <!-- claim:config-claim -->\n\n"
             "The binary exists. <!-- claim:code-claim -->\n\n"
             "CI enforces it. <!-- claim:gate-claim -->"
         ),
@@ -204,6 +205,12 @@ def test_claim_provenance_accepts_a_repo_root_source_root(tmp_path: Path) -> Non
             "    claim: The runbook is documented.",
             "    evidence:",
             "      - docs/60-operations/release.md",
+            "  - id: config-claim",
+            "    state: external",
+            "    kind: local_tool",
+            "    claim: The tool is configured.",
+            "    evidence:",
+            "      - irminsul.toml",
             "  - id: code-claim",
             "    state: implemented",
             "    kind: check",
