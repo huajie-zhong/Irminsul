@@ -286,8 +286,8 @@ def _init_siblings(target: Path, *, interactive: bool, code_repo: str | None, fo
             typer.echo(
                 typer.style(
                     "This directory contains code signals. The siblings layout "
-                    "scaffolds a docs-only repo beside the code repo; for code and "
-                    "docs in one repo use `irminsul init` instead.",
+                    "scaffolds a repo that holds only docs, beside the code repo; "
+                    "for code and docs in one repo use `irminsul init` instead.",
                     fg="red",
                 )
             )

@@ -132,6 +132,17 @@ layout and cannot collide the way "Topology B" did.
 - Repositories using either nested layout have no migration command. Moving to
   `siblings` is a filesystem move plus a `source_roots` edit, and the checks
   behave the same afterwards, but nothing automates it.
+- Nothing detects a retired layout at runtime, and nothing will. Both nested
+  shapes still check clean, because the two mechanisms that made them work were
+  never nested-layout code: the enclosing-ignore filter earns its keep on
+  gitignored generated code configured as a source root, and resolving a path
+  through its own nearest `.git` earns its keep when the invocation root sits
+  below the enclosing git root, as in a monorepo subfolder — the shape this
+  repository's own fixtures use. Retiring a layout means deleting the code that
+  existed to serve it, which is done; it does not mean adding code to police it.
+  A detect-and-reject path would be new machinery built for a layout we no
+  longer support, and it could not tell the retired shapes apart from the
+  supported uses above without breaking them.
 - `--delta` still refuses the siblings layout, so the private-docs story keeps
   paying for the missing feature — now visibly, as the single remaining case.
 - Claims on files outside the docs repo are written source-root-relative, which

@@ -200,6 +200,23 @@ def test_claim_evidence_rejects_the_dot_dot_escape(tmp_path: Path) -> None:
     assert any("must not be absolute or escape the tree with '..'" in m for m in messages)
 
 
+def test_claim_evidence_drift_crosses_the_repo_boundary(tmp_path: Path) -> None:
+    """Resolution is not only for the exists/does-not-exist gate: the drift scan
+    reads the same spelling, so it can pull the evidence's commit time from the
+    sibling code repo and compare it against the doc's time in the docs repo.
+    Before the spelling was unified this silently found nothing, because
+    `repo_root / 'core.py'` does not exist."""
+    repo_root = _build_siblings(tmp_path, doc_when=_dt.datetime(2024, 1, 1, tzinfo=_dt.UTC))
+    _write_claim_doc(repo_root, "core.py")
+    docs_repo = Repo(repo_root)
+    _commit_all(docs_repo, "claim doc", when=_dt.datetime(2024, 1, 1, tzinfo=_dt.UTC))
+    docs_repo.close()
+
+    messages = _claim_findings(repo_root)
+
+    assert messages == ["claim 'core-works' cites evidence changed after the doc: 'core.py'"]
+
+
 def test_claim_evidence_that_names_nothing_is_still_an_error(tmp_path: Path) -> None:
     """The mirror: widening the spelling must not make every string resolve."""
     repo_root = _build_siblings(tmp_path)

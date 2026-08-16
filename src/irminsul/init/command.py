@@ -96,6 +96,15 @@ def parse_code_repo(value: str, *, docs_root: Path) -> tuple[str | None, str]:
         return value, _sibling_dir(f"../{parts[1]}", docs_root, value)
 
     if not is_path and len(parts) == 1 and value not in {".", ".."}:
+        # A bare name normally means the sibling `../<name>`. But when a
+        # directory of that name already sits inside the docs repo, the value is
+        # ambiguous, and the nested reading is the one the deleted layout used —
+        # so resolve it literally and let `_sibling_dir` reject it, which names
+        # the sibling rule and the exact spelling that satisfies it. Silently
+        # picking the other reading would configure a layout the user did not
+        # ask for and skip the message written for this mistake.
+        if (docs_root / value).is_dir():
+            return None, _sibling_dir(value, docs_root, value)
         return None, _sibling_dir(f"../{value}", docs_root, value)
 
     return None, _sibling_dir(value, docs_root, value)

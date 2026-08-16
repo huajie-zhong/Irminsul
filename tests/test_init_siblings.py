@@ -71,6 +71,18 @@ def test_parse_bare_name_is_read_as_a_sibling(tmp_path: Path) -> None:
     assert code_dir == "../code"
 
 
+def test_parse_bare_name_matching_a_nested_directory_is_rejected(tmp_path: Path) -> None:
+    """`--code-repo code` with `./code/` already inside the docs repo is
+    ambiguous, and the nested reading is the one the deleted layout used. The
+    rejection written for exactly that mistake has to be what the user sees,
+    rather than a silent reinterpretation into `../code`."""
+    docs = _docs_repo(tmp_path)
+    (docs / "code").mkdir()
+
+    with pytest.raises(Exception, match="sibling"):
+        parse_code_repo("code", docs_root=docs)
+
+
 def test_parse_url_keeps_the_repo_name(tmp_path: Path) -> None:
     docs = _docs_repo(tmp_path)
     spec, code_dir = parse_code_repo("https://github.com/acme/repo", docs_root=docs)
