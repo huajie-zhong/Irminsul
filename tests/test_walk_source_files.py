@@ -394,6 +394,25 @@ def test_globs_warns_when_two_files_share_one_display_path(tmp_path: Path) -> No
     assert "'a.py' names 2 files" in ambiguous[0].message
 
 
+def test_globs_overlapping_roots_are_not_a_display_collision(tmp_path: Path) -> None:
+    """Overlapping in-repo roots walk a file once per root, and every walk emits
+    the same repo-relative display for the same file. That is one file with one
+    spelling, not two files sharing one — the resolver has nothing to guess at,
+    so no warning may fire."""
+    from irminsul.checks.globs import GlobsCheck
+    from irminsul.config import IrminsulConfig, Paths
+    from irminsul.docgraph import build_graph
+
+    repo = tmp_path / "repo"
+    (repo / "docs").mkdir(parents=True)
+    _make_tree(repo, ["src/a.py", "src/sub/b.py"])
+    config = IrminsulConfig(paths=Paths(docs_root="docs", source_roots=["src", "src/sub"]))
+
+    findings = GlobsCheck().run(build_graph(repo, config))
+
+    assert [f for f in findings if f.category == "ambiguous-source-display"] == []
+
+
 def test_globs_stays_quiet_when_every_display_is_unique(tmp_path: Path) -> None:
     from irminsul.checks.globs import GlobsCheck
     from irminsul.config import IrminsulConfig, Paths

@@ -398,13 +398,20 @@ def _ambiguous_display_findings(source_files: list[tuple[Path, str]]) -> list[Fi
     `.github/workflows/*.yml` then collide with the docs repo's own. Nothing
     can disambiguate them, so the only honest move is to say so and let the
     configuration change.
+
+    One file is never a collision with itself. Overlapping in-repo roots —
+    `["src", "src/sub"]`, or `[".", "src"]` — walk the file under the nested
+    root twice, and both walks emit the same repo-relative display for the
+    same file. The resolver has nothing to guess at there, so identical
+    resolved paths are collapsed before counting.
     """
-    by_display: dict[str, list[Path]] = {}
+    by_display: dict[str, dict[Path, None]] = {}
     for abs_path, display in source_files:
-        by_display.setdefault(display, []).append(abs_path)
+        by_display.setdefault(display, {}).setdefault(abs_path.resolve(strict=False), None)
 
     out: list[Finding] = []
-    for display, paths in sorted(by_display.items()):
+    for display, unique_paths in sorted(by_display.items()):
+        paths = list(unique_paths)
         if len(paths) < 2:
             continue
         collisions = ", ".join(path.as_posix() for path in sorted(paths))
