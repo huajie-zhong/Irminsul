@@ -377,9 +377,7 @@ def test_init_interactive_no_code_can_choose_siblings(tmp_path: Path) -> None:
     repo = _docs_repo(tmp_path)
     # "2" chooses siblings, then the code repo spec, then the project name
     # default, then "n" declines the post-scaffold seed prompt.
-    result = runner.invoke(
-        app, ["init", "--path", str(repo)], input="2\nacme/public-code\n\nn\n"
-    )
+    result = runner.invoke(app, ["init", "--path", str(repo)], input="2\nacme/public-code\n\nn\n")
 
     assert result.exit_code == 0, result.stdout
     assert "siblings" in result.stdout

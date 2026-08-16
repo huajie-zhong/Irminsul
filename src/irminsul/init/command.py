@@ -37,9 +37,9 @@ _SCAFFOLDS_DIR = Path(__file__).parent / "scaffolds"
 _WORKFLOWS_DIR = Path(__file__).parent / "workflows"
 
 #: Directory the sibling repos are checked out under in generated CI.
-CI_WORKSPACE = "workspace"
+_CI_WORKSPACE = "workspace"
 #: Path the docs repo is checked out to in generated sibling CI.
-CI_DOCS_PATH = f"{CI_WORKSPACE}/docs"
+_CI_DOCS_PATH = f"{_CI_WORKSPACE}/docs"
 
 _CODE_SIGNAL_FILES = (
     "pyproject.toml",
@@ -187,7 +187,7 @@ def ci_code_checkout_path(code_dir: str) -> str:
     land wherever `code_dir` points relative to it for `source_roots` to
     resolve identically in CI and on a developer's machine.
     """
-    return posixpath.normpath(posixpath.join(CI_DOCS_PATH, code_dir))
+    return posixpath.normpath(posixpath.join(_CI_DOCS_PATH, code_dir))
 
 
 def _posix_join(prefix: str, rel: str) -> str:
@@ -342,7 +342,7 @@ def write_scaffold(target_root: Path, answers: InitAnswers, *, force: bool = Fal
         "github_user": answers.github_user,
         "today": answers.today,
         "code_repo_spec": answers.code_repo_spec,
-        "docs_checkout_path": CI_DOCS_PATH,
+        "docs_checkout_path": _CI_DOCS_PATH,
         "code_checkout_path": (
             ci_code_checkout_path(answers.code_dir) if answers.code_dir else None
         ),

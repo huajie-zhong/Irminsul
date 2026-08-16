@@ -165,12 +165,20 @@ def _display_path(path: Path, repo_root: Path, source_root: Path) -> str:
 def resolve_display_path(repo_root: Path, source_roots: list[str], display: str) -> Path | None:
     """Absolute path for a `display_posix` spelling, or None when it names nothing.
 
-    The inverse of `_display_path`, and the single place that decodes the one
-    spelling the whole tool speaks. A display is repo-relative when it names
-    something inside `repo_root`, and source-root-relative when it names
-    something under a configured root that lies outside it — the code repo of
-    the `siblings` layout. Repo-relative wins, matching `_display_path`, which
-    only falls back to the source root after `relative_to(repo_root)` fails.
+    A left inverse of `_display_path` — exact wherever the display is
+    unambiguous, which is everywhere a configuration produces one display per
+    file. `_display_path` itself is not injective: two configured roots outside
+    the repo that both hold `a.py`, or a sibling file whose name collides with
+    a repo-relative one, encode to the same spelling, and no implementation can
+    invert that. `GlobsCheck` warns when the walk produces such a collision
+    rather than leaving the resolver to guess.
+
+    It is the single place that decodes the one spelling the whole tool speaks.
+    A display is repo-relative when it names something inside `repo_root`, and
+    source-root-relative when it names something under a configured root that
+    lies outside it — the code repo of the `siblings` layout. Repo-relative
+    wins, matching `_display_path`, which only falls back to the source root
+    after `relative_to(repo_root)` fails.
 
     Roots inside `repo_root` are not searched: their files already display
     repo-relative, so searching them would make a second spelling resolve.
@@ -374,6 +382,52 @@ def _is_excluded(parts: tuple[str, ...]) -> bool:
     return PurePosixPath(parts[-1]).suffix in {".pyc", ".pyo"}
 
 
+def _ambiguous_display_findings(source_files: list[tuple[Path, str]]) -> list[Finding]:
+    """Warn when two source files share one display path.
+
+    `_display_path` is not injective, so `resolve_display_path` is only a left
+    inverse: two files can produce the same spelling, and then no resolver can
+    be right about which one a `describes:` pattern or a `claims[].evidence`
+    entry meant. Two configured roots outside the repo that both hold `a.py`
+    is the plain case; so is a sibling root whose file collides with a
+    repo-relative name, where the repo-relative reading wins and the sibling
+    file quietly stops reading as source.
+
+    It becomes realistic as soon as a configured root widens from `../code/src`
+    to `../code`: the code repo's `README.md`, `AGENTS.md` and
+    `.github/workflows/*.yml` then collide with the docs repo's own. Nothing
+    can disambiguate them, so the only honest move is to say so and let the
+    configuration change.
+    """
+    by_display: dict[str, list[Path]] = {}
+    for abs_path, display in source_files:
+        by_display.setdefault(display, []).append(abs_path)
+
+    out: list[Finding] = []
+    for display, paths in sorted(by_display.items()):
+        if len(paths) < 2:
+            continue
+        collisions = ", ".join(path.as_posix() for path in sorted(paths))
+        out.append(
+            Finding(
+                check=GlobsCheck.name,
+                severity=Severity.warning,
+                category="ambiguous-source-display",
+                message=(f"source display path '{display}' names {len(paths)} files: {collisions}"),
+                suggestion=(
+                    "Narrow or rename the configured source roots so each file has one "
+                    "display path — `describes` and `claims[].evidence` can only mean one"
+                ),
+                data={
+                    "problem": "ambiguous-source-display",
+                    "display": display,
+                    "paths": collisions,
+                },
+            )
+        )
+    return out
+
+
 class GlobsCheck:
     name: ClassVar[str] = "globs"
     default_severity: ClassVar[Severity] = Severity.error
@@ -408,6 +462,8 @@ class GlobsCheck:
                     data={"problem": issue.kind, "source_root": issue.root},
                 )
             )
+
+        out.extend(_ambiguous_display_findings(source_files))
 
         for node in graph.nodes.values():
             for pattern in node.frontmatter.describes:

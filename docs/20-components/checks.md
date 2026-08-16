@@ -41,7 +41,7 @@ Checks consume a [DocGraph](docgraph.md) and return `Finding` records with sever
 | Example check | What it enforces | Severity |
 |---------------|------------------|----------|
 | `frontmatter` | Required fields present, enums valid, id matches filename rule, no duplicate ids | error |
-| `globs` | Every `describes` pattern resolves under the configured source policy; unsafe symlink escapes are rejected | error / warning |
+| `globs` | Every `describes` pattern resolves under the configured source policy; unsafe symlink escapes are rejected; two source files never share one display path | error / warning |
 | `uniqueness` | Each source file claimed by exactly one most-specific doc; ties are silent duplication | error / warning |
 | `links` | Internal markdown links resolve; external/anchor-only skipped | error |
 | `schema-leak` | No type/schema definitions inside `docs/20-components/` (they live in code, not docs) | error |
@@ -68,6 +68,15 @@ produce one `info` finding with `category: stale-suppression` and structured
 line-or-block scope. Informational findings are not stored in baselines, so a
 baseline update cannot hide obsolete exceptions. Unmatched block markers remain
 hard errors, and marker removal stays manual.
+
+`globs` also warns when the source walk emits one display path for two files.
+The display encoding is not injective — two configured roots outside the repo
+that both hold `a.py`, or a sibling file whose name collides with a
+repo-relative one, produce the same spelling — so no `describes` pattern or
+`claims[].evidence` entry can name one of them, and nothing downstream can
+disambiguate. Widening a configured root from `../code/src` to `../code` is
+enough to hit it: the code repo's readme and its `.github/workflows/*.yml`
+then collide with the docs repo's own.
 
 `retired-references` builds its tombstone registry only from stable ADRs. It is
 a hard check: a stale reference is an `error`, so the gate fails without

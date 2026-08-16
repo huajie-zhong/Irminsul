@@ -388,7 +388,10 @@ class ClaimProvenanceCheck:
                             message=f"claim '{claim.id}' evidence path does not exist: '{evidence}'",
                             path=node.path,
                             doc_id=node.id,
-                            suggestion=_EVIDENCE_SPELLING_SUGGESTION,
+                            suggestion=(
+                                "Point the claim at existing source, config, CI, or doc "
+                                f"evidence. {_EVIDENCE_SPELLING_SUGGESTION}"
+                            ),
                         )
                     )
 

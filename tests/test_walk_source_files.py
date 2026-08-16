@@ -371,6 +371,45 @@ def test_resolve_display_path_prefers_the_repo_relative_reading(tmp_path: Path) 
     assert resolved == docs / "pkg" / "core.py"
 
 
+def test_globs_warns_when_two_files_share_one_display_path(tmp_path: Path) -> None:
+    """`_display_path` is not injective, so the resolver is only a left inverse.
+    Two sibling roots each holding `a.py` encode to the same spelling, and then
+    no `describes` pattern or `claims[].evidence` entry can mean one of them.
+    Nothing can disambiguate it, so it is reported instead of guessed at."""
+    from irminsul.checks.globs import GlobsCheck
+    from irminsul.config import IrminsulConfig, Paths
+    from irminsul.docgraph import build_graph
+
+    docs = tmp_path / "docs"
+    (docs / "docs").mkdir(parents=True)
+    _make_tree(tmp_path / "code", ["a.py"])
+    _make_tree(tmp_path / "code2", ["a.py"])
+    config = IrminsulConfig(paths=Paths(docs_root="docs", source_roots=["../code", "../code2"]))
+
+    findings = GlobsCheck().run(build_graph(docs, config))
+
+    ambiguous = [f for f in findings if f.category == "ambiguous-source-display"]
+    assert len(ambiguous) == 1
+    assert ambiguous[0].severity.value == "warning"
+    assert "'a.py' names 2 files" in ambiguous[0].message
+
+
+def test_globs_stays_quiet_when_every_display_is_unique(tmp_path: Path) -> None:
+    from irminsul.checks.globs import GlobsCheck
+    from irminsul.config import IrminsulConfig, Paths
+    from irminsul.docgraph import build_graph
+
+    docs = tmp_path / "docs"
+    (docs / "docs").mkdir(parents=True)
+    _make_tree(tmp_path / "code", ["a.py"])
+    _make_tree(tmp_path / "code2", ["b.py"])
+    config = IrminsulConfig(paths=Paths(docs_root="docs", source_roots=["../code", "../code2"]))
+
+    findings = GlobsCheck().run(build_graph(docs, config))
+
+    assert [f for f in findings if f.category == "ambiguous-source-display"] == []
+
+
 def test_resolve_display_path_does_not_search_roots_inside_the_repo(tmp_path: Path) -> None:
     """Files under an in-repo source root already display repo-relative, so
     searching that root would make a second spelling resolve: `evidence:
