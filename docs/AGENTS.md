@@ -172,7 +172,7 @@ automatically once any doc declares one.
 | `0040-retired-reference-audit` | [Detect references to retired commands and concepts](80-evolution/rfcs/0040-retired-reference-audit.md) | explanation | 2 |  |
 | `0041-pre-lifecycle-rfc-migration` | [Migrate pre-lifecycle RFCs without inferring intent](80-evolution/rfcs/0041-pre-lifecycle-rfc-migration.md) | explanation | 2 |  |
 | `0042-rfc-dependency-and-supersession-graphs` | [RFC dependency and supersession graphs](80-evolution/rfcs/0042-rfc-dependency-and-supersession-graphs.md) | explanation | 2 |  |
-| `0044-cross-repo-delta` | [Cross-repo topologies for check --delta](80-evolution/rfcs/0044-cross-repo-delta.md) | explanation | 2 |  |
+| `0044-cross-repo-delta` | [Cross-repo layouts for check --delta](80-evolution/rfcs/0044-cross-repo-delta.md) | explanation | 2 |  |
 | `80-evolution` | [Evolution](80-evolution/INDEX.md) | reference | 4 |  |
 | `patterns` | [Evolution Patterns](80-evolution/patterns.md) | explanation | 2 |  |
 | `rfcs` | [RFCs](80-evolution/rfcs/INDEX.md) | reference | 2 |  |

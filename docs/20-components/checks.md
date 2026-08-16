@@ -102,7 +102,12 @@ case. So a declaration like `sidecar mode` still catches a capitalised heading,
 while a proper name such as `Topology A` cannot swallow the ordinary English
 "whatever topology a project picks" — a tombstone that wants both readings lists
 both spellings in `matches`. Fenced examples stay
-visible because obsolete commands there are operationally dangerous. Findings
+visible because obsolete commands there are operationally dangerous — which
+means a migration note showing the retired invocation has no in-fence remedy,
+since a Markdown link cannot live inside a fence. Two answers exist and both
+are deliberate: wrap the example in an HTML comment, which is not read as a
+current claim, or keep it where the audit does not reach — a `draft` doc or
+the changelog, which is a migration record rather than guidance. Findings
 aggregate repeated aliases per retirement and doc, and carry the declaring ADR,
 guidance, first line, and occurrence count. An exact phrase linked to its owning
 ADR is an explicit historical citation. CLI tombstones are first checked against

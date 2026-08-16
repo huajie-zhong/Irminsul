@@ -1,6 +1,6 @@
 ---
 id: 0044-cross-repo-delta
-title: "Cross-repo topologies for check --delta"
+title: "Cross-repo layouts for check --delta"
 audience: explanation
 tier: 2
 status: draft
@@ -13,7 +13,7 @@ affects:
 - docgraph
 ---
 
-# RFC 0044: Cross-repo topologies for check --delta
+# RFC 0044: Cross-repo layouts for check --delta
 
 ## Summary
 
