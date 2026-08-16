@@ -202,6 +202,36 @@ def resolve_display_path(repo_root: Path, source_roots: list[str], display: str)
     return None
 
 
+def external_display_for_path(
+    repo_root: Path, source_roots: list[str], resolved: Path
+) -> str | None:
+    """The display spelling of an on-disk file under an external source root.
+
+    The encode direction of `resolve_display_path`, for the one case where a
+    user holds a filesystem path the tool refuses: a sibling source file's
+    real location (`../code/src/app/main.py`) is outside the repo, but the
+    tool speaks its source-root-relative display (`app/main.py`). Returns None
+    when no configured external root contains the file, or when the spelling
+    would decode to a *different* file — the repo-relative reading wins in
+    `resolve_display_path`, so a colliding in-repo name (which `GlobsCheck`
+    warns about) makes the display mean something else and mapping to it would
+    silently answer about the wrong file.
+    """
+    resolved_abs = resolved.resolve()
+    repo_abs = repo_root.resolve()
+    for root in source_roots:
+        abs_root = (repo_root / root).resolve()
+        if abs_root.is_relative_to(repo_abs):
+            continue
+        if not resolved_abs.is_relative_to(abs_root):
+            continue
+        display = PurePosixPath(*resolved_abs.relative_to(abs_root).parts).as_posix()
+        decoded = resolve_display_path(repo_root, source_roots, display)
+        if decoded is not None and decoded.resolve() == resolved_abs:
+            return display
+    return None
+
+
 def is_external_source_display(repo_root: Path, source_roots: list[str], display: str) -> bool:
     """True when `display` resolves under a source root outside `repo_root`.
 

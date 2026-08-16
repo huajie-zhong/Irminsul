@@ -13,6 +13,7 @@ from pathspec import GitIgnoreSpec
 
 from irminsul.checks import HARD_REGISTRY, SOFT_REGISTRY, Check, Finding, sort_findings
 from irminsul.checks.globs import (
+    external_display_for_path,
     is_source_path,
     resolve_display_path,
     source_root_prefixes,
@@ -572,6 +573,12 @@ def _existing_repo_relative(repo_root: Path, raw_path: Path, source_roots: list[
     had no spelling at all for its own source files: the `../code/...` form is
     outside the repo and refused, and the display form did not exist on disk
     under `repo_root`.
+
+    The mirror also holds: an existing file under a configured external root —
+    `../code/src/app/main.py`, the spelling a shell tab-completes — maps to
+    its display spelling instead of being refused, the encode direction of the
+    same round trip. Only a path that neither lies in the repo nor maps to a
+    display the tool speaks is refused as outside the repo.
     """
     absolute = raw_path if raw_path.is_absolute() else repo_root / raw_path
     resolved = absolute.resolve()
@@ -579,6 +586,9 @@ def _existing_repo_relative(repo_root: Path, raw_path: Path, source_roots: list[
         try:
             rel = resolved.relative_to(repo_root.resolve())
         except ValueError as exc:
+            display_spelling = external_display_for_path(repo_root, source_roots, resolved)
+            if display_spelling is not None:
+                return Path(PurePosixPath(display_spelling))
             raise ContextError(f"path is outside the repo: {raw_path}", code=2) from exc
         return Path(PurePosixPath(*rel.parts))
 

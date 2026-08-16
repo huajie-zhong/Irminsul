@@ -256,12 +256,25 @@ def test_a_claim_on_a_missing_sibling_file_is_an_error(tmp_path: Path) -> None:
     assert "'gone.py' matched zero files" in result.output
 
 
-def test_sibling_source_paths_are_not_addressable_by_path(tmp_path: Path) -> None:
-    """`context <path>` resolves against the repo irminsul was invoked from, so
-    a file in the sibling code repo cannot be named that way. Pinned because it
-    is a documented limitation of the layout, not an accident."""
+def test_sibling_source_paths_map_to_their_display_spelling(tmp_path: Path) -> None:
+    """`context ../code/src/core.py` — the spelling a shell tab-completes — is
+    the real location of a file the tool addresses as `core.py`. An existing
+    path under a configured external source root maps to that display spelling
+    instead of being refused as outside the repo."""
     repo_root = _build_siblings(tmp_path)
     result = runner.invoke(app, ["context", "../code/src/core.py", "--path", str(repo_root)])
+    assert result.exit_code == 0, result.output
+    assert "owner: core" in result.output
+
+
+def test_paths_outside_every_source_root_are_still_refused(tmp_path: Path) -> None:
+    """The mirror: the mapping covers configured external roots only. A real
+    file outside the repo and outside every root has no display spelling, so
+    it is refused exactly as before."""
+    repo_root = _build_siblings(tmp_path)
+    stray = repo_root.parent / "stray.py"
+    stray.write_text("x = 1\n", encoding="utf-8")
+    result = runner.invoke(app, ["context", "../stray.py", "--path", str(repo_root)])
     assert result.exit_code == 2
     assert "outside the repo" in result.output
 

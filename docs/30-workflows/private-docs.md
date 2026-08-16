@@ -152,12 +152,14 @@ new. Run `check` without `--delta`. See
 to compare across the sibling boundary is proposed but not shipped.
 
 Commands that take a path resolve it against the repository Irminsul was
-invoked from, so a file in the sibling code repo cannot be named by its
-filesystem path — `irminsul context ../code/src/core.py` exits 2. Name it by
-its display spelling instead, the same source-root-relative form `describes:`
-and `claims[].evidence` use: with `source_roots = ["../code/src"]`,
-`irminsul context core.py` resolves. That is the only spelling the tool speaks
-for a file outside the docs repo.
+invoked from. A file in the sibling code repo answers to two spellings there:
+its display spelling — the source-root-relative form `describes:` and
+`claims[].evidence` use, so with `source_roots = ["../code/src"]`,
+`irminsul context core.py` resolves — and its filesystem path,
+`irminsul context ../code/src/core.py`, which `context` maps to that same
+display spelling when the file exists under a configured source root. The
+display spelling is still the only form the docs themselves may use; a path
+outside the docs repo and outside every configured root exits 2.
 
 Two repositories cannot be made atomic. The Change Triplet holds inside the
 docs repo; coordinating a code change with its doc change stays a review

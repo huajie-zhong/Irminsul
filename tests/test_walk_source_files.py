@@ -452,6 +452,38 @@ def test_resolve_display_path_rejects_escapes_and_misses(tmp_path: Path) -> None
     assert resolve_display_path(docs, ["../code/src"], "/etc/passwd") is None
 
 
+def test_external_display_for_path_encodes_the_walks_spelling(tmp_path: Path) -> None:
+    """The encode direction of `resolve_display_path`: the real location of a
+    sibling source file maps to the display the whole tool speaks."""
+    from irminsul.checks.globs import external_display_for_path
+
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    code = tmp_path / "code"
+    _make_tree(code, ["src/pkg/core.py"])
+
+    roots = ["../code/src"]
+    assert external_display_for_path(docs, roots, code / "src" / "pkg" / "core.py") == "pkg/core.py"
+    assert external_display_for_path(docs, roots, tmp_path / "stray.py") is None
+
+
+def test_external_display_for_path_refuses_a_colliding_spelling(tmp_path: Path) -> None:
+    """When the display would decode to a different file — the repo-relative
+    reading wins in `resolve_display_path` — mapping to it would silently
+    answer about the wrong file, so the encode refuses instead."""
+    from irminsul.checks.globs import external_display_for_path
+
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    _make_tree(docs, ["pkg/core.py"])
+    code = tmp_path / "code"
+    _make_tree(code, ["src/pkg/core.py"])
+
+    assert (
+        external_display_for_path(docs, ["../code/src"], code / "src" / "pkg" / "core.py") is None
+    )
+
+
 def test_is_external_source_display_only_covers_roots_outside_the_repo(tmp_path: Path) -> None:
     """In-repo source is classified by its repo-relative prefix, so the disk
     test exists only for the siblings case where no prefix survives."""

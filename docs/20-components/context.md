@@ -21,7 +21,7 @@ tests:
 
 The command supports exactly one input mode:
 
-- `irminsul context <path>` for a source or doc path. A path inside the invocation root is named repo-relative; a source file under a configured root *outside* it — the sibling code repo of the [private-docs layout](../30-workflows/private-docs.md) — is named by its source-root-relative display spelling, the same one `describes:` and `claims[].evidence` use. Its filesystem path (`../code/src/core.py`) is refused as outside the repo
+- `irminsul context <path>` for a source or doc path. A path inside the invocation root is named repo-relative; a source file under a configured root *outside* it — the sibling code repo of the [private-docs layout](../30-workflows/private-docs.md) — is named by its source-root-relative display spelling, the same one `describes:` and `claims[].evidence` use. Its filesystem path (`../code/src/core.py`) also works: an existing file under a configured external root is mapped to that display spelling. Only a path that neither lies in the repo nor sits under a configured root is refused as outside the repo
 - `irminsul context --topic "<query terms>"` for deterministic tokenized search over doc id, title, path, `describes`, `tests`, `tags`, and `summary`: every whitespace-separated term in the query must appear as a substring somewhere in that set (terms may hit different fields), so multi-word queries no longer need to match as one literal phrase
 - `irminsul context --changed` for staged, unstaged, and untracked git files
 - `irminsul context --change <rfc-id>` as an alias for the [change lifecycle](change.md) status report, so an agent oriented around one RFC gets the same evidence view without switching command groups
