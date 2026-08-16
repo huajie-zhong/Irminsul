@@ -4,8 +4,14 @@
 
 ### Enhancements
 - `irminsul init --topology same-repo|siblings` — one command scaffolds either supported repository layout. `--topology siblings` takes `--code-repo <owner/repo|path>`, writes `source_roots` reaching through `../`, and generates two-checkout CI (ADR-0022).
+- `claims[].evidence` now reads the same display spelling as `describes:`: repo-relative inside the docs repo, source-root-relative for files under a source root outside it. In the `siblings` layout a claim on `../code/src/core.py` is written `core.py`, so evidence and `describes:` can finally name the same file. Evidence that is absolute or reaches out through `..` is rejected.
+- `--code-repo <bare-name>` is rejected instead of silently reinterpreted when a directory of that name already exists inside the docs repo, since the intended meaning is ambiguous.
+
+### Changed
+- **`retired-references` is now a hard check and its stale-guidance findings are errors**, so a reference to retired surface fails the gate without `--strict` (ADR-0022). Move it from `checks.soft_deterministic` to `checks.hard` in `irminsul.toml`. It now also audits ADRs (except against their own tombstones), the `AGENTS.md` / `CLAUDE.md` agent manifests, and frontmatter; the generated `regen agents-md` region and frozen RFC records stay out of range.
 
 ### Removed
+- `/mkdocs.yml` from `.gitignore` — nothing has generated it since the render subsystem was retired (ADR-0013).
 - `irminsul init-docs-only` and `irminsul init --fresh --topology docs-only`, along with the two nested repository layouts they served — code cloned into a gitignored subfolder of the docs repo, and `docs/` as a nested private repo inside the code repo (ADR-0022). Only `same-repo` and `siblings` are supported; moving to `siblings` is a filesystem move plus a `source_roots` edit, and nothing automates it.
 
 ## v0.2.0 (2026-05-08)
