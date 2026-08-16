@@ -64,10 +64,10 @@ simply absent from the base checkout (see
 [private docs](../30-workflows/private-docs.md)). The base run then finds
 nothing under that tree and every finding over it survives as new — the exact
 inversion of what `--delta` promises. `verify_single_repo_topology` compares
-the nearest enclosing `.git` of `docs_root` and each source root against the
-target repo's own, and exits 2 naming the offending roots before any checkout
-happens. Only configured roots are inspected, so a vendored checkout carrying
-its own `.git` never trips it.
+the nearest enclosing `.git` of each configured source root against the target
+repo's own, and exits 2 naming the offending roots before any checkout happens.
+Only configured source roots are inspected, so a vendored checkout carrying its
+own `.git` never trips it.
 
 Teaching `--delta` to compare across the sibling boundary means anchoring the
 doc walk and the source walk to different roots, and accepting that a single

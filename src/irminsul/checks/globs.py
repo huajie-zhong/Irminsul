@@ -229,9 +229,10 @@ def _matches(spec: GitIgnoreSpec | None, display: str, *, is_dir: bool = False) 
 class _GitIgnoreMatcher:
     def __init__(self, source_root: Path) -> None:
         self.source_root = source_root
+        # `git_root_for` walks up, returning `source_root` itself or one of its
+        # parents, so the boundary is always an ancestor of the source root and
+        # needs no containment fallback.
         self.boundary = git_root_for(source_root) or source_root
-        if not source_root.is_relative_to(self.boundary):
-            self.boundary = source_root
         self._cache: dict[Path, GitIgnoreSpec | None] = {}
 
     def matches(self, path: Path, *, is_dir: bool = False) -> bool:

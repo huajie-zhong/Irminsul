@@ -125,8 +125,8 @@ def test_pristine_checkout_no_git_repo_raises(tmp_path: Path) -> None:
             pass
 
 
-def _config(*, docs_root: str = "docs", source_roots: list[str] | None = None) -> IrminsulConfig:
-    return IrminsulConfig(paths=Paths(docs_root=docs_root, source_roots=source_roots or ["src"]))
+def _config(*, source_roots: list[str] | None = None) -> IrminsulConfig:
+    return IrminsulConfig(paths=Paths(docs_root="docs", source_roots=source_roots or ["src"]))
 
 
 def _seed_repo(root: Path) -> None:
@@ -198,6 +198,20 @@ def test_cross_repo_trees_ignores_an_unconfigured_nested_repo(tmp_path: Path) ->
     _seed_repo(_tree(tmp_path, "vendor/third-party"))
 
     assert cross_repo_trees(tmp_path, _config()) == []
+
+
+def test_cross_repo_trees_inspects_source_roots_only(tmp_path: Path) -> None:
+    """`docs_root` is not enumerated. It is always inside `repo_root`, so the
+    only way it could answer to another repository is a `.git` at or below it —
+    a repo nested inside another's working tree, which no supported layout has.
+    `--delta` treats that like any other unsupported nesting: it runs."""
+    _seed_repo(tmp_path)
+    docs = _tree(tmp_path, "docs")
+    _seed_repo(docs)
+    _tree(tmp_path, "src")
+
+    assert cross_repo_trees(tmp_path, _config()) == []
+    verify_single_repo_topology(tmp_path, _config())
 
 
 def test_verify_single_repo_topology_passes_for_one_repo(tmp_path: Path) -> None:

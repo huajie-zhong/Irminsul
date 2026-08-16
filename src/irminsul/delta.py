@@ -61,13 +61,20 @@ def compute_delta(worktree_findings: list[Finding], base_findings: list[Finding]
 
 
 def cross_repo_trees(repo_root: Path, config: IrminsulConfig) -> list[str]:
-    """Configured trees owned by a git repository other than `repo_root`'s.
+    """Configured source roots owned by a git repository other than `repo_root`'s.
 
     `git worktree add` checks out tracked files only, so a tree that belongs to
     another repository is simply absent from the base checkout. In the siblings
     layout that is the code repo `source_roots` reach through `../`. Checked per
     configured root rather than by scanning the tree, so an unrelated vendored
     checkout never trips it.
+
+    Only `source_roots` are inspected. `docs_root` is always inside `repo_root` —
+    a `docs_root` that escapes it does not degrade, it fails outright in
+    `build_graph`'s `_to_repo_relative` — so the only way it could answer to a
+    different repository is a `.git` at or below `docs_root`, which is a
+    repository nested inside another's working tree. Neither supported layout
+    has one, and `--delta` treats every other such nesting as ordinary.
 
     A configured root that is missing on disk is skipped — the source walk
     already reports it, and its absence says nothing about the layout.
@@ -77,7 +84,7 @@ def cross_repo_trees(repo_root: Path, config: IrminsulConfig) -> list[str]:
         return []
     own_resolved = own_root.resolve()
     outside: list[str] = []
-    for rel in (config.paths.docs_root, *config.paths.source_roots):
+    for rel in config.paths.source_roots:
         tree = (repo_root / rel).resolve()
         if not tree.is_dir():
             continue

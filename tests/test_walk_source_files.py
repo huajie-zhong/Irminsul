@@ -215,14 +215,22 @@ def test_explicit_exclude_vetoes_include(tmp_path: Path) -> None:
 
 
 def test_enclosing_ignore_cannot_hide_explicit_source_root(tmp_path: Path) -> None:
+    """Configuring a root is a deliberate act; a `.gitignore` above it must not
+    silently undo it. The live same-repo case is generated code: the tree is
+    gitignored because it is build output, and it is a source root because docs
+    still have to own it.
+
+    Only the pattern that would hide the root itself is dropped. Patterns that
+    select files *within* the root are ordinary excludes and still apply — the
+    root is un-hidden, not un-filtered."""
     repo = tmp_path / "repo"
-    _make_tree(repo, ["code/src/a.py", "code/src/generated.py"])
+    _make_tree(repo, ["generated/api.py", "generated/scratch.py"])
     (repo / ".git").mkdir()
-    (repo / ".gitignore").write_text("/code/\ncode/src/generated.py\n", encoding="utf-8")
+    (repo / ".gitignore").write_text("/generated/\ngenerated/scratch.py\n", encoding="utf-8")
 
-    result = _walk(repo, roots=["code/src"])
+    result = _walk(repo, roots=["generated"])
 
-    assert {display for _, display in result.files} == {"code/src/a.py"}
+    assert {display for _, display in result.files} == {"generated/api.py"}
 
 
 def test_cross_repo_uses_nearest_repository_gitignore(tmp_path: Path) -> None:
