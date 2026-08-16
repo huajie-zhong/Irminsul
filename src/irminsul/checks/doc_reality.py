@@ -8,6 +8,11 @@ from pathlib import Path
 from typing import ClassVar
 
 from irminsul.checks.base import Finding, Severity
+from irminsul.checks.globs import (
+    is_external_source_display,
+    resolve_display_path,
+    source_root_prefixes,
+)
 from irminsul.config import TerminologyRule
 from irminsul.docgraph import DocGraph, DocNode
 from irminsul.frontmatter import ClaimStateEnum, RfcStateEnum, StatusEnum
@@ -42,6 +47,10 @@ _STRUCTURED_SECTION_HEADINGS = {
     "health dashboard",
 }
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
+_EVIDENCE_SPELLING_SUGGESTION = (
+    "Spell evidence the way `describes:` does: repo-relative inside the docs repo, "
+    "source-root-relative for files under a source root outside it"
+)
 
 
 def _stable_audit_nodes(graph: DocGraph) -> list[DocNode]:
@@ -342,6 +351,11 @@ class ClaimProvenanceCheck:
 
         return out
 
+    def _resolve_evidence(self, graph: DocGraph, evidence: str) -> Path | None:
+        assert graph.config is not None
+        assert graph.repo_root is not None
+        return resolve_display_path(graph.repo_root, graph.config.paths.source_roots, evidence)
+
     def _validate_evidence(self, graph: DocGraph, node: DocNode) -> list[Finding]:
         assert graph.config is not None
         assert graph.repo_root is not None
@@ -350,21 +364,22 @@ class ClaimProvenanceCheck:
         for claim in node.frontmatter.claims:
             evidence_paths = [Path(evidence) for evidence in claim.evidence]
             for evidence, rel_path in zip(claim.evidence, evidence_paths, strict=True):
-                if Path(evidence).is_absolute():
+                if rel_path.is_absolute() or ".." in rel_path.parts:
                     out.append(
                         Finding(
                             check=self.name,
                             severity=Severity.error,
                             message=(
-                                f"claim '{claim.id}' evidence must be repo-relative: '{evidence}'"
+                                f"claim '{claim.id}' evidence must not be absolute or "
+                                f"escape the tree with '..': '{evidence}'"
                             ),
                             path=node.path,
                             doc_id=node.id,
-                            suggestion="Use a repo-relative evidence path",
+                            suggestion=_EVIDENCE_SPELLING_SUGGESTION,
                         )
                     )
                     continue
-                if not (graph.repo_root / rel_path).exists():
+                if self._resolve_evidence(graph, evidence) is None:
                     out.append(
                         Finding(
                             check=self.name,
@@ -372,7 +387,7 @@ class ClaimProvenanceCheck:
                             message=f"claim '{claim.id}' evidence path does not exist: '{evidence}'",
                             path=node.path,
                             doc_id=node.id,
-                            suggestion="Point the claim at existing source, config, CI, or doc evidence",
+                            suggestion=_EVIDENCE_SPELLING_SUGGESTION,
                         )
                     )
 
@@ -500,8 +515,8 @@ class ClaimProvenanceCheck:
             latest_path: str | None = None
             latest_time = None
             for evidence in claim.evidence:
-                evidence_abs = graph.repo_root / evidence
-                if not evidence_abs.exists():
+                evidence_abs = self._resolve_evidence(graph, evidence)
+                if evidence_abs is None:
                     continue
                 evidence_time = last_commit_time_any_repo(evidence_abs, graph.repo_root)
                 if evidence_time is None or evidence_time.when is None:
@@ -570,12 +585,26 @@ class ClaimProvenanceCheck:
         )
 
     def _is_source_evidence(self, graph: DocGraph, path: Path) -> bool:
+        """True when the evidence spelling names a configured source tree.
+
+        Two spellings, because the source walk emits two. Inside the docs repo
+        a source file displays repo-relative, so the configured root is a
+        literal prefix and the test stays lexical — a not-yet-created
+        `src/new.py` still reads as source, and `_validate_evidence` reports
+        its absence once rather than twice. Outside the docs repo (`siblings`)
+        the display is source-root-relative and carries no prefix at all, so
+        membership is settled on disk instead.
+        """
         assert graph.config is not None
+        assert graph.repo_root is not None
         path_posix = path.as_posix()
-        return any(
-            path_posix == root.strip("/\\") or path_posix.startswith(f"{root.strip('/\\')}/")
-            for root in graph.config.paths.source_roots
-        )
+        source_roots = graph.config.paths.source_roots
+        for prefix in source_root_prefixes(graph.repo_root, source_roots):
+            if not prefix:
+                return True
+            if path_posix == prefix or path_posix.startswith(f"{prefix}/"):
+                return True
+        return is_external_source_display(graph.repo_root, source_roots, path_posix)
 
     def _is_component_doc_evidence(self, graph: DocGraph, path: Path) -> bool:
         docs_root = _docs_root(graph)

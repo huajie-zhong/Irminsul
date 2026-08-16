@@ -74,6 +74,24 @@ Widen the configured root to `../code` if you prefer claims that read
 `src/core.py`. Claims on files inside the docs repo — tests, fixtures, the docs
 themselves — stay repo-relative as usual.
 
+The structured `claims:` field reads the same spelling. Evidence naming a file
+in the code repo is written source-root-relative, exactly as `describes:` writes
+it, and evidence naming anything inside the docs repo stays repo-relative:
+
+```yaml
+claims:
+  - id: core-works
+    state: implemented
+    kind: feature
+    claim: The core module exists.
+    evidence:
+      - core.py                     # ../code/src/core.py
+      - docs/20-components/core.md  # inside the docs repo
+```
+
+There is one spelling, so there is no escape hatch: an evidence path that is
+absolute, or that reaches out through `..`, is an error.
+
 ## CI
 
 The gate runs in the private docs repo, and CI has to rebuild the workspace

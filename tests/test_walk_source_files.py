@@ -9,6 +9,8 @@ import pytest
 from irminsul.checks.globs import (
     _is_within_source_root,
     is_configured_source_path,
+    is_external_source_display,
+    resolve_display_path,
     walk_configured_source_files,
     walk_source_files,
 )
@@ -309,3 +311,63 @@ def test_deleted_path_policy_honors_excludes_and_gitignore(tmp_path: Path) -> No
     assert is_configured_source_path(repo, config, "src/a.py") is True
     assert is_configured_source_path(repo, config, "src/excluded.py") is False
     assert is_configured_source_path(repo, config, "src/ignored.py") is False
+
+
+def test_resolve_display_path_round_trips_the_walks_own_spelling(tmp_path: Path) -> None:
+    """The resolver is the inverse of `_display_path`, so every display the walk
+    emits must resolve back to the file it came from — in both layouts. This is
+    the property `claims[].evidence` relies on to speak one spelling."""
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    _make_tree(docs, ["src/in_repo.py"])
+    code = tmp_path / "code"
+    _make_tree(code, ["src/pkg/core.py"])
+
+    roots = ["src", "../code/src"]
+    result = _walk(docs, roots=roots)
+    displays = {display for _, display in result.files}
+
+    assert displays == {"src/in_repo.py", "pkg/core.py"}
+    for abs_path, display in result.files:
+        assert resolve_display_path(docs, roots, display) == abs_path
+
+
+def test_resolve_display_path_prefers_the_repo_relative_reading(tmp_path: Path) -> None:
+    """`_display_path` tries `relative_to(repo_root)` first and only falls back
+    to the source root, so the resolver must break the same tie the same way."""
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    _make_tree(docs, ["pkg/core.py"])
+    code = tmp_path / "code"
+    _make_tree(code, ["src/pkg/core.py"])
+
+    resolved = resolve_display_path(docs, ["../code/src"], "pkg/core.py")
+
+    assert resolved == docs / "pkg" / "core.py"
+
+
+def test_resolve_display_path_rejects_escapes_and_misses(tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    code = tmp_path / "code"
+    _make_tree(code, ["src/pkg/core.py"])
+
+    assert resolve_display_path(docs, ["../code/src"], "../code/src/pkg/core.py") is None
+    assert resolve_display_path(docs, ["../code/src"], "pkg/gone.py") is None
+    assert resolve_display_path(docs, ["../code/src"], "/etc/passwd") is None
+
+
+def test_is_external_source_display_only_covers_roots_outside_the_repo(tmp_path: Path) -> None:
+    """In-repo source is classified by its repo-relative prefix, so the disk
+    test exists only for the siblings case where no prefix survives."""
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    _make_tree(docs, ["src/in_repo.py", "notes/thing.md"])
+    code = tmp_path / "code"
+    _make_tree(code, ["src/pkg/core.py"])
+
+    roots = ["src", "../code/src"]
+
+    assert is_external_source_display(docs, roots, "pkg/core.py")
+    assert not is_external_source_display(docs, roots, "src/in_repo.py")
+    assert not is_external_source_display(docs, roots, "notes/thing.md")

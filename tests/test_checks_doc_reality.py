@@ -192,6 +192,63 @@ def test_claim_provenance_flags_state_inappropriate_evidence(tmp_path: Path) -> 
     assert "state 'enabled'" in findings[0].message
 
 
+def test_claim_provenance_rejects_evidence_that_escapes_the_repo(tmp_path: Path) -> None:
+    """In `same-repo` every source file is addressable repo-relative, so a `..`
+    segment names nothing the tool is willing to reason about. It used to slip
+    past the guard, which tested only `is_absolute()`, while the error text and
+    the suggestion both insisted evidence stays inside the tree."""
+    _write_config(tmp_path)
+    (tmp_path / "src").mkdir()
+    outside = tmp_path.parent / "outside"
+    outside.mkdir(exist_ok=True)
+    (outside / "claim.py").write_text("x = 1\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/00-foundation/enforcement.md",
+        doc_id="enforcement",
+        body="The module exists. <!-- claim:escaping-claim -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: escaping-claim",
+            "    state: implemented",
+            "    kind: check",
+            "    claim: Source exists.",
+            "    evidence:",
+            "      - ../outside/claim.py",
+        ],
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert any("must not be absolute or escape the tree with '..'" in f.message for f in findings)
+    assert all(f.severity.value == "error" for f in findings)
+
+
+def test_claim_provenance_rejects_absolute_evidence(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "claim.py").write_text("x = 1\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/00-foundation/enforcement.md",
+        doc_id="enforcement",
+        body="The module exists. <!-- claim:absolute-claim -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: absolute-claim",
+            "    state: implemented",
+            "    kind: check",
+            "    claim: Source exists.",
+            "    evidence:",
+            f"      - {(tmp_path / 'src' / 'claim.py').as_posix()}",
+        ],
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert any("must not be absolute or escape the tree with '..'" in f.message for f in findings)
+
+
 def test_claim_provenance_warns_on_risky_prose_without_reference(tmp_path: Path) -> None:
     _write_config(tmp_path)
     _write_doc(

@@ -129,6 +129,87 @@ def _build_siblings(
     return docs_repo_root
 
 
+def _write_claim_doc(repo_root: Path, evidence: str) -> None:
+    """A foundation doc whose claim cites a file in the sibling code repo.
+
+    `claim-provenance` only inspects `00-foundation/` and `10-architecture/`,
+    so the claim has to live there for the evidence spelling to be exercised.
+    """
+    foundation = repo_root / "docs" / "00-foundation"
+    foundation.mkdir(parents=True, exist_ok=True)
+    (foundation / "purpose.md").write_text(
+        "\n".join(
+            [
+                "---",
+                "id: purpose",
+                "title: Purpose",
+                "audience: explanation",
+                "tier: 2",
+                "status: stable",
+                "describes: []",
+                "claims:",
+                "  - id: core-works",
+                "    state: implemented",
+                "    kind: feature",
+                "    claim: The core module exists.",
+                "    evidence:",
+                f"      - {evidence}",
+                "---",
+                "",
+                "# Purpose",
+                "",
+                "The core module is real. <!-- claim:core-works -->",
+                "",
+                "## Scope & Limitations",
+                "None.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def _claim_findings(repo_root: Path) -> list[str]:
+    from irminsul.checks.doc_reality import ClaimProvenanceCheck
+
+    config = load(find_config(repo_root))
+    graph = build_graph(repo_root, config)
+    return [f.message for f in ClaimProvenanceCheck().run(graph)]
+
+
+def test_claim_evidence_uses_the_source_root_relative_spelling(tmp_path: Path) -> None:
+    """One spelling for the whole tool. `describes:`, the source walk and
+    `mtime-drift` all address a sibling source file by its source-root-relative
+    display path, and `claims[].evidence` now reads the same spelling — so a
+    claim on `../code/src/core.py` is written `core.py`, exactly as the doc
+    glob writes it."""
+    repo_root = _build_siblings(tmp_path)
+    _write_claim_doc(repo_root, "core.py")
+
+    assert _claim_findings(repo_root) == []
+
+
+def test_claim_evidence_rejects_the_dot_dot_escape(tmp_path: Path) -> None:
+    """The escape hatch is gone now that the display spelling resolves. It only
+    ever worked by accident — nothing validated it — and it contradicted the
+    spelling every other subsystem requires."""
+    repo_root = _build_siblings(tmp_path)
+    _write_claim_doc(repo_root, "../code/src/core.py")
+
+    messages = _claim_findings(repo_root)
+
+    assert any("must not be absolute or escape the tree with '..'" in m for m in messages)
+
+
+def test_claim_evidence_that_names_nothing_is_still_an_error(tmp_path: Path) -> None:
+    """The mirror: widening the spelling must not make every string resolve."""
+    repo_root = _build_siblings(tmp_path)
+    _write_claim_doc(repo_root, "gone.py")
+
+    messages = _claim_findings(repo_root)
+
+    assert any("evidence path does not exist: 'gone.py'" in m for m in messages)
+
+
 def test_checks_pass_across_the_repo_boundary(tmp_path: Path) -> None:
     repo_root = _build_siblings(tmp_path)
     result = runner.invoke(app, ["check", "--profile", "configured", "--path", str(repo_root)])

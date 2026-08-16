@@ -162,6 +162,59 @@ def _display_path(path: Path, repo_root: Path, source_root: Path) -> str:
     return PurePosixPath(*relative.parts).as_posix()
 
 
+def resolve_display_path(repo_root: Path, source_roots: list[str], display: str) -> Path | None:
+    """Absolute path for a `display_posix` spelling, or None when it names nothing.
+
+    The inverse of `_display_path`, and the single place that decodes the one
+    spelling the whole tool speaks. A display is repo-relative when it names
+    something inside `repo_root`, and source-root-relative when it names
+    something under a configured root that lies outside it — the code repo of
+    the `siblings` layout. Repo-relative wins, matching `_display_path`, which
+    only falls back to the source root after `relative_to(repo_root)` fails.
+
+    Roots inside `repo_root` are not searched: their files already display
+    repo-relative, so searching them would make a second spelling resolve.
+    """
+    relative = Path(*PurePosixPath(display.replace("\\", "/")).parts)
+    if relative.is_absolute() or ".." in relative.parts:
+        return None
+
+    candidate = repo_root / relative
+    if candidate.exists():
+        return candidate
+
+    repo_abs = repo_root.resolve()
+    for root in source_roots:
+        abs_root = (repo_root / root).resolve()
+        if abs_root.is_relative_to(repo_abs):
+            continue
+        candidate = abs_root / relative
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def is_external_source_display(repo_root: Path, source_roots: list[str], display: str) -> bool:
+    """True when `display` resolves under a source root outside `repo_root`.
+
+    The `siblings` counterpart to the lexical prefix test that classifies
+    in-repo source: a source-root-relative display carries no prefix to match,
+    so membership can only be settled on disk.
+    """
+    resolved = resolve_display_path(repo_root, source_roots, display)
+    if resolved is None:
+        return False
+    resolved_abs = resolved.resolve()
+    repo_abs = repo_root.resolve()
+    for root in source_roots:
+        abs_root = (repo_root / root).resolve()
+        if abs_root.is_relative_to(repo_abs):
+            continue
+        if resolved_abs.is_relative_to(abs_root):
+            return True
+    return False
+
+
 def _is_within_source_root(target: Path, source_root: Path) -> bool:
     return target.resolve(strict=False).is_relative_to(source_root.resolve())
 
