@@ -57,8 +57,8 @@ irminsul regen agents-md                 # rebuild the docs/AGENTS.md manifest
 **The single data structure: `DocGraph`** (`src/irminsul/docgraph.py`). Built once per CLI invocation by `build_graph(repo_root, config)`. Walks `docs_root`, parses every `*.md` (skipping the `EXEMPT_TOPLEVEL_NAMES` set: `README.md`, `GLOSSARY.md`, `CONTRIBUTING.md`, `AGENTS.md`), validates frontmatter, and exposes nodes by id and by repo-relative POSIX path. Every check consumes a `DocGraph`; nothing else. If you're adding behavior, ask first whether it belongs *on the graph* or *in a check*.
 
 **Two check registries** (`src/irminsul/checks/__init__.py`). Names in `irminsul.toml` are resolved against these maps; an unknown name prints a yellow note and is skipped (not an error).
-- `HARD_REGISTRY` — 9 checks: `frontmatter`, `globs`, `uniqueness`, `links`, `schema-leak`, `coverage`, `liar`, `prose-file-reference`, `agents-manifest`. Errors from these always block (exit 1) regardless of `--strict`.
-- `SOFT_REGISTRY` — 19 deterministic warnings: `mtime-drift`, `orphans`, `stale-reaper`, `supersession`, `parent-child`, `glossary-discipline`, `external-links`, `rfc-resolution`, `reality`, `claim-anchor`, … (full list in `checks/__init__.py`). Promoted to errors only with `--strict`.
+- `HARD_REGISTRY` — 11 checks: `frontmatter`, `globs`, `uniqueness`, `links`, `schema-leak`, `coverage`, `liar`, `prose-file-reference`, `agents-manifest`, `rfc-lifecycle-integrity`, `retired-references`. Errors from these always block (exit 1) regardless of `--strict`.
+- `SOFT_REGISTRY` — 23 deterministic warnings: `mtime-drift`, `orphans`, `stale-reaper`, `supersession`, `parent-child`, `glossary-discipline`, `external-links`, `rfc-resolution`, `reality`, `claim-anchor`, … (full list in `checks/__init__.py`). Promoted to errors only with `--strict`.
 
 All checks subclass `Check` and return `list[Finding]` with `(check, severity, path, line, message, suggestion)`. Severity ordering and exit-code logic live in `cli.check`.
 
