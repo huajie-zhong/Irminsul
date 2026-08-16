@@ -14,7 +14,9 @@ Two repository layouts are supported, and `Topology` names them:
 from __future__ import annotations
 
 import datetime as _dt
+import os
 import posixpath
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
@@ -48,6 +50,15 @@ _CODE_SIGNAL_FILES = (
     "go.mod",
 )
 _CODE_SIGNAL_DIRS = ("src", "app", "lib")
+
+_GITHUB_SSH_RE = re.compile(r"^git@github\.com:(?P<owner>[^/\s:]+)/(?P<repo>[^/\s:]+?)/?$")
+_GITHUB_URL_RE = re.compile(
+    r"^https?://(?:www\.)?github\.com/(?P<owner>[^/\s]+)/(?P<repo>[^/\s]+?)/?$"
+)
+#: A bare `owner/repo` shorthand. The owner excludes the characters that would
+#: make the value a path or a URL instead — GitHub owner names carry none of
+#: them, while repository names may contain a dot (`acme/repo.js`).
+_OWNER_REPO_RE = re.compile(r"^(?P<owner>[^/\s:@.~]+)/(?P<repo>[^/\s:@]+)$")
 
 
 class Topology(StrEnum):
@@ -85,17 +96,46 @@ def parse_code_repo(value: str, *, docs_root: Path) -> tuple[str | None, str]:
     code checkout, always of the form `../<name>`: "siblings" means one parent
     directory holding both repos, so anything else is rejected here rather than
     silently scaffolding a layout the tool does not support.
+
+    Three normalizations happen before any of that, because each one silently
+    produced a wrong answer instead of an error:
+
+    - Host separators. `..\\code` is what a Windows shell hands over, and every
+      path this module writes is POSIX. Unnormalized it read as a bare name and
+      wrote `../..\\code/src` into `paths.source_roots` plus a CI `path:` with a
+      `..` in it, which `actions/checkout` rejects.
+    - `~`. It was already treated as "this is a path" but never expanded, so a
+      legitimate `~/ws/code` resolved under the docs repo and was refused.
+    - Clone URLs. `git@github.com:acme/code.git` was read as the *coordinate*
+      `git@github.com:acme/code.git`, which `actions/checkout` cannot use, and
+      `https://github.com/acme/code` was read as no coordinate at all even
+      though the owner and repo are right there in it. Both now yield
+      `acme/code`, and a `.git` suffix never reaches the directory name — a
+      clone of `code.git` produces `code/`.
     """
-    if "://" in value:
-        name = PurePosixPath(urlsplit(value).path.rstrip("/")).name
-        return None, _sibling_dir(f"../{name or 'code'}", docs_root, value)
+    raw = value.strip()
+    normalized = raw.replace("\\", "/")
 
-    parts = value.split("/")
-    is_path = value.startswith(("./", "../", "~", "/")) or Path(value).is_absolute()
-    if not is_path and len(parts) == 2 and all(parts) and "." not in parts:
-        return value, _sibling_dir(f"../{parts[1]}", docs_root, value)
+    remote = _GITHUB_SSH_RE.match(normalized) or _GITHUB_URL_RE.match(normalized)
+    if remote is not None:
+        repo = _strip_git_suffix(remote["repo"])
+        return f"{remote['owner']}/{repo}", _sibling_dir(f"../{repo}", docs_root, raw)
 
-    if not is_path and len(parts) == 1 and value not in {".", ".."}:
+    if "://" in normalized:
+        name = _strip_git_suffix(PurePosixPath(urlsplit(normalized).path.rstrip("/")).name)
+        return None, _sibling_dir(f"../{name or 'code'}", docs_root, raw)
+
+    expanded = os.path.expanduser(normalized)
+    parts = expanded.split("/")
+    is_path = expanded.startswith(("./", "../", "~", "/")) or Path(expanded).is_absolute()
+
+    if not is_path:
+        shorthand = _OWNER_REPO_RE.match(expanded)
+        if shorthand is not None:
+            repo = _strip_git_suffix(shorthand["repo"])
+            return f"{shorthand['owner']}/{repo}", _sibling_dir(f"../{repo}", docs_root, raw)
+
+    if not is_path and len(parts) == 1 and expanded not in {".", ".."}:
         # A bare name normally means the sibling `../<name>`. But when a
         # directory of that name already sits inside the docs repo, the value is
         # ambiguous, and the nested reading is the one the deleted layout used —
@@ -103,11 +143,15 @@ def parse_code_repo(value: str, *, docs_root: Path) -> tuple[str | None, str]:
         # the sibling rule and the exact spelling that satisfies it. Silently
         # picking the other reading would configure a layout the user did not
         # ask for and skip the message written for this mistake.
-        if (docs_root / value).is_dir():
-            return None, _sibling_dir(value, docs_root, value)
-        return None, _sibling_dir(f"../{value}", docs_root, value)
+        if (docs_root / expanded).is_dir():
+            return None, _sibling_dir(expanded, docs_root, raw)
+        return None, _sibling_dir(f"../{expanded}", docs_root, raw)
 
-    return None, _sibling_dir(value, docs_root, value)
+    return None, _sibling_dir(expanded, docs_root, raw)
+
+
+def _strip_git_suffix(name: str) -> str:
+    return name[: -len(".git")] if name.endswith(".git") else name
 
 
 def _sibling_dir(candidate: str, docs_root: Path, original: str) -> str:
@@ -116,9 +160,16 @@ def _sibling_dir(candidate: str, docs_root: Path, original: str) -> str:
     Rejection is the point: a path that lands inside the docs repo is the
     deleted nested layout, and one further away than a sibling is a shape the
     generated CI workspace cannot express.
+
+    Only the *containing* directories are resolved, never the final component.
+    `--code-repo ../code` where `code` is a symlink names `code`; resolving
+    through it renamed the sibling to its target in `paths.source_roots`, or
+    rejected the value outright when the target lived elsewhere — either way
+    answering about a path the user never typed.
     """
     docs_abs = docs_root.resolve()
-    code_abs = (docs_root / candidate).resolve()
+    joined = docs_root / candidate
+    code_abs = joined.parent.resolve() / joined.name
     if code_abs.parent == docs_abs.parent and code_abs != docs_abs:
         return f"../{code_abs.name}"
     raise typer.BadParameter(

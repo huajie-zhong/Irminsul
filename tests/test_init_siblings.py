@@ -22,6 +22,13 @@ runner = CliRunner()
 _yaml = YAML(typ="safe")
 
 
+def _symlink(link: Path, target: Path) -> None:
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except OSError as exc:  # pragma: no cover - Windows without developer mode
+        pytest.skip(f"symlink creation unavailable: {exc}")
+
+
 def _docs_repo(tmp_path: Path) -> Path:
     """An empty docs repo inside a workspace that can hold a sibling."""
     repo = tmp_path / "workspace" / "docs"
@@ -84,11 +91,69 @@ def test_parse_bare_name_matching_a_nested_directory_is_rejected(tmp_path: Path)
         parse_code_repo("code", docs_root=docs)
 
 
-def test_parse_url_keeps_the_repo_name(tmp_path: Path) -> None:
+def test_parse_reads_the_coordinate_out_of_a_github_url(tmp_path: Path) -> None:
+    """The owner and the repo are right there in the URL, and without them the
+    generated workflow ships an `OWNER/CODE-REPO` placeholder the user has to
+    fill in by hand."""
     docs = _docs_repo(tmp_path)
-    spec, code_dir = parse_code_repo("https://github.com/acme/repo", docs_root=docs)
+    assert parse_code_repo("https://github.com/acme/repo", docs_root=docs) == (
+        "acme/repo",
+        "../repo",
+    )
+    assert parse_code_repo("https://github.com/acme/repo.git", docs_root=docs) == (
+        "acme/repo",
+        "../repo",
+    )
+
+
+def test_parse_reads_the_coordinate_out_of_a_git_ssh_url(tmp_path: Path) -> None:
+    """`git@github.com:acme/repo.git` was accepted as the coordinate itself,
+    which `actions/checkout` cannot use, and named the checkout directory
+    `repo.git` — a clone produces `repo/`."""
+    docs = _docs_repo(tmp_path)
+    assert parse_code_repo("git@github.com:acme/repo.git", docs_root=docs) == (
+        "acme/repo",
+        "../repo",
+    )
+
+
+def test_parse_keeps_a_non_github_url_local(tmp_path: Path) -> None:
+    """CI can only generate a checkout step for a GitHub coordinate, so any
+    other host stays a local path with the placeholder note."""
+    docs = _docs_repo(tmp_path)
+    spec, code_dir = parse_code_repo("https://gitlab.com/acme/repo", docs_root=docs)
     assert spec is None
     assert code_dir == "../repo"
+
+
+def test_parse_normalises_windows_separators(tmp_path: Path) -> None:
+    """`..\\code` is what a Windows shell hands over. Unnormalized it read as a
+    bare name and wrote `../..\\code/src` into `paths.source_roots`, plus a CI
+    `path:` containing `..`, which `actions/checkout` rejects."""
+    docs = _docs_repo(tmp_path)
+    assert parse_code_repo("..\\code", docs_root=docs) == (None, "../code")
+
+
+def test_parse_expands_a_tilde_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`~` was already read as "this is a path" but never expanded, so a
+    legitimate sibling resolved under the docs repo and was refused."""
+    docs = _docs_repo(tmp_path)
+    monkeypatch.setenv("HOME", str(docs.parent))
+    monkeypatch.setenv("USERPROFILE", str(docs.parent))
+
+    assert parse_code_repo("~/code", docs_root=docs) == (None, "../code")
+
+
+def test_parse_does_not_resolve_through_a_symlinked_sibling(tmp_path: Path) -> None:
+    """The user named `../code`; resolving through the link renamed the sibling
+    to its target in `paths.source_roots`, and rejected the value outright when
+    the target lived outside the workspace."""
+    docs = _docs_repo(tmp_path)
+    target = docs.parent.parent / "elsewhere"
+    target.mkdir()
+    _symlink(docs.parent / "code", target)
+
+    assert parse_code_repo("../code", docs_root=docs) == (None, "../code")
 
 
 def test_parse_absolute_sibling_path(tmp_path: Path) -> None:

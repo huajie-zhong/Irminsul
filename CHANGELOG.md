@@ -5,6 +5,7 @@
 ### Enhancements
 - `irminsul init --topology same-repo|siblings` — one command scaffolds either supported repository layout. `--topology siblings` takes `--code-repo <owner/repo|path>`, writes `source_roots` reaching through `../`, and generates two-checkout CI (ADR-0022).
 - `claims[].evidence` now reads the same display spelling as `describes:`: repo-relative inside the docs repo, source-root-relative for files under a source root outside it. In the `siblings` layout a claim on `../code/src/core.py` is written `core.py`, so evidence and `describes:` can finally name the same file. Evidence that is absolute or reaches out through `..` is rejected.
+- `--code-repo` reads a GitHub coordinate out of `https://github.com/owner/repo` and `git@github.com:owner/repo.git` as well as the `owner/repo` shorthand, and a `.git` suffix never reaches the checkout directory name. Windows separators are normalised, `~` is expanded, and a symlinked sibling keeps the name the user typed instead of being rewritten to its target.
 - `--code-repo <bare-name>` is rejected instead of silently reinterpreted when a directory of that name already exists inside the docs repo, since the intended meaning is ambiguous.
 
 ### Changed

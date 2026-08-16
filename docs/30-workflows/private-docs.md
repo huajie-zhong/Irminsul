@@ -53,6 +53,15 @@ the docs repo, init detects its languages and source roots; when it is not, the
 scaffold writes `../<name>/src` and the source walk reports the missing root as
 a warning until the clone lands.
 
+`--code-repo` takes either a GitHub coordinate or a path to the sibling.
+`owner/repo`, `https://github.com/owner/repo` and `git@github.com:owner/repo.git`
+all read as the coordinate `owner/repo`, which is what the generated workflow
+checks out. Any other host, and any path — `../code`, `~/ws/code`, an absolute
+path — configures the local layout and leaves the workflow's `repository:` as a
+placeholder to fill in. Whatever the spelling, the code repo has to end up
+beside the docs repo under one parent; anything else is refused rather than
+scaffolded.
+
 ## Path semantics
 
 Git-time lookups resolve through each file's nearest enclosing `.git`
