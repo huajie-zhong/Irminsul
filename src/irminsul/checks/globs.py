@@ -239,7 +239,27 @@ def is_external_source_display(repo_root: Path, source_roots: list[str], display
     in-repo source: a source-root-relative display carries no prefix to match,
     so membership can only be settled on disk.
     """
-    resolved = resolve_display_path(repo_root, source_roots, display)
+    return is_external_source_location(
+        repo_root, source_roots, resolve_display_path(repo_root, source_roots, display)
+    )
+
+
+def is_external_source_location(
+    repo_root: Path, source_roots: list[str], resolved: Path | None
+) -> bool:
+    """Whether an already-resolved path is source under an external root.
+
+    The containment half of `is_external_source_display`, split out so a
+    caller that already resolved the display — `ClaimProvenanceCheck` resolves
+    each evidence spelling once — does not pay for a second resolution.
+
+    Containment alone is not enough: the walk never returns files under a dot
+    directory, `__pycache__`, or bytecode suffixes, and the in-repo classifier
+    refuses the identical spelling through `is_source_path`. Without the same
+    built-in exclusions here, `.github/workflows/ci.yml` resolving into the
+    sibling repo read as source — the opposite classification of the same
+    path in-repo. `None` (an unresolvable display) is never source.
+    """
     if resolved is None:
         return False
     resolved_abs = resolved.resolve()
@@ -248,7 +268,10 @@ def is_external_source_display(repo_root: Path, source_roots: list[str], display
         abs_root = (repo_root / root).resolve()
         if abs_root.is_relative_to(repo_abs):
             continue
-        if resolved_abs.is_relative_to(abs_root):
+        if not resolved_abs.is_relative_to(abs_root):
+            continue
+        parts = resolved_abs.relative_to(abs_root).parts
+        if parts and not _is_excluded(parts):
             return True
     return False
 

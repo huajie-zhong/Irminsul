@@ -9,7 +9,7 @@ from typing import ClassVar
 
 from irminsul.checks.base import Finding, Severity
 from irminsul.checks.globs import (
-    is_external_source_display,
+    is_external_source_location,
     is_source_path,
     resolve_display_path,
     source_root_prefixes,
@@ -343,11 +343,12 @@ class ClaimProvenanceCheck:
                 continue
 
             claim_ids = {claim.id for claim in node.frontmatter.claims}
-            out.extend(self._validate_evidence(graph, node))
+            resolved = self._resolve_node_evidence(graph, node)
+            out.extend(self._validate_evidence(graph, node, resolved))
             out.extend(self._validate_body_claim_refs(node, claim_ids))
             out.extend(self._scan_risky_prose(node, claim_ids))
             out.extend(self._scan_structured_sections(node, claim_ids))
-            out.extend(self._scan_evidence_drift(graph, node))
+            out.extend(self._scan_evidence_drift(graph, node, resolved))
             out.extend(self._scan_planned_claim_lifecycle(graph, node))
 
         return out
@@ -357,14 +358,33 @@ class ClaimProvenanceCheck:
         assert graph.repo_root is not None
         return resolve_display_path(graph.repo_root, graph.config.paths.source_roots, evidence)
 
-    def _validate_evidence(self, graph: DocGraph, node: DocNode) -> list[Finding]:
+    def _resolve_node_evidence(self, graph: DocGraph, node: DocNode) -> dict[str, Path | None]:
+        """Every evidence spelling of the node, resolved once.
+
+        `_validate_evidence`, `_scan_evidence_drift`, and the source
+        classifiers all need the same answer; resolving here keeps it to one
+        disk probe per spelling instead of up to three per scan.
+        """
+        return {
+            evidence: self._resolve_evidence(graph, evidence)
+            for claim in node.frontmatter.claims
+            for evidence in claim.evidence
+        }
+
+    def _validate_evidence(
+        self, graph: DocGraph, node: DocNode, resolved: dict[str, Path | None]
+    ) -> list[Finding]:
         assert graph.config is not None
         assert graph.repo_root is not None
 
         out: list[Finding] = []
         for claim in node.frontmatter.claims:
-            evidence_paths = [Path(evidence) for evidence in claim.evidence]
-            for evidence, rel_path in zip(claim.evidence, evidence_paths, strict=True):
+            evidence_refs = [
+                (Path(evidence), resolved.get(evidence)) for evidence in claim.evidence
+            ]
+            for evidence, (rel_path, resolved_path) in zip(
+                claim.evidence, evidence_refs, strict=True
+            ):
                 if rel_path.is_absolute() or ".." in rel_path.parts:
                     out.append(
                         Finding(
@@ -380,7 +400,7 @@ class ClaimProvenanceCheck:
                         )
                     )
                     continue
-                if self._resolve_evidence(graph, evidence) is None:
+                if resolved_path is None:
                     out.append(
                         Finding(
                             check=self.name,
@@ -395,7 +415,7 @@ class ClaimProvenanceCheck:
                         )
                     )
 
-            if not self._has_state_appropriate_evidence(graph, claim.state, evidence_paths):
+            if not self._has_state_appropriate_evidence(graph, claim.state, evidence_refs):
                 out.append(
                     Finding(
                         check=self.name,
@@ -415,20 +435,27 @@ class ClaimProvenanceCheck:
         self,
         graph: DocGraph,
         state: ClaimStateEnum,
-        evidence_paths: list[Path],
+        evidence_refs: list[tuple[Path, Path | None]],
     ) -> bool:
         if state == ClaimStateEnum.planned:
-            return any(self._is_rfc_evidence(graph, path) for path in evidence_paths)
+            return any(self._is_rfc_evidence(graph, path) for path, _ in evidence_refs)
         if state == ClaimStateEnum.implemented:
-            return any(self._is_implementation_evidence(graph, path) for path in evidence_paths)
+            return any(
+                self._is_implementation_evidence(graph, path, resolved)
+                for path, resolved in evidence_refs
+            )
         if state == ClaimStateEnum.available:
             return any(
-                self._is_implementation_evidence(graph, path) for path in evidence_paths
-            ) and any(self._is_enablement_doc_evidence(graph, path) for path in evidence_paths)
+                self._is_implementation_evidence(graph, path, resolved)
+                for path, resolved in evidence_refs
+            ) and any(self._is_enablement_doc_evidence(graph, path) for path, _ in evidence_refs)
         if state == ClaimStateEnum.enabled:
-            return any(self._is_enabled_evidence(path) for path in evidence_paths)
+            return any(self._is_enabled_evidence(path) for path, _ in evidence_refs)
         if state == ClaimStateEnum.external:
-            return any(self._is_external_process_evidence(graph, path) for path in evidence_paths)
+            return any(
+                self._is_external_process_evidence(graph, path, resolved)
+                for path, resolved in evidence_refs
+            )
         return False
 
     def _state_suggestion(self, state: ClaimStateEnum) -> str:
@@ -507,7 +534,9 @@ class ClaimProvenanceCheck:
             )
         return out
 
-    def _scan_evidence_drift(self, graph: DocGraph, node: DocNode) -> list[Finding]:
+    def _scan_evidence_drift(
+        self, graph: DocGraph, node: DocNode, resolved: dict[str, Path | None]
+    ) -> list[Finding]:
         assert graph.repo_root is not None
 
         doc_time = last_commit_time_any_repo(graph.repo_root / node.path, graph.repo_root)
@@ -519,7 +548,7 @@ class ClaimProvenanceCheck:
             latest_path: str | None = None
             latest_time = None
             for evidence in claim.evidence:
-                evidence_abs = self._resolve_evidence(graph, evidence)
+                evidence_abs = resolved.get(evidence)
                 if evidence_abs is None:
                     continue
                 evidence_time = last_commit_time_any_repo(evidence_abs, graph.repo_root)
@@ -588,7 +617,7 @@ class ClaimProvenanceCheck:
             path.as_posix().startswith(f"{docs_root}/80-evolution/rfcs/") and path.suffix == ".md"
         )
 
-    def _is_source_evidence(self, graph: DocGraph, path: Path) -> bool:
+    def _is_source_evidence(self, graph: DocGraph, path: Path, resolved: Path | None) -> bool:
         """True when the evidence spelling names a configured source tree.
 
         Two spellings, because the source walk emits two. Inside the docs repo
@@ -597,7 +626,8 @@ class ClaimProvenanceCheck:
         `src/new.py` still reads as source, and `_validate_evidence` reports
         its absence once rather than twice. Outside the docs repo (`siblings`)
         the display is source-root-relative and carries no prefix at all, so
-        membership is settled on disk instead.
+        membership is settled on disk instead — on `resolved`, the caller's
+        already-resolved location of the spelling, so nothing resolves twice.
         """
         assert graph.config is not None
         assert graph.repo_root is not None
@@ -610,7 +640,7 @@ class ClaimProvenanceCheck:
                 continue
             if path_posix == prefix or path_posix.startswith(f"{prefix}/"):
                 return True
-        return is_external_source_display(graph.repo_root, source_roots, path_posix)
+        return is_external_source_location(graph.repo_root, source_roots, resolved)
 
     def _is_repo_root_source(self, graph: DocGraph, path: Path, path_posix: str) -> bool:
         """Whether a source root that *is* the repo root claims this path.
@@ -642,8 +672,12 @@ class ClaimProvenanceCheck:
         docs_root = _docs_root(graph)
         return path.as_posix().startswith(f"{docs_root}/20-components/")
 
-    def _is_implementation_evidence(self, graph: DocGraph, path: Path) -> bool:
-        return self._is_source_evidence(graph, path) or self._is_component_doc_evidence(graph, path)
+    def _is_implementation_evidence(
+        self, graph: DocGraph, path: Path, resolved: Path | None
+    ) -> bool:
+        return self._is_source_evidence(graph, path, resolved) or self._is_component_doc_evidence(
+            graph, path
+        )
 
     def _is_enablement_doc_evidence(self, graph: DocGraph, path: Path) -> bool:
         path_posix = path.as_posix()
@@ -661,7 +695,9 @@ class ClaimProvenanceCheck:
             or (path_posix.startswith(".github/workflows/") and path.suffix in {".yml", ".yaml"})
         )
 
-    def _is_external_process_evidence(self, graph: DocGraph, path: Path) -> bool:
+    def _is_external_process_evidence(
+        self, graph: DocGraph, path: Path, resolved: Path | None
+    ) -> bool:
         path_posix = path.as_posix()
         docs_root = _docs_root(graph)
         return (
@@ -670,7 +706,7 @@ class ClaimProvenanceCheck:
             or path_posix in {"action.yml", "action.yaml"}
             or path_posix in {".pre-commit-config.yaml", ".pre-commit-config.yml"}
             or path_posix.startswith(".github/")
-        ) and not self._is_source_evidence(graph, path)
+        ) and not self._is_source_evidence(graph, path, resolved)
 
 
 class TerminologyOverloadCheck:

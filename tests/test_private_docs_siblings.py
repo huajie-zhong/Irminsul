@@ -227,6 +227,22 @@ def test_claim_evidence_that_names_nothing_is_still_an_error(tmp_path: Path) -> 
     assert any("evidence path does not exist: 'gone.py'" in m for m in messages)
 
 
+def test_a_dotfile_in_the_sibling_repo_is_not_source_evidence(tmp_path: Path) -> None:
+    """The source walk excludes dot directories, so a spelling that resolves
+    into the sibling repo's `.hidden/` must not read as implementation
+    evidence — the in-repo branch already refuses the identical spelling. It
+    used to count, because the external branch checked containment only."""
+    repo_root = _build_siblings(tmp_path)
+    hidden = repo_root.parent / "code" / "src" / ".hidden"
+    hidden.mkdir(parents=True)
+    (hidden / "x.py").write_text("x = 1\n", encoding="utf-8")
+    _write_claim_doc(repo_root, ".hidden/x.py")
+
+    messages = _claim_findings(repo_root)
+
+    assert any("no evidence appropriate for state 'implemented'" in m for m in messages)
+
+
 def test_checks_pass_across_the_repo_boundary(tmp_path: Path) -> None:
     repo_root = _build_siblings(tmp_path)
     result = runner.invoke(app, ["check", "--profile", "configured", "--path", str(repo_root)])

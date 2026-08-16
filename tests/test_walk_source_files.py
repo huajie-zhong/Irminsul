@@ -452,6 +452,33 @@ def test_resolve_display_path_rejects_escapes_and_misses(tmp_path: Path) -> None
     assert resolve_display_path(docs, ["../code/src"], "/etc/passwd") is None
 
 
+def test_is_external_source_display_applies_the_walks_exclusions(tmp_path: Path) -> None:
+    """The walk never returns files under a dot directory, `__pycache__`, or
+    bytecode suffixes, and the in-repo classifier refuses the identical
+    spelling. Containment alone made `.hidden/x.py` resolving into the sibling
+    repo read as source — the opposite classification of the same path
+    in-repo."""
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    code = tmp_path / "code"
+    _make_tree(
+        code,
+        [
+            "src/ok.py",
+            "src/.hidden/x.py",
+            "src/.github/workflows/ci.yml",
+            "src/__pycache__/m.pyc",
+        ],
+    )
+
+    roots = ["../code/src"]
+
+    assert is_external_source_display(docs, roots, "ok.py")
+    assert not is_external_source_display(docs, roots, ".hidden/x.py")
+    assert not is_external_source_display(docs, roots, ".github/workflows/ci.yml")
+    assert not is_external_source_display(docs, roots, "__pycache__/m.pyc")
+
+
 def test_external_display_for_path_encodes_the_walks_spelling(tmp_path: Path) -> None:
     """The encode direction of `resolve_display_path`: the real location of a
     sibling source file maps to the display the whole tool speaks."""
