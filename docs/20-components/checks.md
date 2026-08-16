@@ -83,7 +83,13 @@ an ADR is never audited against the tombstones it declares itself, since a
 decision has to be able to name what it retired; RFCs are frozen historical
 record under ADR-0016; and so are the generated navigation rows that echo their
 titles. Non-stable atoms, link destinations, URLs, and HTML comments are also
-not treated as current claims. Fenced examples stay
+not treated as current claims. Phrases match whole tokens, never substrings, and
+case is part of the phrase: a `cli-command` match is always case-sensitive, and a
+`concept` match folds case only when the declaration is written entirely in lower
+case. So a declaration like `sidecar mode` still catches a capitalised heading,
+while a proper name such as `Topology A` cannot swallow the ordinary English
+"whatever topology a project picks" — a tombstone that wants both readings lists
+both spellings in `matches`. Fenced examples stay
 visible because obsolete commands there are operationally dangerous. Findings
 aggregate repeated aliases per retirement and doc, and carry the declaring ADR,
 guidance, first line, and occurrence count. An exact phrase linked to its owning

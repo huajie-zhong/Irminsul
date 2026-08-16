@@ -156,6 +156,74 @@ def test_concept_matching_is_case_insensitive_and_token_bounded(tmp_path: Path) 
     assert [finding.data["match"] for finding in findings if finding.data] == ["reference layer"]
 
 
+def test_capitalised_concept_does_not_match_lowercase_prose(tmp_path: Path) -> None:
+    """`Topology A` folded to lower case matched "whatever topology a project
+    picks" — a whole-token match on ordinary English, so word boundaries could
+    not save it. A capital in the declaration marks a proper name and keeps the
+    match case-sensitive."""
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path, concept="Topology A")
+    _write_doc(
+        tmp_path,
+        "docs/20-components/current.md",
+        doc_id="current",
+        body="Whatever topology a project picks, the checks behave the same.",
+    )
+
+    assert _findings(tmp_path) == []
+
+
+def test_capitalised_concept_still_matches_its_declared_spelling(tmp_path: Path) -> None:
+    """The other half: case sensitivity must not cost the tombstone its job."""
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path, concept="Topology A")
+    _write_doc(
+        tmp_path,
+        "docs/20-components/current.md",
+        doc_id="current",
+        body="Scaffold a private docs tree with Topology A.",
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [finding.data["match"] for finding in findings if finding.data] == ["Topology A"]
+
+
+def test_both_spellings_of_one_concept_are_distinct_declarations(tmp_path: Path) -> None:
+    """A tombstone that wants a capitalised name matched loosely lists both
+    spellings. They compile to different patterns, so neither is reported as an
+    ambiguous duplicate of the other, and a line that matches both is still one
+    finding because both belong to the same entry."""
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/50-decisions/0001-retire-lettered.md",
+        doc_id="0001-retire-lettered",
+        audience="adr",
+        body="The lettered names are gone.",
+        frontmatter_extra=[
+            "retires:",
+            "  - id: lettered-topologies",
+            "    kind: concept",
+            "    matches:",
+            "      - Topology A",
+            "      - topology a",
+            "    guidance: Name the layout instead.",
+        ],
+    )
+    _write_doc(
+        tmp_path,
+        "docs/20-components/current.md",
+        doc_id="current",
+        body="Topology A is what we call it.",
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [finding.category for finding in findings] == ["retired-reference"]
+    assert findings[0].path == Path("docs/20-components/current.md")
+
+
 def test_command_matching_is_case_sensitive_and_token_bounded(tmp_path: Path) -> None:
     _write_config(tmp_path)
     _write_retirement_adr(tmp_path)

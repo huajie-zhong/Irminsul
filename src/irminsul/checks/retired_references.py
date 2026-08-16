@@ -233,15 +233,39 @@ def _is_authoritative_owner(node: DocNode) -> bool:
     )
 
 
+def _folds_case(phrase: str, kind: RetirementKindEnum) -> bool:
+    """Whether this phrase is matched case-insensitively.
+
+    Only `concept` phrases ever fold case, and only the ones written entirely
+    in lower case — the "smart case" rule that `rg` and `vim` use. A concept is
+    prose, so `docs-only topology` has to catch `Docs-Only Topology` at the
+    start of a sentence or inside a heading. But a concept named with a capital
+    is a proper name, and folding its case turns short ones into landmines: the
+    two-token `Topology A` matched the ordinary English "whatever topology a
+    project picks", so the tombstone failed the build on prose that never
+    mentioned the retired thing. Word boundaries do not help — "topology a" is
+    a whole-token match there. Case is the signal that separates the name from
+    the words it is spelled with, so a capitalised declaration keeps it.
+
+    The cost is that a capitalised phrase no longer catches an all-lowercase
+    reference to it. That is the right trade: guidance that names a retired
+    concept spells it the way the tombstone declares it, and a tombstone that
+    wants both spellings can list both in `matches:`.
+    """
+    if kind != RetirementKindEnum.concept:
+        return False
+    return not any(char.isupper() for char in phrase)
+
+
 def _compile_phrase(phrase: str, kind: RetirementKindEnum) -> re.Pattern[str]:
     core = r"\s+".join(re.escape(part) for part in phrase.split())
-    flags = re.IGNORECASE if kind == RetirementKindEnum.concept else 0
+    flags = re.IGNORECASE if _folds_case(phrase, kind) else 0
     return re.compile(rf"(?<![\w-]){core}(?![\w-])", flags)
 
 
 def _normalize_phrase(phrase: str, kind: RetirementKindEnum) -> str:
     normalized = " ".join(phrase.split())
-    return normalized.lower() if kind == RetirementKindEnum.concept else normalized
+    return normalized.lower() if _folds_case(phrase, kind) else normalized
 
 
 def _guidance_sources(graph: DocGraph) -> list[_GuidanceSource]:
@@ -444,11 +468,12 @@ def _auditable_line(
     rule: _RetirementRule,
 ) -> str:
     expected_label = _citation_label(rule.phrase)
+    folds_case = _folds_case(rule.phrase, rule.entry.kind)
     for linked in linked_labels:
         actual_label = _citation_label(linked.label)
         labels_match = (
             actual_label.casefold() == expected_label.casefold()
-            if rule.entry.kind == RetirementKindEnum.concept
+            if folds_case
             else actual_label == expected_label
         )
         replacement = (

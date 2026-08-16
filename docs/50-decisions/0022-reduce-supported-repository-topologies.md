@@ -21,12 +21,6 @@ retires:
       - --topology docs-only
       - docs-only topology
     guidance: The siblings layout replaces it; pass `--topology siblings` and keep the code repo outside the docs repo.
-  - id: lettered-topologies
-    kind: concept
-    matches:
-      - Topology A
-      - Topology B
-    guidance: Name the layout instead - `same-repo` or `siblings`.
 ---
 
 # ADR-0022: Reduce supported repository topologies to two
@@ -103,7 +97,13 @@ open work tracked in
 [`RFC 0044`](../80-evolution/rfcs/0044-cross-repo-delta.md).
 
 Stop using lettered topology names. `same-repo` and `siblings` describe the
-layout and cannot collide the way "Topology B" did.
+layout and cannot collide the way "Topology B" did. This is a naming rule, not a
+retirement: no tombstone enforces it. A `retires:` entry names something that
+was removed and that guidance might still teach a reader to use, and the letters
+named nothing beyond the two layouts already tombstoned above. A two-token
+phrase ending in a single letter is also the most collision-prone shape a
+tombstone can have, and this one collided with ordinary English on its first
+outing.
 
 ## Alternatives Considered
 
@@ -149,7 +149,7 @@ layout and cannot collide the way "Topology B" did.
   reads less obviously than the nested layouts' repo-relative paths. This is
   existing behavior, now the only behavior, and the workflow doc must teach it.
 - The retirement tombstones above make current guidance that still teaches
-  `init-docs-only` or the lettered names fail the `retired-references` audit.
+  `init-docs-only` or the nested docs-only layout fail the `retired-references` audit.
   For that to be true rather than aspirational, the audit is a **hard** check
   emitting **errors**, so it blocks without `--strict` — CI's dogfood step runs
   none. It reads every stable doc including ADRs, plus the repository readme,
