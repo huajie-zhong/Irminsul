@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from pathlib import Path
 
@@ -24,8 +25,8 @@ def test_annotation_full_shape() -> None:
         suggestion="add it",
     )
     assert _github_annotation(finding) == (
-        "::error file=docs/a.md,line=3,title=irminsul frontmatter,"
-        "code=frontmatter/missing-field::missing field — add it"
+        "::error file=docs/a.md,line=3,"
+        "title=irminsul frontmatter/missing-field::missing field — add it"
     )
 
 
@@ -45,12 +46,12 @@ def test_annotation_omits_line_when_none() -> None:
     finding = Finding(
         check="x", code="x/y", severity=Severity.error, message="m", path=Path("docs/a.md")
     )
-    assert _github_annotation(finding) == ("::error file=docs/a.md,title=irminsul x,code=x/y::m")
+    assert _github_annotation(finding) == "::error file=docs/a.md,title=irminsul x/y::m"
 
 
 def test_annotation_omits_file_when_path_none() -> None:
     finding = Finding(check="x", code="x/y", severity=Severity.warning, message="m")
-    assert _github_annotation(finding) == "::warning title=irminsul x,code=x/y::m"
+    assert _github_annotation(finding) == "::warning title=irminsul x/y::m"
 
 
 def test_annotation_escapes_message_data() -> None:
@@ -60,9 +61,7 @@ def test_annotation_escapes_message_data() -> None:
         severity=Severity.info,
         message="50% done\r\nnext line",
     )
-    assert _github_annotation(finding) == (
-        "::notice title=irminsul x,code=x/y::50%25 done%0D%0Anext line"
-    )
+    assert _github_annotation(finding) == "::notice title=irminsul x/y::50%25 done%0D%0Anext line"
 
 
 def test_annotation_escapes_property_values() -> None:
@@ -73,9 +72,7 @@ def test_annotation_escapes_property_values() -> None:
         message="m",
         path=Path("docs/a,b:c.md"),
     )
-    assert _github_annotation(finding) == (
-        "::error file=docs/a%2Cb%3Ac.md,title=irminsul x,code=x/y::m"
-    )
+    assert _github_annotation(finding) == "::error file=docs/a%2Cb%3Ac.md,title=irminsul x/y::m"
 
 
 def test_annotation_no_suggestion_separator_without_suggestion() -> None:
@@ -95,7 +92,13 @@ def test_check_format_github_end_to_end(fixture_repo: Callable[[str], Path]) -> 
     annotations = [line for line in lines if line.startswith("::")]
     assert annotations, result.stdout
     assert all(line.startswith(("::error ", "::warning ", "::notice ")) for line in annotations)
-    assert any("title=irminsul " in line for line in annotations)
+    # The finding code rides inside `title=` — the only annotation property
+    # the Actions runner keeps besides location — never in a `code=` property,
+    # which the runner would silently discard.
+    assert all(
+        re.search(r"title=irminsul [a-z0-9-]+/[a-z0-9-]+::", line) for line in annotations
+    ), result.stdout
+    assert all(",code=" not in line for line in annotations)
     # the plain one-line summary still closes the output
     assert "error" in lines[-1] and "warning" in lines[-1]
 

@@ -11,7 +11,7 @@ like any other soft signal.
 
 from __future__ import annotations
 
-from typing import Final
+from typing import ClassVar, Final
 
 from irminsul.checks.base import Finding, Severity
 from irminsul.checks.uniqueness import most_specific_claims, resolve_claims
@@ -19,6 +19,33 @@ from irminsul.docgraph import DocGraph, DocNode
 
 CHECK_NAME: Final = "co-change"
 CODE_UNREFLECTED_CHANGE: Final = "co-change/unreflected-change"
+
+
+class CoChangeCheck:
+    """Docs must ship in the same change as the code they claim.
+
+    Deliberately absent from both registries: the check cannot run from a
+    `DocGraph` alone — it needs the changed-file set only the CLI's `--diff`
+    flag supplies, so the CLI calls `run_co_change` directly. The class
+    exists to give co-change the same `name`/`explanations` surface as a
+    registered check, so `irminsul explain` resolves every code the CLI can
+    print, including this one.
+    """
+
+    name: ClassVar[str] = CHECK_NAME
+    default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_UNREFLECTED_CHANGE: (
+            "A source file this doc claims via `describes` changed in the diff, but "
+            "the doc itself did not. Update the doc in the same change, or run "
+            "`irminsul context <changed-file>` to see what it claims."
+        ),
+    }
+
+    def run(self, graph: DocGraph) -> list[Finding]:
+        raise NotImplementedError(
+            "co-change needs the changed-file set; call run_co_change(graph, changed)"
+        )
 
 
 def run_co_change(graph: DocGraph, changed: frozenset[str]) -> list[Finding]:

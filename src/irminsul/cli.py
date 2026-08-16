@@ -464,8 +464,11 @@ def _github_annotation(finding: Finding) -> str:
         props.append(f"file={_escape_github_property(finding.path.as_posix())}")
     if finding.line is not None:
         props.append(f"line={finding.line}")
-    props.append("title=" + _escape_github_property(f"irminsul {finding.check}"))
-    props.append("code=" + _escape_github_property(finding.code))
+    # The code rides in `title=`: the Actions runner only recognizes
+    # file/line/col/endLine/endColumn/title on issue commands and silently
+    # drops unknown properties, so a dedicated `code=` property would never
+    # reach the PR annotation.
+    props.append("title=" + _escape_github_property(f"irminsul {finding.code}"))
     data = finding.message
     if finding.suggestion:
         data = f"{data} — {finding.suggestion}"
@@ -1160,16 +1163,28 @@ def refs_command(
 
 
 def _check_summary(cls: type[Check]) -> str:
-    """First line of the check's module docstring, or "" if it has none."""
-    module = sys.modules.get(cls.__module__)
-    doc: str | None = getattr(module, "__doc__", None) if module else None
+    """First line of the check class's docstring, falling back to its module's.
+
+    The fallback alone is not enough: several checks share one module (e.g.
+    `doc_reality.py` hosts four), and the module docstring would describe them
+    all with the same generic line.
+    """
+    doc: str | None = cls.__doc__
+    if not doc:
+        module = sys.modules.get(cls.__module__)
+        doc = getattr(module, "__doc__", None) if module else None
     if not doc:
         return ""
     return doc.strip().splitlines()[0]
 
 
 def _explainable_checks() -> dict[str, type[Check]]:
-    return {**HARD_REGISTRY, **SOFT_REGISTRY}
+    """Every check whose codes the CLI can print: both registries plus the
+    unregistered co-change check, which only runs under `--diff` but reports
+    through the same pipeline."""
+    from irminsul.checks.co_change import CoChangeCheck
+
+    return {**HARD_REGISTRY, **SOFT_REGISTRY, CoChangeCheck.name: CoChangeCheck}
 
 
 def _list_all_codes() -> None:

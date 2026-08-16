@@ -21,7 +21,10 @@ import pytest
 from git import Repo
 
 from irminsul.checks import HARD_REGISTRY, SOFT_REGISTRY, Check, Finding
+from irminsul.checks.base import Severity
+from irminsul.checks.co_change import run_co_change
 from irminsul.checks.external_links import _save_cache
+from irminsul.cli import _explainable_checks
 from irminsul.config import ConfigError, find_config, load
 from irminsul.docgraph import build_graph
 
@@ -288,6 +291,31 @@ _SPECIAL_REPO_BUILDERS: dict[str, Callable[[Path], Path]] = {
 }
 
 
+def _co_change_findings(root: Path) -> list[Finding]:
+    """Findings from the unregistered co-change check.
+
+    It never runs from the registries — the CLI calls `run_co_change` with the
+    `--diff` changed set — so the corpus must invoke it the same way, or its
+    codes escape every corpus-wide assertion below (exactly how an
+    unexplainable `co-change/unreflected-change` shipped once).
+    """
+    (root / "app").mkdir(parents=True)
+    (root / "app" / "alpha.py").write_text("a = 1\n", encoding="utf-8")
+    doc = root / "docs" / "20-components" / "alpha.md"
+    doc.parent.mkdir(parents=True)
+    doc.write_text(
+        "---\nid: alpha\ntitle: Alpha\naudience: explanation\ntier: 3\n"
+        "status: stable\ndescribes:\n  - app/alpha.py\n---\n\n# Alpha\n",
+        encoding="utf-8",
+    )
+    (root / "irminsul.toml").write_text(
+        'project_name = "codes-co-change"\n[paths]\ndocs_root = "docs"\nsource_roots = ["app"]\n',
+        encoding="utf-8",
+    )
+    graph = build_graph(root, load(find_config(root)))
+    return run_co_change(graph, frozenset({"app/alpha.py"}))
+
+
 @pytest.fixture(scope="module")
 def all_findings(tmp_path_factory: pytest.TempPathFactory) -> list[Finding]:
     findings: list[Finding] = []
@@ -318,6 +346,8 @@ def all_findings(tmp_path_factory: pytest.TempPathFactory) -> list[Finding]:
         graph = build_graph(repo_root, config)
         findings.extend(REGISTRY[check_name]().run(graph))
 
+    findings.extend(_co_change_findings(tmp_path_factory.mktemp("co_change")))
+
     return findings
 
 
@@ -347,3 +377,58 @@ def test_every_code_has_an_explanation() -> None:
             assert code.startswith(f"{check_name}/"), (
                 f"{check_name} explanation key {code!r} does not start with '{check_name}/'"
             )
+
+
+def test_corpus_exercises_co_change(all_findings: list[Finding]) -> None:
+    """Guards the corpus itself: without co-change findings in `all_findings`,
+    the explainability assertion below could never catch a co-change gap."""
+    assert any(f.check == "co-change" for f in all_findings)
+
+
+def test_every_emitted_code_is_explainable(all_findings: list[Finding]) -> None:
+    """Every code the CLI can print must resolve through `irminsul explain`.
+
+    Deliberately keyed on the CLI's own `_explainable_checks()` rather than the
+    registries: co-change is unregistered but still prints codes, and this is
+    the assertion that would have caught its codes being unexplainable.
+    """
+    explainable = _explainable_checks()
+    for finding in all_findings:
+        cls = explainable.get(finding.check)
+        assert cls is not None, (
+            f"check {finding.check!r} emits findings but `irminsul explain` does not know it at all"
+        )
+        assert finding.code in cls.explanations, (
+            f"emitted code {finding.code!r} has no explanation on {finding.check!r}; "
+            "`irminsul explain` would exit 1 on a code the CLI printed"
+        )
+
+
+def test_finding_rejects_code_category_divergence() -> None:
+    """`category` predates `code`; when a site sets both they must agree."""
+    with pytest.raises(ValueError, match="disagrees with its category"):
+        Finding(
+            check="adr-structure",
+            code="adr-structure/empty-decision",
+            severity=Severity.warning,
+            message="m",
+            category="missing-section",
+        )
+
+
+def test_finding_accepts_matching_or_absent_category() -> None:
+    matching = Finding(
+        check="adr-structure",
+        code="adr-structure/empty-decision",
+        severity=Severity.warning,
+        message="m",
+        category="empty-decision",
+    )
+    assert matching.category == "empty-decision"
+    absent = Finding(
+        check="links",
+        code="links/broken-link",
+        severity=Severity.error,
+        message="m",
+    )
+    assert absent.category is None

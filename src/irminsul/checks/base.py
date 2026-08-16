@@ -44,6 +44,18 @@ class Finding:
     #: always carries a kebab-case "problem" key; all values are strings.
     data: dict[str, str] | None = None
 
+    def __post_init__(self) -> None:
+        # `code` and `category` describe the same kind slug from two eras —
+        # `category` predates codes and still keys `fixes()` in some checks.
+        # When a site sets both, they must agree; deriving one from the other
+        # instead would silently populate `category` (visible in JSON output
+        # and fix keying) on every finding, changing behavior.
+        if self.category is not None and self.code != f"{self.check}/{self.category}":
+            raise ValueError(
+                f"finding code {self.code!r} disagrees with its category: "
+                f"expected '{self.check}/{self.category}'"
+            )
+
 
 @dataclass(frozen=True)
 class Fix:

@@ -210,8 +210,7 @@ def test_cochange_with_github_format(tmp_path: Path) -> None:
     annotations = [line for line in lines if line.startswith("::")]
     assert len(annotations) == 1
     assert annotations[0].startswith(
-        "::warning file=docs/20-components/alpha.md,title=irminsul co-change,"
-        "code=co-change/unreflected-change::"
+        "::warning file=docs/20-components/alpha.md,title=irminsul co-change/unreflected-change::"
     )
     assert "app/alpha.py" in annotations[0]
     assert "0 errors, 1 warning" in lines[-1]

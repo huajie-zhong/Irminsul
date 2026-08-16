@@ -40,3 +40,37 @@ def test_explain_listing_covers_every_registered_check_code() -> None:
         assert f"[{check_name}]" in result.output
         for code in cls.explanations:
             assert code in result.output
+
+
+def test_explain_resolves_unregistered_co_change_code() -> None:
+    """co-change is in neither registry (it only runs under `--diff`), but the
+    CLI prints its code, so `explain` must resolve it like any other."""
+    result = runner.invoke(app, ["explain", "co-change/unreflected-change"])
+    assert result.exit_code == 0, result.output
+    assert "check: co-change" in result.output
+    assert "changed in the diff" in result.output
+
+
+def test_explain_no_args_listing_includes_co_change() -> None:
+    result = runner.invoke(app, ["explain"])
+    assert result.exit_code == 0, result.output
+    assert "[co-change]" in result.output
+    assert "co-change/unreflected-change" in result.output
+
+
+def test_explain_summaries_differ_for_checks_sharing_a_module() -> None:
+    """Four checks live in `doc_reality.py`; each must explain itself with its
+    own summary line, not the shared module docstring."""
+
+    def summary_line(code: str) -> str:
+        result = runner.invoke(app, ["explain", code])
+        assert result.exit_code == 0, result.output
+        (line,) = [ln for ln in result.output.splitlines() if ln.startswith("check: ")]
+        return line
+
+    prose = summary_line("prose-file-reference/unlinked-reference")
+    claims = summary_line("claim-provenance/evidence-drift")
+    assert prose.removeprefix("check: prose-file-reference") != claims.removeprefix(
+        "check: claim-provenance"
+    )
+    assert "—" in prose and "—" in claims  # both carry a real summary, not just a name

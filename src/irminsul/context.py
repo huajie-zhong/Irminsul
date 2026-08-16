@@ -66,6 +66,7 @@ class DocRef:
 @dataclass(frozen=True)
 class FindingSummary:
     check: str
+    code: str
     severity: str
     message: str
     path: str | None
@@ -1099,6 +1100,7 @@ def _doc_ref(node: DocNode) -> DocRef:
 def _finding_summary(finding: Finding) -> FindingSummary:
     return FindingSummary(
         check=finding.check,
+        code=finding.code,
         severity=finding.severity.value,
         message=finding.message,
         path=finding.path.as_posix() if finding.path else None,
@@ -1219,6 +1221,7 @@ def _doc_ref_to_dict(doc: DocRef) -> dict[str, object]:
 def _finding_to_dict(finding: FindingSummary) -> dict[str, object]:
     return {
         "check": finding.check,
+        "code": finding.code,
         "severity": finding.severity,
         "message": finding.message,
         "path": finding.path,
@@ -1273,7 +1276,9 @@ def _format_result(result: ContextResult, *, include_workflow: bool = False) -> 
             location = finding.path or "<repo>"
             if finding.line is not None:
                 location = f"{location}:{finding.line}"
-            lines.append(f"    [{finding.severity}/{finding.check}] {location}: {finding.message}")
+            # Same identity convention as `irminsul check`: the bracketed code
+            # is what `irminsul explain <code>` accepts; severity stays visible.
+            lines.append(f"    {finding.severity}  [{finding.code}] {location}: {finding.message}")
             if finding.suggestion:
                 lines.append(f"      suggestion: {finding.suggestion}")
     else:

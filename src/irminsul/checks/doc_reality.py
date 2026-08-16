@@ -214,6 +214,8 @@ CODE_STALE_SUPPRESSION = "prose-file-reference/stale-suppression"
 
 
 class ProseFileReferenceCheck:
+    """Local Markdown files named in prose must be real links, not bare mentions."""
+
     name: ClassVar[str] = "prose-file-reference"
     default_severity: ClassVar[Severity] = Severity.error
     explanations: ClassVar[dict[str, str]] = {
@@ -369,6 +371,8 @@ CODE_PLANNED_CLAIM_RESOLVED = "claim-provenance/planned-claim-resolved"
 
 
 class ClaimProvenanceCheck:
+    """High-risk assertions need structured claims backed by evidence that fits their state."""
+
     name: ClassVar[str] = "claim-provenance"
     default_severity: ClassVar[Severity] = Severity.warning
     explanations: ClassVar[dict[str, str]] = {
@@ -795,6 +799,8 @@ CODE_AMBIGUOUS_TERM = "terminology-overload/ambiguous-term"
 
 
 class TerminologyOverloadCheck:
+    """Configured overloaded terms must appear with an explicit disambiguating phrase."""
+
     name: ClassVar[str] = "terminology-overload"
     default_severity: ClassVar[Severity] = Severity.warning
     explanations: ClassVar[dict[str, str]] = {
@@ -848,6 +854,8 @@ CODE_MISSING_REQUIRED_HEADING = "agents-manifest/missing-required-heading"
 
 
 class AgentsManifestCheck:
+    """The docs/AGENTS.md navigation manifest must exist where adopted and match regen output."""
+
     name: ClassVar[str] = "agents-manifest"
     default_severity: ClassVar[Severity] = Severity.error
     explanations: ClassVar[dict[str, str]] = {
