@@ -52,9 +52,7 @@ _CODE_SIGNAL_FILES = (
 _CODE_SIGNAL_DIRS = ("src", "app", "lib")
 
 _GITHUB_SSH_RE = re.compile(r"^git@github\.com:(?P<owner>[^/\s:]+)/(?P<repo>[^/\s:]+?)/?$")
-_GITHUB_URL_RE = re.compile(
-    r"^https?://(?:www\.)?github\.com/(?P<owner>[^/\s]+)/(?P<repo>[^/\s]+?)/?$"
-)
+_GITHUB_HOSTS = {"github.com", "www.github.com"}
 #: A bare `owner/repo` shorthand. The owner excludes the characters that would
 #: make the value a path or a URL instead — GitHub owner names carry none of
 #: them, while repository names may contain a dot (`acme/repo.js`).
@@ -111,18 +109,34 @@ def parse_code_repo(value: str, *, docs_root: Path) -> tuple[str | None, str]:
       `https://github.com/acme/code` was read as no coordinate at all even
       though the owner and repo are right there in it. Both now yield
       `acme/code`, and a `.git` suffix never reaches the directory name — a
-      clone of `code.git` produces `code/`.
+      clone of `code.git` produces `code/`. Any URL whose host is github.com
+      carries its coordinate in the first two path segments, so a deep link
+      (`.../code/tree/main`) parses too — before it silently yielded no
+      coordinate and a checkout directory named after the *branch* — and a
+      github.com URL with fewer than two segments is rejected rather than
+      degraded into a local path.
     """
     raw = value.strip()
     normalized = raw.replace("\\", "/")
 
-    remote = _GITHUB_SSH_RE.match(normalized) or _GITHUB_URL_RE.match(normalized)
+    remote = _GITHUB_SSH_RE.match(normalized)
     if remote is not None:
         repo = _strip_git_suffix(remote["repo"])
         return f"{remote['owner']}/{repo}", _sibling_dir(f"../{repo}", docs_root, raw)
 
     if "://" in normalized:
-        name = _strip_git_suffix(PurePosixPath(urlsplit(normalized).path.rstrip("/")).name)
+        split = urlsplit(normalized)
+        if (split.hostname or "").lower() in _GITHUB_HOSTS:
+            segments = [segment for segment in split.path.split("/") if segment]
+            if len(segments) < 2:
+                raise typer.BadParameter(
+                    f"{raw!r} names github.com but not a repository. Pass "
+                    "'https://github.com/<owner>/<repo>' or the bare 'owner/repo'.",
+                    param_hint="--code-repo",
+                )
+            repo = _strip_git_suffix(segments[1])
+            return f"{segments[0]}/{repo}", _sibling_dir(f"../{repo}", docs_root, raw)
+        name = _strip_git_suffix(PurePosixPath(split.path.rstrip("/")).name)
         return None, _sibling_dir(f"../{name or 'code'}", docs_root, raw)
 
     expanded = os.path.expanduser(normalized)
@@ -161,6 +175,18 @@ def _sibling_dir(candidate: str, docs_root: Path, original: str) -> str:
     deleted nested layout, and one further away than a sibling is a shape the
     generated CI workspace cannot express.
 
+    A sibling named `docs` is rejected too. The generated workflows check the
+    docs repo out at `workspace/docs` — a fixed path the templates and the
+    private-docs guide both name — so a code checkout of the same name lands
+    on top of it: the second checkout wipes the first and the gate runs in a
+    tree with no `irminsul.toml`. Renaming either checkout on the fly would
+    break the invariant that `source_roots` resolve identically in CI and on a
+    developer's machine (the code checkout must sit wherever `code_dir` points
+    relative to the docs checkout), so the honest answer is the same loud
+    rejection the other unsupported shapes get, naming a spelling that works.
+    The comparison folds case because GitHub's macOS and Windows runners have
+    case-insensitive filesystems, where `Docs` collides just as surely.
+
     Only the *containing* directories are resolved, never the final component.
     `--code-repo ../code` where `code` is a symlink names `code`; resolving
     through it renamed the sibling to its target in `paths.source_roots`, or
@@ -171,6 +197,15 @@ def _sibling_dir(candidate: str, docs_root: Path, original: str) -> str:
     joined = docs_root / candidate
     code_abs = joined.parent.resolve() / joined.name
     if code_abs.parent == docs_abs.parent and code_abs != docs_abs:
+        if code_abs.name.lower() == PurePosixPath(_CI_DOCS_PATH).name.lower():
+            raise typer.BadParameter(
+                f"{original!r} would name the code checkout '{code_abs.name}', which "
+                f"collides with the generated CI: the workflows check the docs repo "
+                f"out at '{_CI_DOCS_PATH}', so a code checkout of the same name would "
+                "overwrite it. Clone or place the code repo under a different sibling "
+                "name and pass that path (e.g. '../code').",
+                param_hint="--code-repo",
+            )
         return f"../{code_abs.name}"
     raise typer.BadParameter(
         f"{original!r} resolves to {code_abs}, which is not a sibling of the docs "

@@ -117,6 +117,31 @@ def test_parse_reads_the_coordinate_out_of_a_git_ssh_url(tmp_path: Path) -> None
     )
 
 
+def test_parse_reads_the_coordinate_out_of_a_deep_github_url(tmp_path: Path) -> None:
+    """A browser hands over `.../tree/main` or `.../blob/main/...` URLs. The
+    coordinate is the first two path segments; falling through to the generic
+    URL branch named the checkout directory after the *branch* and shipped the
+    placeholder CI — a silently wrong scaffold from a URL that plainly says
+    `acme/repo`."""
+    docs = _docs_repo(tmp_path)
+    assert parse_code_repo("https://github.com/acme/repo/tree/main", docs_root=docs) == (
+        "acme/repo",
+        "../repo",
+    )
+    assert parse_code_repo("https://github.com/acme/repo.git/tree/main", docs_root=docs) == (
+        "acme/repo",
+        "../repo",
+    )
+
+
+def test_parse_rejects_a_github_url_without_a_repository(tmp_path: Path) -> None:
+    """A github.com URL must never degrade into the local-path branch — with no
+    repository in it there is nothing to parse, so it fails loudly."""
+    docs = _docs_repo(tmp_path)
+    with pytest.raises(typer.BadParameter, match="not a repository"):
+        parse_code_repo("https://github.com/acme", docs_root=docs)
+
+
 def test_parse_keeps_a_non_github_url_local(tmp_path: Path) -> None:
     """CI can only generate a checkout step for a GitHub coordinate, so any
     other host stays a local path with the placeholder note."""
@@ -185,6 +210,18 @@ def test_parse_rejects_the_docs_repo_itself(tmp_path: Path) -> None:
     docs = _docs_repo(tmp_path)
     with pytest.raises(typer.BadParameter, match="sibling"):
         parse_code_repo(".", docs_root=docs)
+
+
+def test_parse_rejects_a_code_repo_named_docs(tmp_path: Path) -> None:
+    """The generated workflows check the docs repo out at `workspace/docs`, so a
+    code sibling of the same name lands on top of it — the second checkout wipes
+    the first and the gate runs in a tree with no `irminsul.toml`. Case folds
+    because GitHub's macOS and Windows runners are case-insensitive."""
+    docs = tmp_path / "workspace" / "product-docs"
+    docs.mkdir(parents=True)
+    for value in ("acme/docs", "../docs", "https://github.com/acme/Docs"):
+        with pytest.raises(typer.BadParameter, match="workspace/docs"):
+            parse_code_repo(value, docs_root=docs)
 
 
 def test_detected_source_roots_are_normalised_onto_the_code_dir(tmp_path: Path) -> None:
