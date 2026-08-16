@@ -46,6 +46,23 @@ def test_init_no_interactive_creates_expected_tree(tmp_path: Path) -> None:
         assert (target / rel).is_file(), f"missing scaffold output: {rel}"
 
 
+def test_same_repo_workflow_watches_the_configured_source_root(tmp_path: Path) -> None:
+    """The PR workflow only runs when something it checks changed, so the
+    detected source root has to reach the `paths:` filter. Only the file's
+    existence was asserted before, and the filter line is templated."""
+    target = tmp_path / "demo"
+    target.mkdir()
+    (target / "src").mkdir()
+    (target / "pyproject.toml").write_text("[project]\nname='demo'\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
+    assert result.exit_code == 0, result.stdout
+
+    workflow = (target / ".github" / "workflows" / "docs-pr.yml").read_text(encoding="utf-8")
+    assert '- "src/**"' in workflow
+    assert '- "docs/**"' in workflow
+
+
 def test_init_scaffold_config_includes_only_useful_default_knobs(tmp_path: Path) -> None:
     target = tmp_path / "demo"
     target.mkdir()

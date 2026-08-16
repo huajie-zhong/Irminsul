@@ -233,6 +233,23 @@ def test_enclosing_ignore_cannot_hide_explicit_source_root(tmp_path: Path) -> No
     assert {display for _, display in result.files} == {"generated/api.py"}
 
 
+def test_enclosing_ignore_cannot_hide_a_multi_segment_source_root(tmp_path: Path) -> None:
+    """The same rule, for a root more than one segment below the git root. The
+    pattern that hides the root is matched against the root's path *relative to
+    the directory holding the .gitignore*, so a one-segment root would never
+    exercise that translation."""
+    repo = tmp_path / "repo"
+    _make_tree(repo, ["build/generated/api.py", "build/generated/scratch.py"])
+    (repo / ".git").mkdir()
+    (repo / ".gitignore").write_text(
+        "/build/generated/\nbuild/generated/scratch.py\n", encoding="utf-8"
+    )
+
+    result = _walk(repo, roots=["build/generated"])
+
+    assert {display for _, display in result.files} == {"build/generated/api.py"}
+
+
 def test_cross_repo_uses_nearest_repository_gitignore(tmp_path: Path) -> None:
     docs = tmp_path / "docs"
     docs.mkdir()
@@ -352,6 +369,18 @@ def test_resolve_display_path_prefers_the_repo_relative_reading(tmp_path: Path) 
     resolved = resolve_display_path(docs, ["../code/src"], "pkg/core.py")
 
     assert resolved == docs / "pkg" / "core.py"
+
+
+def test_resolve_display_path_does_not_search_roots_inside_the_repo(tmp_path: Path) -> None:
+    """Files under an in-repo source root already display repo-relative, so
+    searching that root would make a second spelling resolve: `evidence:
+    core.py` would silently mean `src/core.py` instead of being the error it
+    is. The skip is live behavior, not a shortcut."""
+    repo = tmp_path / "repo"
+    _make_tree(repo, ["src/core.py"])
+
+    assert resolve_display_path(repo, ["src"], "src/core.py") == repo / "src" / "core.py"
+    assert resolve_display_path(repo, ["src"], "core.py") is None
 
 
 def test_resolve_display_path_rejects_escapes_and_misses(tmp_path: Path) -> None:

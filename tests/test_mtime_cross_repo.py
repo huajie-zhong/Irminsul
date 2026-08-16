@@ -153,6 +153,53 @@ def test_enclosing_repo_above_the_invocation_root_supplies_git_times(
     assert result.when is not None
 
 
+def test_repository_below_the_invocation_root_wins_over_the_enclosing_one(
+    tmp_path: Path,
+) -> None:
+    """The other direction the nearest-`.git` rule covers, and the one the
+    docstring names explicitly: a submodule or vendored checkout carrying its
+    own `.git` *below* the invocation root. The enclosing repository still has
+    history for the path — it tracked those files before they moved — so
+    resolving against the invocation root would hand back the wrong commit
+    rather than none, which is the failure mode that hides.
+    """
+    from git import Repo
+
+    outer_root = tmp_path / "project"
+    vendored = outer_root / "vendor" / "lib"
+    vendored.mkdir(parents=True)
+    tracked = vendored / "core.py"
+    tracked.write_text("x = 1\n", encoding="utf-8")
+
+    outer = Repo.init(outer_root)
+    with outer.config_writer() as cw:
+        cw.set_value("user", "name", "Test")
+        cw.set_value("user", "email", "test@example.com")
+        cw.set_value("commit", "gpgsign", "false")
+    outer.git.add(A=True)
+    outer.index.commit("vendored code was once ours")
+    outer_sha = outer.head.commit.hexsha
+    outer.git.rm("-r", "--cached", "vendor/lib")
+    outer.index.commit("hand it to its own repository")
+    outer.close()
+
+    inner = Repo.init(vendored)
+    with inner.config_writer() as cw:
+        cw.set_value("user", "name", "Test")
+        cw.set_value("user", "email", "test@example.com")
+        cw.set_value("commit", "gpgsign", "false")
+    inner.git.add(A=True)
+    inner.index.commit("its own history")
+    inner_sha = inner.head.commit.hexsha
+    inner.close()
+
+    result = last_commit_time_any_repo(tracked, outer_root)
+
+    assert result is not None
+    assert result.sha == inner_sha
+    assert result.sha != outer_sha
+
+
 def test_asking_the_invocation_root_alone_would_lose_the_history(tmp_path: Path) -> None:
     """The mirror, and the reason the branch cannot be collapsed: resolving
     against the invocation root instead of the enclosing repo yields no history

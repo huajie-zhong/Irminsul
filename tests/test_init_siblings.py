@@ -11,11 +11,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import typer
 from ruamel.yaml import YAML
-from typer.testing import CliRunner
+from typer.testing import CliRunner, Result
 
 from irminsul.cli import app
-from irminsul.init.command import ci_code_checkout_path, parse_code_repo
+from irminsul.init.command import _posix_join, ci_code_checkout_path, parse_code_repo
 
 runner = CliRunner()
 _yaml = YAML(typ="safe")
@@ -28,7 +29,7 @@ def _docs_repo(tmp_path: Path) -> Path:
     return repo
 
 
-def _init_siblings(repo: Path, code_repo: str, *extra: str) -> object:
+def _init_siblings(repo: Path, code_repo: str, *extra: str) -> Result:
     return runner.invoke(
         app,
         [
@@ -79,7 +80,7 @@ def test_parse_bare_name_matching_a_nested_directory_is_rejected(tmp_path: Path)
     docs = _docs_repo(tmp_path)
     (docs / "code").mkdir()
 
-    with pytest.raises(Exception, match="sibling"):
+    with pytest.raises(typer.BadParameter, match="sibling"):
         parse_code_repo("code", docs_root=docs)
 
 
@@ -102,14 +103,31 @@ def test_parse_rejects_a_path_inside_the_docs_repo(tmp_path: Path) -> None:
     """The deleted nested layout: a code checkout inside the docs repo. It has
     to fail loudly rather than scaffold something the tool no longer supports."""
     docs = _docs_repo(tmp_path)
-    with pytest.raises(Exception, match="sibling"):
+    with pytest.raises(typer.BadParameter, match="sibling"):
         parse_code_repo("./code", docs_root=docs)
 
 
 def test_parse_rejects_a_path_outside_the_shared_parent(tmp_path: Path) -> None:
     docs = _docs_repo(tmp_path)
-    with pytest.raises(Exception, match="sibling"):
+    with pytest.raises(typer.BadParameter, match="sibling"):
         parse_code_repo("../../elsewhere/code", docs_root=docs)
+
+
+def test_parse_rejects_the_docs_repo_itself(tmp_path: Path) -> None:
+    """`--code-repo .` names the docs repo, which is a sibling of everything
+    the docs repo is a sibling of. Without the identity clause it would be
+    accepted and the docs repo configured as its own code repo."""
+    docs = _docs_repo(tmp_path)
+    with pytest.raises(typer.BadParameter, match="sibling"):
+        parse_code_repo(".", docs_root=docs)
+
+
+def test_detected_source_roots_are_normalised_onto_the_code_dir(tmp_path: Path) -> None:
+    """A language profile may offer `.` as a source-root candidate — Go does,
+    for a flat module — and an unnormalized join writes `../code/.` into
+    `paths.source_roots`."""
+    assert _posix_join("../code", "src") == "../code/src"
+    assert _posix_join("../code", ".") == "../code"
 
 
 def test_ci_code_checkout_path_mirrors_the_local_layout() -> None:
@@ -126,7 +144,7 @@ def test_ci_code_checkout_path_mirrors_the_local_layout() -> None:
 def test_siblings_writes_source_roots_through_the_parent(tmp_path: Path) -> None:
     repo = _docs_repo(tmp_path)
     result = _init_siblings(repo, "acme/public-code")
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 0, result.stdout
 
     toml = (repo / "irminsul.toml").read_text(encoding="utf-8")
     assert 'source_roots = ["../public-code/src"]' in toml
@@ -140,7 +158,7 @@ def test_siblings_detects_languages_from_an_existing_code_repo(tmp_path: Path) -
     (code / "pyproject.toml").write_text("[project]\nname='x'\n", encoding="utf-8")
 
     result = _init_siblings(repo, "acme/public-code")
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 0, result.stdout
 
     toml = (repo / "irminsul.toml").read_text(encoding="utf-8")
     assert 'source_roots = ["../public-code/src"]' in toml
@@ -152,14 +170,14 @@ def test_siblings_does_not_gitignore_anything(tmp_path: Path) -> None:
     docs repo's .gitignore to hide."""
     repo = _docs_repo(tmp_path)
     result = _init_siblings(repo, "acme/public-code")
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 0, result.stdout
     assert not (repo / ".gitignore").exists()
 
 
 def test_siblings_creates_agent_manifests(tmp_path: Path) -> None:
     repo = _docs_repo(tmp_path)
     result = _init_siblings(repo, "acme/public-code")
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 0, result.stdout
 
     docs_manifest = (repo / "docs" / "AGENTS.md").read_text(encoding="utf-8")
     assert "<!-- agents-manifest:generated-start -->" in docs_manifest
@@ -169,7 +187,7 @@ def test_siblings_creates_agent_manifests(tmp_path: Path) -> None:
 def test_siblings_workflow_checks_out_both_repos_under_one_parent(tmp_path: Path) -> None:
     repo = _docs_repo(tmp_path)
     result = _init_siblings(repo, "acme/public-code")
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 0, result.stdout
 
     workflow = _yaml.load(
         (repo / ".github" / "workflows" / "docs-pr.yml").read_text(encoding="utf-8")
@@ -187,7 +205,7 @@ def test_siblings_workflow_checks_out_both_repos_under_one_parent(tmp_path: Path
 def test_siblings_nightly_workflow_runs_the_configured_profile(tmp_path: Path) -> None:
     repo = _docs_repo(tmp_path)
     result = _init_siblings(repo, "acme/public-code")
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 0, result.stdout
 
     workflow = _yaml.load(
         (repo / ".github" / "workflows" / "docs-nightly.yml").read_text(encoding="utf-8")
@@ -202,19 +220,19 @@ def test_siblings_local_path_leaves_the_checkout_to_be_filled_in(tmp_path: Path)
     it ships a placeholder and says so instead of emitting a broken step."""
     repo = _docs_repo(tmp_path)
     result = _init_siblings(repo, "../local-code")
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 0, result.stdout
 
     pr_workflow = (repo / ".github" / "workflows" / "docs-pr.yml").read_text(encoding="utf-8")
     assert "repository: OWNER/CODE-REPO" in pr_workflow
     assert "path: workspace/local-code" in pr_workflow
     assert "Fill in `repository:`" in pr_workflow
-    assert "fill in the `repository:`" in result.output
+    assert "fill in the `repository:`" in result.stdout
 
 
 def test_siblings_scaffold_passes_the_hard_check(tmp_path: Path) -> None:
     repo = _docs_repo(tmp_path)
     result = _init_siblings(repo, "acme/public-code")
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 0, result.stdout
 
     check_result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(repo)])
     assert check_result.exit_code == 0, check_result.stdout

@@ -140,12 +140,13 @@ def ci_code_checkout_path(code_dir: str) -> str:
 
 
 def _posix_join(prefix: str, rel: str) -> str:
-    """Join a `code_dir` onto a detected source root, POSIX-normalized.
+    """Join a detected source root onto `code_dir`, POSIX-normalized.
 
-    Detected roots come back in the host OS's separator; the config file and
-    every check speak POSIX.
+    Normalization is not cosmetic: a language profile may offer `.` as a source
+    root candidate (Go does, for a flat module), and the unnormalized join
+    would write `../code/.` into `paths.source_roots`.
     """
-    return posixpath.join(prefix, PurePosixPath(*Path(rel).parts).as_posix())
+    return posixpath.normpath(posixpath.join(prefix, rel))
 
 
 def gather_answers(
