@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from irminsul.git.mtime import git_root_for, last_commit_time_any_repo
+from irminsul.git.mtime import GitTime, git_root_for, last_commit_time_any_repo
 
 
 def test_git_root_for_finds_project_git(tmp_path: Path) -> None:
@@ -105,3 +105,61 @@ def test_mtime_drift_cross_repo_no_git_emits_error(tmp_path: Path) -> None:
     error_findings = [f for f in findings if f.severity == Severity.error]
     assert error_findings, f"expected error finding for cross-repo no-git; got {findings}"
     assert any("no git history" in f.message for f in error_findings)
+
+
+def _monorepo(tmp_path: Path) -> tuple[Path, Path]:
+    """A git repo whose irminsul root is a subfolder, not the repo root.
+
+    Returns (invocation_root, tracked_file). The only `.git` sits above the
+    invocation root, so `git_root_for` has to walk *up* to reach it.
+    """
+    from git import Repo
+
+    mono = tmp_path / "mono"
+    proj = mono / "packages" / "proj"
+    (proj / "docs").mkdir(parents=True)
+    (proj / "docs" / "d.md").write_text("# d\n", encoding="utf-8")
+
+    repo = Repo.init(mono)
+    with repo.config_writer() as cw:
+        cw.set_value("user", "name", "Test")
+        cw.set_value("user", "email", "test@example.com")
+        cw.set_value("commit", "gpgsign", "false")
+    repo.git.add(A=True)
+    repo.index.commit("monorepo")
+    expected = repo.head.commit.hexsha
+    repo.close()
+    return proj, expected
+
+
+def test_enclosing_repo_above_the_invocation_root_supplies_git_times(
+    tmp_path: Path,
+) -> None:
+    """The invocation root is not always a repository root. In a monorepo
+    subfolder the enclosing `.git` is an *ancestor* of it, and that ancestor is
+    the only repo holding any history for the path.
+
+    Pinned directly rather than left to incidental coverage: this repo's own
+    fixture repos reach the same branch only because they happen to sit inside
+    this git repo, which reads like an accident and invites deletion.
+    """
+    proj, expected_sha = _monorepo(tmp_path)
+    doc = proj / "docs" / "d.md"
+
+    result = last_commit_time_any_repo(doc, proj)
+
+    assert result is not None
+    assert result.sha == expected_sha
+    assert result.when is not None
+
+
+def test_asking_the_invocation_root_alone_would_lose_the_history(tmp_path: Path) -> None:
+    """The mirror, and the reason the branch cannot be collapsed: resolving
+    against the invocation root instead of the enclosing repo yields no history
+    at all, so every git time would silently vanish."""
+    from irminsul.git.mtime import _bulk_lookup
+
+    proj, _ = _monorepo(tmp_path)
+    doc = proj / "docs" / "d.md"
+
+    assert _bulk_lookup(proj, doc) == GitTime(sha=None, when=None)
