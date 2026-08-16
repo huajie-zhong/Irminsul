@@ -12,7 +12,11 @@ from typing import Literal
 from pathspec import GitIgnoreSpec
 
 from irminsul.checks import HARD_REGISTRY, SOFT_REGISTRY, Check, Finding, sort_findings
-from irminsul.checks.globs import is_source_path, source_root_prefixes
+from irminsul.checks.globs import (
+    is_source_path,
+    resolve_display_path,
+    source_root_prefixes,
+)
 from irminsul.checks.uniqueness import specificity
 from irminsul.config import IrminsulConfig
 from irminsul.docgraph import DocGraph, DocNode, build_graph
@@ -411,7 +415,8 @@ def _pending_for_path(
     graph: DocGraph,
     target_path: Path,
 ) -> tuple[list[_PendingResult], list[UnmatchedPath]]:
-    rel = _existing_repo_relative(repo_root, target_path)
+    source_roots = graph.config.paths.source_roots if graph.config is not None else []
+    rel = _existing_repo_relative(repo_root, target_path, source_roots)
     display = rel.as_posix()
 
     node = graph.by_path.get(rel)
@@ -556,16 +561,31 @@ def _declared_test_owners(graph: DocGraph) -> dict[str, tuple[DocNode, ...]]:
     }
 
 
-def _existing_repo_relative(repo_root: Path, raw_path: Path) -> Path:
+def _existing_repo_relative(repo_root: Path, raw_path: Path, source_roots: list[str]) -> Path:
+    """The display spelling of an existing file, or a `ContextError`.
+
+    A path inside the invocation root answers repo-relative, the way it always
+    has. Failing that, the value is read as a display spelling — the one
+    `describes:` and `claims[].evidence` speak — which is how a source file in
+    a sibling code repo is named: with `source_roots = ["../code/src"]`,
+    `workspace/code/src/app/main.py` is `app/main.py`. Without this the layout
+    had no spelling at all for its own source files: the `../code/...` form is
+    outside the repo and refused, and the display form did not exist on disk
+    under `repo_root`.
+    """
     absolute = raw_path if raw_path.is_absolute() else repo_root / raw_path
     resolved = absolute.resolve()
-    if not resolved.exists():
-        raise ContextError(f"path does not exist: {raw_path}", code=1)
-    try:
-        rel = resolved.relative_to(repo_root.resolve())
-    except ValueError as exc:
-        raise ContextError(f"path is outside the repo: {raw_path}", code=2) from exc
-    return Path(PurePosixPath(*rel.parts))
+    if resolved.exists():
+        try:
+            rel = resolved.relative_to(repo_root.resolve())
+        except ValueError as exc:
+            raise ContextError(f"path is outside the repo: {raw_path}", code=2) from exc
+        return Path(PurePosixPath(*rel.parts))
+
+    display = PurePosixPath(raw_path.as_posix())
+    if not raw_path.is_absolute() and resolve_display_path(repo_root, source_roots, str(display)):
+        return Path(display)
+    raise ContextError(f"path does not exist: {raw_path}", code=1)
 
 
 @dataclass(frozen=True)

@@ -375,10 +375,41 @@ def test_init_errors_when_no_code_signals_noninteractive(tmp_path: Path) -> None
 
 def test_init_interactive_no_code_can_choose_siblings(tmp_path: Path) -> None:
     repo = _docs_repo(tmp_path)
-    # "2" chooses siblings, then the code repo spec, then the project name default.
-    result = runner.invoke(app, ["init", "--path", str(repo)], input="2\nacme/public-code\n\n")
+    # "2" chooses siblings, then the code repo spec, then the project name
+    # default, then "n" declines the post-scaffold seed prompt.
+    result = runner.invoke(
+        app, ["init", "--path", str(repo)], input="2\nacme/public-code\n\nn\n"
+    )
 
     assert result.exit_code == 0, result.stdout
     assert "siblings" in result.stdout
     toml = (repo / "irminsul.toml").read_text(encoding="utf-8")
     assert 'source_roots = ["../public-code/src"]' in toml
+
+
+def test_siblings_offers_the_seed_prompt(tmp_path: Path) -> None:
+    """The siblings layout is only reachable in a directory with no code in it,
+    so it scaffolds a brand-new project just as `--fresh` does. The prompt was
+    dropped along with the retired `--fresh --topology docs-only` path that
+    used to carry it."""
+    repo = _docs_repo(tmp_path)
+
+    result = runner.invoke(
+        app,
+        ["init", "--topology", "siblings", "--code-repo", "acme/public-code", "--path", str(repo)],
+        input="\nn\n",
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "principle, idea, and belief" in result.stdout
+    assert "irminsul seed" in result.stdout
+
+
+def test_non_interactive_siblings_stays_scriptable(tmp_path: Path) -> None:
+    """The mirror: `--no-interactive` gains no prompt."""
+    repo = _docs_repo(tmp_path)
+
+    result = _init_siblings(repo, "acme/public-code")
+
+    assert result.exit_code == 0, result.stdout
+    assert "principle, idea, and belief" not in result.stdout

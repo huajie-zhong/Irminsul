@@ -266,6 +266,26 @@ def test_sibling_source_paths_are_not_addressable_by_path(tmp_path: Path) -> Non
     assert "outside the repo" in result.output
 
 
+def test_sibling_source_files_answer_to_their_display_spelling(tmp_path: Path) -> None:
+    """The spelling that does work, and the one `describes:` and
+    `claims[].evidence` already require: source-root-relative. Without it the
+    layout had no spelling at all for its own source files — `../code/...` is
+    outside the repo, and `core.py` did not exist under the docs repo."""
+    repo_root = _build_siblings(tmp_path)
+    result = runner.invoke(app, ["context", "core.py", "--path", str(repo_root)])
+    assert result.exit_code == 0, result.output
+    assert "owner: core" in result.output
+
+
+def test_a_display_spelling_that_names_nothing_still_fails(tmp_path: Path) -> None:
+    """The mirror: the fallback resolves real files under a configured root, it
+    does not accept any string that happens to look like one."""
+    repo_root = _build_siblings(tmp_path)
+    result = runner.invoke(app, ["context", "gone.py", "--path", str(repo_root)])
+    assert result.exit_code == 1
+    assert "path does not exist" in result.output
+
+
 def test_mtime_uses_the_sibling_code_repos_own_history(tmp_path: Path) -> None:
     repo_root = _build_siblings(tmp_path)
     code_repo = Repo(repo_root.parent / "code")

@@ -180,13 +180,26 @@ class Checks(BaseModel):
         unknown = [c for c in v if c not in valid]
         if not unknown:
             return v
+        # A check that moved between the registries is the common case after an
+        # upgrade, and "unknown check name" is the one thing it is not: the name
+        # is real, it belongs in the other list. Saying so turns the failure
+        # into a one-line edit.
+        other_field = "soft_deterministic" if info.field_name == "hard" else "hard"
+        elsewhere = (
+            set(SOFT_DETERMINISTIC_CHECKS)
+            if info.field_name == "hard"
+            else set(HARD_CHECKS) | set(OPT_IN_HARD_CHECKS)
+        )
         entries = []
         for name in unknown:
+            if name in elsewhere:
+                entries.append(f"'{name}' (moved — declare it in checks.{other_field})")
+                continue
             match = difflib.get_close_matches(name, valid, n=1)
             hint = f" (did you mean '{match[0]}'?)" if match else ""
             entries.append(f"'{name}'{hint}")
         raise ValueError(
-            f"unknown check name(s) in checks.{info.field_name}: {', '.join(entries)}. "
+            f"unusable check name(s) in checks.{info.field_name}: {', '.join(entries)}. "
             f"Valid checks.{info.field_name} names: {', '.join(valid)}."
         )
 

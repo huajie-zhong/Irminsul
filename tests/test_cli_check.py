@@ -124,6 +124,24 @@ def test_check_unknown_check_name_exits_two_with_suggestion(
     assert "did you mean 'uniqueness'?" in result.output
 
 
+def test_check_names_the_list_a_moved_check_belongs_in(tmp_path: Path) -> None:
+    """`retired-references` moved from `checks.soft_deterministic` to
+    `checks.hard`, and every existing config then failed to load with "unknown
+    check name" — the one thing the name is not. Naming the other list turns
+    the failure into a one-line edit."""
+    (tmp_path / "irminsul.toml").write_text(
+        'project_name = "moved"\n[paths]\ndocs_root = "docs"\n'
+        '[checks]\nsoft_deterministic = ["retired-references"]\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "docs").mkdir()
+
+    result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(tmp_path)])
+
+    assert result.exit_code == 2
+    assert "'retired-references' (moved — declare it in checks.hard)" in result.output
+
+
 def test_check_good_fixture_config_still_loads(
     fixture_repo: Callable[[str], Path],
 ) -> None:

@@ -111,8 +111,12 @@ def _root(
     """Irminsul — enforce a documentation system in CI."""
 
 
-def _offer_seed_after_fresh_init(target: Path, *, interactive: bool) -> None:
-    """After an interactive fresh-start init, offer to capture the PIB now.
+def _offer_seed_after_scaffold(target: Path, *, interactive: bool) -> None:
+    """After an interactive scaffold of a new project, offer to capture the PIB.
+
+    Both paths that create a project rather than adopt one qualify: a
+    fresh-start same-repo init, and the siblings layout, which is only reachable
+    in a directory with no code in it.
 
     Non-interactive init gains no new prompts — it stays fully scriptable.
     `irminsul seed` remains the standalone command for capturing or redoing
@@ -226,6 +230,7 @@ def init(
             )
             raise typer.Exit(code=2)
         _init_siblings(target, interactive=interactive, code_repo=code_repo, force=force)
+        _offer_seed_after_scaffold(target, interactive=interactive)
         return
 
     has_code = detect_code_signals(target)
@@ -242,7 +247,7 @@ def init(
             )
             raise typer.Exit(code=2)
         run_init_fresh(target, interactive=interactive, force=force)
-        _offer_seed_after_fresh_init(target, interactive=interactive)
+        _offer_seed_after_scaffold(target, interactive=interactive)
         return
 
     if interactive and not has_code:
@@ -253,10 +258,11 @@ def init(
         answer = typer.prompt("Choose", default="1")
         if answer == "1":
             run_init_fresh(target, interactive=interactive, force=force)
-            _offer_seed_after_fresh_init(target, interactive=interactive)
+            _offer_seed_after_scaffold(target, interactive=interactive)
             return
         if answer == "2":
             _init_siblings(target, interactive=interactive, code_repo=code_repo, force=force)
+            _offer_seed_after_scaffold(target, interactive=interactive)
             return
         typer.echo("Canceled.")
         raise typer.Exit(code=0)
