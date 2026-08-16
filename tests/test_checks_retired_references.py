@@ -536,6 +536,28 @@ def test_skips_the_generated_manifest_region(tmp_path: Path) -> None:
     assert [f.line for f in findings] == [5]
 
 
+def test_unmatched_generated_marker_is_reported_and_suppresses_nothing(tmp_path: Path) -> None:
+    """A start marker with no end used to open the generated region and never
+    close it, so one stray line switched this hard check off for the rest of the
+    file — silently, since nothing reported the marker. Only balanced markers
+    blank anything now, and the unmatched one is itself an error."""
+    from irminsul.regen.agents_md import GENERATED_START
+
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    (tmp_path / "README.md").write_text(
+        f"# Demo\n{GENERATED_START}\nRun irminsul render.\n", encoding="utf-8"
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [(f.category, f.line) for f in findings] == [
+        ("unmatched-generated-marker", 2),
+        ("retired-reference", 3),
+    ]
+    assert all(f.severity.value == "error" for f in findings)
+
+
 def test_retired_reference_findings_are_errors(tmp_path: Path) -> None:
     """ADR-0022 nominates this audit as the thing that makes stale guidance
     fail. CI's dogfood step runs no `--strict`, so a warning would report and

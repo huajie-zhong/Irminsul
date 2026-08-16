@@ -72,9 +72,12 @@ hard errors, and marker removal stays manual.
 `retired-references` builds its tombstone registry only from stable ADRs. It is
 a hard check: a stale reference is an `error`, so the gate fails without
 `--strict`, which is what makes a retirement decision enforceable rather than
-advisory. The tombstone-hygiene findings it also emits — an inactive owner, a
-duplicate declaration, a retired CLI identity that is live again — stay warnings,
-since they describe the registry rather than stale guidance.
+advisory. An unmatched `agents-manifest:generated-start` marker is an error too —
+only a balanced pair blanks anything, because an unclosed marker would otherwise
+switch the check off for the rest of the file. The tombstone-hygiene findings it
+also emits — an inactive owner, a duplicate declaration, a retired CLI identity
+that is live again — stay warnings, since they describe the registry rather than
+stale guidance.
 
 It scans every stable atom, frontmatter included, plus the current README, docs
 README, glossary, contributor guidance, and the agent manifests, which are

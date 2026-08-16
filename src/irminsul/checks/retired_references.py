@@ -47,6 +47,7 @@ class _GuidanceSource:
     path: Path
     doc_id: str | None
     lines: tuple[tuple[int, str], ...]
+    unmatched_marker_line: int | None = None
 
 
 @dataclass(frozen=True)
@@ -58,7 +59,11 @@ class _LinkedLabel:
 
 class RetiredReferencesCheck:
     name: ClassVar[str] = "retired-references"
-    default_severity: ClassVar[Severity] = Severity.warning
+    # The check emits both: stale guidance and an unmatched generated marker are
+    # errors, the tombstone-hygiene findings are warnings. The declaration names
+    # the blocking one, matching `RfcLifecycleIntegrityCheck`, the other
+    # mixed-severity hard check.
+    default_severity: ClassVar[Severity] = Severity.error
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.repo_root is None or graph.config is None:
@@ -69,6 +74,8 @@ class RetiredReferencesCheck:
             return findings
 
         for source in _guidance_sources(graph):
+            if source.unmatched_marker_line is not None:
+                findings.append(_unmatched_marker_finding(source))
             # An ADR has to be able to say what it retired, so it is never
             # audited against its own tombstones. Every other document is,
             # including other ADRs.
@@ -282,11 +289,13 @@ def _guidance_sources(graph: DocGraph) -> list[_GuidanceSource]:
         # tombstone is exempted from it in `run` rather than wholesale here.
         if _is_rfc_path(node.path):
             continue
+        lines, unmatched = _file_lines(graph.repo_root / node.path)
         sources.append(
             _GuidanceSource(
                 path=node.path,
                 doc_id=node.id,
-                lines=_file_lines(graph.repo_root / node.path),
+                lines=lines,
+                unmatched_marker_line=unmatched,
             )
         )
 
@@ -311,11 +320,13 @@ def _guidance_sources(graph: DocGraph) -> list[_GuidanceSource]:
                 relative = path.relative_to(graph.repo_root)
             except ValueError:
                 relative = path
+            lines, unmatched = _file_lines(absolute)
             sources.append(
                 _GuidanceSource(
                     path=relative,
                     doc_id=None,
-                    lines=_file_lines(absolute),
+                    lines=lines,
+                    unmatched_marker_line=unmatched,
                 )
             )
     return sources
@@ -326,8 +337,9 @@ def _is_rfc_path(path: Path) -> bool:
     return "80-evolution" in parts and "rfcs" in parts
 
 
-def _file_lines(path: Path) -> tuple[tuple[int, str], ...]:
-    """Every line of the file, with machine-generated regions blanked.
+def _file_lines(path: Path) -> tuple[tuple[tuple[int, str], ...], int | None]:
+    """Every line of the file with machine-generated regions blanked, plus the
+    line number of an unmatched generated-start marker.
 
     Frontmatter is included: a retired name is just as misleading in a `title:`
     or `summary:` as in prose, and the tombstone owner's own `matches:` list is
@@ -338,17 +350,25 @@ def _file_lines(path: Path) -> tuple[tuple[int, str], ...]:
     freezes — so a finding there names a line no one may edit and that `regen`
     would rewrite identically. Line numbers are preserved so every other line in
     the file still reports accurately.
+
+    Only *balanced* markers blank anything, and the line number of an unmatched
+    start marker comes back with the lines. A start marker used to open the
+    region and never close it, so one stray line — a bad merge, a half-written
+    manifest — silently switched a hard check off for the rest of the file. A
+    suppression that broad has to be reported, not inferred.
     """
     lines = path.read_text(encoding="utf-8").splitlines()
-    out: list[tuple[int, str]] = []
-    in_generated = False
-    for lineno, line in enumerate(lines, 1):
+    generated: set[int] = set()
+    open_start: int | None = None
+    for index, line in enumerate(lines):
         if GENERATED_START in line:
-            in_generated = True
-        elif GENERATED_END in line:
-            in_generated = False
-        out.append((lineno, "" if in_generated else line))
-    return tuple(out)
+            if open_start is None:
+                open_start = index
+        elif GENERATED_END in line and open_start is not None:
+            generated.update(range(open_start, index + 1))
+            open_start = None
+    out = tuple((index + 1, "" if index in generated else line) for index, line in enumerate(lines))
+    return out, None if open_start is None else open_start + 1
 
 
 def _visible_source_lines(
@@ -483,6 +503,29 @@ def _auditable_line(
         )
         visible = visible.replace(linked.token, replacement)
     return visible
+
+
+def _unmatched_marker_finding(source: _GuidanceSource) -> Finding:
+    return Finding(
+        check=RetiredReferencesCheck.name,
+        # An error for the same reason the stale-guidance finding is one: the
+        # marker's effect is to stop this hard check reading the rest of the
+        # file, and a suppression nobody declared has to fail rather than warn.
+        severity=Severity.error,
+        category="unmatched-generated-marker",
+        message="generated-region start marker has no matching end marker",
+        path=source.path,
+        doc_id=source.doc_id,
+        line=source.unmatched_marker_line,
+        suggestion=(
+            f"Close the region with `{GENERATED_END}`, or remove the start marker — "
+            "everything below it would otherwise go unaudited"
+        ),
+        data={
+            "problem": "unmatched-generated-marker",
+            "marker": GENERATED_START,
+        },
+    )
 
 
 def _retired_reference_finding(
