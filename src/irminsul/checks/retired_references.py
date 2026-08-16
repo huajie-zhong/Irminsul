@@ -17,6 +17,7 @@ from irminsul.frontmatter import (
     RetirementKindEnum,
     StatusEnum,
 )
+from irminsul.regen.agents_md import GENERATED_END, GENERATED_START
 from irminsul.surface import derive_surface
 
 _REFERENCE_DEFINITION_RE = re.compile(r"^\s{0,3}\[([^\]\n]+)\]:\s*(?:<([^>\n]+)>|(\S+))")
@@ -68,6 +69,12 @@ class RetiredReferencesCheck:
             return findings
 
         for source in _guidance_sources(graph):
+            # An ADR has to be able to say what it retired, so it is never
+            # audited against its own tombstones. Every other document is,
+            # including other ADRs.
+            applicable = [rule for rule in rules if rule.owner.path != source.path]
+            if not applicable:
+                continue
             visible_lines, definitions = _visible_source_lines(source.lines)
             occurrences: dict[tuple[str, str], tuple[_RetirementRule, int, int]] = {}
             for lineno, line in visible_lines:
@@ -77,7 +84,7 @@ class RetiredReferencesCheck:
                     definitions,
                 )
                 handled: set[tuple[str, str]] = set()
-                for rule in rules:
+                for rule in applicable:
                     auditable = _auditable_line(visible, linked_labels, rule)
                     if rule.identity in handled or rule.pattern.search(auditable) is None:
                         continue
@@ -245,20 +252,31 @@ def _guidance_sources(graph: DocGraph) -> list[_GuidanceSource]:
     for node in sorted(graph.nodes.values(), key=lambda item: item.path.as_posix()):
         if node.frontmatter.status != StatusEnum.stable:
             continue
-        if node.frontmatter.audience == AudienceEnum.adr or _is_rfc_path(node.path):
+        # RFCs are frozen historical records (ADR-0016) and are never edited,
+        # so auditing them would report findings nobody is allowed to fix.
+        # ADRs are audited: they are current decisions, and the one that owns a
+        # tombstone is exempted from it in `run` rather than wholesale here.
+        if _is_rfc_path(node.path):
             continue
         sources.append(
             _GuidanceSource(
                 path=node.path,
                 doc_id=node.id,
-                lines=_body_lines(graph.repo_root / node.path),
+                lines=_file_lines(graph.repo_root / node.path),
             )
         )
 
     docs_root = Path(graph.config.paths.docs_root)
+    # The agent guides are the highest-traffic guidance in the repo — `irminsul
+    # init` tells every user to point their agent at them — and none of them is
+    # a graph node: the AGENTS.md files are in EXEMPT_TOPLEVEL_NAMES and
+    # CLAUDE.md lives outside docs_root entirely.
     current_files = {
         Path("README.md"),
+        Path("AGENTS.md"),
+        Path("CLAUDE.md"),
         docs_root / "README.md",
+        docs_root / "AGENTS.md",
         docs_root / "GLOSSARY.md",
         docs_root / "CONTRIBUTING.md",
     }
@@ -273,7 +291,7 @@ def _guidance_sources(graph: DocGraph) -> list[_GuidanceSource]:
                 _GuidanceSource(
                     path=relative,
                     doc_id=None,
-                    lines=tuple(enumerate(absolute.read_text(encoding="utf-8").splitlines(), 1)),
+                    lines=_file_lines(absolute),
                 )
             )
     return sources
@@ -284,17 +302,29 @@ def _is_rfc_path(path: Path) -> bool:
     return "80-evolution" in parts and "rfcs" in parts
 
 
-def _body_lines(path: Path) -> tuple[tuple[int, str], ...]:
+def _file_lines(path: Path) -> tuple[tuple[int, str], ...]:
+    """Every line of the file, with machine-generated regions blanked.
+
+    Frontmatter is included: a retired name is just as misleading in a `title:`
+    or `summary:` as in prose, and the tombstone owner's own `matches:` list is
+    already exempted by the declaring-ADR rule.
+
+    The `regen agents-md` region is not. It is derived output whose rows are the
+    titles of the documents it indexes — including RFCs, whose titles ADR-0016
+    freezes — so a finding there names a line no one may edit and that `regen`
+    would rewrite identically. Line numbers are preserved so every other line in
+    the file still reports accurately.
+    """
     lines = path.read_text(encoding="utf-8").splitlines()
-    if not lines or lines[0].strip() != "---":
-        return tuple(enumerate(lines, 1))
-    closing = next(
-        (index for index, line in enumerate(lines[1:], start=1) if line.strip() == "---"),
-        None,
-    )
-    if closing is None:
-        return tuple(enumerate(lines, 1))
-    return tuple(enumerate(lines[closing + 1 :], start=closing + 2))
+    out: list[tuple[int, str]] = []
+    in_generated = False
+    for lineno, line in enumerate(lines, 1):
+        if GENERATED_START in line:
+            in_generated = True
+        elif GENERATED_END in line:
+            in_generated = False
+        out.append((lineno, "" if in_generated else line))
+    return tuple(out)
 
 
 def _visible_source_lines(
@@ -438,7 +468,11 @@ def _retired_reference_finding(
 ) -> Finding:
     return Finding(
         check=RetiredReferencesCheck.name,
-        severity=Severity.warning,
+        # An error, not a warning: ADR-0022 nominates this audit as the thing
+        # that makes stale guidance fail, and CI runs no `--strict`. A warning
+        # here reports and never blocks, which is what let a retired command
+        # survive in a shipped ADR.
+        severity=Severity.error,
         category="retired-reference",
         message=(f"current guidance references retired {rule.entry.kind.value} '{rule.phrase}'"),
         path=source.path,

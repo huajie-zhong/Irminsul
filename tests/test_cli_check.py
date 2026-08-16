@@ -141,14 +141,17 @@ def test_check_configured_runs_configured_soft_checks(
     assert "[supersession]" in result.stdout
 
 
-def test_check_configured_reports_retired_references(
+def test_check_fails_on_retired_references_without_strict(
     fixture_repo: Callable[[str], Path],
 ) -> None:
-    repo = fixture_repo("soft-retired-references")
+    """ADR-0022 nominates this audit as the safety net for stale guidance, and
+    the dogfood step in CI passes no `--strict`. It is a hard check emitting
+    errors so the gate actually fails."""
+    repo = fixture_repo("hard-retired-references")
 
-    result = runner.invoke(app, ["check", "--profile", "configured", "--path", str(repo)])
+    result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(repo)])
 
-    assert result.exit_code == 0, result.stdout
+    assert result.exit_code == 1, result.stdout
     assert "[retired-references]" in result.stdout
     assert "demo publish" in result.stdout
     assert "0001-retire-publish.md" in result.stdout

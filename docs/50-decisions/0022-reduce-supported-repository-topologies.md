@@ -13,6 +13,7 @@ retires:
     matches:
       - irminsul init-docs-only
       - irm init-docs-only
+      - init-docs-only
     guidance: Use `irminsul init --topology siblings --code-repo <spec-or-path>` to scaffold a docs repo beside a separate code repo.
   - id: docs-only-topology
     kind: concept
@@ -138,3 +139,12 @@ layout and cannot collide the way "Topology B" did.
   existing behavior, now the only behavior, and the workflow doc must teach it.
 - The retirement tombstones above make current guidance that still teaches
   `init-docs-only` or the lettered names fail the `retired-references` audit.
+  For that to be true rather than aspirational, the audit is a **hard** check
+  emitting **errors**, so it blocks without `--strict` — CI's dogfood step runs
+  none. It reads every stable doc including ADRs, plus the repository readme,
+  the two agent manifests, the Claude guide, the docs readme, the glossary and
+  the contributing guide — frontmatter included. Two things are out of range by
+  design: an ADR is never audited against the tombstones it declares itself,
+  and RFC records are frozen by
+  [`ADR-0016`](0016-freeze-implemented-rfc-records.md), so neither their text
+  nor the generated manifest rows that echo their titles are read.

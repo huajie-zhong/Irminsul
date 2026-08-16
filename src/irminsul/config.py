@@ -26,6 +26,7 @@ HARD_CHECKS = (
     "liar",
     "prose-file-reference",
     "rfc-lifecycle-integrity",
+    "retired-references",
 )
 # Hard checks that ship registered and valid in `checks.hard` but are not
 # enabled by default; projects opt in by listing them. `agents-manifest`
@@ -56,7 +57,6 @@ SOFT_DETERMINISTIC_CHECKS = (
     "change-binding",
     "requirement-grammar",
     "adr-structure",
-    "retired-references",
 )
 
 

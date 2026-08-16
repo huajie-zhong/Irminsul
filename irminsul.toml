@@ -19,6 +19,7 @@ hard = [
     "prose-file-reference",
     "agents-manifest",
     "rfc-lifecycle-integrity",
+    "retired-references",
 ]
 soft_deterministic = [
     "mtime-drift",
@@ -43,7 +44,6 @@ soft_deterministic = [
     "change-binding",
     "requirement-grammar",
     "adr-structure",
-    "retired-references",
 ]
 
 [checks.schema_leak]

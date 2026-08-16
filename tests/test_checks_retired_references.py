@@ -375,3 +375,116 @@ def test_reports_duplicate_retirement_provenance_deterministically(tmp_path: Pat
         and finding.data["declared-by"] == "docs/50-decisions/0001-retire-render.md"
         for finding in ambiguous
     )
+
+
+def test_audits_other_adrs(tmp_path: Path) -> None:
+    """ADRs are current decisions, not historical record. The audit used to skip
+    every doc with `audience: adr`, which is how a shipped ADR kept instructing
+    readers to run a command that no longer exists."""
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/50-decisions/0002-other.md",
+        doc_id="0002-other",
+        audience="adr",
+        body="Build the site with irminsul render.",
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [f.path for f in findings] == [Path("docs/50-decisions/0002-other.md")]
+
+
+def test_owner_adr_is_never_audited_against_its_own_tombstones(tmp_path: Path) -> None:
+    """The counterweight: an ADR must be able to name what it retired, in its
+    frontmatter `matches:` list and in the prose explaining the decision."""
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+
+    assert _findings(tmp_path) == []
+
+
+def test_audits_the_agent_manifests(tmp_path: Path) -> None:
+    """`irminsul init` tells every user to point their agent at these files, and
+    none of them is a graph node — the AGENTS.md files are exempt top-level
+    names and CLAUDE.md sits outside docs_root."""
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    (tmp_path / "AGENTS.md").write_text("Use irminsul render.\n", encoding="utf-8")
+    (tmp_path / "CLAUDE.md").write_text("Use irminsul render.\n", encoding="utf-8")
+    (tmp_path / "docs" / "AGENTS.md").write_text("Use irminsul render.\n", encoding="utf-8")
+
+    assert {f.path for f in _findings(tmp_path)} == {
+        Path("AGENTS.md"),
+        Path("CLAUDE.md"),
+        Path("docs/AGENTS.md"),
+    }
+
+
+def test_audits_frontmatter(tmp_path: Path) -> None:
+    """A retired name misleads just as much in a `title:` or `summary:` as in
+    prose, and both are read by agents browsing the manifest."""
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/20-components/thing.md",
+        doc_id="thing",
+        body="Nothing to see.",
+        frontmatter_extra=["summary: Wraps the reference layer."],
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [f.path for f in findings] == [Path("docs/20-components/thing.md")]
+    assert findings[0].line == 8
+
+
+def test_skips_the_generated_manifest_region(tmp_path: Path) -> None:
+    """`regen agents-md` builds those rows from the titles of the docs it
+    indexes, including RFCs whose titles ADR-0016 freezes. A finding there names
+    a line nobody may edit and that `regen` would rewrite identically. Lines
+    outside the markers are still audited, at their true line numbers."""
+    from irminsul.regen.agents_md import GENERATED_END, GENERATED_START
+
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    (tmp_path / "docs" / "AGENTS.md").write_text(
+        "\n".join(
+            [
+                "# Agents",
+                GENERATED_START,
+                "| doc | Uses the reference layer |",
+                GENERATED_END,
+                "Hand-written: the reference layer is how we do it.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [f.line for f in findings] == [5]
+
+
+def test_retired_reference_findings_are_errors(tmp_path: Path) -> None:
+    """ADR-0022 nominates this audit as the thing that makes stale guidance
+    fail. CI's dogfood step runs no `--strict`, so a warning would report and
+    never block."""
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    (tmp_path / "README.md").write_text("Use irminsul render.\n", encoding="utf-8")
+
+    findings = _findings(tmp_path)
+
+    assert [f.severity.value for f in findings] == ["error"]
+
+
+def test_retired_references_is_a_hard_check() -> None:
+    """Hard checks block regardless of `--strict`, which is what makes
+    ADR-0022's safety-net claim true rather than aspirational."""
+    from irminsul.checks import HARD_REGISTRY, SOFT_REGISTRY
+
+    assert RetiredReferencesCheck.name in HARD_REGISTRY
+    assert RetiredReferencesCheck.name not in SOFT_REGISTRY
