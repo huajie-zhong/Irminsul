@@ -191,9 +191,10 @@ def test_capitalised_concept_still_matches_its_declared_spelling(tmp_path: Path)
 
 def test_both_spellings_of_one_concept_are_distinct_declarations(tmp_path: Path) -> None:
     """A tombstone that wants a capitalised name matched loosely lists both
-    spellings. They compile to different patterns, so neither is reported as an
-    ambiguous duplicate of the other, and a line that matches both is still one
-    finding because both belong to the same entry."""
+    spellings. They fold to one dedup key but belong to one entry, so neither
+    is reported as an ambiguous duplicate of the other, both patterns stay
+    active with their own case semantics, and a line that matches both is
+    still one finding because both belong to the same entry."""
     _write_config(tmp_path)
     _write_doc(
         tmp_path,
@@ -222,6 +223,59 @@ def test_both_spellings_of_one_concept_are_distinct_declarations(tmp_path: Path)
 
     assert [finding.category for finding in findings] == ["retired-reference"]
     assert findings[0].path == Path("docs/20-components/current.md")
+
+
+def test_case_variant_tombstones_across_adrs_warn_and_dedupe(tmp_path: Path) -> None:
+    """Two ADRs retiring one concept in different case name the same thing —
+    the dedup key folds case for every concept phrase, capitalised or not.
+    Keying them apart kept both rules active: no ambiguous-retirement warning,
+    and one guidance line drew two hard errors for one reference. The earlier
+    ADR's declaration is canonical and its smart-case matching semantics
+    survive untouched."""
+    _write_config(tmp_path)
+    for doc_id, rel, retirement_id, phrase in (
+        ("0001-retire-a", "docs/50-decisions/0001-retire-a.md", "docs-only", "docs-only topology"),
+        (
+            "0002-retire-b",
+            "docs/50-decisions/0002-retire-b.md",
+            "docs-only-2",
+            "Docs-Only Topology",
+        ),
+    ):
+        _write_doc(
+            tmp_path,
+            rel,
+            doc_id=doc_id,
+            audience="adr",
+            body="Gone.",
+            frontmatter_extra=[
+                "retires:",
+                f"  - id: {retirement_id}",
+                "    kind: concept",
+                "    matches:",
+                f"      - {phrase}",
+                "    guidance: Use the siblings layout.",
+            ],
+        )
+    _write_doc(
+        tmp_path,
+        "docs/20-components/current.md",
+        doc_id="current",
+        body="The Docs-Only Topology still works.",
+    )
+
+    findings = _findings(tmp_path)
+
+    ambiguous = [f for f in findings if f.category == "ambiguous-retirement"]
+    assert [f.path for f in ambiguous] == [Path("docs/50-decisions/0002-retire-b.md")]
+    on_guidance = [
+        f
+        for f in findings
+        if f.category == "retired-reference" and f.path == Path("docs/20-components/current.md")
+    ]
+    assert len(on_guidance) == 1
+    assert on_guidance[0].data is not None
+    assert on_guidance[0].data["declared-by"] == "docs/50-decisions/0001-retire-a.md"
 
 
 def test_command_matching_is_case_sensitive_and_token_bounded(tmp_path: Path) -> None:

@@ -185,7 +185,7 @@ def _retirement_registry(
 
     by_phrase: dict[tuple[RetirementKindEnum, str], list[_RetirementRule]] = {}
     for rule in candidates:
-        key = (rule.entry.kind, _normalize_phrase(rule.phrase, rule.entry.kind))
+        key = (rule.entry.kind, _dedup_phrase_key(rule.phrase, rule.entry.kind))
         by_phrase.setdefault(key, []).append(rule)
 
     active: list[_RetirementRule] = []
@@ -195,10 +195,15 @@ def _retirement_registry(
             key=lambda rule: (rule.owner.path.as_posix(), rule.entry.id),
         )
         canonical = group[0]
-        if len(group) == 1:
-            active.append(canonical)
-            continue
+        active.append(canonical)
         for duplicate in group[1:]:
+            if duplicate.identity == canonical.identity:
+                # One tombstone deliberately listing both spellings — `Topology
+                # A` for the proper name plus `topology a` to fold case. Both
+                # patterns stay active; the per-line identity dedup already
+                # makes a line matching both count once.
+                active.append(duplicate)
+                continue
             findings.append(
                 Finding(
                     check=RetiredReferencesCheck.name,
@@ -270,9 +275,20 @@ def _compile_phrase(phrase: str, kind: RetirementKindEnum) -> re.Pattern[str]:
     return re.compile(rf"(?<![\w-]){core}(?![\w-])", flags)
 
 
-def _normalize_phrase(phrase: str, kind: RetirementKindEnum) -> str:
+def _dedup_phrase_key(phrase: str, kind: RetirementKindEnum) -> str:
+    """The key two declarations must share to count as the same retirement.
+
+    Every concept phrase folds case here — including the capitalised ones that
+    *match* case-sensitively. The registry's question is not "would these
+    patterns fire on the same line" but "do two ADRs claim the same retired
+    thing": `docs-only topology` and `Docs-Only Topology` name one concept,
+    and keying them apart let both rules run, so one guidance line drew two
+    hard errors and no `ambiguous-retirement` warning ever fired. The
+    smart-case *matching* semantics are untouched — `_folds_case` still
+    decides how each surviving pattern compiles.
+    """
     normalized = " ".join(phrase.split())
-    return normalized.lower() if _folds_case(phrase, kind) else normalized
+    return normalized.casefold() if kind == RetirementKindEnum.concept else normalized
 
 
 def _guidance_sources(graph: DocGraph) -> list[_GuidanceSource]:
