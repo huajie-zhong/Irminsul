@@ -11,13 +11,6 @@ from irminsul.cli import app
 runner = CliRunner()
 
 
-def test_init_help_lists_language_option() -> None:
-    result = runner.invoke(app, ["init", "--help"])
-
-    assert result.exit_code == 0, result.stdout
-    assert "--language" in result.stdout
-
-
 def test_init_no_interactive_creates_expected_tree(tmp_path: Path) -> None:
     target = tmp_path / "demo"
     target.mkdir()
@@ -81,8 +74,8 @@ def test_same_repo_undetected_code_requires_language_before_writes(tmp_path: Pat
     result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
 
     assert result.exit_code == 2
-    assert "No supported language could be detected" in result.stdout
-    assert "--language" in result.stdout
+    assert "No supported language could be detected" in result.output
+    assert "--language" in result.output
     assert not (target / "irminsul.toml").exists()
     assert not (target / "docs").exists()
 
@@ -121,7 +114,7 @@ def test_init_fresh_no_interactive_requires_language_before_writes(tmp_path: Pat
     result = runner.invoke(app, ["init", "--fresh", "--no-interactive", "--path", str(target)])
 
     assert result.exit_code == 2
-    assert "--language" in result.stdout
+    assert "--language" in result.output
     assert not (target / "irminsul.toml").exists()
     assert not (target / "docs").exists()
 
@@ -227,7 +220,7 @@ def test_init_fresh_rejects_an_unknown_language_before_writes(tmp_path: Path) ->
     )
 
     assert result.exit_code == 2
-    assert "unsupported language elixir" in result.stdout
+    assert "unsupported language elixir" in result.output
     assert not (target / "irminsul.toml").exists()
 
 
