@@ -45,13 +45,14 @@ Scaffold it with:
 
 ```bash
 mkdir -p workspace/docs && cd workspace/docs
-irminsul init --topology siblings --code-repo owner/public-code
+irminsul init --topology siblings --code-repo owner/public-code --language python
 ```
 
 The code repo does not have to exist yet. When it is already checked out beside
-the docs repo, init detects its languages and source roots; when it is not, the
-scaffold writes `../<name>/src` and the source walk reports the missing root as
-a warning until the clone lands.
+the docs repo, init detects its languages and source roots, so `--language` may
+be omitted. When it is not available locally, declare each intended language by
+repeating `--language`; the scaffold writes `../<name>/src`, and the source walk
+reports the missing root as a warning until the clone lands.
 
 `--code-repo` takes either a GitHub coordinate or a path to the sibling.
 `owner/repo`, `https://github.com/owner/repo` and `git@github.com:owner/repo.git`

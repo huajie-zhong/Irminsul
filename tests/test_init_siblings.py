@@ -36,7 +36,13 @@ def _docs_repo(tmp_path: Path) -> Path:
     return repo
 
 
-def _init_siblings(repo: Path, code_repo: str, *extra: str) -> Result:
+def _init_siblings(
+    repo: Path,
+    code_repo: str,
+    *extra: str,
+    languages: tuple[str, ...] = ("python",),
+) -> Result:
+    language_args = [item for language in languages for item in ("--language", language)]
     return runner.invoke(
         app,
         [
@@ -45,6 +51,7 @@ def _init_siblings(repo: Path, code_repo: str, *extra: str) -> Result:
             "siblings",
             "--code-repo",
             code_repo,
+            *language_args,
             "--no-interactive",
             "--path",
             str(repo),
@@ -250,7 +257,38 @@ def test_siblings_writes_source_roots_through_the_parent(tmp_path: Path) -> None
 
     toml = (repo / "irminsul.toml").read_text(encoding="utf-8")
     assert 'source_roots = ["../public-code/src"]' in toml
-    assert "enabled = []" in toml
+    assert 'enabled = ["python"]' in toml
+
+
+def test_siblings_requires_language_for_an_absent_repo_before_writes(tmp_path: Path) -> None:
+    repo = _docs_repo(tmp_path)
+    result = _init_siblings(repo, "acme/public-code", languages=())
+
+    assert result.exit_code == 2
+    assert "--language" in result.stdout
+    assert not (repo / "irminsul.toml").exists()
+    assert not (repo / "docs").exists()
+
+
+def test_siblings_prompts_for_language_when_the_repo_is_absent(tmp_path: Path) -> None:
+    repo = _docs_repo(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "--topology",
+            "siblings",
+            "--code-repo",
+            "acme/public-code",
+            "--path",
+            str(repo),
+        ],
+        input="\npython, typescript\nn\n",
+    )
+
+    assert result.exit_code == 0, result.stdout
+    toml = (repo / "irminsul.toml").read_text(encoding="utf-8")
+    assert 'enabled = ["python", "typescript"]' in toml
 
 
 def test_siblings_detects_languages_from_an_existing_code_repo(tmp_path: Path) -> None:
@@ -259,12 +297,40 @@ def test_siblings_detects_languages_from_an_existing_code_repo(tmp_path: Path) -
     (code / "src").mkdir(parents=True)
     (code / "pyproject.toml").write_text("[project]\nname='x'\n", encoding="utf-8")
 
-    result = _init_siblings(repo, "acme/public-code")
+    result = _init_siblings(repo, "acme/public-code", languages=())
     assert result.exit_code == 0, result.stdout
 
     toml = (repo / "irminsul.toml").read_text(encoding="utf-8")
     assert 'source_roots = ["../public-code/src"]' in toml
     assert 'enabled = ["python"]' in toml
+
+
+def test_siblings_requires_language_when_detection_finds_none(tmp_path: Path) -> None:
+    repo = _docs_repo(tmp_path)
+    code = repo.parent / "public-code"
+    code.mkdir()
+    (code / "go.mod").write_text("module example.com/demo\n", encoding="utf-8")
+
+    result = _init_siblings(repo, "acme/public-code", languages=())
+
+    assert result.exit_code == 2
+    assert "No supported language could be detected" in result.stdout
+    assert "--language" in result.stdout
+    assert not (repo / "irminsul.toml").exists()
+
+
+def test_siblings_accepts_explicit_language_for_unsupported_detection(tmp_path: Path) -> None:
+    repo = _docs_repo(tmp_path)
+    code = repo.parent / "public-code"
+    code.mkdir()
+    (code / "go.mod").write_text("module example.com/demo\n", encoding="utf-8")
+
+    result = _init_siblings(repo, "acme/public-code", languages=("go",))
+
+    assert result.exit_code == 0, result.stdout
+    toml = (repo / "irminsul.toml").read_text(encoding="utf-8")
+    assert 'source_roots = ["../public-code"]' in toml
+    assert 'enabled = ["go"]' in toml
 
 
 def test_siblings_does_not_gitignore_anything(tmp_path: Path) -> None:
@@ -340,6 +406,22 @@ def test_siblings_scaffold_passes_the_hard_check(tmp_path: Path) -> None:
     assert check_result.exit_code == 0, check_result.stdout
 
 
+def test_siblings_selected_language_activates_schema_leak(tmp_path: Path) -> None:
+    repo = _docs_repo(tmp_path)
+    result = _init_siblings(repo, "acme/public-code")
+    assert result.exit_code == 0, result.stdout
+
+    component_index = repo / "docs" / "20-components" / "INDEX.md"
+    component_index.write_text(
+        component_index.read_text(encoding="utf-8") + "\nclass User(BaseModel):\n",
+        encoding="utf-8",
+    )
+
+    check_result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(repo)])
+    assert check_result.exit_code == 1, check_result.stdout
+    assert "schema-leak" in check_result.stdout
+
+
 def test_siblings_requires_code_repo_when_non_interactive(tmp_path: Path) -> None:
     repo = _docs_repo(tmp_path)
     result = runner.invoke(
@@ -412,9 +494,13 @@ def test_init_errors_when_no_code_signals_noninteractive(tmp_path: Path) -> None
 
 def test_init_interactive_no_code_can_choose_siblings(tmp_path: Path) -> None:
     repo = _docs_repo(tmp_path)
-    # "2" chooses siblings, then the code repo spec, then the project name
-    # default, then "n" declines the post-scaffold seed prompt.
-    result = runner.invoke(app, ["init", "--path", str(repo)], input="2\nacme/public-code\n\nn\n")
+    # Choose siblings, enter the code repo, keep the default project name,
+    # select Python, and decline the post-scaffold seed prompt.
+    result = runner.invoke(
+        app,
+        ["init", "--path", str(repo)],
+        input="2\nacme/public-code\n\npython\nn\n",
+    )
 
     assert result.exit_code == 0, result.stdout
     assert "siblings" in result.stdout
@@ -431,7 +517,17 @@ def test_siblings_offers_the_seed_prompt(tmp_path: Path) -> None:
 
     result = runner.invoke(
         app,
-        ["init", "--topology", "siblings", "--code-repo", "acme/public-code", "--path", str(repo)],
+        [
+            "init",
+            "--topology",
+            "siblings",
+            "--code-repo",
+            "acme/public-code",
+            "--language",
+            "python",
+            "--path",
+            str(repo),
+        ],
         input="\nn\n",
     )
 

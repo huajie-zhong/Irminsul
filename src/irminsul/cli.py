@@ -28,6 +28,7 @@ from irminsul.config import ConfigError, IrminsulConfig, find_config, load
 from irminsul.docgraph import DocGraph, build_graph
 from irminsul.git.mtime import diff_name_only, has_history
 from irminsul.init.command import (
+    SUPPORTED_LANGUAGES,
     Topology,
     detect_code_signals,
     run_init,
@@ -168,6 +169,16 @@ def init(
             ),
         ),
     ] = None,
+    language: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--language",
+            help=(
+                "Language profile for code that cannot be detected yet. Repeat for "
+                f"multiple profiles. Supported: {', '.join(SUPPORTED_LANGUAGES)}."
+            ),
+        ),
+    ] = None,
     allow_existing_code: Annotated[
         bool,
         typer.Option(
@@ -179,7 +190,7 @@ def init(
         bool,
         typer.Option(
             "--no-interactive",
-            help="Use defaults instead of prompting. CI-friendly.",
+            help="Do not prompt; pass required choices explicitly. CI-friendly.",
         ),
     ] = False,
     force: Annotated[
@@ -229,7 +240,13 @@ def init(
                 )
             )
             raise typer.Exit(code=2)
-        _init_siblings(target, interactive=interactive, code_repo=code_repo, force=force)
+        _init_siblings(
+            target,
+            interactive=interactive,
+            code_repo=code_repo,
+            languages=language,
+            force=force,
+        )
         _offer_seed_after_scaffold(target, interactive=interactive)
         return
 
@@ -246,7 +263,7 @@ def init(
                 )
             )
             raise typer.Exit(code=2)
-        run_init_fresh(target, interactive=interactive, force=force)
+        run_init_fresh(target, interactive=interactive, languages=language, force=force)
         _offer_seed_after_scaffold(target, interactive=interactive)
         return
 
@@ -257,11 +274,17 @@ def init(
         typer.echo("  [3] Cancel")
         answer = typer.prompt("Choose", default="1")
         if answer == "1":
-            run_init_fresh(target, interactive=interactive, force=force)
+            run_init_fresh(target, interactive=interactive, languages=language, force=force)
             _offer_seed_after_scaffold(target, interactive=interactive)
             return
         if answer == "2":
-            _init_siblings(target, interactive=interactive, code_repo=code_repo, force=force)
+            _init_siblings(
+                target,
+                interactive=interactive,
+                code_repo=code_repo,
+                languages=language,
+                force=force,
+            )
             _offer_seed_after_scaffold(target, interactive=interactive)
             return
         typer.echo("Canceled.")
@@ -278,10 +301,17 @@ def init(
         )
         raise typer.Exit(code=2)
 
-    run_init(target, interactive=interactive, force=force)
+    run_init(target, interactive=interactive, languages=language, force=force)
 
 
-def _init_siblings(target: Path, *, interactive: bool, code_repo: str | None, force: bool) -> None:
+def _init_siblings(
+    target: Path,
+    *,
+    interactive: bool,
+    code_repo: str | None,
+    languages: list[str] | None,
+    force: bool,
+) -> None:
     """Guard the siblings scaffold against being run inside a code repo.
 
     The target of `--topology siblings` is the docs repo; code signals there
@@ -305,7 +335,13 @@ def _init_siblings(target: Path, *, interactive: bool, code_repo: str | None, fo
             typer.echo("Hint: use `irminsul init` for a single-repo setup.")
             raise typer.Exit(code=0)
 
-    run_init_siblings(target, interactive=interactive, code_repo=code_repo, force=force)
+    run_init_siblings(
+        target,
+        interactive=interactive,
+        code_repo=code_repo,
+        languages=languages,
+        force=force,
+    )
 
 
 @app.command()
