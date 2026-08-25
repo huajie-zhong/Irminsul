@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from click import unstyle
 from typer.testing import CliRunner
 
 from irminsul.cli import app
@@ -75,7 +76,7 @@ def test_same_repo_undetected_code_requires_language_before_writes(tmp_path: Pat
 
     assert result.exit_code == 2
     assert "No supported language could be detected" in result.output
-    assert "--language" in result.output
+    assert "--language" in unstyle(result.output)
     assert not (target / "irminsul.toml").exists()
     assert not (target / "docs").exists()
 
@@ -114,7 +115,7 @@ def test_init_fresh_no_interactive_requires_language_before_writes(tmp_path: Pat
     result = runner.invoke(app, ["init", "--fresh", "--no-interactive", "--path", str(target)])
 
     assert result.exit_code == 2
-    assert "--language" in result.output
+    assert "--language" in unstyle(result.output)
     assert not (target / "irminsul.toml").exists()
     assert not (target / "docs").exists()
 

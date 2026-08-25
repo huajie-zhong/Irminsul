@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 import typer
+from click import unstyle
 from ruamel.yaml import YAML
 from typer.testing import CliRunner, Result
 
@@ -265,7 +266,7 @@ def test_siblings_requires_language_for_an_absent_repo_before_writes(tmp_path: P
     result = _init_siblings(repo, "acme/public-code", languages=())
 
     assert result.exit_code == 2
-    assert "--language" in result.output
+    assert "--language" in unstyle(result.output)
     assert not (repo / "irminsul.toml").exists()
     assert not (repo / "docs").exists()
 
@@ -315,7 +316,7 @@ def test_siblings_requires_language_when_detection_finds_none(tmp_path: Path) ->
 
     assert result.exit_code == 2
     assert "No supported language could be detected" in result.output
-    assert "--language" in result.output
+    assert "--language" in unstyle(result.output)
     assert not (repo / "irminsul.toml").exists()
 
 
