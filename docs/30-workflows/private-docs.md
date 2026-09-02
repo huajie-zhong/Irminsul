@@ -45,7 +45,7 @@ Scaffold it with:
 
 ```bash
 mkdir -p workspace/docs && cd workspace/docs
-irminsul init --topology siblings --code-repo owner/public-code --language python
+irminsul init --topology siblings --code-repo owner/code --language python
 ```
 
 The code repo does not have to exist yet. When it is already checked out beside
@@ -83,6 +83,12 @@ describes:
 Widen the configured root to `../code` if you prefer claims that read
 `src/core.py`. Claims on files inside the docs repo — tests, fixtures, the docs
 themselves — stay repo-relative as usual.
+
+A spelling the source walk emits always means the walked file. If the docs repo
+holds a file of the same short name that no root covers — its own readme beside
+the code repo's, once the root is widened to `../code` — the shared spelling
+names the code repo's file, and `globs` reports the collision so the root can
+be narrowed.
 
 The structured `claims:` field reads the same spelling. Evidence naming a file
 in the code repo is written source-root-relative, exactly as `describes:` writes
@@ -122,7 +128,7 @@ jobs:
           fetch-depth: 0   # mtime drift needs full history
       - uses: actions/checkout@v4
         with:
-          repository: owner/public-code
+          repository: owner/code
           path: workspace/code
           fetch-depth: 0   # mtime drift reads the code repo's own history
       - uses: actions/setup-python@v5
