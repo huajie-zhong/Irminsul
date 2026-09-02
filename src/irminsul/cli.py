@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as _dt
 import glob
 import sys
+from collections.abc import Mapping
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -512,6 +513,40 @@ def _github_annotation(finding: Finding) -> str:
     return f"::{_GITHUB_COMMAND[finding.severity]} {','.join(props)}::{_escape_github_data(data)}"
 
 
+def _print_run_notes(
+    baseline_status: Mapping[str, object], delta_status: Mapping[str, object] | None
+) -> None:
+    """The baseline or delta line that tells a reader what the counts leave out.
+
+    Printed by every human-readable format: the github branch used to carry
+    only the annotations and the summary, so a run whose findings were all
+    suppressed by the baseline looked clean in CI with no sign of the
+    suppression or of stale entries ready to ratchet down.
+    """
+    if delta_status is not None:
+        typer.echo(
+            typer.style(
+                f"{delta_status['new']} new finding(s) vs {delta_status['base']} "
+                f"({delta_status['pre_existing_suppressed']} pre-existing suppressed)",
+                fg="cyan",
+            )
+        )
+    elif baseline_status["applied"]:
+        stale = baseline_status["stale"]
+        stale_note = (
+            f" ({stale} stale entr{'y' if stale == 1 else 'ies'};"
+            " run --update-baseline to ratchet down)"
+            if isinstance(stale, int) and stale > 0
+            else ""
+        )
+        typer.echo(
+            typer.style(
+                f"baseline: {baseline_status['suppressed']} finding(s) suppressed{stale_note}",
+                fg="cyan",
+            )
+        )
+
+
 def _print_summary(counts: dict[Severity, int]) -> None:
     parts: list[str] = [
         f"{counts[Severity.error]} error{'s' if counts[Severity.error] != 1 else ''}",
@@ -860,32 +895,12 @@ def check(
     elif fmt == "github":
         for finding in findings:
             typer.echo(_github_annotation(finding))
+        _print_run_notes(baseline_status, delta_status)
         _print_summary(counts)
     else:
         for finding in findings:
             _print_finding(finding)
-        if delta_status is not None:
-            typer.echo(
-                typer.style(
-                    f"{delta_status['new']} new finding(s) vs {delta_status['base']} "
-                    f"({delta_status['pre_existing_suppressed']} pre-existing suppressed)",
-                    fg="cyan",
-                )
-            )
-        elif baseline_status["applied"]:
-            stale = baseline_status["stale"]
-            stale_note = (
-                f" ({stale} stale entr{'y' if stale == 1 else 'ies'};"
-                " run --update-baseline to ratchet down)"
-                if isinstance(stale, int) and stale > 0
-                else ""
-            )
-            typer.echo(
-                typer.style(
-                    f"baseline: {baseline_status['suppressed']} finding(s) suppressed{stale_note}",
-                    fg="cyan",
-                )
-            )
+        _print_run_notes(baseline_status, delta_status)
         _print_summary(counts)
 
     raise typer.Exit(code=1 if fail else 0)
@@ -1206,12 +1221,13 @@ def refs_command(
         raise typer.Exit(code=exc.code) from exc
 
 
-def _fix_result_to_json(result: FixResult | None, *, dry_run: bool) -> str:
+def _fix_result_to_json(result: FixResult, *, dry_run: bool, notes: list[str] | None = None) -> str:
     """The versioned JSON shape of a fix run.
 
     `written` is empty on a dry run by construction; `planned` is what the run
-    would attempt. A `None` result means nothing was harvested, which is a
-    success with empty collections rather than an error.
+    would attempt. `notes` carries what the plain output says about a run that
+    harvested nothing — an inactive `--check` name, or no fixable findings —
+    so an all-empty envelope cannot be mistaken for a resolved finding.
     """
     import json
 
@@ -1222,13 +1238,33 @@ def _fix_result_to_json(result: FixResult | None, *, dry_run: bool) -> str:
         {
             "version": 1,
             "dry_run": dry_run,
-            "written": [p.as_posix() for p in result.written] if result else [],
-            "planned": _fix_records(result.planned) if result else [],
-            "held": _fix_records(result.held) if result else [],
-            "errors": list(result.errors) if result else [],
+            "written": [p.as_posix() for p in result.written],
+            "planned": _fix_records(result.planned),
+            "held": _fix_records(result.held),
+            "errors": list(result.errors),
+            "notes": list(notes or []),
         },
         indent=2,
     )
+
+
+def _echo_fix_result(result: FixResult, *, dry_run: bool) -> None:
+    """List what a fix run did, in plain output.
+
+    A dry run reports what it would attempt; a live run reports what actually
+    changed. `apply_fixes` groups fixes by path and skips a path whose content
+    is unchanged, so listing `planned` after a live run overstates the result.
+    Shared by `fix` and the `change` commands that apply plans through the
+    same machinery.
+    """
+    if dry_run:
+        for planned in result.planned:
+            typer.echo(f"  {planned.path.as_posix()}: {planned.description}")
+    else:
+        for written in result.written:
+            typer.echo(f"  {written.as_posix()}")
+    for held in result.held:
+        typer.echo(typer.style(f"  held: {held.path.as_posix()}: {held.description}", fg="yellow"))
 
 
 def _check_summary(cls: type[Check]) -> str:
@@ -1345,10 +1381,11 @@ def fix(
     if check_name is not None:
         selected = [(name, registry) for name, registry in selected if name == check_name]
         if not selected:
+            note = f"check '{check_name}' is not active under profile '{profile.value}'"
             if fmt == "json":
-                typer.echo(_fix_result_to_json(None, dry_run=dry_run))
+                typer.echo(_fix_result_to_json(FixResult(), dry_run=dry_run, notes=[note]))
             else:
-                typer.echo(f"check '{check_name}' is not active under profile '{profile.value}'")
+                typer.echo(note)
             raise typer.Exit(code=0)
     for name, registry in selected:
         cls = registry.get(name)
@@ -1361,10 +1398,11 @@ def fix(
             fixes.extend(maybe_fixes(check_findings, graph))
 
     if not fixes:
+        note = "no automatic fixes available"
         if fmt == "json":
-            typer.echo(_fix_result_to_json(None, dry_run=dry_run))
+            typer.echo(_fix_result_to_json(FixResult(), dry_run=dry_run, notes=[note]))
         else:
-            typer.echo("no automatic fixes available")
+            typer.echo(note)
         raise typer.Exit(code=0)
 
     result = apply_fixes(repo_root, fixes, dry_run=dry_run, confirm=confirm)
@@ -1373,17 +1411,7 @@ def fix(
         typer.echo(_fix_result_to_json(result, dry_run=dry_run))
         raise typer.Exit(code=1 if result.errors else 0)
 
-    # A dry run reports what it would attempt; a live run reports what actually
-    # changed. `apply_fixes` groups fixes by path and skips a path whose content
-    # is unchanged, so listing `planned` after a live run overstates the result.
-    if dry_run:
-        for planned in result.planned:
-            typer.echo(f"  {planned.path.as_posix()}: {planned.description}")
-    else:
-        for written in result.written:
-            typer.echo(f"  {written.as_posix()}")
-    for held in result.held:
-        typer.echo(typer.style(f"  held: {held.path.as_posix()}: {held.description}", fg="yellow"))
+    _echo_fix_result(result, dry_run=dry_run)
 
     if result.errors:
         for error in result.errors:
@@ -1882,15 +1910,15 @@ def change_transition(
     for note in plan.notes:
         typer.echo(typer.style(f"  note: {note}", fg="yellow"))
 
-    result = apply_fixes(repo_root, list(plan.fixes), dry_run=dry_run or not confirm, confirm=True)
-    for planned in result.planned:
-        typer.echo(f"  {planned.path.as_posix()}: {planned.description}")
+    plan_only = dry_run or not confirm
+    result = apply_fixes(repo_root, list(plan.fixes), dry_run=plan_only, confirm=True)
+    _echo_fix_result(result, dry_run=plan_only)
     if result.errors:
         for error in result.errors:
             typer.echo(typer.style(error, fg="red"))
         raise typer.Exit(code=1)
 
-    if dry_run or not confirm:
+    if plan_only:
         suffix = "" if confirm else "; re-run with --confirm to apply"
         typer.echo(typer.style(f"planned {len(result.planned)} edit(s){suffix}", fg="green"))
     else:
@@ -2034,8 +2062,7 @@ def change_finalize(
     component_result = apply_fixes(
         repo_root, list(plan.component_fixes), dry_run=plan_only, confirm=True
     )
-    for planned in component_result.planned:
-        typer.echo(f"  {planned.path.as_posix()}: {planned.description}")
+    _echo_fix_result(component_result, dry_run=plan_only)
     if component_result.errors:
         for error in component_result.errors:
             typer.echo(typer.style(error, fg="red"))
@@ -2045,8 +2072,7 @@ def change_finalize(
         raise typer.Exit(code=1)
 
     rfc_result = apply_fixes(repo_root, list(plan.rfc_fixes), dry_run=plan_only, confirm=True)
-    for planned in rfc_result.planned:
-        typer.echo(f"  {planned.path.as_posix()}: {planned.description}")
+    _echo_fix_result(rfc_result, dry_run=plan_only)
     if rfc_result.errors:
         for error in rfc_result.errors:
             typer.echo(typer.style(error, fg="red"))

@@ -212,6 +212,7 @@ def test_fix_json_is_emitted_when_nothing_is_harvested(
         "planned": [],
         "held": [],
         "errors": [],
+        "notes": ["no automatic fixes available"],
     }
 
 
@@ -239,6 +240,27 @@ def test_fix_check_selector_inactive_name_is_noop(
     assert result.exit_code == 0, result.output
     assert "not active" in result.output
     assert old_doc.read_text(encoding="utf-8") == before
+
+    # The JSON envelope used to be byte-identical to a genuine nothing-to-fix
+    # run, so an agent following a stale hint read the finding as resolved.
+    result = runner.invoke(
+        app,
+        [
+            "fix",
+            "--check",
+            "rfc-resolution",
+            "--profile",
+            "configured",
+            "--format",
+            "json",
+            "--path",
+            str(repo),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["written"] == [] and payload["planned"] == []
+    assert payload["notes"] == ["check 'rfc-resolution' is not active under profile 'configured'"]
 
 
 def test_fix_supersession_handles_crlf_and_closing_delimiter_at_eof(
