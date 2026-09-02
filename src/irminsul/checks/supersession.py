@@ -30,10 +30,37 @@ _CAT_MISSING_SUPERSEDES = "missing-supersedes"
 _CAT_UNKNOWN_SUPERSEDES = "unknown-supersedes"
 _CAT_UNKNOWN_SUPERSEDED_BY = "unknown-superseded-by"
 
+CODE_STATUS_NOT_DEPRECATED = f"supersession/{_CAT_STATUS_NOT_DEPRECATED}"
+CODE_MISSING_SUPERSEDED_BY = f"supersession/{_CAT_MISSING_SUPERSEDED_BY}"
+CODE_MISSING_SUPERSEDES = f"supersession/{_CAT_MISSING_SUPERSEDES}"
+CODE_UNKNOWN_SUPERSEDES = f"supersession/{_CAT_UNKNOWN_SUPERSEDES}"
+CODE_UNKNOWN_SUPERSEDED_BY = f"supersession/{_CAT_UNKNOWN_SUPERSEDED_BY}"
+
 
 class SupersessionCheck:
     name: ClassVar[str] = "supersession"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_UNKNOWN_SUPERSEDES: (
+            "A `supersedes` entry references a doc id that does not exist. Fix the id."
+        ),
+        CODE_STATUS_NOT_DEPRECATED: (
+            "A doc named in another doc's `supersedes` is not itself `status: "
+            "deprecated`. Set `status: deprecated` on the superseded doc."
+        ),
+        CODE_MISSING_SUPERSEDED_BY: (
+            "A doc named in another doc's `supersedes` does not point back via "
+            "`superseded_by`. Add `superseded_by:` on the superseded doc."
+        ),
+        CODE_UNKNOWN_SUPERSEDED_BY: (
+            "A `superseded_by` entry references a doc id that does not exist. Fix the id."
+        ),
+        CODE_MISSING_SUPERSEDES: (
+            "A doc claims `superseded_by` another doc, but that doc's `supersedes` "
+            "list doesn't name it back. Add the id to the superseding doc's "
+            "`supersedes`."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         out: list[Finding] = []
@@ -51,6 +78,7 @@ class SupersessionCheck:
                             message=(f"'supersedes' references unknown doc id '{old_id}'"),
                             path=new_doc.path,
                             doc_id=new_doc.id,
+                            code=CODE_UNKNOWN_SUPERSEDES,
                             category=_CAT_UNKNOWN_SUPERSEDES,
                         )
                     )
@@ -70,6 +98,7 @@ class SupersessionCheck:
                             path=old.path,
                             doc_id=old.id,
                             suggestion=f"set 'status: deprecated' in {old.path.as_posix()}",
+                            code=CODE_STATUS_NOT_DEPRECATED,
                             category=_CAT_STATUS_NOT_DEPRECATED,
                         )
                     )
@@ -87,6 +116,7 @@ class SupersessionCheck:
                             path=old.path,
                             doc_id=old.id,
                             suggestion=f"add 'superseded_by: {new_doc.id}' to {old.path.as_posix()}",
+                            code=CODE_MISSING_SUPERSEDED_BY,
                             category=_CAT_MISSING_SUPERSEDED_BY,
                         )
                     )
@@ -107,6 +137,7 @@ class SupersessionCheck:
                         message=f"'superseded_by' references unknown doc id '{sb}'",
                         path=node.path,
                         doc_id=node.id,
+                        code=CODE_UNKNOWN_SUPERSEDED_BY,
                         category=_CAT_UNKNOWN_SUPERSEDED_BY,
                     )
                 )
@@ -125,6 +156,7 @@ class SupersessionCheck:
                         path=target.path,
                         doc_id=target.id,
                         suggestion=f"add '{node.id}' to '{sb}.supersedes'",
+                        code=CODE_MISSING_SUPERSEDES,
                         category=_CAT_MISSING_SUPERSEDES,
                     )
                 )

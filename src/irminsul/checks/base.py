@@ -29,6 +29,12 @@ class Finding:
     check: str
     severity: Severity
     message: str
+    #: Stable identity of the message template this finding was built from,
+    #: shaped `<check-name>/<kind-slug>` (e.g. `links/broken-link`). One code
+    #: per distinct message template a check emits, not per occurrence — it
+    #: survives wording changes across releases, unlike the free-text
+    #: `message`. Looked up by `irminsul explain <code>`.
+    code: str
     path: Path | None = None
     doc_id: str | None = None
     line: int | None = None
@@ -37,6 +43,18 @@ class Finding:
     #: Machine-readable decomposition of the finding for agents. When set, it
     #: always carries a kebab-case "problem" key; all values are strings.
     data: dict[str, str] | None = None
+
+    def __post_init__(self) -> None:
+        # `code` and `category` describe the same kind slug from two eras —
+        # `category` predates codes and still keys `fixes()` in some checks.
+        # When a site sets both, they must agree; deriving one from the other
+        # instead would silently populate `category` (visible in JSON output
+        # and fix keying) on every finding, changing behavior.
+        if self.category is not None and self.code != f"{self.check}/{self.category}":
+            raise ValueError(
+                f"finding code {self.code!r} disagrees with its category: "
+                f"expected '{self.check}/{self.category}'"
+            )
 
 
 @dataclass(frozen=True)
@@ -51,6 +69,10 @@ class Fix:
 class Check(Protocol):
     name: ClassVar[str]
     default_severity: ClassVar[Severity]
+    #: Every code this check can emit, mapped to a one-to-two-sentence
+    #: explanation of what the finding kind means and how to fix it. Keyed by
+    #: the full `<check-name>/<kind-slug>` code. Read by `irminsul explain`.
+    explanations: ClassVar[dict[str, str]]
 
     def run(self, graph: DocGraph) -> list[Finding]: ...
 
@@ -112,6 +134,7 @@ def finding_records(findings: list[Finding], commands: list[str | None]) -> list
     for finding, command in zip(findings, commands, strict=True):
         record: dict[str, object] = {
             "check": finding.check,
+            "code": finding.code,
             "severity": finding.severity.value,
             "message": finding.message,
             "path": finding.path.as_posix() if finding.path else None,

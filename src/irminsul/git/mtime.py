@@ -198,10 +198,20 @@ def last_commit_time_any_repo(path: Path, docs_root: Path) -> GitTime | None:
     should emit an error Finding. Returns _NO_TIME when git exists but path has
     no commits (same as same-repo behaviour).
 
-    A path *inside* docs_root may still belong to a nested repository — e.g. a
-    private docs repo that the outer (public) code repo gitignores. The nearest
-    enclosing `.git` is authoritative so stale history from a former outer-repo
-    location cannot override the nested repository.
+    `docs_root` here is the directory irminsul was invoked from — the one that
+    owns `irminsul.toml` — which is not necessarily a repository root. The
+    common case that makes the last line load-bearing is a monorepo subfolder:
+    irminsul runs from `packages/proj/`, the `.git` sits above at the monorepo
+    root, and `git_root_for` walks *up* to find it. The enclosing root is then
+    an **ancestor** of `docs_root`, not a descendant, and it is the only repo
+    that has any history for the path — asking `docs_root` instead returns
+    GitTime(None, None) and every git time silently disappears. Irminsul's own
+    fixture repos take this path, since they live inside this git repo.
+
+    The same line also covers a repository *below* `docs_root` (a submodule or
+    vendored checkout carrying its own `.git`). Either way the nearest enclosing
+    `.git` is authoritative, so history from the wrong repository — stale or
+    absent — cannot override it.
     """
     try:
         path.relative_to(docs_root)

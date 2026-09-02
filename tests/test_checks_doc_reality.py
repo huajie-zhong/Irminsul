@@ -20,8 +20,13 @@ from irminsul.docgraph import build_graph
 from irminsul.regen.agents_md import regen_agents_md
 
 
-def _write_config(repo: Path, *, coverage_rule: bool = False) -> None:
-    base = 'project_name = "doc-reality"\n[paths]\ndocs_root = "docs"\nsource_roots = ["src"]\n'
+def _write_config(
+    repo: Path, *, coverage_rule: bool = False, source_roots: str = '["src"]'
+) -> None:
+    base = (
+        'project_name = "doc-reality"\n[paths]\ndocs_root = "docs"\n'
+        f"source_roots = {source_roots}\n"
+    )
     if coverage_rule:
         base += (
             "[[checks.terminology_overload.rules]]\n"
@@ -165,6 +170,99 @@ def test_claim_provenance_accepts_valid_claim_states(tmp_path: Path) -> None:
     assert ClaimProvenanceCheck().run(_graph(tmp_path)) == []
 
 
+def test_claim_provenance_accepts_a_repo_root_source_root(tmp_path: Path) -> None:
+    """`irminsul init` writes `source_roots = ["."]` for a flat Go repo, whose
+    repo-relative prefix is the empty string — a prefix every path starts with.
+    Classifying by that prefix alone made every path source evidence, and
+    `state: external` is "process evidence that is *not* source", so no
+    external claim could be satisfied. The docs tree, `irminsul.toml`, the
+    Action and the workflows are not source even when the source root is the
+    repo root."""
+    _write_config(tmp_path, source_roots='["."]')
+    (tmp_path / "main.go").write_text("package main\n", encoding="utf-8")
+    (tmp_path / "action.yml").write_text("name: docs\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/60-operations/release.md",
+        doc_id="release",
+        body="The release runbook.",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/00-foundation/enforcement.md",
+        doc_id="enforcement",
+        body=(
+            "The runbook exists. <!-- claim:process-claim -->\n\n"
+            "The tool is configured. <!-- claim:config-claim -->\n\n"
+            "The binary exists. <!-- claim:code-claim -->\n\n"
+            "CI enforces it. <!-- claim:gate-claim -->"
+        ),
+        frontmatter_extra=[
+            "claims:",
+            "  - id: process-claim",
+            "    state: external",
+            "    kind: local_tool",
+            "    claim: The runbook is documented.",
+            "    evidence:",
+            "      - docs/60-operations/release.md",
+            "  - id: config-claim",
+            "    state: external",
+            "    kind: local_tool",
+            "    claim: The tool is configured.",
+            "    evidence:",
+            "      - irminsul.toml",
+            "  - id: code-claim",
+            "    state: implemented",
+            "    kind: check",
+            "    claim: Source exists.",
+            "    evidence:",
+            "      - main.go",
+            "  - id: gate-claim",
+            "    state: enabled",
+            "    kind: ci_gate",
+            "    claim: Action evidence exists.",
+            "    evidence:",
+            "      - action.yml",
+        ],
+    )
+
+    assert ClaimProvenanceCheck().run(_graph(tmp_path)) == []
+
+
+def test_repo_root_source_root_does_not_make_every_doc_implementation(tmp_path: Path) -> None:
+    """The mirror: widening "everything is source" would also stop
+    `implemented` and `available` from being checked at all."""
+    _write_config(tmp_path, source_roots='["."]')
+    (tmp_path / "main.go").write_text("package main\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/70-knowledge/notes.md",
+        doc_id="notes",
+        body="Background reading.",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/00-foundation/enforcement.md",
+        doc_id="enforcement",
+        body="The feature is built. <!-- claim:code-claim -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: code-claim",
+            "    state: implemented",
+            "    kind: check",
+            "    claim: Source exists.",
+            "    evidence:",
+            "      - docs/70-knowledge/notes.md",
+        ],
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert [f.message for f in findings] == [
+        "claim 'code-claim' has no evidence appropriate for state 'implemented'"
+    ]
+
+
 def test_claim_provenance_flags_state_inappropriate_evidence(tmp_path: Path) -> None:
     _write_config(tmp_path)
     (tmp_path / "src").mkdir()
@@ -190,6 +288,63 @@ def test_claim_provenance_flags_state_inappropriate_evidence(tmp_path: Path) -> 
     assert len(findings) == 1
     assert findings[0].severity.value == "error"
     assert "state 'enabled'" in findings[0].message
+
+
+def test_claim_provenance_rejects_evidence_that_escapes_the_repo(tmp_path: Path) -> None:
+    """In `same-repo` every source file is addressable repo-relative, so a `..`
+    segment names nothing the tool is willing to reason about. It used to slip
+    past the guard, which tested only `is_absolute()`, while the error text and
+    the suggestion both insisted evidence stays inside the tree."""
+    _write_config(tmp_path)
+    (tmp_path / "src").mkdir()
+    outside = tmp_path.parent / "outside"
+    outside.mkdir(exist_ok=True)
+    (outside / "claim.py").write_text("x = 1\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/00-foundation/enforcement.md",
+        doc_id="enforcement",
+        body="The module exists. <!-- claim:escaping-claim -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: escaping-claim",
+            "    state: implemented",
+            "    kind: check",
+            "    claim: Source exists.",
+            "    evidence:",
+            "      - ../outside/claim.py",
+        ],
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert any("must not be absolute or escape the tree with '..'" in f.message for f in findings)
+    assert all(f.severity.value == "error" for f in findings)
+
+
+def test_claim_provenance_rejects_absolute_evidence(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "claim.py").write_text("x = 1\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/00-foundation/enforcement.md",
+        doc_id="enforcement",
+        body="The module exists. <!-- claim:absolute-claim -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: absolute-claim",
+            "    state: implemented",
+            "    kind: check",
+            "    claim: Source exists.",
+            "    evidence:",
+            f"      - {(tmp_path / 'src' / 'claim.py').as_posix()}",
+        ],
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert any("must not be absolute or escape the tree with '..'" in f.message for f in findings)
 
 
 def test_claim_provenance_warns_on_risky_prose_without_reference(tmp_path: Path) -> None:

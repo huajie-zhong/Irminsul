@@ -117,9 +117,18 @@ async def _check_urls(
     return results
 
 
+CODE_UNREACHABLE = "external-links/unreachable"
+
+
 class ExternalLinksCheck:
     name: ClassVar[str] = "external-links"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_UNREACHABLE: (
+            "An external http/https link failed or returned a non-2xx/3xx status when "
+            "checked. Fix the URL, or remove the link if the resource is gone."
+        ),
+    }
 
     def __init__(self) -> None:
         self._md = MarkdownIt("commonmark")
@@ -173,6 +182,7 @@ class ExternalLinksCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_UNREACHABLE,
                         severity=Severity.warning,
                         message=msg,
                         path=doc_path,

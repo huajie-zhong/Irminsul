@@ -32,5 +32,4 @@ The reference document moves from the repo root (`Irminsul-reference.md`) into `
 
 - Every PR that touches `src/irminsul/` is gated by `irminsul check`.
 - Component docs under `docs/20-components/` declare `describes:` claims that cover the source tree; uniqueness will catch any source file that gets added without doc updates.
-- The release workflow (when triggered) builds the same docs with `irminsul render` for the project site.
 - We must keep the dogfood honest: when a check produces noise on this repo, fix the check (or document the carve-out), don't suppress the finding.

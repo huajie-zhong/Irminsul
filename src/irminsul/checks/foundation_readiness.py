@@ -20,10 +20,19 @@ from irminsul.checks.base import Finding, Severity
 from irminsul.docgraph import DocGraph
 from irminsul.init.placeholders import SCAFFOLD_PLACEHOLDER_PHRASES
 
+CODE_SCAFFOLD_PLACEHOLDER = "foundation-readiness/scaffold-placeholder"
+
 
 class FoundationReadinessCheck:
     name: ClassVar[str] = "foundation-readiness"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_SCAFFOLD_PLACEHOLDER: (
+            "A foundation or architecture doc still contains a literal scaffold "
+            "placeholder phrase from `irminsul init --fresh`. Replace it with real "
+            "project intent, or run `irminsul seed`."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None:
@@ -52,6 +61,7 @@ class FoundationReadinessCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_SCAFFOLD_PLACEHOLDER,
                     severity=Severity.warning,
                     message=(
                         f"foundation doc '{node.id}' still contains scaffold "

@@ -56,9 +56,19 @@ def _matches(kind: str, span: str, identity: str) -> bool:
     return span == identity
 
 
+CODE_DERIVABLE_ENUMERATION = "liar/derivable-enumeration"
+
+
 class LiarCheck:
     name: ClassVar[str] = "liar"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_DERIVABLE_ENUMERATION: (
+            "This doc's prose hand-enumerates a derivable code surface (commands, "
+            "endpoints, exports, env vars) instead of linking to it. Declare a curated "
+            "`inventory:` subset, or link to `irminsul surface <kind>`."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None or graph.repo_root is None:
@@ -94,6 +104,7 @@ class LiarCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_DERIVABLE_ENUMERATION,
                             severity=self.default_severity,
                             message=(
                                 f"prose enumerates {len(found)} '{kind}' items that are "

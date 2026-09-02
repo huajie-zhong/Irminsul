@@ -64,13 +64,22 @@ def cross_repo_trees(repo_root: Path, config: IrminsulConfig) -> list[str]:
     """Configured trees owned by a git repository other than `repo_root`'s.
 
     `git worktree add` checks out tracked files only, so a tree that belongs to
-    a nested or sibling repository is simply absent from the base checkout: the
-    gitignored code subfolder when the docs repo is primary, or the whole docs
-    repo when the code repo is primary. Checked per configured root rather than
-    by scanning the tree, so an unrelated vendored checkout never trips it.
+    another repository is simply absent from the base checkout. In the siblings
+    layout that is the code repo `source_roots` reach through `../`. Checked per
+    configured root rather than by scanning the tree, so an unrelated vendored
+    checkout never trips it.
+
+    `docs_root` is inspected too, even though no supported layout puts it in
+    another repository. This is not layout policing: `--delta` is answering
+    "which findings are new", and a `docs_root` carrying its own `.git` — an
+    ordinary git submodule is enough — is absent from the base worktree exactly
+    the way a sibling code repo is, so every pre-existing finding in the docs
+    tree comes back as new. A refusal is recoverable; a confidently inverted
+    answer is not, and telling the two shapes apart costs one element in this
+    loop.
 
     A configured root that is missing on disk is skipped — the source walk
-    already reports it, and its absence says nothing about topology.
+    already reports it, and its absence says nothing about the layout.
     """
     own_root = git_root_for(repo_root)
     if own_root is None:
@@ -91,16 +100,23 @@ def verify_single_repo_topology(repo_root: Path, config: IrminsulConfig) -> None
     """Raise `DeltaError` when `--delta` would silently compare against a tree
     the base checkout cannot contain.
 
-    Without this the base run finds nothing under those roots, so every finding
-    over them survives as "new" — the exact inversion of what `--delta`
-    promises, delivered with a nonzero exit and no warning.
+    Of the two supported layouts this guards exactly one: `siblings`, where the
+    code repo is a separate git repository that `git worktree add` cannot
+    reproduce. It also catches a configured tree that answers to another
+    repository for reasons no layout chose — a docs submodule, say. Without the
+    guard the base run finds nothing under those roots, so every finding over
+    them survives as "new" — the exact inversion of what `--delta` promises,
+    delivered with a nonzero exit and no warning.
+
+    Teaching `--delta` to compare across the sibling boundary is open work; the
+    seam is here, and it is the only place the refusal is decided.
     """
     outside = cross_repo_trees(repo_root, config)
     if not outside:
         return
     roots = ", ".join(repr(r) for r in outside)
     raise DeltaError(
-        f"--delta does not support cross-repo topologies yet: {roots} "
+        f"--delta cannot compare across a repository boundary yet: {roots} "
         f"belong(s) to a different git repository than {repo_root}. "
         "`git worktree add` checks out tracked files only, so the base "
         "checkout would omit them and every finding over them would be "
@@ -136,12 +152,22 @@ def pristine_checkout(repo_root: Path, rev: str) -> Generator[Path, None, None]:
             repo.git.worktree("add", "--detach", str(scratch_dir), rev)
         except GitCommandError as e:
             raise DeltaError(f"could not check out --delta-base {rev!r}: {e}") from e
+        finally:
+            # Release the handle before the yield rather than after. The caller
+            # runs a full check pass in there — seconds, not milliseconds — and
+            # `repo` goes unused for all of it, while GitPython keeps a
+            # persistent git process alive behind it. `_remove_worktree` retries
+            # precisely because Windows can still be holding the checkout open.
+            repo.close()
         try:
             yield scratch_dir
         finally:
-            _remove_worktree(repo, scratch_dir)
+            cleanup_repo = Repo(repo_root, search_parent_directories=False)
+            try:
+                _remove_worktree(cleanup_repo, scratch_dir)
+            finally:
+                cleanup_repo.close()
     finally:
-        repo.close()
         shutil.rmtree(scratch_parent, ignore_errors=True)
 
 

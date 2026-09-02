@@ -17,6 +17,7 @@ from irminsul.frontmatter import (
     RetirementKindEnum,
     StatusEnum,
 )
+from irminsul.regen.agents_md import GENERATED_END, GENERATED_START, manifest_rel_path
 from irminsul.surface import derive_surface
 
 _REFERENCE_DEFINITION_RE = re.compile(r"^\s{0,3}\[([^\]\n]+)\]:\s*(?:<([^>\n]+)>|(\S+))")
@@ -27,6 +28,7 @@ _REFERENCE_LINK_RE = re.compile(r"(?<!!)\[([^\]\n]+)\]\[([^\]\n]*)\]")
 _AUTOLINK_RE = re.compile(r"<(?:(?:https?|mailto):[^>\n]+)>")
 _BARE_URL_RE = re.compile(r"(?:https?|mailto):[^\s)>]+")
 _MARKUP_RE = re.compile(r"[`*_~]")
+_FENCE_RE = re.compile(r"^\s*(```|~~~)")
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,7 @@ class _GuidanceSource:
     path: Path
     doc_id: str | None
     lines: tuple[tuple[int, str], ...]
+    unmatched_marker_line: int | None = None
 
 
 @dataclass(frozen=True)
@@ -55,9 +58,45 @@ class _LinkedLabel:
     destination: str
 
 
+CODE_INACTIVE_RETIREMENT = "retired-references/inactive-retirement"
+CODE_RETIREMENT_STILL_LIVE = "retired-references/retirement-still-live"
+CODE_AMBIGUOUS_RETIREMENT = "retired-references/ambiguous-retirement"
+CODE_RETIRED_REFERENCE = "retired-references/retired-reference"
+CODE_UNMATCHED_GENERATED_MARKER = "retired-references/unmatched-generated-marker"
+
+
 class RetiredReferencesCheck:
     name: ClassVar[str] = "retired-references"
-    default_severity: ClassVar[Severity] = Severity.warning
+    # The check emits both: stale guidance and an unmatched generated marker are
+    # errors, the tombstone-hygiene findings are warnings. The declaration names
+    # the blocking one, matching `RfcLifecycleIntegrityCheck`, the other
+    # mixed-severity hard check.
+    default_severity: ClassVar[Severity] = Severity.error
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_INACTIVE_RETIREMENT: (
+            "A `retires` declaration is inactive because its owner is not a stable ADR. "
+            "Move the declarations to the stable ADR that approved the retirement."
+        ),
+        CODE_RETIREMENT_STILL_LIVE: (
+            "A retired CLI identity is still present in the current derived surface. "
+            "Remove the tombstone if the command was restored, or remove the live "
+            "command if the retirement still governs."
+        ),
+        CODE_AMBIGUOUS_RETIREMENT: (
+            "The same retired phrase is declared by more than one ADR. Keep one "
+            "authoritative tombstone."
+        ),
+        CODE_RETIRED_REFERENCE: (
+            "Current guidance references a phrase, symbol, or concept an ADR has "
+            "declared retired. Follow the retirement's guidance and remove or replace "
+            "the reference."
+        ),
+        CODE_UNMATCHED_GENERATED_MARKER: (
+            "A generated-region start marker has no matching end marker, which would "
+            "leave everything below it unaudited. Close the region with the end marker "
+            "or remove the start marker."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.repo_root is None or graph.config is None:
@@ -68,6 +107,14 @@ class RetiredReferencesCheck:
             return findings
 
         for source in _guidance_sources(graph):
+            if source.unmatched_marker_line is not None:
+                findings.append(_unmatched_marker_finding(source))
+            # An ADR has to be able to say what it retired, so it is never
+            # audited against its own tombstones. Every other document is,
+            # including other ADRs.
+            applicable = [rule for rule in rules if rule.owner.path != source.path]
+            if not applicable:
+                continue
             visible_lines, definitions = _visible_source_lines(source.lines)
             occurrences: dict[tuple[str, str], tuple[_RetirementRule, int, int]] = {}
             for lineno, line in visible_lines:
@@ -77,7 +124,7 @@ class RetiredReferencesCheck:
                     definitions,
                 )
                 handled: set[tuple[str, str]] = set()
-                for rule in rules:
+                for rule in applicable:
                     auditable = _auditable_line(visible, linked_labels, rule)
                     if rule.identity in handled or rule.pattern.search(auditable) is None:
                         continue
@@ -108,6 +155,7 @@ def _retirement_registry(
             findings.append(
                 Finding(
                     check=RetiredReferencesCheck.name,
+                    code=CODE_INACTIVE_RETIREMENT,
                     severity=Severity.warning,
                     category="inactive-retirement",
                     message=(
@@ -138,6 +186,7 @@ def _retirement_registry(
                     findings.append(
                         Finding(
                             check=RetiredReferencesCheck.name,
+                            code=CODE_RETIREMENT_STILL_LIVE,
                             severity=Severity.warning,
                             category="retirement-still-live",
                             message=(
@@ -171,7 +220,7 @@ def _retirement_registry(
 
     by_phrase: dict[tuple[RetirementKindEnum, str], list[_RetirementRule]] = {}
     for rule in candidates:
-        key = (rule.entry.kind, _normalize_phrase(rule.phrase, rule.entry.kind))
+        key = (rule.entry.kind, _dedup_phrase_key(rule.phrase, rule.entry.kind))
         by_phrase.setdefault(key, []).append(rule)
 
     active: list[_RetirementRule] = []
@@ -181,13 +230,19 @@ def _retirement_registry(
             key=lambda rule: (rule.owner.path.as_posix(), rule.entry.id),
         )
         canonical = group[0]
-        if len(group) == 1:
-            active.append(canonical)
-            continue
+        active.append(canonical)
         for duplicate in group[1:]:
+            if duplicate.identity == canonical.identity:
+                # One tombstone deliberately listing both spellings — `Topology
+                # A` for the proper name plus `topology a` to fold case. Both
+                # patterns stay active; the per-line identity dedup already
+                # makes a line matching both count once.
+                active.append(duplicate)
+                continue
             findings.append(
                 Finding(
                     check=RetiredReferencesCheck.name,
+                    code=CODE_AMBIGUOUS_RETIREMENT,
                     severity=Severity.warning,
                     category="ambiguous-retirement",
                     message=(
@@ -226,15 +281,50 @@ def _is_authoritative_owner(node: DocNode) -> bool:
     )
 
 
+def _folds_case(phrase: str, kind: RetirementKindEnum) -> bool:
+    """Whether this phrase is matched case-insensitively.
+
+    Only `concept` phrases ever fold case, and only the ones written entirely
+    in lower case — the "smart case" rule that `rg` and `vim` use. A concept is
+    prose, so `docs-only topology` has to catch `Docs-Only Topology` at the
+    start of a sentence or inside a heading. But a concept named with a capital
+    is a proper name, and folding its case turns short ones into landmines: the
+    two-token `Topology A` matched the ordinary English "whatever topology a
+    project picks", so the tombstone failed the build on prose that never
+    mentioned the retired thing. Word boundaries do not help — "topology a" is
+    a whole-token match there. Case is the signal that separates the name from
+    the words it is spelled with, so a capitalised declaration keeps it.
+
+    The cost is that a capitalised phrase no longer catches an all-lowercase
+    reference to it. That is the right trade: guidance that names a retired
+    concept spells it the way the tombstone declares it, and a tombstone that
+    wants both spellings can list both in `matches:`.
+    """
+    if kind != RetirementKindEnum.concept:
+        return False
+    return not any(char.isupper() for char in phrase)
+
+
 def _compile_phrase(phrase: str, kind: RetirementKindEnum) -> re.Pattern[str]:
     core = r"\s+".join(re.escape(part) for part in phrase.split())
-    flags = re.IGNORECASE if kind == RetirementKindEnum.concept else 0
+    flags = re.IGNORECASE if _folds_case(phrase, kind) else 0
     return re.compile(rf"(?<![\w-]){core}(?![\w-])", flags)
 
 
-def _normalize_phrase(phrase: str, kind: RetirementKindEnum) -> str:
+def _dedup_phrase_key(phrase: str, kind: RetirementKindEnum) -> str:
+    """The key two declarations must share to count as the same retirement.
+
+    Every concept phrase folds case here — including the capitalised ones that
+    *match* case-sensitively. The registry's question is not "would these
+    patterns fire on the same line" but "do two ADRs claim the same retired
+    thing": `docs-only topology` and `Docs-Only Topology` name one concept,
+    and keying them apart let both rules run, so one guidance line drew two
+    hard errors and no `ambiguous-retirement` warning ever fired. The
+    smart-case *matching* semantics are untouched — `_folds_case` still
+    decides how each surviving pattern compiles.
+    """
     normalized = " ".join(phrase.split())
-    return normalized.lower() if kind == RetirementKindEnum.concept else normalized
+    return normalized.casefold() if kind == RetirementKindEnum.concept else normalized
 
 
 def _guidance_sources(graph: DocGraph) -> list[_GuidanceSource]:
@@ -245,38 +335,58 @@ def _guidance_sources(graph: DocGraph) -> list[_GuidanceSource]:
     for node in sorted(graph.nodes.values(), key=lambda item: item.path.as_posix()):
         if node.frontmatter.status != StatusEnum.stable:
             continue
-        if node.frontmatter.audience == AudienceEnum.adr or _is_rfc_path(node.path):
+        # RFCs are frozen historical records (ADR-0016) and are never edited,
+        # so auditing them would report findings nobody is allowed to fix.
+        # ADRs are audited: they are current decisions, and the one that owns a
+        # tombstone is exempted from it in `run` rather than wholesale here.
+        if _is_rfc_path(node.path):
             continue
+        lines, unmatched = _file_lines(graph.repo_root / node.path, blank_generated=False)
         sources.append(
             _GuidanceSource(
                 path=node.path,
                 doc_id=node.id,
-                lines=_body_lines(graph.repo_root / node.path),
+                lines=lines,
+                unmatched_marker_line=unmatched,
             )
         )
 
     docs_root = Path(graph.config.paths.docs_root)
+    manifest = _repo_relative(graph.repo_root, manifest_rel_path(graph.config))
+    # The agent guides are the highest-traffic guidance in the repo — `irminsul
+    # init` tells every user to point their agent at them — and none of them is
+    # a graph node: the AGENTS.md files are in EXEMPT_TOPLEVEL_NAMES and
+    # CLAUDE.md lives outside docs_root entirely.
     current_files = {
         Path("README.md"),
+        Path("AGENTS.md"),
+        Path("CLAUDE.md"),
         docs_root / "README.md",
+        docs_root / "AGENTS.md",
         docs_root / "GLOSSARY.md",
         docs_root / "CONTRIBUTING.md",
     }
     for path in sorted(current_files, key=lambda item: item.as_posix()):
         absolute = graph.repo_root / path
         if absolute.is_file():
-            try:
-                relative = path.relative_to(graph.repo_root)
-            except ValueError:
-                relative = path
+            relative = _repo_relative(graph.repo_root, path)
+            lines, unmatched = _file_lines(absolute, blank_generated=relative == manifest)
             sources.append(
                 _GuidanceSource(
                     path=relative,
                     doc_id=None,
-                    lines=tuple(enumerate(absolute.read_text(encoding="utf-8").splitlines(), 1)),
+                    lines=lines,
+                    unmatched_marker_line=unmatched,
                 )
             )
     return sources
+
+
+def _repo_relative(repo_root: Path, path: Path) -> Path:
+    try:
+        return path.relative_to(repo_root)
+    except ValueError:
+        return path
 
 
 def _is_rfc_path(path: Path) -> bool:
@@ -284,17 +394,58 @@ def _is_rfc_path(path: Path) -> bool:
     return "80-evolution" in parts and "rfcs" in parts
 
 
-def _body_lines(path: Path) -> tuple[tuple[int, str], ...]:
+def _file_lines(
+    path: Path, *, blank_generated: bool
+) -> tuple[tuple[tuple[int, str], ...], int | None]:
+    """Every line of the file, numbered, with the agent manifest's
+    machine-generated region blanked and the line number of an unmatched
+    generated-start marker.
+
+    Frontmatter is included: a retired name is just as misleading in a `title:`
+    or `summary:` as in prose, and the tombstone owner's own `matches:` list is
+    already exempted by the declaring-ADR rule.
+
+    The `regen agents-md` region is not. It is derived output whose rows are the
+    titles of the documents it indexes — including RFCs, whose titles ADR-0016
+    freezes — so a finding there names a line no one may edit and that `regen`
+    would rewrite identically. Line numbers are preserved so every other line in
+    the file still reports accurately.
+
+    Only the manifest carries that region, so only the manifest is read for its
+    markers. Anywhere else the marker text is an example — the checks guide and
+    ADR-0004 both discuss it — and reading an example as a region either failed
+    the build on it or let a fenced pair hide stale guidance from a hard check.
+    Inside the manifest a fenced example is skipped for the same reason, and a
+    start and end on one line close the region on that line.
+
+    Only *balanced* markers blank anything, and the line number of an unmatched
+    start marker comes back with the lines. A start marker used to open the
+    region and never close it, so one stray line — a bad merge, a half-written
+    manifest — silently switched a hard check off for the rest of the file. A
+    suppression that broad has to be reported, not inferred.
+    """
     lines = path.read_text(encoding="utf-8").splitlines()
-    if not lines or lines[0].strip() != "---":
-        return tuple(enumerate(lines, 1))
-    closing = next(
-        (index for index, line in enumerate(lines[1:], start=1) if line.strip() == "---"),
-        None,
-    )
-    if closing is None:
-        return tuple(enumerate(lines, 1))
-    return tuple(enumerate(lines[closing + 1 :], start=closing + 2))
+    if not blank_generated:
+        return tuple(enumerate(lines, start=1)), None
+
+    generated: set[int] = set()
+    open_start: int | None = None
+    in_fence = False
+    for index, line in enumerate(lines):
+        if _FENCE_RE.match(line):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        rest = line
+        if open_start is None and GENERATED_START in rest:
+            open_start = index
+            rest = rest[rest.index(GENERATED_START) + len(GENERATED_START) :]
+        if open_start is not None and GENERATED_END in rest:
+            generated.update(range(open_start, index + 1))
+            open_start = None
+    out = tuple((index + 1, "" if index in generated else line) for index, line in enumerate(lines))
+    return out, None if open_start is None else open_start + 1
 
 
 def _visible_source_lines(
@@ -414,11 +565,12 @@ def _auditable_line(
     rule: _RetirementRule,
 ) -> str:
     expected_label = _citation_label(rule.phrase)
+    folds_case = _folds_case(rule.phrase, rule.entry.kind)
     for linked in linked_labels:
         actual_label = _citation_label(linked.label)
         labels_match = (
             actual_label.casefold() == expected_label.casefold()
-            if rule.entry.kind == RetirementKindEnum.concept
+            if folds_case
             else actual_label == expected_label
         )
         replacement = (
@@ -430,6 +582,30 @@ def _auditable_line(
     return visible
 
 
+def _unmatched_marker_finding(source: _GuidanceSource) -> Finding:
+    return Finding(
+        check=RetiredReferencesCheck.name,
+        code=CODE_UNMATCHED_GENERATED_MARKER,
+        # An error for the same reason the stale-guidance finding is one: the
+        # marker's effect is to stop this hard check reading the rest of the
+        # file, and a suppression nobody declared has to fail rather than warn.
+        severity=Severity.error,
+        category="unmatched-generated-marker",
+        message="generated-region start marker has no matching end marker",
+        path=source.path,
+        doc_id=source.doc_id,
+        line=source.unmatched_marker_line,
+        suggestion=(
+            f"Close the region with `{GENERATED_END}`, or remove the start marker — "
+            "everything below it would otherwise go unaudited"
+        ),
+        data={
+            "problem": "unmatched-generated-marker",
+            "marker": GENERATED_START,
+        },
+    )
+
+
 def _retired_reference_finding(
     source: _GuidanceSource,
     lineno: int,
@@ -438,7 +614,12 @@ def _retired_reference_finding(
 ) -> Finding:
     return Finding(
         check=RetiredReferencesCheck.name,
-        severity=Severity.warning,
+        code=CODE_RETIRED_REFERENCE,
+        # An error, not a warning: ADR-0022 nominates this audit as the thing
+        # that makes stale guidance fail, and CI runs no `--strict`. A warning
+        # here reports and never blocks, which is what let a retired command
+        # survive in a shipped ADR.
+        severity=Severity.error,
         category="retired-reference",
         message=(f"current guidance references retired {rule.entry.kind.value} '{rule.phrase}'"),
         path=source.path,

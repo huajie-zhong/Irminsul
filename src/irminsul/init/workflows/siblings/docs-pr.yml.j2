@@ -1,0 +1,49 @@
+name: docs-pr
+
+# Siblings layout: this docs repo and the code repo are two separate git
+# repositories that live side by side under one parent directory, so
+# `source_roots` in irminsul.toml point out through `../`. CI has to rebuild
+# that shape before it can run the gate: every checkout gets an explicit
+# `path:` under a common parent, and irminsul runs from the docs checkout.
+#
+# The composite Action cannot express a `working-directory`, so this workflow
+# installs the CLI and calls it directly.
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "irminsul.toml"
+      - ".github/workflows/docs-pr.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: {{ docs_checkout_path }}
+          fetch-depth: 0   # mtime drift needs full history
+{% if code_repo_spec %}
+      - uses: actions/checkout@v4
+        with:
+          repository: {{ code_repo_spec }}
+          path: {{ code_checkout_path }}
+          fetch-depth: 0   # mtime drift reads the code repo's own history
+          # A private code repo also needs a credential here, e.g.
+          # token: {% raw %}${{ secrets.CODE_REPO_TOKEN }}{% endraw %}
+{% else %}
+      # TODO: the code repo was configured as a local path, so its GitHub
+      # coordinate is unknown. Fill in `repository:` below.
+      - uses: actions/checkout@v4
+        with:
+          repository: OWNER/CODE-REPO
+          path: {{ code_checkout_path }}
+          fetch-depth: 0
+{% endif %}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install irminsul
+      - run: irminsul check --profile=hard
+        working-directory: {{ docs_checkout_path }}
