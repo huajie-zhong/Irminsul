@@ -98,7 +98,7 @@ def parse_code_repo(value: str, *, docs_root: Path) -> tuple[str | None, str]:
     directory holding both repos, so anything else is rejected here rather than
     silently scaffolding a layout the tool does not support.
 
-    Three normalizations happen before any of that, because each one silently
+    Four normalizations happen before any of that, because each one silently
     produced a wrong answer instead of an error:
 
     - Host separators. `..\\code` is what a Windows shell hands over, and every
@@ -118,9 +118,13 @@ def parse_code_repo(value: str, *, docs_root: Path) -> tuple[str | None, str]:
       coordinate and a checkout directory named after the *branch* — and a
       github.com URL with fewer than two segments is rejected rather than
       degraded into a local path.
+    - A trailing slash. `acme/code/` is how a shell completes a directory
+      name, and it stopped the value matching the `owner/repo` shorthand, so
+      the coordinate was read as a path under the docs repo and refused.
     """
     raw = value.strip()
     normalized = raw.replace("\\", "/")
+    normalized = normalized.rstrip("/") or normalized
 
     remote = _GITHUB_SSH_RE.match(normalized)
     if remote is not None:
@@ -194,11 +198,14 @@ def _sibling_dir(candidate: str, docs_root: Path, original: str) -> str:
     `--code-repo ../code` where `code` is a symlink names `code`; resolving
     through it renamed the sibling to its target in `paths.source_roots`, or
     rejected the value outright when the target lived elsewhere — either way
-    answering about a path the user never typed.
+    answering about a path the user never typed. A candidate whose last
+    component is `..` has no name to keep, and resolving only its containing
+    directory let `../..`, `code/..` and `acme/..` through as a sibling called
+    `..`; those resolve in full and are rejected like any other non-sibling.
     """
     docs_abs = docs_root.resolve()
     joined = docs_root / candidate
-    code_abs = joined.parent.resolve() / joined.name
+    code_abs = joined.resolve() if joined.name == ".." else joined.parent.resolve() / joined.name
     if code_abs.parent == docs_abs.parent and code_abs != docs_abs:
         if code_abs.name.lower() == PurePosixPath(_CI_DOCS_PATH).name.lower():
             raise typer.BadParameter(

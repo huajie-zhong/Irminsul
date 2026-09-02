@@ -211,6 +211,25 @@ def test_parse_rejects_a_path_outside_the_shared_parent(tmp_path: Path) -> None:
         parse_code_repo("../../elsewhere/code", docs_root=docs)
 
 
+@pytest.mark.parametrize("value", ["../..", "code/..", "acme/.."])
+def test_parse_rejects_a_dot_dot_tail(tmp_path: Path, value: str) -> None:
+    """The containment test resolved only the containing directory, so a
+    candidate ending in `..` kept `..` as its name: `../..` passed as a sibling
+    called `..`, writing `source_roots = ["../../src"]` and CI that checks the
+    code out on top of the docs checkout."""
+    docs = _docs_repo(tmp_path)
+    with pytest.raises(typer.BadParameter, match="sibling"):
+        parse_code_repo(value, docs_root=docs)
+
+
+def test_parse_strips_a_trailing_slash(tmp_path: Path) -> None:
+    """Shell completion leaves `acme/repo/`, which stopped matching the
+    `owner/repo` shorthand and was refused as a path inside the docs repo."""
+    docs = _docs_repo(tmp_path)
+    assert parse_code_repo("acme/repo/", docs_root=docs) == ("acme/repo", "../repo")
+    assert parse_code_repo("../code/", docs_root=docs) == (None, "../code")
+
+
 def test_parse_rejects_the_docs_repo_itself(tmp_path: Path) -> None:
     """`--code-repo .` names the docs repo, which is a sibling of everything
     the docs repo is a sibling of. Without the identity clause it would be
@@ -440,6 +459,30 @@ def test_siblings_refuses_a_directory_that_holds_code(tmp_path: Path) -> None:
     result = _init_siblings(repo, "acme/public-code")
     assert result.exit_code == 2
     assert "irminsul init" in result.stdout
+    assert not (repo / "irminsul.toml").exists()
+
+
+def test_retired_init_docs_only_command_is_gone() -> None:
+    """ADR-0022 retired `init-docs-only`. Its tombstone only bites while the
+    command stays gone: `retired-references` stands a tombstone down when the
+    CLI identity is live again, so restoring the command would also disarm
+    the guard against guidance that teaches it, and nothing else in the suite
+    pinned the removal."""
+    result = runner.invoke(app, ["init-docs-only", "--help"])
+
+    assert result.exit_code == 2
+    assert "No such command" in unstyle(result.output)
+
+
+def test_retired_docs_only_topology_is_rejected(tmp_path: Path) -> None:
+    repo = _docs_repo(tmp_path)
+
+    result = runner.invoke(
+        app,
+        ["init", "--topology", "docs-only", "--no-interactive", "--path", str(repo)],
+    )
+
+    assert result.exit_code == 2
     assert not (repo / "irminsul.toml").exists()
 
 
