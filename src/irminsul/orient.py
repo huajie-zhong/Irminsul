@@ -140,8 +140,11 @@ def _entry_docs(repo_root: Path, docs_root: str) -> list[str]:
 
     Root-level entries come first — the harness router is read before the
     navigation manifest — then the docs-root entries in their own priority
-    order. Only files that exist are reported, and a name reachable at both
-    levels is reported once, at the root.
+    order. Only files that exist are reported. The dedup below matters only
+    when `docs_root` is the repo root itself, where `AGENTS.md` is reachable
+    at both levels and would otherwise be listed twice; under a nested
+    `docs_root` the root router and the manifest are distinct files and both
+    are reported.
     """
     out: list[str] = []
     for name in _ROOT_ENTRY_DOC_NAMES:

@@ -76,8 +76,10 @@ irminsul regen agents-md                 # rebuild the docs/AGENTS.md manifest
 **The single data structure: `DocGraph`** (`src/irminsul/docgraph.py`). Built once per CLI invocation by `build_graph(repo_root, config)`. Walks `docs_root`, parses every `*.md` (skipping the `EXEMPT_TOPLEVEL_NAMES` set: `README.md`, `GLOSSARY.md`, `CONTRIBUTING.md`, `AGENTS.md`), validates frontmatter, and exposes nodes by id and by repo-relative POSIX path. Every check consumes a `DocGraph`; nothing else. If you're adding behavior, ask first whether it belongs *on the graph* or *in a check*.
 
 **Two check registries** (`src/irminsul/checks/__init__.py`). Names in `irminsul.toml` are resolved against these maps. `config.py` validates `checks.hard`/`checks.soft_deterministic` against its own known-name tuples at config-load time — a name that is not valid there is a hard error (red message, exit 2), with a did-you-mean suggestion, or a pointer to the other list when the check moved between them.
-- `HARD_REGISTRY` — 11 checks: `frontmatter`, `globs`, `uniqueness`, `links`, `schema-leak`, `coverage`, `liar`, `prose-file-reference`, `agents-manifest`, `rfc-lifecycle-integrity`, `retired-references`. Errors from these always block (exit 1) regardless of `--strict`.
-- `SOFT_REGISTRY` — 23 deterministic warnings: `mtime-drift`, `orphans`, `stale-reaper`, `supersession`, `parent-child`, `glossary-discipline`, `external-links`, `rfc-resolution`, `reality`, `claim-anchor`, … (full list in `checks/__init__.py`). Promoted to errors only with `--strict`.
+- `HARD_REGISTRY` — errors from these always block (exit 1) regardless of `--strict`.
+- `SOFT_REGISTRY` — deterministic warnings, promoted to errors only with `--strict`.
+
+The registries in `checks/__init__.py` are the full list, and `irminsul orient` reports the configured set live. This file deliberately carries neither the counts nor the names: both rotted here before, and nothing mechanical can catch it when they do.
 
 All checks subclass `Check` and return `list[Finding]` with `(check, severity, path, line, message, suggestion)`. Severity ordering and exit-code logic live in `cli.check`.
 
@@ -93,13 +95,13 @@ All checks subclass `Check` and return `list[Finding]` with `(check, severity, p
 
 **`context`, `refs`, `new`, `regen`, and `list`**. `irminsul context <path>|--topic <query>|--changed` (`src/irminsul/context.py`) returns ownership, tests, dependencies, relevant deterministic findings, and next command hints. `irminsul refs <doc-id|path>|--symbol <query>` (`src/irminsul/refs.py`) reports doc backlinks (strong `depends_on` plus weak markdown links) or symbol owners/references. `irminsul new {adr,component,rfc}` writes templated atoms from `src/irminsul/new/templates/`. `irminsul regen agents-md` (`src/irminsul/regen/agents_md.py`) is the only regen target — it rebuilds the `docs/AGENTS.md` navigation manifest. `irminsul list {orphans,stale,undocumented,lifecycle}` (`src/irminsul/listing/command.py`) wraps checks with custom filtering; each subcommand supports `--format plain|json`. The CLI also ships `seed` (PIB capture into the foundation layer), `surface` (derive cli/http/exports/env-var surfaces on demand), `anchors` (report or re-pin anchored prose claims), `mcp` (read-only MCP stdio server), and `fix` (deterministic remediations).
 
-**The composite Action** (`action.yml`) is a thin shell wrapper: `pip install irminsul[==version]` → `irminsul check --profile=… --format=…`. Don't add logic here; add it to the CLI and let the Action call it.
+**The composite Action** (`action.yml`) is a thin shell wrapper: install the CLI (the pinned release when `version` is set, otherwise the same ref of this repository the workflow references) → `irminsul check --profile=… --format=…`. Don't add logic here; add it to the CLI and let the Action call it.
 
 ## The docs tree must obey the rules it enforces
 
 `docs/` is the project's documentation, and because we ship a tool that enforces a doc system, our own docs must obey it too. CI dogfoods `irminsul check --profile=hard` against this repo, so a doc change that breaks the rules breaks the build. The 9-layer structure (`00-foundation/`, `10-architecture/`, …, `90-meta/`) is enforced; doc IDs use bare slugs because the numeric prefixes namespace them. `docs/CONTRIBUTING.md` is the authoritative authoring guide. Before adding or moving a doc, read `docs/10-architecture/layers.md` and `docs/10-architecture/tiers.md`. If `irminsul check --profile=hard` fails on a doc change, the doc is wrong, not the check — fix the frontmatter, glob, or link rather than relaxing the check.
 
-Note the two distinct files named `AGENTS.md`: **this file** is the root harness router, and `docs/AGENTS.md` is the generated navigation manifest. Root-level files sit outside `docs_root`, so no check can see them — their accuracy is a review responsibility.
+Note the two distinct files named `AGENTS.md`: **this file** is the root harness router, and `docs/AGENTS.md` is the generated navigation manifest. Root-level files sit outside `docs_root`, so the doc-graph checks cannot see them; only `retired-references` reads the readme and the two agent files. Their accuracy is otherwise a review responsibility.
 
 ## Tests
 

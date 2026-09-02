@@ -15,7 +15,10 @@ inputs:
     description: 'Output format: github | plain | json. Defaults to GitHub annotations on the failing line.'
     default: github
   version:
-    description: Pin a specific irminsul release to install (default unpinned).
+    description: >-
+      Pin a specific irminsul release from PyPI. Unpinned, the CLI is installed
+      from the same ref of this repository that the workflow references, so the
+      inputs above always match the installed CLI.
     default: ''
 
 runs:
@@ -30,12 +33,16 @@ runs:
       run: |
         if [ -n "${{ inputs.version }}" ]; then
           pip install "irminsul==${{ inputs.version }}"
+        elif [ -n "${{ github.action_repository }}" ] && [ -n "${{ github.action_ref }}" ]; then
+          pip install "irminsul @ git+https://github.com/${{ github.action_repository }}@${{ github.action_ref }}"
         else
           pip install irminsul
         fi
     - name: Run irminsul check
       shell: bash
       run: |
-        ARGS="--profile=${{ inputs.profile }} --format=${{ inputs.format }}"
-        if [ "${{ inputs.strict }}" = "true" ]; then ARGS="$ARGS --strict"; fi
-        irminsul check $ARGS
+        args=()
+        if [ -n "${{ inputs.profile }}" ]; then args+=("--profile=${{ inputs.profile }}"); fi
+        if [ -n "${{ inputs.format }}" ]; then args+=("--format=${{ inputs.format }}"); fi
+        if [ "${{ inputs.strict }}" = "true" ]; then args+=(--strict); fi
+        irminsul check "${args[@]}"
