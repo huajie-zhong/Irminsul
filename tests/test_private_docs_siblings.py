@@ -200,6 +200,29 @@ def test_claim_evidence_rejects_the_dot_dot_escape(tmp_path: Path) -> None:
     assert any("must not be absolute or escape the tree with '..'" in m for m in messages)
 
 
+def test_claim_evidence_names_the_sibling_file_the_docs_repo_shadows(tmp_path: Path) -> None:
+    """The code repo's package readme under `src/` displays as `README.md`,
+    the spelling of the docs repo's own readme. `describes:` and the source
+    walk read the sibling file, and evidence has to mean the same one. It used
+    to resolve to the docs-repo readme instead, and the only spelling that
+    reached the sibling file — `../code/src/README.md` — is the escape the
+    checker rejects, so no spelling was right. `globs` reports the collision
+    so the root can be narrowed; the claim itself is sound."""
+    from irminsul.checks.globs import GlobsCheck
+
+    repo_root = _build_siblings(tmp_path)
+    (tmp_path / "workspace" / "code" / "src" / "README.md").write_text("# pkg\n", encoding="utf-8")
+    (repo_root / "README.md").write_text("# private docs\n", encoding="utf-8")
+    _write_claim_doc(repo_root, "README.md")
+
+    assert _claim_findings(repo_root) == []
+
+    graph = build_graph(repo_root, load(find_config(repo_root)))
+    ambiguous = [f for f in GlobsCheck().run(graph) if f.category == "ambiguous-source-display"]
+    assert len(ambiguous) == 1
+    assert "'README.md' names 2 files" in ambiguous[0].message
+
+
 def test_claim_evidence_drift_crosses_the_repo_boundary(tmp_path: Path) -> None:
     """Resolution is not only for the exists/does-not-exist gate: the drift scan
     reads the same spelling, so it can pull the evidence's commit time from the

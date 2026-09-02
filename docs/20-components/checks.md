@@ -69,14 +69,16 @@ line-or-block scope. Informational findings are not stored in baselines, so a
 baseline update cannot hide obsolete exceptions. Unmatched block markers remain
 hard errors, and marker removal stays manual.
 
-`globs` also warns when the source walk emits one display path for two files.
-The display encoding is not injective — two configured roots outside the repo
-that both hold `a.py`, or a sibling file whose name collides with a
-repo-relative one, produce the same spelling — so no `describes` pattern or
+`globs` also warns when one display path names two files. The display
+encoding is not injective — two configured roots outside the repo that both
+hold `a.py`, or a sibling file whose display is also the name of a docs-repo
+file no root covers, produce the same spelling — so no `describes` pattern or
 `claims[].evidence` entry can name one of them, and nothing downstream can
 disambiguate. Widening a configured root from `../code/src` to `../code` is
-enough to hit it: the code repo's readme and its `.github/workflows/*.yml`
-then collide with the docs repo's own.
+enough to hit it: the code repo's readme and agent manifest then collide
+with the docs repo's own. A spelling the walk emits resolves to the walked
+source file, so the docs-repo file is the one that becomes unnameable until
+the root is narrowed.
 
 `retired-references` builds its tombstone registry only from stable ADRs. It is
 a hard check: a stale reference is an `error`, so the gate fails without

@@ -9,7 +9,7 @@ import pytest
 from irminsul.checks.globs import (
     _is_within_source_root,
     is_configured_source_path,
-    is_external_source_display,
+    is_external_source_location,
     resolve_display_path,
     walk_configured_source_files,
     walk_source_files,
@@ -22,6 +22,12 @@ def _make_tree(base: Path, files: list[str]) -> None:
         p = base / rel
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text("# placeholder")
+
+
+def _is_external(repo_root: Path, roots: list[str], display: str) -> bool:
+    return is_external_source_location(
+        repo_root, roots, resolve_display_path(repo_root, roots, display)
+    )
 
 
 def _walk(
@@ -357,9 +363,13 @@ def test_resolve_display_path_round_trips_the_walks_own_spelling(tmp_path: Path)
         assert resolve_display_path(docs, roots, display) == abs_path
 
 
-def test_resolve_display_path_prefers_the_repo_relative_reading(tmp_path: Path) -> None:
-    """`_display_path` tries `relative_to(repo_root)` first and only falls back
-    to the source root, so the resolver must break the same tie the same way."""
+def test_resolve_display_path_prefers_the_walked_sibling_file(tmp_path: Path) -> None:
+    """The resolver answers the way the walk does. A docs-repo file that no
+    source root covers is never walked, so the spelling it shares with a
+    sibling source file names the sibling one — the file `describes:`,
+    `coverage` and `mtime-drift` already read. Reading the docs-repo file
+    instead sent `claims[].evidence` to a different file than every other
+    subsystem, with nothing reported."""
     docs = tmp_path / "docs"
     docs.mkdir()
     _make_tree(docs, ["pkg/core.py"])
@@ -368,7 +378,31 @@ def test_resolve_display_path_prefers_the_repo_relative_reading(tmp_path: Path) 
 
     resolved = resolve_display_path(docs, ["../code/src"], "pkg/core.py")
 
-    assert resolved == docs / "pkg" / "core.py"
+    assert resolved == code / "src" / "pkg" / "core.py"
+
+
+def test_resolve_display_path_keeps_pruned_spellings_repo_relative(tmp_path: Path) -> None:
+    """The walk prunes dot directories even inside a sibling root, so
+    `.github/workflows/ci.yml` is never a source display and still names the
+    docs repo's own workflow — the `enabled` evidence a claim means by it —
+    when the code repo has one at the same path. With no docs-repo file the
+    sibling one resolves last, so the spelling is not simply refused."""
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    _make_tree(docs, [".github/workflows/ci.yml"])
+    code = tmp_path / "code"
+    _make_tree(code, [".github/workflows/ci.yml", "src/core.py"])
+    bare = tmp_path / "bare"
+    bare.mkdir()
+
+    assert (
+        resolve_display_path(docs, ["../code"], ".github/workflows/ci.yml")
+        == docs / ".github" / "workflows" / "ci.yml"
+    )
+    assert (
+        resolve_display_path(bare, ["../code"], ".github/workflows/ci.yml")
+        == code / ".github" / "workflows" / "ci.yml"
+    )
 
 
 def test_globs_warns_when_two_files_share_one_display_path(tmp_path: Path) -> None:
@@ -413,6 +447,32 @@ def test_globs_overlapping_roots_are_not_a_display_collision(tmp_path: Path) -> 
     assert [f for f in findings if f.category == "ambiguous-source-display"] == []
 
 
+def test_globs_warns_when_a_sibling_file_shadows_a_docs_repo_file(tmp_path: Path) -> None:
+    """A widened sibling root makes the code repo's `README.md` display as
+    `README.md`, the spelling of the docs repo's own readme. The walk never
+    visits the docs-repo file, so a collision map built from walked files
+    alone could not see the case its own docstring named. The resolver reads
+    the sibling file, which leaves the docs-repo one unnameable; that is
+    reported rather than left for a claim to discover."""
+    from irminsul.checks.globs import GlobsCheck
+    from irminsul.config import IrminsulConfig, Paths
+    from irminsul.docgraph import build_graph
+
+    docs = tmp_path / "docs"
+    (docs / "docs").mkdir(parents=True)
+    _make_tree(docs, ["README.md"])
+    _make_tree(tmp_path / "code", ["README.md", "src/core.py"])
+    config = IrminsulConfig(paths=Paths(docs_root="docs", source_roots=["../code"]))
+
+    findings = GlobsCheck().run(build_graph(docs, config))
+
+    ambiguous = [f for f in findings if f.category == "ambiguous-source-display"]
+    assert len(ambiguous) == 1
+    assert "'README.md' names 2 files" in ambiguous[0].message
+    assert (docs / "README.md").resolve().as_posix() in ambiguous[0].message
+    assert (tmp_path / "code" / "README.md").resolve().as_posix() in ambiguous[0].message
+
+
 def test_globs_stays_quiet_when_every_display_is_unique(tmp_path: Path) -> None:
     from irminsul.checks.globs import GlobsCheck
     from irminsul.config import IrminsulConfig, Paths
@@ -452,7 +512,7 @@ def test_resolve_display_path_rejects_escapes_and_misses(tmp_path: Path) -> None
     assert resolve_display_path(docs, ["../code/src"], "/etc/passwd") is None
 
 
-def test_is_external_source_display_applies_the_walks_exclusions(tmp_path: Path) -> None:
+def test_is_external_source_location_applies_the_walks_exclusions(tmp_path: Path) -> None:
     """The walk never returns files under a dot directory, `__pycache__`, or
     bytecode suffixes, and the in-repo classifier refuses the identical
     spelling. Containment alone made `.hidden/x.py` resolving into the sibling
@@ -473,10 +533,10 @@ def test_is_external_source_display_applies_the_walks_exclusions(tmp_path: Path)
 
     roots = ["../code/src"]
 
-    assert is_external_source_display(docs, roots, "ok.py")
-    assert not is_external_source_display(docs, roots, ".hidden/x.py")
-    assert not is_external_source_display(docs, roots, ".github/workflows/ci.yml")
-    assert not is_external_source_display(docs, roots, "__pycache__/m.pyc")
+    assert _is_external(docs, roots, "ok.py")
+    assert not _is_external(docs, roots, ".hidden/x.py")
+    assert not _is_external(docs, roots, ".github/workflows/ci.yml")
+    assert not _is_external(docs, roots, "__pycache__/m.pyc")
 
 
 def test_external_display_for_path_encodes_the_walks_spelling(tmp_path: Path) -> None:
@@ -495,23 +555,25 @@ def test_external_display_for_path_encodes_the_walks_spelling(tmp_path: Path) ->
 
 
 def test_external_display_for_path_refuses_a_colliding_spelling(tmp_path: Path) -> None:
-    """When the display would decode to a different file — the repo-relative
-    reading wins in `resolve_display_path` — mapping to it would silently
-    answer about the wrong file, so the encode refuses instead."""
+    """When the display would decode to a different file — two external roots
+    both holding `pkg/core.py`, where the first root's file is what
+    `resolve_display_path` answers — mapping the second root's file to it
+    would silently answer about the wrong file, so the encode refuses."""
     from irminsul.checks.globs import external_display_for_path
 
     docs = tmp_path / "docs"
     docs.mkdir()
-    _make_tree(docs, ["pkg/core.py"])
     code = tmp_path / "code"
     _make_tree(code, ["src/pkg/core.py"])
+    code2 = tmp_path / "code2"
+    _make_tree(code2, ["src/pkg/core.py"])
+    roots = ["../code/src", "../code2/src"]
 
-    assert (
-        external_display_for_path(docs, ["../code/src"], code / "src" / "pkg" / "core.py") is None
-    )
+    assert external_display_for_path(docs, roots, code / "src" / "pkg" / "core.py") == "pkg/core.py"
+    assert external_display_for_path(docs, roots, code2 / "src" / "pkg" / "core.py") is None
 
 
-def test_is_external_source_display_only_covers_roots_outside_the_repo(tmp_path: Path) -> None:
+def test_is_external_source_location_only_covers_roots_outside_the_repo(tmp_path: Path) -> None:
     """In-repo source is classified by its repo-relative prefix, so the disk
     test exists only for the siblings case where no prefix survives."""
     docs = tmp_path / "docs"
@@ -522,6 +584,6 @@ def test_is_external_source_display_only_covers_roots_outside_the_repo(tmp_path:
 
     roots = ["src", "../code/src"]
 
-    assert is_external_source_display(docs, roots, "pkg/core.py")
-    assert not is_external_source_display(docs, roots, "src/in_repo.py")
-    assert not is_external_source_display(docs, roots, "notes/thing.md")
+    assert _is_external(docs, roots, "pkg/core.py")
+    assert not _is_external(docs, roots, "src/in_repo.py")
+    assert not _is_external(docs, roots, "notes/thing.md")
