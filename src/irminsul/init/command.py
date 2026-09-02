@@ -17,7 +17,7 @@ import datetime as _dt
 import os
 import posixpath
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
@@ -29,6 +29,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from irminsul.config import find_config, load
 from irminsul.init.detector import detect_languages, detect_source_roots
+from irminsul.languages import LANGUAGE_REGISTRY
 from irminsul.regen.agents_md import manifest_rel_path, regen_agents_md
 
 _GITHUB_USER_PLACEHOLDER = "huajie-zhong"
@@ -50,6 +51,8 @@ _CODE_SIGNAL_FILES = (
     "go.mod",
 )
 _CODE_SIGNAL_DIRS = ("src", "app", "lib")
+
+SUPPORTED_LANGUAGES = tuple(LANGUAGE_REGISTRY)
 
 _GITHUB_SSH_RE = re.compile(r"^git@github\.com:(?P<owner>[^/\s:]+)/(?P<repo>[^/\s:]+?)/?$")
 _GITHUB_HOSTS = {"github.com", "www.github.com"}
@@ -95,7 +98,7 @@ def parse_code_repo(value: str, *, docs_root: Path) -> tuple[str | None, str]:
     directory holding both repos, so anything else is rejected here rather than
     silently scaffolding a layout the tool does not support.
 
-    Three normalizations happen before any of that, because each one silently
+    Four normalizations happen before any of that, because each one silently
     produced a wrong answer instead of an error:
 
     - Host separators. `..\\code` is what a Windows shell hands over, and every
@@ -115,9 +118,13 @@ def parse_code_repo(value: str, *, docs_root: Path) -> tuple[str | None, str]:
       coordinate and a checkout directory named after the *branch* — and a
       github.com URL with fewer than two segments is rejected rather than
       degraded into a local path.
+    - A trailing slash. `acme/code/` is how a shell completes a directory
+      name, and it stopped the value matching the `owner/repo` shorthand, so
+      the coordinate was read as a path under the docs repo and refused.
     """
     raw = value.strip()
     normalized = raw.replace("\\", "/")
+    normalized = normalized.rstrip("/") or normalized
 
     remote = _GITHUB_SSH_RE.match(normalized)
     if remote is not None:
@@ -191,11 +198,14 @@ def _sibling_dir(candidate: str, docs_root: Path, original: str) -> str:
     `--code-repo ../code` where `code` is a symlink names `code`; resolving
     through it renamed the sibling to its target in `paths.source_roots`, or
     rejected the value outright when the target lived elsewhere — either way
-    answering about a path the user never typed.
+    answering about a path the user never typed. A candidate whose last
+    component is `..` has no name to keep, and resolving only its containing
+    directory let `../..`, `code/..` and `acme/..` through as a sibling called
+    `..`; those resolve in full and are rejected like any other non-sibling.
     """
     docs_abs = docs_root.resolve()
     joined = docs_root / candidate
-    code_abs = joined.parent.resolve() / joined.name
+    code_abs = joined.resolve() if joined.name == ".." else joined.parent.resolve() / joined.name
     if code_abs.parent == docs_abs.parent and code_abs != docs_abs:
         if code_abs.name.lower() == PurePosixPath(_CI_DOCS_PATH).name.lower():
             raise typer.BadParameter(
@@ -235,13 +245,63 @@ def _posix_join(prefix: str, rel: str) -> str:
     return posixpath.normpath(posixpath.join(prefix, rel))
 
 
+def _normalise_languages(values: Sequence[str]) -> list[str]:
+    unknown = sorted(set(values) - set(SUPPORTED_LANGUAGES))
+    if unknown:
+        supported = ", ".join(SUPPORTED_LANGUAGES)
+        raise typer.BadParameter(
+            f"unsupported language {', '.join(unknown)}; choose from: {supported}",
+            param_hint="--language",
+        )
+    selected = set(values)
+    return [name for name in SUPPORTED_LANGUAGES if name in selected]
+
+
+def _select_languages(
+    *,
+    explicit: Sequence[str] | None,
+    detected: Sequence[str],
+    interactive: bool,
+    unavailable_reason: str,
+) -> list[str]:
+    if explicit:
+        return _normalise_languages(explicit)
+    if detected:
+        return _normalise_languages(detected)
+
+    supported = ", ".join(SUPPORTED_LANGUAGES)
+    if not interactive:
+        raise typer.BadParameter(
+            f"{unavailable_reason} Pass --language <name> at least once; "
+            f"supported values: {supported}.",
+            param_hint="--language",
+        )
+
+    while True:
+        raw = typer.prompt(f"Languages (comma-separated; choose from: {supported})")
+        requested = [value.strip() for value in raw.split(",") if value.strip()]
+        if not requested:
+            typer.echo(typer.style("Choose at least one language.", fg="red"))
+            continue
+        try:
+            return _normalise_languages(requested)
+        except typer.BadParameter as exc:
+            typer.echo(typer.style(str(exc), fg="red"))
+
+
 def gather_answers(
     *,
     repo_root: Path,
     interactive: bool,
+    languages: Sequence[str] | None = None,
 ) -> InitAnswers:
-    languages = detect_languages(repo_root) or ["python"]
-    source_roots = detect_source_roots(repo_root, languages)
+    selected_languages = _select_languages(
+        explicit=languages,
+        detected=detect_languages(repo_root),
+        interactive=interactive,
+        unavailable_reason="No supported language could be detected from the local code.",
+    )
+    source_roots = detect_source_roots(repo_root, selected_languages)
     today = _dt.date.today().isoformat()
 
     default_project_name = repo_root.resolve().name or "untitled"
@@ -253,7 +313,7 @@ def gather_answers(
 
     return InitAnswers(
         project_name=project_name,
-        languages=languages,
+        languages=selected_languages,
         source_roots=source_roots,
         github_user=_GITHUB_USER_PLACEHOLDER,
         today=today,
@@ -264,10 +324,17 @@ def gather_answers_fresh(
     *,
     repo_root: Path,
     interactive: bool,
+    languages: Sequence[str] | None = None,
 ) -> InitAnswers:
-    """Gather answers for a language-neutral same-repo fresh start."""
+    """Gather answers for a same-repo fresh start."""
     today = _dt.date.today().isoformat()
     default_project_name = repo_root.resolve().name or "untitled"
+    selected_languages = _select_languages(
+        explicit=languages,
+        detected=[],
+        interactive=interactive,
+        unavailable_reason="No code exists yet, so languages cannot be detected.",
+    )
 
     if interactive:
         project_name = typer.prompt("Project name", default=default_project_name)
@@ -276,7 +343,7 @@ def gather_answers_fresh(
 
     return InitAnswers(
         project_name=project_name,
-        languages=[],
+        languages=selected_languages,
         source_roots=["src"],
         github_user=_GITHUB_USER_PLACEHOLDER,
         today=today,
@@ -288,12 +355,13 @@ def gather_answers_siblings(
     repo_root: Path,
     interactive: bool,
     code_repo: str | None,
+    languages: Sequence[str] | None = None,
 ) -> InitAnswers:
     """Gather answers for the siblings layout.
 
     One gatherer covers both a code repo that already exists and one that does
-    not exist yet: presence on disk is what decides whether languages and source
-    roots can be detected, so there is nothing for the caller to declare.
+    not exist yet. Existing code is detected unless the caller supplies
+    languages explicitly; unavailable or undetected code requires a declaration.
     """
     today = _dt.date.today().isoformat()
     default_project_name = repo_root.resolve().name or "untitled"
@@ -315,15 +383,32 @@ def gather_answers_siblings(
 
     code_path = repo_root / code_dir
     if code_path.is_dir():
-        languages = detect_languages(code_path)
-        source_roots = [_posix_join(code_dir, r) for r in detect_source_roots(code_path, languages)]
+        detected_languages = detect_languages(code_path)
+        unavailable_reason = "No supported language could be detected from the sibling code."
     else:
-        languages = []
+        detected_languages = []
+        unavailable_reason = (
+            "The sibling code repository is not available locally, so its languages "
+            "cannot be detected."
+        )
+
+    selected_languages = _select_languages(
+        explicit=languages,
+        detected=detected_languages,
+        interactive=interactive,
+        unavailable_reason=unavailable_reason,
+    )
+    if code_path.is_dir():
+        source_roots = [
+            _posix_join(code_dir, root)
+            for root in detect_source_roots(code_path, selected_languages)
+        ]
+    else:
         source_roots = [_posix_join(code_dir, "src")]
 
     return InitAnswers(
         project_name=project_name,
-        languages=languages,
+        languages=selected_languages,
         source_roots=source_roots,
         github_user=_GITHUB_USER_PLACEHOLDER,
         today=today,
@@ -452,14 +537,28 @@ def print_next_steps(answers: InitAnswers, written: list[Path]) -> None:
     typer.echo("  6. Push — CI enforces from PR #1.")
 
 
-def run_init(target_root: Path, *, interactive: bool, force: bool = False) -> None:
-    answers = gather_answers(repo_root=target_root, interactive=interactive)
+def run_init(
+    target_root: Path,
+    *,
+    interactive: bool,
+    languages: Sequence[str] | None = None,
+    force: bool = False,
+) -> None:
+    answers = gather_answers(repo_root=target_root, interactive=interactive, languages=languages)
     written = _scaffold_with_agent_wiring(target_root, answers, force=force)
     print_next_steps(answers, written)
 
 
-def run_init_fresh(target_root: Path, *, interactive: bool, force: bool = False) -> None:
-    answers = gather_answers_fresh(repo_root=target_root, interactive=interactive)
+def run_init_fresh(
+    target_root: Path,
+    *,
+    interactive: bool,
+    languages: Sequence[str] | None = None,
+    force: bool = False,
+) -> None:
+    answers = gather_answers_fresh(
+        repo_root=target_root, interactive=interactive, languages=languages
+    )
     written = _scaffold_with_agent_wiring(target_root, answers, force=force)
     for root in answers.source_roots:
         (target_root / root).mkdir(parents=True, exist_ok=True)
@@ -471,10 +570,14 @@ def run_init_siblings(
     *,
     interactive: bool,
     code_repo: str | None,
+    languages: Sequence[str] | None = None,
     force: bool = False,
 ) -> None:
     answers = gather_answers_siblings(
-        repo_root=target_root, interactive=interactive, code_repo=code_repo
+        repo_root=target_root,
+        interactive=interactive,
+        code_repo=code_repo,
+        languages=languages,
     )
     written = _scaffold_with_agent_wiring(target_root, answers, force=force)
     _print_siblings_next_steps(answers, written)

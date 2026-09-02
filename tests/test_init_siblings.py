@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 import typer
+from click import unstyle
 from ruamel.yaml import YAML
 from typer.testing import CliRunner, Result
 
@@ -36,7 +37,13 @@ def _docs_repo(tmp_path: Path) -> Path:
     return repo
 
 
-def _init_siblings(repo: Path, code_repo: str, *extra: str) -> Result:
+def _init_siblings(
+    repo: Path,
+    code_repo: str,
+    *extra: str,
+    languages: tuple[str, ...] = ("python",),
+) -> Result:
+    language_args = [item for language in languages for item in ("--language", language)]
     return runner.invoke(
         app,
         [
@@ -45,6 +52,7 @@ def _init_siblings(repo: Path, code_repo: str, *extra: str) -> Result:
             "siblings",
             "--code-repo",
             code_repo,
+            *language_args,
             "--no-interactive",
             "--path",
             str(repo),
@@ -203,6 +211,25 @@ def test_parse_rejects_a_path_outside_the_shared_parent(tmp_path: Path) -> None:
         parse_code_repo("../../elsewhere/code", docs_root=docs)
 
 
+@pytest.mark.parametrize("value", ["../..", "code/..", "acme/.."])
+def test_parse_rejects_a_dot_dot_tail(tmp_path: Path, value: str) -> None:
+    """The containment test resolved only the containing directory, so a
+    candidate ending in `..` kept `..` as its name: `../..` passed as a sibling
+    called `..`, writing `source_roots = ["../../src"]` and CI that checks the
+    code out on top of the docs checkout."""
+    docs = _docs_repo(tmp_path)
+    with pytest.raises(typer.BadParameter, match="sibling"):
+        parse_code_repo(value, docs_root=docs)
+
+
+def test_parse_strips_a_trailing_slash(tmp_path: Path) -> None:
+    """Shell completion leaves `acme/repo/`, which stopped matching the
+    `owner/repo` shorthand and was refused as a path inside the docs repo."""
+    docs = _docs_repo(tmp_path)
+    assert parse_code_repo("acme/repo/", docs_root=docs) == ("acme/repo", "../repo")
+    assert parse_code_repo("../code/", docs_root=docs) == (None, "../code")
+
+
 def test_parse_rejects_the_docs_repo_itself(tmp_path: Path) -> None:
     """`--code-repo .` names the docs repo, which is a sibling of everything
     the docs repo is a sibling of. Without the identity clause it would be
@@ -250,7 +277,38 @@ def test_siblings_writes_source_roots_through_the_parent(tmp_path: Path) -> None
 
     toml = (repo / "irminsul.toml").read_text(encoding="utf-8")
     assert 'source_roots = ["../public-code/src"]' in toml
-    assert "enabled = []" in toml
+    assert 'enabled = ["python"]' in toml
+
+
+def test_siblings_requires_language_for_an_absent_repo_before_writes(tmp_path: Path) -> None:
+    repo = _docs_repo(tmp_path)
+    result = _init_siblings(repo, "acme/public-code", languages=())
+
+    assert result.exit_code == 2
+    assert "--language" in unstyle(result.output)
+    assert not (repo / "irminsul.toml").exists()
+    assert not (repo / "docs").exists()
+
+
+def test_siblings_prompts_for_language_when_the_repo_is_absent(tmp_path: Path) -> None:
+    repo = _docs_repo(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "--topology",
+            "siblings",
+            "--code-repo",
+            "acme/public-code",
+            "--path",
+            str(repo),
+        ],
+        input="\npython, typescript\nn\n",
+    )
+
+    assert result.exit_code == 0, result.stdout
+    toml = (repo / "irminsul.toml").read_text(encoding="utf-8")
+    assert 'enabled = ["python", "typescript"]' in toml
 
 
 def test_siblings_detects_languages_from_an_existing_code_repo(tmp_path: Path) -> None:
@@ -259,12 +317,40 @@ def test_siblings_detects_languages_from_an_existing_code_repo(tmp_path: Path) -
     (code / "src").mkdir(parents=True)
     (code / "pyproject.toml").write_text("[project]\nname='x'\n", encoding="utf-8")
 
-    result = _init_siblings(repo, "acme/public-code")
+    result = _init_siblings(repo, "acme/public-code", languages=())
     assert result.exit_code == 0, result.stdout
 
     toml = (repo / "irminsul.toml").read_text(encoding="utf-8")
     assert 'source_roots = ["../public-code/src"]' in toml
     assert 'enabled = ["python"]' in toml
+
+
+def test_siblings_requires_language_when_detection_finds_none(tmp_path: Path) -> None:
+    repo = _docs_repo(tmp_path)
+    code = repo.parent / "public-code"
+    code.mkdir()
+    (code / "go.mod").write_text("module example.com/demo\n", encoding="utf-8")
+
+    result = _init_siblings(repo, "acme/public-code", languages=())
+
+    assert result.exit_code == 2
+    assert "No supported language could be detected" in result.output
+    assert "--language" in unstyle(result.output)
+    assert not (repo / "irminsul.toml").exists()
+
+
+def test_siblings_accepts_explicit_language_for_unsupported_detection(tmp_path: Path) -> None:
+    repo = _docs_repo(tmp_path)
+    code = repo.parent / "public-code"
+    code.mkdir()
+    (code / "go.mod").write_text("module example.com/demo\n", encoding="utf-8")
+
+    result = _init_siblings(repo, "acme/public-code", languages=("go",))
+
+    assert result.exit_code == 0, result.stdout
+    toml = (repo / "irminsul.toml").read_text(encoding="utf-8")
+    assert 'source_roots = ["../public-code"]' in toml
+    assert 'enabled = ["go"]' in toml
 
 
 def test_siblings_does_not_gitignore_anything(tmp_path: Path) -> None:
@@ -340,6 +426,22 @@ def test_siblings_scaffold_passes_the_hard_check(tmp_path: Path) -> None:
     assert check_result.exit_code == 0, check_result.stdout
 
 
+def test_siblings_selected_language_activates_schema_leak(tmp_path: Path) -> None:
+    repo = _docs_repo(tmp_path)
+    result = _init_siblings(repo, "acme/public-code")
+    assert result.exit_code == 0, result.stdout
+
+    component_index = repo / "docs" / "20-components" / "INDEX.md"
+    component_index.write_text(
+        component_index.read_text(encoding="utf-8") + "\nclass User(BaseModel):\n",
+        encoding="utf-8",
+    )
+
+    check_result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(repo)])
+    assert check_result.exit_code == 1, check_result.stdout
+    assert "schema-leak" in check_result.stdout
+
+
 def test_siblings_requires_code_repo_when_non_interactive(tmp_path: Path) -> None:
     repo = _docs_repo(tmp_path)
     result = runner.invoke(
@@ -357,6 +459,30 @@ def test_siblings_refuses_a_directory_that_holds_code(tmp_path: Path) -> None:
     result = _init_siblings(repo, "acme/public-code")
     assert result.exit_code == 2
     assert "irminsul init" in result.stdout
+    assert not (repo / "irminsul.toml").exists()
+
+
+def test_retired_init_docs_only_command_is_gone() -> None:
+    """ADR-0022 retired `init-docs-only`. Its tombstone only bites while the
+    command stays gone: `retired-references` stands a tombstone down when the
+    CLI identity is live again, so restoring the command would also disarm
+    the guard against guidance that teaches it, and nothing else in the suite
+    pinned the removal."""
+    result = runner.invoke(app, ["init-docs-only", "--help"])
+
+    assert result.exit_code == 2
+    assert "No such command" in unstyle(result.output)
+
+
+def test_retired_docs_only_topology_is_rejected(tmp_path: Path) -> None:
+    repo = _docs_repo(tmp_path)
+
+    result = runner.invoke(
+        app,
+        ["init", "--topology", "docs-only", "--no-interactive", "--path", str(repo)],
+    )
+
+    assert result.exit_code == 2
     assert not (repo / "irminsul.toml").exists()
 
 
@@ -412,9 +538,13 @@ def test_init_errors_when_no_code_signals_noninteractive(tmp_path: Path) -> None
 
 def test_init_interactive_no_code_can_choose_siblings(tmp_path: Path) -> None:
     repo = _docs_repo(tmp_path)
-    # "2" chooses siblings, then the code repo spec, then the project name
-    # default, then "n" declines the post-scaffold seed prompt.
-    result = runner.invoke(app, ["init", "--path", str(repo)], input="2\nacme/public-code\n\nn\n")
+    # Choose siblings, enter the code repo, keep the default project name,
+    # select Python, and decline the post-scaffold seed prompt.
+    result = runner.invoke(
+        app,
+        ["init", "--path", str(repo)],
+        input="2\nacme/public-code\n\npython\nn\n",
+    )
 
     assert result.exit_code == 0, result.stdout
     assert "siblings" in result.stdout
@@ -431,7 +561,17 @@ def test_siblings_offers_the_seed_prompt(tmp_path: Path) -> None:
 
     result = runner.invoke(
         app,
-        ["init", "--topology", "siblings", "--code-repo", "acme/public-code", "--path", str(repo)],
+        [
+            "init",
+            "--topology",
+            "siblings",
+            "--code-repo",
+            "acme/public-code",
+            "--language",
+            "python",
+            "--path",
+            str(repo),
+        ],
         input="\nn\n",
     )
 

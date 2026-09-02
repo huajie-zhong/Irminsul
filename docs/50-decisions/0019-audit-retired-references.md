@@ -47,7 +47,9 @@ absence, Git history, or approximate prose similarity.
 ## Consequences
 
 - Stable ADRs become the durable provenance for removed public knowledge.
-- Current examples and prose receive actionable warnings when they teach retired
-  surfaces.
+- Current examples and prose receive actionable findings when they teach retired
+  surfaces — warnings at first, and errors since
+  [`ADR-0022`](0022-reduce-supported-repository-topologies.md) made the audit a
+  hard check.
 - Restored CLI commands contradict stale retirement metadata visibly.
 - Teams must backfill precise aliases for retirements that predate this field.

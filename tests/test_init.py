@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from click import unstyle
 from typer.testing import CliRunner
 
 from irminsul.cli import app
@@ -15,7 +16,10 @@ def test_init_no_interactive_creates_expected_tree(tmp_path: Path) -> None:
     target = tmp_path / "demo"
     target.mkdir()
     (target / "src").mkdir()  # code signal required by --no-interactive guard
-    result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
+    result = runner.invoke(
+        app,
+        ["init", "--language", "python", "--no-interactive", "--path", str(target)],
+    )
     assert result.exit_code == 0, result.stdout
 
     expected = [
@@ -63,11 +67,28 @@ def test_same_repo_workflow_watches_the_configured_source_root(tmp_path: Path) -
     assert '- "docs/**"' in workflow
 
 
+def test_same_repo_undetected_code_requires_language_before_writes(tmp_path: Path) -> None:
+    target = tmp_path / "demo"
+    target.mkdir()
+    (target / "src").mkdir()
+
+    result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
+
+    assert result.exit_code == 2
+    assert "No supported language could be detected" in result.output
+    assert "--language" in unstyle(result.output)
+    assert not (target / "irminsul.toml").exists()
+    assert not (target / "docs").exists()
+
+
 def test_init_scaffold_config_includes_only_useful_default_knobs(tmp_path: Path) -> None:
     target = tmp_path / "demo"
     target.mkdir()
     (target / "src").mkdir()
-    result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
+    result = runner.invoke(
+        app,
+        ["init", "--language", "python", "--no-interactive", "--path", str(target)],
+    )
     assert result.exit_code == 0, result.stdout
 
     toml = (target / "irminsul.toml").read_text(encoding="utf-8")
@@ -89,21 +110,53 @@ def test_init_scaffold_config_includes_only_useful_default_knobs(tmp_path: Path)
     assert parsed["paths"]["honor_gitignore"] is True
 
 
-def test_init_fresh_no_interactive_creates_source_root(tmp_path: Path) -> None:
+def test_init_fresh_no_interactive_requires_language_before_writes(tmp_path: Path) -> None:
     target = tmp_path / "demo"
     result = runner.invoke(app, ["init", "--fresh", "--no-interactive", "--path", str(target)])
+
+    assert result.exit_code == 2
+    assert "--language" in unstyle(result.output)
+    assert not (target / "irminsul.toml").exists()
+    assert not (target / "docs").exists()
+
+
+def test_init_fresh_no_interactive_creates_source_root(tmp_path: Path) -> None:
+    target = tmp_path / "demo"
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "--fresh",
+            "--language",
+            "python",
+            "--no-interactive",
+            "--path",
+            str(target),
+        ],
+    )
     assert result.exit_code == 0, result.stdout
 
     assert (target / "src").is_dir()
     assert (target / "irminsul.toml").is_file()
     toml = (target / "irminsul.toml").read_text(encoding="utf-8")
     assert 'source_roots = ["src"]' in toml
-    assert "enabled = []" in toml
+    assert 'enabled = ["python"]' in toml
 
 
 def test_init_fresh_generated_repo_passes_hard_check(tmp_path: Path) -> None:
     target = tmp_path / "demo"
-    result = runner.invoke(app, ["init", "--fresh", "--no-interactive", "--path", str(target)])
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "--fresh",
+            "--language",
+            "python",
+            "--no-interactive",
+            "--path",
+            str(target),
+        ],
+    )
     assert result.exit_code == 0, result.stdout
 
     check_result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(target)])
@@ -114,14 +167,62 @@ def test_init_interactive_no_code_can_choose_fresh_start(tmp_path: Path) -> None
     target = tmp_path / "demo"
     target.mkdir()
 
-    # "1" choose fresh-start, project name default, "n" declines the post-init
-    # seed prompt.
-    result = runner.invoke(app, ["init", "--path", str(target)], input="1\n\nn\n")
+    # Choose fresh-start, reject empty and unsupported language answers, select
+    # Python, keep the default project name, and decline the post-init seed prompt.
+    result = runner.invoke(
+        app,
+        ["init", "--path", str(target)],
+        input="1\n\nelixir\npython\n\nn\n",
+    )
 
     assert result.exit_code == 0, result.stdout
     assert "Fresh-start, same repo" in result.stdout
     assert (target / "src").is_dir()
-    assert "enabled = []" in (target / "irminsul.toml").read_text(encoding="utf-8")
+    assert 'enabled = ["python"]' in (target / "irminsul.toml").read_text(encoding="utf-8")
+
+
+def test_init_fresh_normalises_explicit_language_order_and_duplicates(tmp_path: Path) -> None:
+    target = tmp_path / "demo"
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "--fresh",
+            "--language",
+            "rust",
+            "--language",
+            "python",
+            "--language",
+            "rust",
+            "--no-interactive",
+            "--path",
+            str(target),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    toml = (target / "irminsul.toml").read_text(encoding="utf-8")
+    assert 'enabled = ["python", "rust"]' in toml
+
+
+def test_init_fresh_rejects_an_unknown_language_before_writes(tmp_path: Path) -> None:
+    target = tmp_path / "demo"
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "--fresh",
+            "--language",
+            "elixir",
+            "--no-interactive",
+            "--path",
+            str(target),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "unsupported language elixir" in result.output
+    assert not (target / "irminsul.toml").exists()
 
 
 def test_init_fresh_in_non_empty_no_code_directory(tmp_path: Path) -> None:
@@ -130,7 +231,18 @@ def test_init_fresh_in_non_empty_no_code_directory(tmp_path: Path) -> None:
     (target / "README.md").write_text("# Demo\n", encoding="utf-8")
     (target / ".gitignore").write_text(".env\n", encoding="utf-8")
 
-    result = runner.invoke(app, ["init", "--fresh", "--no-interactive", "--path", str(target)])
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "--fresh",
+            "--language",
+            "python",
+            "--no-interactive",
+            "--path",
+            str(target),
+        ],
+    )
 
     assert result.exit_code == 0, result.stdout
     assert (target / "README.md").read_text(encoding="utf-8") == "# Demo\n"
@@ -160,6 +272,8 @@ def test_init_fresh_allows_existing_code_with_explicit_override(tmp_path: Path) 
             "init",
             "--fresh",
             "--allow-existing-code",
+            "--language",
+            "python",
             "--no-interactive",
             "--path",
             str(target),
@@ -167,7 +281,7 @@ def test_init_fresh_allows_existing_code_with_explicit_override(tmp_path: Path) 
     )
 
     assert result.exit_code == 0, result.stdout
-    assert "enabled = []" in (target / "irminsul.toml").read_text(encoding="utf-8")
+    assert 'enabled = ["python"]' in (target / "irminsul.toml").read_text(encoding="utf-8")
 
 
 def test_init_fresh_does_not_overwrite_without_force(tmp_path: Path) -> None:
@@ -178,7 +292,18 @@ def test_init_fresh_does_not_overwrite_without_force(tmp_path: Path) -> None:
     custom = docs_dir / "principles.md"
     custom.write_text("# my custom principles\n", encoding="utf-8")
 
-    result = runner.invoke(app, ["init", "--fresh", "--no-interactive", "--path", str(target)])
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "--fresh",
+            "--language",
+            "python",
+            "--no-interactive",
+            "--path",
+            str(target),
+        ],
+    )
 
     assert result.exit_code == 0, result.stdout
     assert custom.read_text(encoding="utf-8") == "# my custom principles\n"
@@ -192,7 +317,10 @@ def test_init_then_check_passes_on_freshly_scaffolded_repo(tmp_path: Path) -> No
     (target / "src").mkdir()
     (target / "src" / "demo.py").write_text("def x(): pass\n")
 
-    result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
+    result = runner.invoke(
+        app,
+        ["init", "--language", "python", "--no-interactive", "--path", str(target)],
+    )
     assert result.exit_code == 0
 
     check_result = runner.invoke(app, ["check", "--profile", "hard", "--path", str(target)])
@@ -212,7 +340,10 @@ def test_init_does_not_overwrite_without_force(tmp_path: Path) -> None:
     custom = docs_dir / "principles.md"
     custom.write_text("# my custom principles\n")
 
-    result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
+    result = runner.invoke(
+        app,
+        ["init", "--language", "python", "--no-interactive", "--path", str(target)],
+    )
     assert result.exit_code == 0
 
     assert custom.read_text() == "# my custom principles\n"
@@ -223,7 +354,10 @@ def test_init_creates_agent_manifests(tmp_path: Path) -> None:
     target.mkdir()
     (target / "src").mkdir()  # code signal
 
-    result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
+    result = runner.invoke(
+        app,
+        ["init", "--language", "python", "--no-interactive", "--path", str(target)],
+    )
     assert result.exit_code == 0, result.stdout
 
     docs_manifest = (target / "docs" / "AGENTS.md").read_text(encoding="utf-8")
@@ -240,7 +374,18 @@ def test_init_creates_agent_manifests(tmp_path: Path) -> None:
 
 def test_init_fresh_creates_agent_manifests(tmp_path: Path) -> None:
     target = tmp_path / "demo"
-    result = runner.invoke(app, ["init", "--fresh", "--no-interactive", "--path", str(target)])
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "--fresh",
+            "--language",
+            "python",
+            "--no-interactive",
+            "--path",
+            str(target),
+        ],
+    )
     assert result.exit_code == 0, result.stdout
 
     docs_manifest = (target / "docs" / "AGENTS.md").read_text(encoding="utf-8")
@@ -255,7 +400,10 @@ def test_init_does_not_clobber_existing_root_agents_md(tmp_path: Path) -> None:
     custom = target / "AGENTS.md"
     custom.write_text("# my hand-written agent notes\n", encoding="utf-8")
 
-    result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
+    result = runner.invoke(
+        app,
+        ["init", "--language", "python", "--no-interactive", "--path", str(target)],
+    )
     assert result.exit_code == 0, result.stdout
 
     assert custom.read_text(encoding="utf-8") == "# my hand-written agent notes\n"
@@ -271,7 +419,10 @@ def test_init_does_not_clobber_existing_docs_agents_md(tmp_path: Path) -> None:
     custom = docs_dir / "AGENTS.md"
     custom.write_text("# my curated manifest\n", encoding="utf-8")
 
-    result = runner.invoke(app, ["init", "--no-interactive", "--path", str(target)])
+    result = runner.invoke(
+        app,
+        ["init", "--language", "python", "--no-interactive", "--path", str(target)],
+    )
     assert result.exit_code == 0, result.stdout
 
     assert custom.read_text(encoding="utf-8") == "# my curated manifest\n"
@@ -286,6 +437,17 @@ def test_init_force_overwrites_existing_files(tmp_path: Path) -> None:
     custom = docs_dir / "principles.md"
     custom.write_text("# my custom principles\n")
 
-    result = runner.invoke(app, ["init", "--no-interactive", "--force", "--path", str(target)])
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "--language",
+            "python",
+            "--no-interactive",
+            "--force",
+            "--path",
+            str(target),
+        ],
+    )
     assert result.exit_code == 0
     assert "my custom principles" not in custom.read_text()

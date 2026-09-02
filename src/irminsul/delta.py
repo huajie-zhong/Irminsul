@@ -152,12 +152,22 @@ def pristine_checkout(repo_root: Path, rev: str) -> Generator[Path, None, None]:
             repo.git.worktree("add", "--detach", str(scratch_dir), rev)
         except GitCommandError as e:
             raise DeltaError(f"could not check out --delta-base {rev!r}: {e}") from e
+        finally:
+            # Release the handle before the yield rather than after. The caller
+            # runs a full check pass in there — seconds, not milliseconds — and
+            # `repo` goes unused for all of it, while GitPython keeps a
+            # persistent git process alive behind it. `_remove_worktree` retries
+            # precisely because Windows can still be holding the checkout open.
+            repo.close()
         try:
             yield scratch_dir
         finally:
-            _remove_worktree(repo, scratch_dir)
+            cleanup_repo = Repo(repo_root, search_parent_directories=False)
+            try:
+                _remove_worktree(cleanup_repo, scratch_dir)
+            finally:
+                cleanup_repo.close()
     finally:
-        repo.close()
         shutil.rmtree(scratch_parent, ignore_errors=True)
 
 

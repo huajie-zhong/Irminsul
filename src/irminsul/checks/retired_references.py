@@ -17,7 +17,7 @@ from irminsul.frontmatter import (
     RetirementKindEnum,
     StatusEnum,
 )
-from irminsul.regen.agents_md import GENERATED_END, GENERATED_START
+from irminsul.regen.agents_md import GENERATED_END, GENERATED_START, manifest_rel_path
 from irminsul.surface import derive_surface
 
 _REFERENCE_DEFINITION_RE = re.compile(r"^\s{0,3}\[([^\]\n]+)\]:\s*(?:<([^>\n]+)>|(\S+))")
@@ -28,6 +28,7 @@ _REFERENCE_LINK_RE = re.compile(r"(?<!!)\[([^\]\n]+)\]\[([^\]\n]*)\]")
 _AUTOLINK_RE = re.compile(r"<(?:(?:https?|mailto):[^>\n]+)>")
 _BARE_URL_RE = re.compile(r"(?:https?|mailto):[^\s)>]+")
 _MARKUP_RE = re.compile(r"[`*_~]")
+_FENCE_RE = re.compile(r"^\s*(```|~~~)")
 
 
 @dataclass(frozen=True)
@@ -340,7 +341,7 @@ def _guidance_sources(graph: DocGraph) -> list[_GuidanceSource]:
         # tombstone is exempted from it in `run` rather than wholesale here.
         if _is_rfc_path(node.path):
             continue
-        lines, unmatched = _file_lines(graph.repo_root / node.path)
+        lines, unmatched = _file_lines(graph.repo_root / node.path, blank_generated=False)
         sources.append(
             _GuidanceSource(
                 path=node.path,
@@ -351,6 +352,7 @@ def _guidance_sources(graph: DocGraph) -> list[_GuidanceSource]:
         )
 
     docs_root = Path(graph.config.paths.docs_root)
+    manifest = _repo_relative(graph.repo_root, manifest_rel_path(graph.config))
     # The agent guides are the highest-traffic guidance in the repo — `irminsul
     # init` tells every user to point their agent at them — and none of them is
     # a graph node: the AGENTS.md files are in EXEMPT_TOPLEVEL_NAMES and
@@ -367,11 +369,8 @@ def _guidance_sources(graph: DocGraph) -> list[_GuidanceSource]:
     for path in sorted(current_files, key=lambda item: item.as_posix()):
         absolute = graph.repo_root / path
         if absolute.is_file():
-            try:
-                relative = path.relative_to(graph.repo_root)
-            except ValueError:
-                relative = path
-            lines, unmatched = _file_lines(absolute)
+            relative = _repo_relative(graph.repo_root, path)
+            lines, unmatched = _file_lines(absolute, blank_generated=relative == manifest)
             sources.append(
                 _GuidanceSource(
                     path=relative,
@@ -383,14 +382,24 @@ def _guidance_sources(graph: DocGraph) -> list[_GuidanceSource]:
     return sources
 
 
+def _repo_relative(repo_root: Path, path: Path) -> Path:
+    try:
+        return path.relative_to(repo_root)
+    except ValueError:
+        return path
+
+
 def _is_rfc_path(path: Path) -> bool:
     parts = path.as_posix().split("/")
     return "80-evolution" in parts and "rfcs" in parts
 
 
-def _file_lines(path: Path) -> tuple[tuple[tuple[int, str], ...], int | None]:
-    """Every line of the file with machine-generated regions blanked, plus the
-    line number of an unmatched generated-start marker.
+def _file_lines(
+    path: Path, *, blank_generated: bool
+) -> tuple[tuple[tuple[int, str], ...], int | None]:
+    """Every line of the file, numbered, with the agent manifest's
+    machine-generated region blanked and the line number of an unmatched
+    generated-start marker.
 
     Frontmatter is included: a retired name is just as misleading in a `title:`
     or `summary:` as in prose, and the tombstone owner's own `matches:` list is
@@ -402,6 +411,13 @@ def _file_lines(path: Path) -> tuple[tuple[tuple[int, str], ...], int | None]:
     would rewrite identically. Line numbers are preserved so every other line in
     the file still reports accurately.
 
+    Only the manifest carries that region, so only the manifest is read for its
+    markers. Anywhere else the marker text is an example — the checks guide and
+    ADR-0004 both discuss it — and reading an example as a region either failed
+    the build on it or let a fenced pair hide stale guidance from a hard check.
+    Inside the manifest a fenced example is skipped for the same reason, and a
+    start and end on one line close the region on that line.
+
     Only *balanced* markers blank anything, and the line number of an unmatched
     start marker comes back with the lines. A start marker used to open the
     region and never close it, so one stray line — a bad merge, a half-written
@@ -409,13 +425,23 @@ def _file_lines(path: Path) -> tuple[tuple[tuple[int, str], ...], int | None]:
     suppression that broad has to be reported, not inferred.
     """
     lines = path.read_text(encoding="utf-8").splitlines()
+    if not blank_generated:
+        return tuple(enumerate(lines, start=1)), None
+
     generated: set[int] = set()
     open_start: int | None = None
+    in_fence = False
     for index, line in enumerate(lines):
-        if GENERATED_START in line:
-            if open_start is None:
-                open_start = index
-        elif GENERATED_END in line and open_start is not None:
+        if _FENCE_RE.match(line):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        rest = line
+        if open_start is None and GENERATED_START in rest:
+            open_start = index
+            rest = rest[rest.index(GENERATED_START) + len(GENERATED_START) :]
+        if open_start is not None and GENERATED_END in rest:
             generated.update(range(open_start, index + 1))
             open_start = None
     out = tuple((index + 1, "" if index in generated else line) for index, line in enumerate(lines))
