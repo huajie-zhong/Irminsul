@@ -83,9 +83,12 @@ the root is narrowed.
 `retired-references` builds its tombstone registry only from stable ADRs. It is
 a hard check: a stale reference is an `error`, so the gate fails without
 `--strict`, which is what makes a retirement decision enforceable rather than
-advisory. An unmatched `agents-manifest:generated-start` marker is an error too —
-only a balanced pair blanks anything, because an unclosed marker would otherwise
-switch the check off for the rest of the file. The tombstone-hygiene findings it
+advisory. An unmatched `agents-manifest:generated-start` marker in the agent
+manifest is an error too — only a balanced pair blanks anything, because an
+unclosed marker would otherwise switch the check off for the rest of the file.
+The markers are read only in the manifest that `regen agents-md` writes, and
+never inside a fenced example there, so quoting them in other guidance neither
+opens a region nor hides anything. The tombstone-hygiene findings it
 also emits — an inactive owner, a duplicate declaration, a retired CLI identity
 that is live again — stay warnings, since they describe the registry rather than
 stale guidance.

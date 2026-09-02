@@ -599,8 +599,8 @@ def test_unmatched_generated_marker_is_reported_and_suppresses_nothing(tmp_path:
 
     _write_config(tmp_path)
     _write_retirement_adr(tmp_path)
-    (tmp_path / "README.md").write_text(
-        f"# Demo\n{GENERATED_START}\nRun irminsul render.\n", encoding="utf-8"
+    (tmp_path / "docs" / "AGENTS.md").write_text(
+        f"# Agents\n{GENERATED_START}\nRun irminsul render.\n", encoding="utf-8"
     )
 
     findings = _findings(tmp_path)
@@ -610,6 +610,93 @@ def test_unmatched_generated_marker_is_reported_and_suppresses_nothing(tmp_path:
         ("retired-reference", 3),
     ]
     assert all(f.severity.value == "error" for f in findings)
+
+
+def test_marker_text_outside_the_manifest_is_ordinary_prose(tmp_path: Path) -> None:
+    """Only the manifest carries a generated region, so only the manifest is
+    read for markers. Anywhere else the marker text is an example: a balanced
+    pair does not blank the stale guidance between it, and a lone start marker
+    is not an unmatched region. Otherwise a fenced example that quoted the
+    markers either failed the build or switched a hard check off."""
+    from irminsul.regen.agents_md import GENERATED_END, GENERATED_START
+
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    (tmp_path / "README.md").write_text(
+        "\n".join(
+            [
+                "# Demo",
+                "```markdown",
+                GENERATED_START,
+                "Run irminsul render.",
+                GENERATED_END,
+                "```",
+                "The region opens with:",
+                "```",
+                GENERATED_START,
+                "```",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [(f.category, f.line) for f in findings] == [("retired-reference", 4)]
+
+
+def test_manifest_fenced_marker_example_opens_no_region(tmp_path: Path) -> None:
+    """The manifest's curated prose may quote the marker in a fenced example.
+    Reading that as the region start paired it with the real end and blanked
+    the curated prose between — stale guidance included — so fenced lines are
+    skipped and only the real region is blanked."""
+    from irminsul.regen.agents_md import GENERATED_END, GENERATED_START
+
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    (tmp_path / "docs" / "AGENTS.md").write_text(
+        "\n".join(
+            [
+                "# Agents",
+                "```",
+                GENERATED_START,
+                "```",
+                "Hand-written: the reference layer is how we do it.",
+                GENERATED_START,
+                "| doc | Uses the reference layer |",
+                GENERATED_END,
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [(f.category, f.line) for f in findings] == [("retired-reference", 5)]
+
+
+def test_manifest_markers_on_one_line_close_the_region(tmp_path: Path) -> None:
+    """A start and end on one line never paired — the end was only looked for
+    on later lines — so the manifest reported an unmatched marker whose
+    suggested fix was already on that line."""
+    from irminsul.regen.agents_md import GENERATED_END, GENERATED_START
+
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    (tmp_path / "docs" / "AGENTS.md").write_text(
+        "\n".join(
+            [
+                "# Agents",
+                f"{GENERATED_START} Uses the reference layer {GENERATED_END}",
+                "Hand-written: the reference layer is how we do it.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [(f.category, f.line) for f in findings] == [("retired-reference", 3)]
 
 
 def test_retired_reference_findings_are_errors(tmp_path: Path) -> None:
