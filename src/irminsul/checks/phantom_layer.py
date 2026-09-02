@@ -17,10 +17,23 @@ from irminsul.checks.base import Finding, Severity
 from irminsul.docgraph import DocGraph
 from irminsul.frontmatter import StatusEnum
 
+CODE_LAYER_UNDER_CONSTRUCTION = "phantom-layer/layer-under-construction"
+CODE_HOLLOW_LAYER = "phantom-layer/hollow-layer"
+
 
 class PhantomLayerCheck:
     name: ClassVar[str] = "phantom-layer"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_LAYER_UNDER_CONSTRUCTION: (
+            "A directory has only a draft INDEX.md and no content docs. Non-gating while "
+            "the layer is deliberately still under construction."
+        ),
+        CODE_HOLLOW_LAYER: (
+            "A directory has only INDEX.md and no content docs, and the INDEX claims "
+            "'stable'. Add content docs or remove the directory from the nav."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None or graph.repo_root is None:
@@ -41,16 +54,19 @@ class PhantomLayerCheck:
                     index_node is not None and index_node.frontmatter.status == StatusEnum.draft
                 )
                 if is_draft:
+                    code = CODE_LAYER_UNDER_CONSTRUCTION
                     severity = Severity.info
                     message = f"layer under construction: '{rel}' has only a draft INDEX.md"
                     suggestion = "add content docs, or this stays as a non-gating note while draft"
                 else:
+                    code = CODE_HOLLOW_LAYER
                     severity = Severity.warning
                     message = f"phantom layer: '{rel}' has only INDEX.md and no content docs"
                     suggestion = "add content docs or remove the directory from the nav"
                 out.append(
                     Finding(
                         check=self.name,
+                        code=code,
                         severity=severity,
                         message=message,
                         path=Path(rel + "/INDEX.md"),

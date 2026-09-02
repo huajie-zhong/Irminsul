@@ -62,7 +62,7 @@ The server is strictly read-only: no tool writes files, and there is no MCP path
 
 ## Wiring it into an agent
 
-The optional dependency comes from the `mcp` extra: `pip install 'irminsul[mcp]'`. Without it, `irminsul mcp` exits 1 with that install hint.
+The optional dependency comes from the `mcp` extra: `pip install 'irminsul[mcp]'`. Without it, `irminsul mcp` exits 1 with that install hint. The extra requires the 2.x MCP SDK — the server targets `mcp.server.MCPServer`, which replaced the 1.x `mcp.server.fastmcp.FastMCP`. The constraint is bounded below the next major so an upstream breaking rename fails at dependency resolution rather than at import.
 
 [Adoption](init.md) already writes the project registration below as `.mcp.json`, so a scaffolded repo needs no manual wiring. What follows is the fallback: a repo adopted before the registration was scaffolded, one whose `.mcp.json` already existed and was therefore left untouched, or a client that reads its own config location.
 

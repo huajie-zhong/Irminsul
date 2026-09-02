@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -631,6 +632,29 @@ def test_context_profile_all_available_broadens_deterministic_findings(tmp_path:
     }
     assert "orphans" not in configured_checks
     assert "orphans" in broad_checks
+
+
+def test_context_plain_findings_render_code_as_identity(tmp_path: Path) -> None:
+    """Plain findings carry the `[<code>]` identity `irminsul explain` accepts,
+    with severity kept visible — the same convention `irminsul check` prints —
+    not the old `[severity/check]` bracket."""
+    repo = _make_context_repo(tmp_path, configured_soft=False)
+
+    result = runner.invoke(
+        app,
+        [
+            "context",
+            "src/mylib/core.py",
+            "--profile",
+            "all-available",
+            "--path",
+            str(repo),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert re.search(r"(?m)^\s+warning\s+\[orphans/orphan-doc\] ", result.output), result.output
+    assert "[warning/orphans]" not in result.output
 
 
 def test_context_changed_groups_by_owner_and_reports_unmatched(tmp_path: Path) -> None:

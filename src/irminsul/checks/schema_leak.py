@@ -50,9 +50,19 @@ def _active_profiles(enabled: Sequence[str]) -> list[LanguageProfile]:
     return [LANGUAGE_REGISTRY[name] for name in enabled if name in LANGUAGE_REGISTRY]
 
 
+CODE_PATTERN_MATCH = "schema-leak/pattern-match"
+
+
 class SchemaLeakCheck:
     name: ClassVar[str] = "schema-leak"
     default_severity: ClassVar[Severity] = Severity.error
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_PATTERN_MATCH: (
+            "A protected doc's code block contains a type/schema definition pattern "
+            "(class, struct, interface, ...). Move the definition into code and derive it "
+            "via `irminsul surface`, or reference it instead of restating it."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None:
@@ -93,6 +103,7 @@ class SchemaLeakCheck:
                             out.append(
                                 Finding(
                                     check=self.name,
+                                    code=CODE_PATTERN_MATCH,
                                     severity=Severity.error,
                                     message=(
                                         f"schema-leak: line matches "

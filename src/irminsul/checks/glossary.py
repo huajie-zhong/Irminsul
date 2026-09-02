@@ -374,9 +374,38 @@ def _split_href(href: str) -> tuple[str, str | None]:
     return target, anchor if sep else None
 
 
+CODE_MALFORMED_METADATA = "glossary-discipline/malformed-metadata"
+CODE_REDEFINED_TERM = "glossary-discipline/redefined-term"
+CODE_FORBIDDEN_SYNONYM = "glossary-discipline/forbidden-synonym"
+CODE_UNLINKED_TERM = "glossary-discipline/unlinked-term"
+CODE_UNUSED_TERM = "glossary-discipline/unused-term"
+
+
 class GlossaryDisciplineCheck:
     name: ClassVar[str] = "glossary-discipline"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_MALFORMED_METADATA: (
+            "A glossary entry's `match`/`forbidden_synonyms`/`case_sensitive` metadata "
+            "failed to parse. Fix the malformed line in GLOSSARY.md."
+        ),
+        CODE_REDEFINED_TERM: (
+            "A doc other than the glossary redefines a glossary term (heading or bold "
+            "lead-in). The glossary is canonical — link to it instead."
+        ),
+        CODE_FORBIDDEN_SYNONYM: (
+            "A doc uses a synonym the glossary entry explicitly forbids. Use the "
+            "canonical term instead."
+        ),
+        CODE_UNLINKED_TERM: (
+            "A doc uses a glossary term with metadata but never links its first "
+            "occurrence to the glossary anchor. Link the first use."
+        ),
+        CODE_UNUSED_TERM: (
+            "A glossary entry with metadata is declared but never used or linked "
+            "anywhere. Remove the entry, link to it, or add matching `match` strings."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None or graph.repo_root is None:
@@ -409,6 +438,7 @@ class GlossaryDisciplineCheck:
         out: list[Finding] = [
             Finding(
                 check=self.name,
+                code=CODE_MALFORMED_METADATA,
                 severity=Severity.warning,
                 message=issue.message,
                 path=glossary_rel,
@@ -427,6 +457,7 @@ class GlossaryDisciplineCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_REDEFINED_TERM,
                             severity=Severity.warning,
                             message=(
                                 f"glossary term '{entry.term}' redefined in "
@@ -447,6 +478,7 @@ class GlossaryDisciplineCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_UNUSED_TERM,
                         severity=Severity.warning,
                         message=f"glossary term '{entry.term}' is declared but unused",
                         path=glossary_rel,
@@ -545,6 +577,7 @@ class GlossaryDisciplineCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_FORBIDDEN_SYNONYM,
                         severity=Severity.warning,
                         message=(
                             f"forbidden synonym '{synonym}' used; canonical term is '{entry.term}'"
@@ -586,6 +619,7 @@ class GlossaryDisciplineCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_UNLINKED_TERM,
                     severity=Severity.info,
                     message=(
                         f"glossary term '{entry.term}' used without linking to "

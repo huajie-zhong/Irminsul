@@ -11,22 +11,24 @@ describes:
 tests:
   - tests/test_init.py
   - tests/test_init_detector.py
-  - tests/test_init_docs_only.py
+  - tests/test_init_siblings.py
 implements:
   - 0035-rfc-lifecycle-integrity-and-frozen-records
 ---
 
 # Init scaffolder
 
-`irminsul init` scaffolds a `/docs` skeleton, an `irminsul.toml`, and the two GitHub workflows (PR-time `docs-pr.yml`, nightly `docs-nightly.yml`) into a target codebase. Existing-code adoption auto-detects languages and source roots, then asks for the project name when interactive.
+`irminsul init` scaffolds a `/docs` skeleton, an `irminsul.toml`, and the two GitHub workflows (PR-time `docs-pr.yml`, nightly `docs-nightly.yml`) into a target codebase. Existing-code adoption auto-detects languages and source roots when possible; explicit `--language` values take precedence.
 
-The no-code path distinguishes setup intent:
+`--topology` selects one of the two supported repository layouts ([`ADR-0022`](../50-decisions/0022-reduce-supported-repository-topologies.md)), and there are three paths through the command:
 
-- **Fresh-start, same repo:** `irminsul init --fresh` creates docs, config, workflows, and an empty `src/` source root. It writes `languages.enabled = []` and does not generate starter code.
-- **Fresh-start, private docs / public code:** `irminsul init --fresh --topology docs-only --code-repo owner/code-repo` creates the docs repo now, configures the code checkout as a gitignored subfolder, and allows that code folder to be absent.
-- **Docs-only repo for existing separate code:** `irminsul init-docs-only --code-repo owner/repo` keeps the existing two-repo adoption path and detects language/source roots when the code subfolder is already present.
+- **Adopt existing same-repo code:** `irminsul init` detects languages and source roots in place.
+- **Fresh-start, same repo:** `irminsul init --fresh --language python` creates docs, config, workflows, and an empty `src/` source root without generating starter code. Interactive runs prompt for at least one language when the option is omitted; non-interactive runs require it.
+- **Docs repo beside a separate code repo:** `irminsul init --topology siblings --code-repo owner/code-repo --language python` writes `source_roots` reaching through `../` and generates two-checkout CI. When the code repo already exists locally, init detects its languages and source roots unless explicit languages were supplied. When the repo is unavailable or detection finds no supported language, interactive runs prompt and non-interactive runs require `--language`. `--code-repo` values that do not resolve to a direct sibling of the docs repo are rejected. See [private docs](../30-workflows/private-docs.md) for the layout.
 
-Templates live as Jinja files under `src/irminsul/init/scaffolds/` (`docs/` tree + `irminsul.toml`) and `src/irminsul/init/workflows/` (CI workflows). Output paths mirror the template path with `.j2` stripped.
+`--language` accepts `python`, `typescript`, `go`, or `rust` and may be repeated. Generated config uses registry order and removes duplicates, so the same selected profiles always produce the same `languages.enabled` list.
+
+Templates live as Jinja files under `src/irminsul/init/scaffolds/` (`docs/` tree + `irminsul.toml`) and `src/irminsul/init/workflows/<topology>/` (CI workflows). Output paths mirror the template path with `.j2` stripped, and workflow templates flatten into `.github/workflows/`. The two topologies get separate workflow templates rather than one branching template: the sibling gate needs two checkouts under a common parent plus a `working-directory`, which the composite Action cannot express, so it installs and calls the CLI directly.
 
 Agent-harness wiring is written after the templates, from module constants rather than templates:
 
@@ -37,7 +39,7 @@ Agent-harness wiring is written after the templates, from module constants rathe
 
 The registration wires the [MCP server](mcp-server.md); the skill points at orientation and the [agent protocol](../90-meta/agent-protocol.md) without restating either. Neither file carries a project-specific value, so neither needs substitution, and holding them as constants avoids depending on hidden-file inclusion in the built wheel — which no scaffold template currently exercises. Both follow the same skip-if-exists policy as the templates: an existing registration may hold servers the adopter needs, so it is left byte-identical and the manual registration command is printed instead. Neither file is governed by a check, because neither is derived from anything ([ADR-0023](../50-decisions/0023-scaffold-agent-harness-wiring-statically.md)).
 
-The scaffold is born compliant with its own configured checks: every layer (including `00-foundation/`, `10-architecture/`, and `80-evolution/rfcs/`) ships a navigation INDEX so sibling docs are never orphans, the tier-3 layer INDEXes carry a Scope & Limitations section, and the INDEX of each not-yet-filled layer is `status: draft`, which the `phantom-layer` check treats as under-construction rather than navigation rot. A freshly initialized repo reports zero errors and zero warnings under the configured check profile.
+The scaffold is born compliant with its own configured checks: every layer (including `00-foundation/`, `10-architecture/`, and `80-evolution/rfcs/`) ships a navigation INDEX so sibling docs are never orphans, the tier-3 layer INDEXes carry a Scope & Limitations section, and the INDEX of each not-yet-filled layer is `status: draft`, which the `phantom-layer` check treats as under-construction rather than navigation rot. A freshly initialized same-repo scaffold reports zero errors and zero warnings under the configured check profile; a siblings scaffold whose code repo is not yet cloned beside it reports that missing source root as its one warning until the clone lands.
 
 `detector.detect_languages()` checks for marker files (`pyproject.toml`, `package.json`+`tsconfig.json`, etc.) — cheap heuristics, fast and resilient to weird repo shapes. `detect_source_roots()` filters each detected language's `source_root_candidates` to those that exist on disk, falling back to `["src"]` if nothing matches.
 

@@ -22,10 +22,19 @@ from typing import ClassVar
 from irminsul.checks.base import Finding, Severity
 from irminsul.docgraph import DocGraph, DocNode
 
+CODE_UNKNOWN_DEPENDENCY = "doc-refs/unknown-dependency"
+
 
 class DocRefsCheck:
     name: ClassVar[str] = "doc-refs"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_UNKNOWN_DEPENDENCY: (
+            "A `depends_on` entry names a doc id that does not exist in the graph. Fix "
+            "the id or remove the entry; run `irminsul refs <id>` to locate the intended "
+            "doc."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         out: list[Finding] = []
@@ -36,6 +45,7 @@ class DocRefsCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_UNKNOWN_DEPENDENCY,
                         severity=self.default_severity,
                         message=(f"'depends_on' references unknown doc id '{dep_id}'"),
                         path=node.path,

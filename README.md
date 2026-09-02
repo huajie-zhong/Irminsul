@@ -22,12 +22,12 @@ For a new project with no code yet:
 
 ```bash
 pipx install irminsul
-irminsul init --fresh --path my-new-project
+irminsul init --fresh --language python --path my-new-project
 ```
 
 That scaffolds a 9-layer `/docs` skeleton, an `irminsul.toml` config, GitHub Actions workflows, and the agent wiring: `docs/AGENTS.md` (the generated navigation manifest), a root `AGENTS.md` pointer that Claude Code, Cursor, and Codex pick up natively, a `.mcp.json` registering the read-only MCP server, and a harness skill that routes an agent to `irminsul orient`. Three commands, ten seconds, fully wired.
 
-For private docs with separate public code, use `irminsul init-docs-only --code-repo owner/repo` when the code repo already exists, or `irminsul init --fresh --topology docs-only --code-repo owner/future-repo` when both repos are starting from zero.
+For private docs with separate public code, run `irminsul init --topology siblings --code-repo owner/repo --language python` inside a docs repo that sits beside the code repo. The code repo does not have to exist yet; omit `--language` when a local checkout is available for detection.
 
 ## For AI agents
 

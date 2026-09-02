@@ -109,6 +109,7 @@ automatically once any doc declares one.
 | `0019-audit-retired-references` | [ADR-0019: Audit retired references from decision-owned tombstones](50-decisions/0019-audit-retired-references.md) | adr | 2 | Keep retirement provenance in stable ADRs and audit current guidance with deterministic exact matching. |
 | `0020-migrate-pre-lifecycle-rfcs-explicitly` | [ADR-0020: Migrate pre-lifecycle RFCs explicitly](50-decisions/0020-migrate-pre-lifecycle-rfcs-explicitly.md) | adr | 2 | Preserve historical RFC truth through explicit, evidence-backed lifecycle classification. |
 | `0021-derive-rfc-relationship-graphs` | [ADR-0021: Derive RFC relationship graphs](50-decisions/0021-derive-rfc-relationship-graphs.md) | adr | 2 | Derive lifecycle-aware RFC relationships from forward declarations without mutating frozen predecessors. |
+| `0022-reduce-supported-repository-topologies` | [ADR-0022: Reduce supported repository topologies to two](50-decisions/0022-reduce-supported-repository-topologies.md) | adr | 2 | Support only the same-repo and siblings layouts; retire both nested private-docs topologies and the command that scaffolded one. |
 | `0023-scaffold-agent-harness-wiring-statically` | [ADR-0023: Scaffold agent harness wiring statically](50-decisions/0023-scaffold-agent-harness-wiring-statically.md) | adr | 2 | Write harness wiring at adoption as unpoliced static constants, and repair the agent-facing surfaces that state something untrue. |
 | `50-decisions` | [Architecture decisions](50-decisions/INDEX.md) | reference | 2 |  |
 
@@ -173,6 +174,7 @@ automatically once any doc declares one.
 | `0041-pre-lifecycle-rfc-migration` | [Migrate pre-lifecycle RFCs without inferring intent](80-evolution/rfcs/0041-pre-lifecycle-rfc-migration.md) | explanation | 2 |  |
 | `0042-rfc-dependency-and-supersession-graphs` | [RFC dependency and supersession graphs](80-evolution/rfcs/0042-rfc-dependency-and-supersession-graphs.md) | explanation | 2 |  |
 | `0043-wire-agent-harnesses-at-setup-and-repair-agent-facing-claims` | [Wire agent harnesses at setup and repair agent-facing claims](80-evolution/rfcs/0043-wire-agent-harnesses-at-setup-and-repair-agent-facing-claims.md) | explanation | 2 |  |
+| `0044-cross-repo-delta` | [Cross-repo layouts for check --delta](80-evolution/rfcs/0044-cross-repo-delta.md) | explanation | 2 |  |
 | `80-evolution` | [Evolution](80-evolution/INDEX.md) | reference | 4 |  |
 | `patterns` | [Evolution Patterns](80-evolution/patterns.md) | explanation | 2 |  |
 | `rfcs` | [RFCs](80-evolution/rfcs/INDEX.md) | reference | 2 |  |

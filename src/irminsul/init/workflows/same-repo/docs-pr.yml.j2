@@ -5,9 +5,7 @@ on:
     paths:
       - "docs/**"
       - "irminsul.toml"
-{% if not code_repo_spec %}
       - "{{ source_roots[0] }}/**"
-{% endif %}
       - ".github/workflows/docs-pr.yml"
 
 jobs:
@@ -17,13 +15,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # mtime drift needs full history
-{% if code_repo_spec %}
-      - uses: actions/checkout@v4
-        with:
-          repository: {{ code_repo_spec }}
-          path: {{ code_subfolder }}
-          fetch-depth: 1
-{% endif %}
       - uses: {{ github_user }}/irminsul@v0.1.0
         with:
           profile: hard

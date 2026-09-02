@@ -41,13 +41,13 @@ Checks consume a [DocGraph](docgraph.md) and return `Finding` records with sever
 | Example check | What it enforces | Severity |
 |---------------|------------------|----------|
 | `frontmatter` | Required fields present, enums valid, id matches filename rule, no duplicate ids | error |
-| `globs` | Every `describes` pattern resolves under the configured source policy; unsafe symlink escapes are rejected | error / warning |
+| `globs` | Every `describes` pattern resolves under the configured source policy; unsafe symlink escapes are rejected; two source files never share one display path | error / warning |
 | `uniqueness` | Each source file claimed by exactly one most-specific doc; ties are silent duplication | error / warning |
 | `links` | Internal markdown links resolve; external/anchor-only skipped | error |
 | `schema-leak` | No type/schema definitions inside `docs/20-components/` (they live in code, not docs) | error |
 | `prose-file-reference` | Local `.md` references in prose must be real links or explicitly ignored | error |
 | `rfc-lifecycle-integrity` | Implemented RFC seals, premature implementation evidence, and draft/live lifecycle drift | error / warning |
-| `retired-references` | Current guidance does not present ADR-retired commands or concepts as live | warning |
+| `retired-references` | Current guidance does not present ADR-retired commands or concepts as live | error / warning |
 
 Soft deterministic checks warn rather than block. For example, `foundation-readiness` warns when a `00-foundation/` or `10-architecture/` doc still contains literal scaffold placeholder phrases — a signal the project never ran [`irminsul seed`](seed.md) to capture real intent. Another, `doc-refs`, warns when a `depends_on` entry names a doc id that doesn't exist in the graph — a dangling edge would otherwise silently weaken orphan detection and the other consumers of strong dependencies; the [refs query](refs.md) helps locate the intended doc. A third, `phantom-layer`, flags a directory whose only doc is its INDEX as navigation rot — at `warning` when that INDEX is `status: stable`, downgraded to `info` when it is `status: draft`, since a draft INDEX marks a layer deliberately under construction (the state every freshly scaffolded layer starts in) rather than abandoned navigation. And `change-binding` keeps declared change intent honest: an accepted RFC must declare `affects` explicitly, every declared component id must resolve, and when a diff range is available the declared scope is compared against the components that actually own the changed source (see the [change lifecycle](change.md)). `requirement-grammar` validates the requirement/scenario structure of behavior-changing RFCs — stable unique ids, SHALL/MUST behavior text, WHEN/THEN scenarios, a supported evidence class, or the explicit no-new-behavior disposition; the same findings that warn here block `change transition ... accepted`, because acceptance freezes the contract to implement.
 
@@ -69,11 +69,50 @@ line-or-block scope. Informational findings are not stored in baselines, so a
 baseline update cannot hide obsolete exceptions. Unmatched block markers remain
 hard errors, and marker removal stays manual.
 
-`retired-references` builds its tombstone registry only from stable ADRs. It
-scans stable non-historical atoms plus current README, glossary, and contributor
-guidance; ADRs, RFCs, non-stable atoms, generated navigation, link destinations,
-URLs, and HTML comments are not treated as current claims. Fenced examples stay
-visible because obsolete commands there are operationally dangerous. Findings
+`globs` also warns when one display path names two files. The display
+encoding is not injective — two configured roots outside the repo that both
+hold `a.py`, or a sibling file whose display is also the name of a docs-repo
+file no root covers, produce the same spelling — so no `describes` pattern or
+`claims[].evidence` entry can name one of them, and nothing downstream can
+disambiguate. Widening a configured root from `../code/src` to `../code` is
+enough to hit it: the code repo's readme and agent manifest then collide
+with the docs repo's own. A spelling the walk emits resolves to the walked
+source file, so the docs-repo file is the one that becomes unnameable until
+the root is narrowed.
+
+`retired-references` builds its tombstone registry only from stable ADRs. It is
+a hard check: a stale reference is an `error`, so the gate fails without
+`--strict`, which is what makes a retirement decision enforceable rather than
+advisory. An unmatched `agents-manifest:generated-start` marker in the agent
+manifest is an error too — only a balanced pair blanks anything, because an
+unclosed marker would otherwise switch the check off for the rest of the file.
+The markers are read only in the manifest that `regen agents-md` writes, and
+never inside a fenced example there, so quoting them in other guidance neither
+opens a region nor hides anything. The tombstone-hygiene findings it
+also emits — an inactive owner, a duplicate declaration, a retired CLI identity
+that is live again — stay warnings, since they describe the registry rather than
+stale guidance.
+
+It scans every stable atom, frontmatter included, plus the current README, docs
+README, glossary, contributor guidance, and the agent manifests, which are
+high-traffic guidance that no doc node covers. Out of range:
+an ADR is never audited against the tombstones it declares itself, since a
+decision has to be able to name what it retired; RFCs are frozen historical
+record under ADR-0016; and so are the generated navigation rows that echo their
+titles. Non-stable atoms, link destinations, URLs, and HTML comments are also
+not treated as current claims. Phrases match whole tokens, never substrings, and
+case is part of the phrase: a `cli-command` match is always case-sensitive, and a
+`concept` match folds case only when the declaration is written entirely in lower
+case. So a declaration like `sidecar mode` still catches a capitalised heading,
+while a proper name such as `Topology A` cannot swallow the ordinary English
+"whatever topology a project picks" — a tombstone that wants both readings lists
+both spellings in `matches`. Fenced examples stay
+visible because obsolete commands there are operationally dangerous — which
+means a migration note showing the retired invocation has no in-fence remedy,
+since a Markdown link cannot live inside a fence. Two answers exist and both
+are deliberate: wrap the example in an HTML comment, which is not read as a
+current claim, or keep it where the audit does not reach — a `draft` doc or
+the changelog, which is a migration record rather than guidance. Findings
 aggregate repeated aliases per retirement and doc, and carry the declaring ADR,
 guidance, first line, and occurrence count. An exact phrase linked to its owning
 ADR is an explicit historical citation. CLI tombstones are first checked against
