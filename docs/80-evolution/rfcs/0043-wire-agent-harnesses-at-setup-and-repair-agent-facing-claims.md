@@ -14,7 +14,7 @@ affects:
 - mcp-server
 - new-list-regen
 - check-pipeline
-resolved_by: docs/50-decisions/0022-scaffold-agent-harness-wiring-statically.md
+resolved_by: docs/50-decisions/0023-scaffold-agent-harness-wiring-statically.md
 required_updates:
 - path: docs/20-components/init.md
   reason: Init now writes harness wiring, so the scope limitation denying local tooling configuration is false.

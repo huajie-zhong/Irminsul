@@ -30,7 +30,7 @@ _WORKFLOWS_DIR = Path(__file__).parent / "workflows"
 # `scaffolds/`: neither file carries a project-specific value, and the built
 # wheel contains no dot-prefixed files today, so hidden-template inclusion under
 # the configured package root is unverified — a silently excluded template would
-# fail at release time rather than at test time (ADR-0022).
+# fail at release time rather than at test time (ADR-0023).
 _MCP_CONFIG_PATH = Path(".mcp.json")
 _SKILL_PATH = Path(".claude") / "skills" / "irminsul" / "SKILL.md"
 
@@ -50,7 +50,7 @@ _MCP_MANUAL_COMMAND = "claude mcp add irminsul -- irminsul mcp --path ."
 
 # A trigger, not a copy. The command vocabulary is served live by `irminsul
 # orient` and the work order lives in the agent protocol doc; restating either
-# here would be a third copy in a format no check can read (ADR-0022).
+# here would be a third copy in a format no check can read (ADR-0023).
 _SKILL_BODY = """---
 name: irminsul
 description: Use when editing code in a repo with an irminsul.toml at the root.
@@ -331,7 +331,7 @@ def write_harness_files(target_root: Path, *, force: bool = False) -> tuple[list
 
     Both files are unpoliced by design: neither is derived from anything, so a
     drift check would compare a constant against itself, and its cost would fall
-    on adopters who legitimately delete either file (ADR-0022). Applies the same
+    on adopters who legitimately delete either file (ADR-0023). Applies the same
     skip-if-exists policy as `write_scaffold`, because an existing registration
     may hold servers the adopter needs.
     """

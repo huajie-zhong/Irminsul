@@ -1,6 +1,6 @@
 ---
-id: 0022-scaffold-agent-harness-wiring-statically
-title: "ADR-0022: Scaffold agent harness wiring statically"
+id: 0023-scaffold-agent-harness-wiring-statically
+title: "ADR-0023: Scaffold agent harness wiring statically"
 audience: adr
 tier: 2
 status: stable
@@ -8,7 +8,7 @@ describes: []
 summary: Write harness wiring at adoption as unpoliced static constants, and repair the agent-facing surfaces that state something untrue.
 ---
 
-# ADR-0022: Scaffold agent harness wiring statically
+# ADR-0023: Scaffold agent harness wiring statically
 
 ## Status
 

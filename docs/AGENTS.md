@@ -109,7 +109,7 @@ automatically once any doc declares one.
 | `0019-audit-retired-references` | [ADR-0019: Audit retired references from decision-owned tombstones](50-decisions/0019-audit-retired-references.md) | adr | 2 | Keep retirement provenance in stable ADRs and audit current guidance with deterministic exact matching. |
 | `0020-migrate-pre-lifecycle-rfcs-explicitly` | [ADR-0020: Migrate pre-lifecycle RFCs explicitly](50-decisions/0020-migrate-pre-lifecycle-rfcs-explicitly.md) | adr | 2 | Preserve historical RFC truth through explicit, evidence-backed lifecycle classification. |
 | `0021-derive-rfc-relationship-graphs` | [ADR-0021: Derive RFC relationship graphs](50-decisions/0021-derive-rfc-relationship-graphs.md) | adr | 2 | Derive lifecycle-aware RFC relationships from forward declarations without mutating frozen predecessors. |
-| `0022-scaffold-agent-harness-wiring-statically` | [ADR-0022: Scaffold agent harness wiring statically](50-decisions/0022-scaffold-agent-harness-wiring-statically.md) | adr | 2 | Write harness wiring at adoption as unpoliced static constants, and repair the agent-facing surfaces that state something untrue. |
+| `0023-scaffold-agent-harness-wiring-statically` | [ADR-0023: Scaffold agent harness wiring statically](50-decisions/0023-scaffold-agent-harness-wiring-statically.md) | adr | 2 | Write harness wiring at adoption as unpoliced static constants, and repair the agent-facing surfaces that state something untrue. |
 | `50-decisions` | [Architecture decisions](50-decisions/INDEX.md) | reference | 2 |  |
 
 ### 60-operations
