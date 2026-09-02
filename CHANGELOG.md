@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Enhancements
+- `irminsul init --language <python|typescript|go|rust>` declares language profiles when code is not available for detection and may be repeated for multi-language projects. Interactive greenfield initialization prompts for at least one language; non-interactive initialization requires the option before writing a scaffold.
 - `irminsul init --topology same-repo|siblings` — one command scaffolds either supported repository layout. `--topology siblings` takes `--code-repo <owner/repo|path>`, writes `source_roots` reaching through `../`, and generates two-checkout CI (ADR-0022).
 - `claims[].evidence` now reads the same display spelling as `describes:`: repo-relative inside the docs repo, source-root-relative for files under a source root outside it. In the `siblings` layout a claim on `../code/src/core.py` is written `core.py`, so evidence and `describes:` can finally name the same file. Evidence that is absolute or reaches out through `..` is rejected.
 - `globs` warns when the source walk produces one display path for two files — two configured roots outside the repo that both hold `a.py`, or a sibling file colliding with a repo-relative name. The display encoding is not injective, so nothing downstream can disambiguate; the collision is now reported rather than resolved by luck.
