@@ -38,11 +38,11 @@ _GITHUB_USER_PLACEHOLDER = "huajie-zhong"
 _SCAFFOLDS_DIR = Path(__file__).parent / "scaffolds"
 _WORKFLOWS_DIR = Path(__file__).parent / "workflows"
 
-# Agent-harness wiring. Held as constants rather than as Jinja templates under
-# `scaffolds/`: neither file carries a project-specific value, and the built
-# wheel contains no dot-prefixed files today, so hidden-template inclusion under
-# the configured package root is unverified — a silently excluded template would
-# fail at release time rather than at test time (ADR-0023).
+# Agent-harness wiring. The registration is a constant rather than a scaffold
+# template because under `--force` it is merged into an existing `.mcp.json` —
+# one that may hold servers the adopter needs — and the template writer only
+# knows skip-or-replace. The skill sits beside it so the two harness files
+# share one writer and one skipped-file note (ADR-0023).
 _MCP_CONFIG_PATH = Path(".mcp.json")
 _SKILL_PATH = Path(".claude") / "skills" / "irminsul" / "SKILL.md"
 
@@ -536,52 +536,93 @@ def generate_agents_manifest(target_root: Path, *, force: bool = False) -> list[
     return [rel_path]
 
 
-def write_harness_files(target_root: Path, *, force: bool = False) -> tuple[list[Path], list[Path]]:
-    """Write the agent-harness wiring. Returns `(written, skipped)`.
+@dataclass(frozen=True)
+class HarnessWiring:
+    written: list[Path]
+    skipped: list[Path]
+    #: Whether `.mcp.json` names the `irminsul` server after the call — written
+    #: now, or already present in a registration that was left alone.
+    mcp_registered: bool
 
-    Both files are unpoliced by design: neither is derived from anything, so a
-    drift check would compare a constant against itself, and its cost would fall
-    on adopters who legitimately delete either file (ADR-0023). Applies the same
-    skip-if-exists policy as `write_scaffold`, because an existing registration
-    may hold servers the adopter needs.
+
+def _load_mcp_config(path: Path) -> dict[str, Any] | None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _registers_irminsul(config: dict[str, Any] | None) -> bool:
+    servers = config.get("mcpServers") if config is not None else None
+    return isinstance(servers, dict) and "irminsul" in servers
+
+
+def _write_lf(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8", newline="\n")
+
+
+def write_harness_files(target_root: Path, *, force: bool = False) -> HarnessWiring:
+    """Write the agent-harness wiring.
+
+    Both files are skipped when present. Under `force` the skill is replaced,
+    but the registration is merged: the `irminsul` entry is set in the
+    existing `mcpServers` map and every other server the adopter registered
+    survives. Only a file that is not a JSON object is replaced wholesale,
+    since there is nothing to merge into. Both are written with LF newlines on
+    every platform, so the committed bytes are identical everywhere. Neither
+    file is policed by a check: neither is derived from anything, and the cost
+    would fall on adopters who legitimately delete either one (ADR-0023).
     """
-    payloads: list[tuple[Path, str]] = [
-        (_MCP_CONFIG_PATH, json.dumps(_MCP_CONFIG, indent=2) + "\n"),
-        (_SKILL_PATH, _SKILL_BODY),
-    ]
-
     written: list[Path] = []
     skipped: list[Path] = []
-    for output_rel, content in payloads:
-        out_abs = target_root / output_rel
-        if out_abs.exists() and not force:
-            skipped.append(output_rel)
-            continue
-        out_abs.parent.mkdir(parents=True, exist_ok=True)
-        out_abs.write_text(content, encoding="utf-8")
-        written.append(output_rel)
 
-    return written, skipped
+    mcp_abs = target_root / _MCP_CONFIG_PATH
+    existing = _load_mcp_config(mcp_abs) if mcp_abs.exists() else None
+    registered = _registers_irminsul(existing)
+    if mcp_abs.exists() and not force:
+        skipped.append(_MCP_CONFIG_PATH)
+    else:
+        config: dict[str, Any] = dict(existing) if existing is not None else {}
+        servers = config.get("mcpServers")
+        merged = dict(servers) if isinstance(servers, dict) else {}
+        merged["irminsul"] = _MCP_CONFIG["mcpServers"]["irminsul"]
+        config["mcpServers"] = merged
+        _write_lf(mcp_abs, json.dumps(config, indent=2) + "\n")
+        written.append(_MCP_CONFIG_PATH)
+        registered = True
+
+    skill_abs = target_root / _SKILL_PATH
+    if skill_abs.exists() and not force:
+        skipped.append(_SKILL_PATH)
+    else:
+        _write_lf(skill_abs, _SKILL_BODY)
+        written.append(_SKILL_PATH)
+
+    return HarnessWiring(written=written, skipped=skipped, mcp_registered=registered)
 
 
 def _scaffold_with_agent_wiring(
     target_root: Path, answers: InitAnswers, *, force: bool
-) -> list[Path]:
+) -> tuple[list[Path], bool]:
     """Render the scaffold, then wire the repo for agent harnesses.
 
     Writes `docs/AGENTS.md` (the navigation manifest) via the regen machinery,
     then the harness wiring (`.mcp.json`, the harness skill). The root
-    `AGENTS.md` pointer is part of the scaffold templates. Any of these that
-    already exists is skipped, with a note, unless `force` is given.
+    `AGENTS.md` router and the `CLAUDE.md` pointer are scaffold templates.
+    Any of these that already exists is skipped, with a note, unless `force`
+    is given. Returns the files written and whether `.mcp.json` ends up
+    registering the server, so the next steps can say which is the case.
     """
     root_manifest_preexisting = (target_root / "AGENTS.md").exists()
     written = write_scaffold(target_root, answers, force=force)
     written.extend(generate_agents_manifest(target_root, force=force))
-    harness_written, harness_skipped = write_harness_files(target_root, force=force)
-    written.extend(harness_written)
+    harness = write_harness_files(target_root, force=force)
+    written.extend(harness.written)
 
     preexisting = [Path("AGENTS.md")] if root_manifest_preexisting else []
-    preexisting.extend(harness_skipped)
+    preexisting.extend(harness.skipped)
     if preexisting and not force:
         names = ", ".join(p.as_posix() for p in preexisting)
         typer.echo(
@@ -590,17 +631,34 @@ def _scaffold_with_agent_wiring(
                 fg="yellow",
             )
         )
-        if _MCP_CONFIG_PATH in harness_skipped:
+        if _MCP_CONFIG_PATH in harness.skipped and not harness.mcp_registered:
             typer.echo(
                 typer.style(
                     f"      to register the MCP server manually: {_MCP_MANUAL_COMMAND}",
                     fg="yellow",
                 )
             )
-    return written
+    return written, harness.mcp_registered
 
 
-def print_next_steps(answers: InitAnswers, written: list[Path]) -> None:
+def _harness_next_step(mcp_registered: bool) -> str:
+    """Step 4 of the next steps, worded for what adoption actually did."""
+    lead = (
+        "  4. Point your coding agent at AGENTS.md (repo root) — it routes to "
+        "docs/AGENTS.md and the agent loop. "
+    )
+    if mcp_registered:
+        return lead + ".mcp.json registers the MCP server; it needs `pip install 'irminsul[mcp]'`."
+    return (
+        lead
+        + f"Register the MCP server with `{_MCP_MANUAL_COMMAND}`; "
+        + "it needs `pip install 'irminsul[mcp]'`."
+    )
+
+
+def print_next_steps(
+    answers: InitAnswers, written: list[Path], *, mcp_registered: bool = True
+) -> None:
     typer.echo()
     typer.echo(typer.style("Created:", fg="green", bold=True))
     for p in written:
@@ -610,11 +668,7 @@ def print_next_steps(answers: InitAnswers, written: list[Path]) -> None:
     typer.echo("  1. Edit docs/00-foundation/principles.md")
     typer.echo("  2. Edit docs/10-architecture/overview.md")
     typer.echo("  3. Add CODEOWNERS coverage for /docs (project-specific; not auto-generated).")
-    typer.echo(
-        "  4. Point your coding agent at AGENTS.md (repo root) — it routes to "
-        "docs/AGENTS.md and the agent loop. .mcp.json registers the MCP server; "
-        "it needs `pip install 'irminsul[mcp]'`."
-    )
+    typer.echo(_harness_next_step(mcp_registered))
     typer.echo("  5. git add . && git commit -m 'Adopt Irminsul'")
     typer.echo("  6. Push — CI enforces from PR #1.")
 
@@ -627,8 +681,8 @@ def run_init(
     force: bool = False,
 ) -> None:
     answers = gather_answers(repo_root=target_root, interactive=interactive, languages=languages)
-    written = _scaffold_with_agent_wiring(target_root, answers, force=force)
-    print_next_steps(answers, written)
+    written, mcp_registered = _scaffold_with_agent_wiring(target_root, answers, force=force)
+    print_next_steps(answers, written, mcp_registered=mcp_registered)
 
 
 def run_init_fresh(
@@ -641,10 +695,10 @@ def run_init_fresh(
     answers = gather_answers_fresh(
         repo_root=target_root, interactive=interactive, languages=languages
     )
-    written = _scaffold_with_agent_wiring(target_root, answers, force=force)
+    written, mcp_registered = _scaffold_with_agent_wiring(target_root, answers, force=force)
     for root in answers.source_roots:
         (target_root / root).mkdir(parents=True, exist_ok=True)
-    print_next_steps(answers, written)
+    print_next_steps(answers, written, mcp_registered=mcp_registered)
 
 
 def run_init_siblings(
@@ -661,11 +715,13 @@ def run_init_siblings(
         code_repo=code_repo,
         languages=languages,
     )
-    written = _scaffold_with_agent_wiring(target_root, answers, force=force)
-    _print_siblings_next_steps(answers, written)
+    written, mcp_registered = _scaffold_with_agent_wiring(target_root, answers, force=force)
+    _print_siblings_next_steps(answers, written, mcp_registered=mcp_registered)
 
 
-def _print_siblings_next_steps(answers: InitAnswers, written: list[Path]) -> None:
+def _print_siblings_next_steps(
+    answers: InitAnswers, written: list[Path], *, mcp_registered: bool = True
+) -> None:
     typer.echo()
     typer.echo(typer.style("Created:", fg="green", bold=True))
     for p in written:
@@ -681,11 +737,7 @@ def _print_siblings_next_steps(answers: InitAnswers, written: list[Path]) -> Non
         typer.echo(f"  1. Clone or place the code repo at {answers.code_dir}/")
     typer.echo("  2. Edit docs/00-foundation/principles.md")
     typer.echo("  3. Edit docs/10-architecture/overview.md")
-    typer.echo(
-        "  4. Point your coding agent at AGENTS.md (repo root) — it routes to "
-        "docs/AGENTS.md and the agent loop. .mcp.json registers the MCP server; "
-        "it needs `pip install 'irminsul[mcp]'`."
-    )
+    typer.echo(_harness_next_step(mcp_registered))
     typer.echo("  5. git add . && git commit -m 'Adopt Irminsul (siblings)'")
     typer.echo("  6. Push — CI enforces from PR #1.")
     if answers.code_repo_spec is None:

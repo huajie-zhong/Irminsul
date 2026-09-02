@@ -32,17 +32,20 @@ a constant while its component page advertises next-command hints. The fix comma
 reports planned fixes after a live run, though no-op fixes are skipped during
 application.
 
-Root-level files sit outside the docs root, so no check can reach them. The tool is
+Root-level files sit outside the docs root, so the doc-graph checks cannot reach them;
+only the retired-reference audit reads the readme and the agent files. The tool is
 structurally blind exactly where its own entry point decayed.
 
 ## Decision
 
 Write two harness files at adoption: a project-scoped MCP registration and a
 trigger-only skill. Hold both as module constants in the init package rather than as
-scaffold templates, because the built wheel contains no dot-prefixed files today and
-inclusion of a hidden template under the configured package root is unverified — a
-silently excluded template fails at release time, not at test time. Neither file carries
-a project-specific value, so neither needs substitution.
+scaffold templates, because the registration has to be merged into an existing file
+under `--force` — a registration may hold servers the adopter needs — and the template
+writer only knows skip-or-replace; the skill sits beside it so the two share one writer
+and one skipped-file note. Neither file carries a project-specific value, so neither
+needs substitution. Scaffold a pointer file for Claude Code that imports the root entry point,
+as a template, so the harness that reads that file reaches the router the skill assumes.
 
 Keep the skill a trigger. It carries its activation condition and two pointers: run
 orientation first, then follow the recorded work order. It carries no command table and
@@ -54,8 +57,10 @@ compare a constant against itself, and its cost would fall on adopters who legit
 delete either file. Accept the optional server dependency's absence as a self-diagnosing
 failure rather than moving it into the base dependency set.
 
-Never overwrite either file. Reuse the existing skip-if-exists policy and the existing
-pre-existing-file note, and print the manual registration command as the fallback.
+Skip both files when present, unless forced. Reuse the existing skip-if-exists policy
+and the pre-existing-file note, and print the manual registration command as the fallback
+unless the existing registration already names the server. Under `--force`, replace the
+skill but merge the registration, keeping every other server.
 
 Collapse the duplicated root entry point to one canonical document and one reference,
 rather than re-synchronizing the pair. Add no check for the result: after the collapse
@@ -81,8 +86,9 @@ exit code unchanged for every format.
 - **Add slash-command wrappers for the command vocabulary.** Rejected as a third
   ungoverned copy of a vocabulary already served live and already policed against
   command drift.
-- **Ship the registration as a hidden scaffold template.** Rejected because hidden-file
-  inclusion in the built wheel is unverified and would fail at release time.
+- **Ship the registration as a hidden scaffold template.** Dot-prefixed templates do
+  ship in the built wheel, so this was viable; rejected because the template writer
+  cannot merge into an existing registration, which `--force` has to do.
 - **Move the optional server dependency into the base set.** Rejected because the failure
   is visible with a one-line remedy already printed, and the cost would fall on every
   installation.
@@ -97,8 +103,9 @@ exit code unchanged for every format.
 - Adoption now writes outside the docs tree and the CI directory, widening its
   responsibility.
 - The registration content exists both as an init constant and as an illustrative block
-  in the server's component page. At this size there is no generator-free way to keep one
-  copy; the duplication is recorded rather than hidden.
+  in the server's component page, and this repository tracks its own copies of both
+  harness files. A repository-local test binds all of them to the constants, so drift
+  fails this suite without adding an adopter-facing check.
 - A change to the server's invocation will not mechanically flag already-adopted
   repositories, and the skill is stale without signal if harness conventions change.
 - The root entry point remains outside every check's reach, so its accuracy stays a

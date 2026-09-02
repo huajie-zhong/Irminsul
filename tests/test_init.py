@@ -9,6 +9,7 @@ from click import unstyle
 from typer.testing import CliRunner
 
 from irminsul.cli import app
+from irminsul.init.command import _MCP_CONFIG, _SKILL_BODY
 
 runner = CliRunner()
 
@@ -26,6 +27,7 @@ def test_init_no_interactive_creates_expected_tree(tmp_path: Path) -> None:
     expected = [
         "irminsul.toml",
         "AGENTS.md",
+        "CLAUDE.md",
         "docs/AGENTS.md",
         "docs/README.md",
         "docs/GLOSSARY.md",
@@ -484,16 +486,48 @@ def test_init_does_not_clobber_existing_mcp_registration(tmp_path: Path) -> None
     assert existing.read_text(encoding="utf-8") == original
     assert "already present, left untouched: .mcp.json" in result.stdout
     assert "claude mcp add irminsul -- irminsul mcp --path ." in result.stdout
+    # Step 4 says what actually happened rather than claiming the registration.
+    assert "Register the MCP server with" in result.stdout
+    assert ".mcp.json registers the MCP server" not in result.stdout
     # The skill is independent of the registration and still lands.
     assert (target / ".claude" / "skills" / "irminsul" / "SKILL.md").is_file()
 
 
-def test_init_force_rewrites_harness_files(tmp_path: Path) -> None:
+def test_init_skips_the_manual_command_when_already_registered(tmp_path: Path) -> None:
+    """A re-run over an adopted repo used to print the manual registration
+    command although `.mcp.json` already named the server."""
     target = tmp_path / "demo"
     target.mkdir()
     (target / "src").mkdir()  # code signal
     existing = target / ".mcp.json"
-    existing.write_text("{}\n", encoding="utf-8")
+    existing.write_text(json.dumps(_MCP_CONFIG, indent=2) + "\n", encoding="utf-8")
+
+    result = runner.invoke(
+        app, ["init", "--no-interactive", "--language", "python", "--path", str(target)]
+    )
+    assert result.exit_code == 0, result.stdout
+
+    assert "already present, left untouched: .mcp.json" in result.stdout
+    assert "claude mcp add" not in result.stdout
+    assert ".mcp.json registers the MCP server" in result.stdout
+
+
+def test_init_force_merges_into_an_existing_registration(tmp_path: Path) -> None:
+    """`--force` used to replace `.mcp.json` wholesale, silently deleting every
+    other server the adopter had registered. The file is the adopter's client
+    config, not an irminsul-owned template, so the entry is merged in."""
+    target = tmp_path / "demo"
+    target.mkdir()
+    (target / "src").mkdir()  # code signal
+    existing = target / ".mcp.json"
+    others = {
+        "mcpServers": {
+            "github": {"command": "gh-mcp", "args": ["serve"]},
+            "postgres": {"command": "pg-mcp", "args": []},
+        },
+        "unrelated": True,
+    }
+    existing.write_text(json.dumps(others, indent=2) + "\n", encoding="utf-8")
 
     result = runner.invoke(
         app, ["init", "--no-interactive", "--language", "python", "--force", "--path", str(target)]
@@ -501,7 +535,81 @@ def test_init_force_rewrites_harness_files(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.stdout
 
     config = json.loads(existing.read_text(encoding="utf-8"))
-    assert "irminsul" in config["mcpServers"]
+    assert config["unrelated"] is True
+    assert set(config["mcpServers"]) == {"github", "postgres", "irminsul"}
+    assert config["mcpServers"]["github"] == others["mcpServers"]["github"]
+    assert config["mcpServers"]["irminsul"] == _MCP_CONFIG["mcpServers"]["irminsul"]
+
+
+def test_init_force_replaces_a_registration_that_is_not_json(tmp_path: Path) -> None:
+    target = tmp_path / "demo"
+    target.mkdir()
+    (target / "src").mkdir()  # code signal
+    existing = target / ".mcp.json"
+    existing.write_text("not json\n", encoding="utf-8")
+
+    result = runner.invoke(
+        app, ["init", "--no-interactive", "--language", "python", "--force", "--path", str(target)]
+    )
+    assert result.exit_code == 0, result.stdout
+
+    config = json.loads(existing.read_text(encoding="utf-8"))
+    assert config == _MCP_CONFIG
+
+
+def test_init_harness_files_use_lf_newlines(tmp_path: Path) -> None:
+    """Portable by contract means byte-identical on every platform, and
+    `write_text` without `newline` wrote CRLF on Windows."""
+    target = tmp_path / "demo"
+    target.mkdir()
+    (target / "src").mkdir()  # code signal
+
+    result = runner.invoke(
+        app, ["init", "--no-interactive", "--language", "python", "--path", str(target)]
+    )
+    assert result.exit_code == 0, result.stdout
+
+    for rel in (".mcp.json", ".claude/skills/irminsul/SKILL.md"):
+        assert b"\r" not in (target / rel).read_bytes(), rel
+
+
+def test_init_writes_a_claude_pointer_that_references_the_router(tmp_path: Path) -> None:
+    """Claude Code reads `CLAUDE.md`; the router is `AGENTS.md`. The pointer
+    imports the router rather than restating it, the way this repository's
+    own `CLAUDE.md` does, so the two cannot drift apart."""
+    target = tmp_path / "demo"
+    target.mkdir()
+    (target / "src").mkdir()  # code signal
+
+    result = runner.invoke(
+        app, ["init", "--no-interactive", "--language", "python", "--path", str(target)]
+    )
+    assert result.exit_code == 0, result.stdout
+
+    pointer = (target / "CLAUDE.md").read_text(encoding="utf-8")
+    assert "@AGENTS.md" in pointer
+    assert "## " not in pointer
+
+
+def test_tracked_harness_files_match_the_scaffold() -> None:
+    """This repository dogfoods the wiring adoption writes. The tracked copies
+    and the component page's illustrative block are bound to the constants
+    here, so a change to the invocation cannot leave this repo registering
+    something different from what adopters get."""
+    repo_root = Path(__file__).resolve().parents[1]
+
+    assert json.loads((repo_root / ".mcp.json").read_text(encoding="utf-8")) == _MCP_CONFIG
+    skill = repo_root / ".claude" / "skills" / "irminsul" / "SKILL.md"
+    assert skill.read_text(encoding="utf-8") == _SKILL_BODY
+    pointer_template = repo_root / "src" / "irminsul" / "init" / "scaffolds" / "CLAUDE.md.j2"
+    assert (repo_root / "CLAUDE.md").read_text(encoding="utf-8") == pointer_template.read_text(
+        encoding="utf-8"
+    )
+
+    page = (repo_root / "docs" / "20-components" / "mcp-server.md").read_text(encoding="utf-8")
+    start = page.index("```json\n") + len("```json\n")
+    end = page.index("```", start)
+    assert json.loads(page[start:end]) == _MCP_CONFIG
 
 
 def test_init_force_overwrites_existing_files(tmp_path: Path) -> None:

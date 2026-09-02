@@ -180,10 +180,10 @@ overridden, without altering the exit code for any format.
 
 **Harness files are static constants, not templates.** The MCP registration carries no
 project-specific value, so it needs no substitution. It is a module constant in the init
-package rather than a scaffold template, because the built wheel currently contains no
-dot-prefixed files and inclusion of a hidden template under the configured package root
-is unverified — a silently excluded template fails at release time, not at test time.
-The skill file is a constant for the same reason.
+package rather than a scaffold template because a forced re-run has to merge it into an
+existing registration rather than replace one that may hold other servers, which the
+skip-or-replace template writer cannot express. The skill file sits beside it so both
+share one writer and one skipped-file note.
 
 **The skill is a trigger, not a copy.** It carries the activation condition and two
 pointers: run orientation first, then follow the recorded work order. It deliberately
@@ -236,8 +236,9 @@ change, so both surface as unbound review clues rather than as evidence.
 ## Drawbacks
 
 - The registration content exists both as an init constant and as an illustrative block
-  in the server's component document. At this size there is no generator-free way to
-  keep one copy, so the duplication is accepted and recorded rather than hidden.
+  in the server's component document, and this repository tracks its own copies of both
+  harness files. A repository-local test binds them to the constant, so drift fails this
+  suite rather than adding an adopter-facing check.
 - Writing harness files means adoption now touches paths outside the docs tree and the
   CI directory, widening what adoption is responsible for.
 - Leaving both harness files unpoliced accepts silent staleness if the server's
