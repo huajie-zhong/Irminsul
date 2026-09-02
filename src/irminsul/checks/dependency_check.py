@@ -50,9 +50,19 @@ def _dotted_to_paths(module: str, source_roots: list[str], repo_root: Path) -> l
     return candidates
 
 
+CODE_HALLUCINATED_DEPENDENCY = "import-deps/hallucinated-dependency"
+
+
 class DependencyCheck:
     name: ClassVar[str] = "import-deps"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_HALLUCINATED_DEPENDENCY: (
+            "A `depends_on` entry is declared but no import relationship backs it in "
+            "code. Remove the stale declaration, or verify the doc claiming the "
+            "dependent module actually covers the right files."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None or graph.repo_root is None:
@@ -132,6 +142,7 @@ class DependencyCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_HALLUCINATED_DEPENDENCY,
                         severity=Severity.warning,
                         message=f"depends_on '{dep_id}' declared but no import relationship found",
                         path=node.path,

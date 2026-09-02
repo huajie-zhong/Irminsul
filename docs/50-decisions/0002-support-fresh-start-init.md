@@ -11,7 +11,9 @@ describes: []
 
 ## Status
 
-Proposed, 2026-05-09.
+Proposed, 2026-05-09. Its topology clauses were superseded by
+[`ADR-0022`](0022-reduce-supported-repository-topologies.md) and have been
+removed from the text below; the fresh-start decision itself stands.
 
 ## Context
 
@@ -47,14 +49,9 @@ Non-interactive `--fresh` should create docs, config, CI wiring, and an empty
 source root. It should not create language-specific starter code or tests because
 Irminsul cannot safely assume the project's implementation language or framework.
 
-Fresh-start must also support the private-docs/public-code topology. In that
-case, init creates the private docs repo now and configures a future or existing
-public code repo as a gitignored subfolder. The code checkout path may be absent
-at init time.
-
-Midway adoption keeps the same topology support: existing same-repo code uses
-`irminsul init`, while existing public or separate code with private docs uses
-`irminsul init-docs-only`.
+Which repository layouts `init` scaffolds, and how a private docs tree reaches
+a separate code repo, are decided by
+[`ADR-0022`](0022-reduce-supported-repository-topologies.md), not here.
 
 Fresh-start may run in a non-empty directory that has no code signals, such as a
 repo containing only `README.md` and `.gitignore`.
@@ -77,11 +74,9 @@ choice to start the project under Irminsul from day one.
 
 Fresh project adoption becomes intentional and documented. Users can start with a
 valid docs gate before code exists, and CI can enforce structure from the first
-PR. This applies both to same-repo projects and to projects where public code and
-private docs start as separate repositories. Midway adoption keeps its existing
-same-repo and private-docs/public-code paths.
+PR.
 
 The init flow gains another branch and needs tests for no-code directories,
-non-empty no-code directories, private-docs/public-code fresh setup, and
-no-overwrite behavior. Implementation must carefully distinguish missing future
-source roots from accidental missing source roots in an already-adopted repo.
+non-empty no-code directories, and no-overwrite behavior. Implementation must
+carefully distinguish missing future source roots from accidental missing source
+roots in an already-adopted repo.

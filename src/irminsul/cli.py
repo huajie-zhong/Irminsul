@@ -28,11 +28,12 @@ from irminsul.config import ConfigError, IrminsulConfig, find_config, load
 from irminsul.docgraph import DocGraph, build_graph
 from irminsul.git.mtime import diff_name_only, has_history
 from irminsul.init.command import (
+    SUPPORTED_LANGUAGES,
+    Topology,
     detect_code_signals,
     run_init,
-    run_init_docs_only,
     run_init_fresh,
-    run_init_fresh_docs_only,
+    run_init_siblings,
 )
 from irminsul.seed.command import (
     PIB_INTRO,
@@ -90,11 +91,6 @@ class ContextProfile(StrEnum):
     all_available = "all-available"
 
 
-class FreshTopology(StrEnum):
-    same_repo = "same-repo"
-    docs_only = "docs-only"
-
-
 def _version_callback(value: bool) -> None:
     if value:
         typer.echo(f"irminsul {__version__}")
@@ -116,8 +112,12 @@ def _root(
     """Irminsul — enforce a documentation system in CI."""
 
 
-def _offer_seed_after_fresh_init(target: Path, *, interactive: bool) -> None:
-    """After an interactive fresh-start init, offer to capture the PIB now.
+def _offer_seed_after_scaffold(target: Path, *, interactive: bool) -> None:
+    """After an interactive scaffold of a new project, offer to capture the PIB.
+
+    Both paths that create a project rather than adopt one qualify: a
+    fresh-start same-repo init, and the siblings layout, which is only reachable
+    in a directory with no code in it.
 
     Non-interactive init gains no new prompts — it stays fully scriptable.
     `irminsul seed` remains the standalone command for capturing or redoing
@@ -150,17 +150,33 @@ def init(
         ),
     ] = False,
     topology: Annotated[
-        FreshTopology,
+        Topology,
         typer.Option(
             "--topology",
-            help="Fresh-start topology: same-repo or docs-only.",
+            help=(
+                "Repository layout: 'same-repo' (docs/ inside the code repo) or "
+                "'siblings' (this docs repo beside a separate code repo)."
+            ),
         ),
-    ] = FreshTopology.same_repo,
+    ] = Topology.same_repo,
     code_repo: Annotated[
         str | None,
         typer.Option(
             "--code-repo",
-            help=("Future or existing code repository for `--fresh --topology docs-only`."),
+            help=(
+                "Sibling code repository for `--topology siblings`: GitHub "
+                "'owner/repo' or a relative path such as '../code'."
+            ),
+        ),
+    ] = None,
+    language: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--language",
+            help=(
+                "Language profile for code that cannot be detected yet. Repeat for "
+                f"multiple profiles. Supported: {', '.join(SUPPORTED_LANGUAGES)}."
+            ),
         ),
     ] = None,
     allow_existing_code: Annotated[
@@ -174,7 +190,7 @@ def init(
         bool,
         typer.Option(
             "--no-interactive",
-            help="Use defaults instead of prompting. CI-friendly.",
+            help="Do not prompt; pass required choices explicitly. CI-friendly.",
         ),
     ] = False,
     force: Annotated[
@@ -192,33 +208,49 @@ def init(
         ),
     ] = Path("."),
 ) -> None:
-    """Scaffold the docs skeleton, irminsul.toml, and CI workflows (single-repo)."""
+    """Scaffold the docs skeleton, irminsul.toml, and CI workflows.
+
+    Two repository layouts are supported. `--topology same-repo` (the default)
+    puts `docs/` inside the code repo. `--topology siblings` scaffolds a docs
+    repo that sits beside a separate code repo under a common parent directory,
+    which is how a private docs tree pairs with a public code repo.
+    """
     target = path.resolve()
     target.mkdir(parents=True, exist_ok=True)
     interactive = not no_interactive
+
+    if code_repo is not None and topology != Topology.siblings:
+        typer.echo(
+            typer.style(
+                "`--code-repo` is only valid with `--topology siblings`.",
+                fg="red",
+            )
+        )
+        raise typer.Exit(code=2)
+
+    if topology == Topology.siblings:
+        if fresh:
+            typer.echo(
+                typer.style(
+                    "`--fresh` is not valid with `--topology siblings`. The sibling "
+                    "code checkout is detected on disk, so the same command covers a "
+                    "code repo that already exists and one that does not exist yet. "
+                    "Run `irminsul init --topology siblings --code-repo <spec-or-path>`.",
+                    fg="red",
+                )
+            )
+            raise typer.Exit(code=2)
+        _init_siblings(
+            target,
+            interactive=interactive,
+            code_repo=code_repo,
+            languages=language,
+            force=force,
+        )
+        _offer_seed_after_scaffold(target, interactive=interactive)
+        return
+
     has_code = detect_code_signals(target)
-
-    if not fresh and topology != FreshTopology.same_repo:
-        typer.echo(
-            typer.style(
-                "`--topology` is only valid with `--fresh`. "
-                "Use `irminsul init-docs-only --code-repo <spec-or-path>` "
-                "to adopt existing separate code.",
-                fg="red",
-            )
-        )
-        raise typer.Exit(code=2)
-
-    if code_repo is not None and topology != FreshTopology.docs_only:
-        typer.echo(
-            typer.style(
-                "`--code-repo` is only valid with `--fresh --topology docs-only`. "
-                "Use `irminsul init-docs-only --code-repo <spec-or-path>` "
-                "to adopt existing separate code.",
-                fg="red",
-            )
-        )
-        raise typer.Exit(code=2)
 
     if fresh:
         if has_code and not allow_existing_code:
@@ -231,34 +263,29 @@ def init(
                 )
             )
             raise typer.Exit(code=2)
-        if topology == FreshTopology.docs_only:
-            run_init_fresh_docs_only(
-                target, interactive=interactive, code_repo=code_repo, force=force
-            )
-        else:
-            run_init_fresh(target, interactive=interactive, force=force)
-        _offer_seed_after_fresh_init(target, interactive=interactive)
+        run_init_fresh(target, interactive=interactive, languages=language, force=force)
+        _offer_seed_after_scaffold(target, interactive=interactive)
         return
 
     if interactive and not has_code:
         typer.echo("No code detected here. What are you setting up?")
         typer.echo("  [1] Fresh-start, same repo")
-        typer.echo("  [2] Fresh-start, private docs / public code")
-        typer.echo("  [3] Docs-only repo for existing separate code")
-        typer.echo("  [4] Cancel")
+        typer.echo("  [2] Docs repo beside a separate code repo (siblings)")
+        typer.echo("  [3] Cancel")
         answer = typer.prompt("Choose", default="1")
         if answer == "1":
-            run_init_fresh(target, interactive=interactive, force=force)
-            _offer_seed_after_fresh_init(target, interactive=interactive)
+            run_init_fresh(target, interactive=interactive, languages=language, force=force)
+            _offer_seed_after_scaffold(target, interactive=interactive)
             return
         if answer == "2":
-            run_init_fresh_docs_only(
-                target, interactive=interactive, code_repo=code_repo, force=force
+            _init_siblings(
+                target,
+                interactive=interactive,
+                code_repo=code_repo,
+                languages=language,
+                force=force,
             )
-            _offer_seed_after_fresh_init(target, interactive=interactive)
-            return
-        if answer == "3":
-            run_init_docs_only(target, interactive=interactive, code_repo=None, force=force)
+            _offer_seed_after_scaffold(target, interactive=interactive)
             return
         typer.echo("Canceled.")
         raise typer.Exit(code=0)
@@ -267,70 +294,54 @@ def init(
             typer.style(
                 "No code detected in the target directory.\n"
                 "Use `irminsul init --fresh` to start a new project, or\n"
-                "`irminsul init-docs-only --code-repo <spec-or-path>` "
-                "for a docs-only repo.",
+                "`irminsul init --topology siblings --code-repo <spec-or-path>` "
+                "for a docs repo beside a separate code repo.",
                 fg="red",
             )
         )
         raise typer.Exit(code=2)
 
-    run_init(target, interactive=interactive, force=force)
+    run_init(target, interactive=interactive, languages=language, force=force)
 
 
-@app.command("init-docs-only")
-def init_docs_only(
-    code_repo: Annotated[
-        str | None,
-        typer.Option(
-            "--code-repo",
-            help=(
-                "Code repository spec: GitHub 'owner/repo' or a local path. "
-                "The code is cloned/placed as a gitignored subfolder inside this docs repo."
-            ),
-        ),
-    ] = None,
-    no_interactive: Annotated[
-        bool,
-        typer.Option("--no-interactive", help="Use defaults instead of prompting."),
-    ] = False,
-    force: Annotated[
-        bool,
-        typer.Option("--force", help="Overwrite scaffold files that already exist."),
-    ] = False,
-    path: Annotated[
-        Path,
-        typer.Option("--path", help="Root of the docs-only repo. Defaults to current directory."),
-    ] = Path("."),
+def _init_siblings(
+    target: Path,
+    *,
+    interactive: bool,
+    code_repo: str | None,
+    languages: list[str] | None,
+    force: bool,
 ) -> None:
-    """Scaffold a docs-only repo where code lives in a separate repository (Topology A).
+    """Guard the siblings scaffold against being run inside a code repo.
 
-    The code repo is cloned as a gitignored subfolder inside this docs repo so
-    that all source-coverage checks work without cross-repo filesystem access.
-    Topology B (code at a sibling filesystem path) is not yet supported.
+    The target of `--topology siblings` is the docs repo; code signals there
+    mean the caller wanted the same-repo layout instead.
     """
-    target = path.resolve()
-    target.mkdir(parents=True, exist_ok=True)
-    interactive = not no_interactive
-
-    if interactive and detect_code_signals(target):
-        answer = typer.confirm(
-            "This directory looks like a code repo. Are you sure you want two-repo (docs-only) mode?",
+    if detect_code_signals(target):
+        if not interactive:
+            typer.echo(
+                typer.style(
+                    "This directory contains code signals. The siblings layout "
+                    "scaffolds a repo that holds only docs, beside the code repo; "
+                    "for code and docs in one repo use `irminsul init` instead.",
+                    fg="red",
+                )
+            )
+            raise typer.Exit(code=2)
+        if not typer.confirm(
+            "This directory looks like a code repo. Are you sure you want the siblings layout?",
             default=False,
-        )
-        if not answer:
+        ):
             typer.echo("Hint: use `irminsul init` for a single-repo setup.")
             raise typer.Exit(code=0)
-    elif not interactive and detect_code_signals(target):
-        typer.echo(
-            typer.style(
-                "This directory contains code signals. "
-                "For a single-repo setup use `irminsul init` instead.",
-                fg="red",
-            )
-        )
-        raise typer.Exit(code=2)
 
-    run_init_docs_only(target, interactive=interactive, code_repo=code_repo, force=force)
+    run_init_siblings(
+        target,
+        interactive=interactive,
+        code_repo=code_repo,
+        languages=languages,
+        force=force,
+    )
 
 
 @app.command()
@@ -435,7 +446,7 @@ def _print_finding(finding: Finding) -> None:
     color, bold = _SEVERITY_STYLE[finding.severity]
     severity_str = typer.style(finding.severity.value.ljust(7), fg=color, bold=bold)
     location = _format_location(finding)
-    typer.echo(f"{location}  {severity_str}  [{finding.check}]  {finding.message}")
+    typer.echo(f"{location}  {severity_str}  [{finding.code}]  {finding.message}")
     if finding.suggestion:
         typer.echo(typer.style(f"      → {finding.suggestion}", dim=True))
 
@@ -489,7 +500,11 @@ def _github_annotation(finding: Finding) -> str:
         props.append(f"file={_escape_github_property(finding.path.as_posix())}")
     if finding.line is not None:
         props.append(f"line={finding.line}")
-    props.append("title=" + _escape_github_property(f"irminsul {finding.check}"))
+    # The code rides in `title=`: the Actions runner only recognizes
+    # file/line/col/endLine/endColumn/title on issue commands and silently
+    # drops unknown properties, so a dedicated `code=` property would never
+    # reach the PR annotation.
+    props.append("title=" + _escape_github_property(f"irminsul {finding.code}"))
     data = finding.message
     if finding.suggestion:
         data = f"{data} — {finding.suggestion}"
@@ -1181,6 +1196,70 @@ def refs_command(
     except RefsError as exc:
         typer.echo(typer.style(str(exc), fg="red"))
         raise typer.Exit(code=exc.code) from exc
+
+
+def _check_summary(cls: type[Check]) -> str:
+    """First line of the check class's docstring, falling back to its module's.
+
+    The fallback alone is not enough: several checks share one module (e.g.
+    `doc_reality.py` hosts four), and the module docstring would describe them
+    all with the same generic line.
+    """
+    doc: str | None = cls.__doc__
+    if not doc:
+        module = sys.modules.get(cls.__module__)
+        doc = getattr(module, "__doc__", None) if module else None
+    if not doc:
+        return ""
+    return doc.strip().splitlines()[0]
+
+
+def _explainable_checks() -> dict[str, type[Check]]:
+    """Every check whose codes the CLI can print: both registries plus the
+    unregistered co-change check, which only runs under `--diff` but reports
+    through the same pipeline."""
+    from irminsul.checks.co_change import CoChangeCheck
+
+    return {**HARD_REGISTRY, **SOFT_REGISTRY, CoChangeCheck.name: CoChangeCheck}
+
+
+def _list_all_codes() -> None:
+    for check_name, cls in sorted(_explainable_checks().items()):
+        if not cls.explanations:
+            continue
+        typer.echo(typer.style(f"[{check_name}]", fg="cyan", bold=True))
+        for known_code in sorted(cls.explanations):
+            typer.echo(f"  {known_code}")
+
+
+@app.command("explain")
+def explain_command(
+    code: Annotated[
+        str | None,
+        typer.Argument(help="Finding code to explain, e.g. links/broken-link."),
+    ] = None,
+) -> None:
+    """Explain a finding code: what it means and how to fix it.
+
+    With no code, or an unknown code, lists every known code grouped by check.
+    """
+    if code is not None:
+        for check_name, cls in sorted(_explainable_checks().items()):
+            explanation = cls.explanations.get(code)
+            if explanation is None:
+                continue
+            typer.echo(typer.style(code, fg="cyan", bold=True))
+            summary = _check_summary(cls)
+            typer.echo(f"check: {check_name}" + (f" — {summary}" if summary else ""))
+            typer.echo()
+            typer.echo(explanation)
+            return
+        typer.echo(typer.style(f"unknown code '{code}'", fg="red"))
+        typer.echo()
+        _list_all_codes()
+        raise typer.Exit(code=1)
+
+    _list_all_codes()
 
 
 @app.command()

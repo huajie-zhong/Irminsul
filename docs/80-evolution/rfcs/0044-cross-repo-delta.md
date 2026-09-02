@@ -1,6 +1,6 @@
 ---
 id: 0044-cross-repo-delta
-title: "Cross-repo topologies for check --delta"
+title: "Cross-repo layouts for check --delta"
 audience: explanation
 tier: 2
 status: draft
@@ -13,11 +13,11 @@ affects:
 - docgraph
 ---
 
-# RFC 0044: Cross-repo topologies for check --delta
+# RFC 0044: Cross-repo layouts for check --delta
 
 ## Summary
 
-Record the repository topology in `irminsul.toml`, verify it against the tree
+Record the repository layout in `irminsul.toml`, verify it against the tree
 rather than trusting it, and split `build_graph`'s single `repo_root` into a
 docs anchor and a source anchor so `check --delta` can compare across a
 repository boundary instead of refusing to.
@@ -32,82 +32,78 @@ output an agent skips.
 
 `git worktree add` checks out tracked files only. A configured tree owned by a
 different git repository is therefore absent from the base checkout, and the
-base run finds nothing under it. Every finding over that tree survives as new.
-Both cross-repo layouts this project supports hit it, for the same reason but
-with different blast radii:
+base run finds nothing under it. Every finding over that tree survives as new:
 
 | layout | absent from the base checkout | result |
 | --- | --- | --- |
-| single repo | nothing | correct |
-| code repo nested in the docs repo | the gitignored code subfolder | source-dependent findings all read as new |
-| docs repo nested in the code repo | the whole of `docs/` | every finding reads as new |
+| `same-repo` | nothing | correct |
+| `siblings` | the code repo `source_roots` reach through `../` | source-dependent findings all read as new |
 
-The second row is the severe one: `build_graph` walks a docs root that does not
-exist, produces an empty graph, and `compute_delta` compares against an empty
-fingerprint set. See [private docs](../../30-workflows/private-docs.md) for the
-two layouts and [baseline](../../20-components/baseline.md) for the delta
-mechanism.
+[`ADR-0022`](../../50-decisions/0022-reduce-supported-repository-topologies.md)
+reduced the supported layouts to those two, which narrows this RFC's problem
+considerably. The nested layouts it retired included the severe case — a docs
+root owned by another repository, where `build_graph` walked a docs root that
+did not exist and `compute_delta` compared against an empty fingerprint set.
+That case can no longer arise: in both surviving layouts `docs_root` belongs to
+the repository Irminsul was invoked from. What remains is bounded to source
+roots.
 
-`verify_single_repo_topology` currently refuses both layouts with exit 2, which
-is honest but leaves every cross-repo user without the feature.
+See [private docs](../../30-workflows/private-docs.md) for the sibling layout
+and [baseline](../../20-components/baseline.md) for the delta mechanism.
+`verify_single_repo_topology` currently refuses `siblings` with exit 2, which is
+honest but leaves every private-docs user without the feature.
 
 ## Detailed Design
 
-### Declare the topology
+### Declare the layout
 
-Add `paths.topology` to the `Paths` model with values `same-repo`,
-`nested-code`, and `nested-docs`. The field is optional with a default, so
-existing configs keep loading unchanged — `extra="forbid"` rejects unknown keys,
-not known keys that are absent.
+Add `paths.topology` to the `Paths` model with values `same-repo` and
+`siblings`, matching the `Topology` enum the init scaffolder already uses. The
+field is optional with a default, so existing configs keep loading unchanged —
+`extra="forbid"` rejects unknown keys, not known keys that are absent.
 
-The values are named for the layout rather than lettered. "Topology B" already
-denotes two different things in this repository: the nested-docs layout in
-[private docs](../../30-workflows/private-docs.md), and a sibling-path layout in
-[RFC 0001](0001-topology-b-and-format-json.md) and the `init-docs-only`
-docstring. This RFC does not settle which meaning wins, but it declines to
-encode either into a config value.
+Sharing the vocabulary with `init` is the point. When the config value, the
+`--topology` flag and the scaffolded workflows all say `siblings`, there is one
+name for the layout and nothing to reconcile.
 
 ### Populate it, but do not trust it
 
-`init` already knows the answer. `FreshTopology` is a user-facing `--topology`
-flag, and `InitAnswers` carries `code_repo_spec` and `code_subfolder`; the
-scaffold template simply never writes them. Emitting the field is recovering
-information the tool already collected.
+`init` already knows the answer: `--topology` is a user-facing flag and
+`InitAnswers` carries `code_repo_spec` and `code_dir`; the scaffold template
+simply never writes the field. Emitting it is recovering information the tool
+already collected.
 
-That is not sufficient on its own. `init` scaffolds only `same-repo` and
-`nested-code` — the nested-docs layout is built by hand, and it is exactly the
-layout that fails worst. Repositories initialized before this field exists also
-have nothing recorded.
+That is not sufficient on its own. Repositories initialized before this field
+exists have nothing recorded, and a repository can be moved between layouts by
+hand.
 
 So detection is the fallback, not the exception: when `paths.topology` is
-absent, derive it by comparing the nearest enclosing `.git` of `docs_root` and
-each source root against the target repo's own, which is what
-`cross_repo_trees` already does and what `git_root_for` already provides. A
-declared topology that disagrees with the detected one is a soft finding, not a
-silent override — a hand-maintained assertion with nothing verifying it is the
-drift this project exists to catch.
+absent, derive it by comparing the nearest enclosing `.git` of each source root
+against the target repo's own, which is what `cross_repo_trees` already does and
+what `git_root_for` already provides. A declared layout that disagrees with the
+detected one is a soft finding, not a silent override — a hand-maintained
+assertion with nothing verifying it is the drift this project exists to catch.
 
 ### Split the graph's anchor
 
 `build_graph(repo_root, config)` takes one root, and that root anchors both the
-doc walk and, through `walk_configured_source_files`, the source walk. Every
-cross-repo mode needs those to differ. Introduce a second anchor — a
+doc walk and, through `walk_configured_source_files`, the source walk. The
+sibling layout needs those to differ. Introduce a second anchor — a
 `source_root_base` threaded to the single resolution site in `_walk_source_files`
-— and let the topology select how the two are set:
+— and let the layout select how the two are set:
 
 | topology | doc walk anchored at | source walk anchored at |
 | --- | --- | --- |
 | `same-repo` | scratch checkout | scratch checkout |
-| `nested-code` | scratch checkout | live working tree |
-| `nested-docs` | scratch checkout of the nested docs repo | live working tree |
+| `siblings` | scratch checkout | live working tree |
 
-`nested-docs` also changes which repository `pristine_checkout` operates on: the
-base rev names a point in the docs history, so the checkout must target the repo
-that owns `docs_root`, not the repo at `repo_root`.
+Because `docs_root` always belongs to the invoked repository, `pristine_checkout`
+keeps operating on that repository in both layouts — one fewer moving part than
+when three layouts were in scope.
 
 ### Hold source constant, and say so
 
-A cross-repo layout has two independent histories, and `--delta-base` names a
+The sibling layout has two independent histories, and `--delta-base` names a
 point in one of them. Holding the source tree constant across both passes is
 therefore the defined comparison, and it has a cost worth stating plainly:
 a source edit that makes a doc claim stale produces the same finding in both
@@ -126,8 +122,8 @@ part of this proposal rather than a follow-up.
 Splitting the graph anchor touches a parameter that roughly fifteen call sites
 reach through `walk_configured_source_files`. The call sites do not change, but
 the invariant "one root anchors everything" stops holding, and future code that
-assumes it will be subtly wrong in cross-repo mode only — a class of bug that
-CI on a single-repo fixture will not catch.
+assumes it will be subtly wrong in the sibling layout only — a class of bug that
+CI on a same-repo fixture will not catch.
 
 Delta already costs about 2.5x a plain run. Holding source constant does not
 reduce that.
@@ -135,12 +131,14 @@ reduce that.
 ## Alternatives
 
 **Keep refusing.** Honest, already shipped, zero risk. It leaves every
-cross-repo user without the feature, and the nested-docs layout is a documented,
-tested configuration rather than an exotic one.
+private-docs user without the feature, and `siblings` is now one of only two
+supported layouts rather than one of four.
 
 **Detect only, no config field.** Always accurate, no migration, no rot. It
 gives up the declarative contract the rest of `[paths]` follows, and leaves no
-place for a user to state intent when detection is ambiguous.
+place for a user to state intent when detection is ambiguous. With two values
+instead of four this alternative is stronger than it was, since detection has
+only one distinction to get right.
 
 **Add `--delta-source-base <rev>`.** Correct rather than approximate: name a
 base in the second history explicitly. It requires the user to know both
@@ -150,19 +148,18 @@ beyond two repositories.
 **Auto-select the source repo's `HEAD`.** Appears to remove the limitation.
 It does not: with uncommitted source edits, `HEAD`-versus-worktree in the source
 repo is a different comparison than the one the user asked for, so `--delta`
-would quietly mean something different in cross-repo mode than in same-repo
-mode.
+would quietly mean something different in the sibling layout than in
+`same-repo`.
 
 ## Unresolved Questions
 
 Should a declared-versus-detected mismatch be a soft finding or a hard error?
-Soft matches how the project treats other drift, but a wrong topology produces
+Soft matches how the project treats other drift, but a wrong layout produces
 wrong delta output rather than merely stale prose.
 
-Which meaning of "Topology B" survives — the nested-docs layout that ships and
-is tested, or the sibling-path layout that RFC 0001 proposed and
-`init-docs-only` still refers to? This RFC routes around the collision; it does
-not resolve it.
-
-Does the sibling-path layout, if it is ever implemented, need a fourth topology
-value, or does it fold into `nested-code` with a relative source root?
+What the sibling-delta comparison should actually be is open, and this RFC does
+not settle it. "Hold source constant" above is the shape this proposal assumes,
+not a decided answer; a separate design is in progress and may replace it. The
+seam is `verify_single_repo_topology` in `delta.py` — the single place the
+refusal is decided — and nothing else in the codebase depends on the refusal
+staying.

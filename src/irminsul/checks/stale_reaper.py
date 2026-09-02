@@ -15,10 +15,19 @@ from irminsul.docgraph import DocGraph
 from irminsul.frontmatter import StatusEnum
 from irminsul.git.mtime import last_commit_time_any_repo
 
+CODE_STALE_DEPRECATED_DOC = "stale-reaper/stale-deprecated-doc"
+
 
 class StaleReaperCheck:
     name: ClassVar[str] = "stale-reaper"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_STALE_DEPRECATED_DOC: (
+            "A `status: deprecated` doc has not been touched for longer than the "
+            "configured threshold. Remove the doc, set `status: removed`, or rewrite and "
+            "recommit it."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None or graph.repo_root is None:
@@ -44,6 +53,7 @@ class StaleReaperCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_STALE_DEPRECATED_DOC,
                     severity=Severity.warning,
                     message=(f"deprecated doc unrevisited for {age} days (threshold {threshold})"),
                     path=node.path,

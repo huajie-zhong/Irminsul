@@ -156,6 +156,128 @@ def test_concept_matching_is_case_insensitive_and_token_bounded(tmp_path: Path) 
     assert [finding.data["match"] for finding in findings if finding.data] == ["reference layer"]
 
 
+def test_capitalised_concept_does_not_match_lowercase_prose(tmp_path: Path) -> None:
+    """`Topology A` folded to lower case matched "whatever topology a project
+    picks" — a whole-token match on ordinary English, so word boundaries could
+    not save it. A capital in the declaration marks a proper name and keeps the
+    match case-sensitive."""
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path, concept="Topology A")
+    _write_doc(
+        tmp_path,
+        "docs/20-components/current.md",
+        doc_id="current",
+        body="Whatever topology a project picks, the checks behave the same.",
+    )
+
+    assert _findings(tmp_path) == []
+
+
+def test_capitalised_concept_still_matches_its_declared_spelling(tmp_path: Path) -> None:
+    """The other half: case sensitivity must not cost the tombstone its job."""
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path, concept="Topology A")
+    _write_doc(
+        tmp_path,
+        "docs/20-components/current.md",
+        doc_id="current",
+        body="Scaffold a private docs tree with Topology A.",
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [finding.data["match"] for finding in findings if finding.data] == ["Topology A"]
+
+
+def test_both_spellings_of_one_concept_are_distinct_declarations(tmp_path: Path) -> None:
+    """A tombstone that wants a capitalised name matched loosely lists both
+    spellings. They fold to one dedup key but belong to one entry, so neither
+    is reported as an ambiguous duplicate of the other, both patterns stay
+    active with their own case semantics, and a line that matches both is
+    still one finding because both belong to the same entry."""
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/50-decisions/0001-retire-lettered.md",
+        doc_id="0001-retire-lettered",
+        audience="adr",
+        body="The lettered names are gone.",
+        frontmatter_extra=[
+            "retires:",
+            "  - id: lettered-topologies",
+            "    kind: concept",
+            "    matches:",
+            "      - Topology A",
+            "      - topology a",
+            "    guidance: Name the layout instead.",
+        ],
+    )
+    _write_doc(
+        tmp_path,
+        "docs/20-components/current.md",
+        doc_id="current",
+        body="Topology A is what we call it.",
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [finding.category for finding in findings] == ["retired-reference"]
+    assert findings[0].path == Path("docs/20-components/current.md")
+
+
+def test_case_variant_tombstones_across_adrs_warn_and_dedupe(tmp_path: Path) -> None:
+    """Two ADRs retiring one concept in different case name the same thing —
+    the dedup key folds case for every concept phrase, capitalised or not.
+    Keying them apart kept both rules active: no ambiguous-retirement warning,
+    and one guidance line drew two hard errors for one reference. The earlier
+    ADR's declaration is canonical and its smart-case matching semantics
+    survive untouched."""
+    _write_config(tmp_path)
+    for doc_id, rel, retirement_id, phrase in (
+        ("0001-retire-a", "docs/50-decisions/0001-retire-a.md", "docs-only", "docs-only topology"),
+        (
+            "0002-retire-b",
+            "docs/50-decisions/0002-retire-b.md",
+            "docs-only-2",
+            "Docs-Only Topology",
+        ),
+    ):
+        _write_doc(
+            tmp_path,
+            rel,
+            doc_id=doc_id,
+            audience="adr",
+            body="Gone.",
+            frontmatter_extra=[
+                "retires:",
+                f"  - id: {retirement_id}",
+                "    kind: concept",
+                "    matches:",
+                f"      - {phrase}",
+                "    guidance: Use the siblings layout.",
+            ],
+        )
+    _write_doc(
+        tmp_path,
+        "docs/20-components/current.md",
+        doc_id="current",
+        body="The Docs-Only Topology still works.",
+    )
+
+    findings = _findings(tmp_path)
+
+    ambiguous = [f for f in findings if f.category == "ambiguous-retirement"]
+    assert [f.path for f in ambiguous] == [Path("docs/50-decisions/0002-retire-b.md")]
+    on_guidance = [
+        f
+        for f in findings
+        if f.category == "retired-reference" and f.path == Path("docs/20-components/current.md")
+    ]
+    assert len(on_guidance) == 1
+    assert on_guidance[0].data is not None
+    assert on_guidance[0].data["declared-by"] == "docs/50-decisions/0001-retire-a.md"
+
+
 def test_command_matching_is_case_sensitive_and_token_bounded(tmp_path: Path) -> None:
     _write_config(tmp_path)
     _write_retirement_adr(tmp_path)
@@ -375,3 +497,228 @@ def test_reports_duplicate_retirement_provenance_deterministically(tmp_path: Pat
         and finding.data["declared-by"] == "docs/50-decisions/0001-retire-render.md"
         for finding in ambiguous
     )
+
+
+def test_audits_other_adrs(tmp_path: Path) -> None:
+    """ADRs are current decisions, not historical record. The audit used to skip
+    every doc with `audience: adr`, which is how a shipped ADR kept instructing
+    readers to run a command that no longer exists."""
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/50-decisions/0002-other.md",
+        doc_id="0002-other",
+        audience="adr",
+        body="Build the site with irminsul render.",
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [f.path for f in findings] == [Path("docs/50-decisions/0002-other.md")]
+
+
+def test_owner_adr_is_never_audited_against_its_own_tombstones(tmp_path: Path) -> None:
+    """The counterweight: an ADR must be able to name what it retired, in its
+    frontmatter `matches:` list and in the prose explaining the decision."""
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+
+    assert _findings(tmp_path) == []
+
+
+def test_audits_the_agent_manifests(tmp_path: Path) -> None:
+    """`irminsul init` tells every user to point their agent at these files, and
+    none of them is a graph node — the AGENTS.md files are exempt top-level
+    names and CLAUDE.md sits outside docs_root."""
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    (tmp_path / "AGENTS.md").write_text("Use irminsul render.\n", encoding="utf-8")
+    (tmp_path / "CLAUDE.md").write_text("Use irminsul render.\n", encoding="utf-8")
+    (tmp_path / "docs" / "AGENTS.md").write_text("Use irminsul render.\n", encoding="utf-8")
+
+    assert {f.path for f in _findings(tmp_path)} == {
+        Path("AGENTS.md"),
+        Path("CLAUDE.md"),
+        Path("docs/AGENTS.md"),
+    }
+
+
+def test_audits_frontmatter(tmp_path: Path) -> None:
+    """A retired name misleads just as much in a `title:` or `summary:` as in
+    prose, and both are read by agents browsing the manifest."""
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/20-components/thing.md",
+        doc_id="thing",
+        body="Nothing to see.",
+        frontmatter_extra=["summary: Wraps the reference layer."],
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [f.path for f in findings] == [Path("docs/20-components/thing.md")]
+    assert findings[0].line == 8
+
+
+def test_skips_the_generated_manifest_region(tmp_path: Path) -> None:
+    """`regen agents-md` builds those rows from the titles of the docs it
+    indexes, including RFCs whose titles ADR-0016 freezes. A finding there names
+    a line nobody may edit and that `regen` would rewrite identically. Lines
+    outside the markers are still audited, at their true line numbers."""
+    from irminsul.regen.agents_md import GENERATED_END, GENERATED_START
+
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    (tmp_path / "docs" / "AGENTS.md").write_text(
+        "\n".join(
+            [
+                "# Agents",
+                GENERATED_START,
+                "| doc | Uses the reference layer |",
+                GENERATED_END,
+                "Hand-written: the reference layer is how we do it.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [f.line for f in findings] == [5]
+
+
+def test_unmatched_generated_marker_is_reported_and_suppresses_nothing(tmp_path: Path) -> None:
+    """A start marker with no end used to open the generated region and never
+    close it, so one stray line switched this hard check off for the rest of the
+    file — silently, since nothing reported the marker. Only balanced markers
+    blank anything now, and the unmatched one is itself an error."""
+    from irminsul.regen.agents_md import GENERATED_START
+
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    (tmp_path / "docs" / "AGENTS.md").write_text(
+        f"# Agents\n{GENERATED_START}\nRun irminsul render.\n", encoding="utf-8"
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [(f.category, f.line) for f in findings] == [
+        ("unmatched-generated-marker", 2),
+        ("retired-reference", 3),
+    ]
+    assert all(f.severity.value == "error" for f in findings)
+
+
+def test_marker_text_outside_the_manifest_is_ordinary_prose(tmp_path: Path) -> None:
+    """Only the manifest carries a generated region, so only the manifest is
+    read for markers. Anywhere else the marker text is an example: a balanced
+    pair does not blank the stale guidance between it, and a lone start marker
+    is not an unmatched region. Otherwise a fenced example that quoted the
+    markers either failed the build or switched a hard check off."""
+    from irminsul.regen.agents_md import GENERATED_END, GENERATED_START
+
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    (tmp_path / "README.md").write_text(
+        "\n".join(
+            [
+                "# Demo",
+                "```markdown",
+                GENERATED_START,
+                "Run irminsul render.",
+                GENERATED_END,
+                "```",
+                "The region opens with:",
+                "```",
+                GENERATED_START,
+                "```",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [(f.category, f.line) for f in findings] == [("retired-reference", 4)]
+
+
+def test_manifest_fenced_marker_example_opens_no_region(tmp_path: Path) -> None:
+    """The manifest's curated prose may quote the marker in a fenced example.
+    Reading that as the region start paired it with the real end and blanked
+    the curated prose between — stale guidance included — so fenced lines are
+    skipped and only the real region is blanked."""
+    from irminsul.regen.agents_md import GENERATED_END, GENERATED_START
+
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    (tmp_path / "docs" / "AGENTS.md").write_text(
+        "\n".join(
+            [
+                "# Agents",
+                "```",
+                GENERATED_START,
+                "```",
+                "Hand-written: the reference layer is how we do it.",
+                GENERATED_START,
+                "| doc | Uses the reference layer |",
+                GENERATED_END,
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [(f.category, f.line) for f in findings] == [("retired-reference", 5)]
+
+
+def test_manifest_markers_on_one_line_close_the_region(tmp_path: Path) -> None:
+    """A start and end on one line never paired — the end was only looked for
+    on later lines — so the manifest reported an unmatched marker whose
+    suggested fix was already on that line."""
+    from irminsul.regen.agents_md import GENERATED_END, GENERATED_START
+
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    (tmp_path / "docs" / "AGENTS.md").write_text(
+        "\n".join(
+            [
+                "# Agents",
+                f"{GENERATED_START} Uses the reference layer {GENERATED_END}",
+                "Hand-written: the reference layer is how we do it.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    findings = _findings(tmp_path)
+
+    assert [(f.category, f.line) for f in findings] == [("retired-reference", 3)]
+
+
+def test_retired_reference_findings_are_errors(tmp_path: Path) -> None:
+    """ADR-0022 nominates this audit as the thing that makes stale guidance
+    fail. CI's dogfood step runs no `--strict`, so a warning would report and
+    never block."""
+    _write_config(tmp_path)
+    _write_retirement_adr(tmp_path)
+    (tmp_path / "README.md").write_text("Use irminsul render.\n", encoding="utf-8")
+
+    findings = _findings(tmp_path)
+
+    assert [f.severity.value for f in findings] == ["error"]
+
+
+def test_retired_references_is_a_hard_check() -> None:
+    """Hard checks block regardless of `--strict`, which is what makes
+    ADR-0022's safety-net claim true rather than aspirational."""
+    from irminsul.checks import HARD_REGISTRY, SOFT_REGISTRY
+
+    assert RetiredReferencesCheck.name in HARD_REGISTRY
+    assert RetiredReferencesCheck.name not in SOFT_REGISTRY
+    # The check emits both severities; the declaration names the blocking one,
+    # matching RfcLifecycleIntegrityCheck, the other mixed-severity hard check.
+    assert RetiredReferencesCheck.default_severity.value == "error"

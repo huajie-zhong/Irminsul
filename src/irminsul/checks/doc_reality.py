@@ -8,6 +8,12 @@ from pathlib import Path
 from typing import ClassVar
 
 from irminsul.checks.base import Finding, Severity
+from irminsul.checks.globs import (
+    is_external_source_location,
+    is_source_path,
+    resolve_display_path,
+    source_root_prefixes,
+)
 from irminsul.config import TerminologyRule
 from irminsul.docgraph import DocGraph, DocNode
 from irminsul.frontmatter import ClaimStateEnum, RfcStateEnum, StatusEnum
@@ -42,6 +48,10 @@ _STRUCTURED_SECTION_HEADINGS = {
     "health dashboard",
 }
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
+_EVIDENCE_SPELLING_SUGGESTION = (
+    "Spell evidence the way `describes:` does: repo-relative inside the docs repo, "
+    "source-root-relative for files under a source root outside it"
+)
 
 
 def _stable_audit_nodes(graph: DocGraph) -> list[DocNode]:
@@ -197,9 +207,36 @@ def _normalize_heading(heading: str) -> str:
     return normalized
 
 
+CODE_UNLINKED_REFERENCE = "prose-file-reference/unlinked-reference"
+CODE_IGNORE_END_WITHOUT_START = "prose-file-reference/ignore-end-without-start"
+CODE_IGNORE_START_WITHOUT_END = "prose-file-reference/ignore-start-without-end"
+CODE_STALE_SUPPRESSION = "prose-file-reference/stale-suppression"
+
+
 class ProseFileReferenceCheck:
+    """Local Markdown files named in prose must be real links, not bare mentions."""
+
     name: ClassVar[str] = "prose-file-reference"
     default_severity: ClassVar[Severity] = Severity.error
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_UNLINKED_REFERENCE: (
+            "A local `.md` filename is named in prose without a Markdown link. Convert it "
+            "to a link, or suppress the line with an `irminsul:ignore prose-file-reference` "
+            "comment if it's intentionally a bare mention."
+        ),
+        CODE_IGNORE_END_WITHOUT_START: (
+            "An `irminsul:ignore-end prose-file-reference` marker has no matching "
+            "ignore-start. Remove it or add the matching start marker."
+        ),
+        CODE_IGNORE_START_WITHOUT_END: (
+            "An `irminsul:ignore-start prose-file-reference` marker is never closed. Add "
+            "the matching `irminsul:ignore-end prose-file-reference` marker."
+        ),
+        CODE_STALE_SUPPRESSION: (
+            "An ignore marker no longer hides an unlinked local Markdown reference — the "
+            "prose it was protecting has since changed. Remove the stale suppression."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         out: list[Finding] = []
@@ -232,6 +269,7 @@ class ProseFileReferenceCheck:
                         out.append(
                             Finding(
                                 check=self.name,
+                                code=CODE_IGNORE_END_WITHOUT_START,
                                 severity=self.default_severity,
                                 message="ignore-end without matching ignore-start",
                                 path=node.path,
@@ -272,6 +310,7 @@ class ProseFileReferenceCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_UNLINKED_REFERENCE,
                             severity=self.default_severity,
                             message=(f"local markdown reference '{target}' is not a Markdown link"),
                             path=node.path,
@@ -288,6 +327,7 @@ class ProseFileReferenceCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_IGNORE_START_WITHOUT_END,
                         severity=self.default_severity,
                         message="ignore-start without matching ignore-end",
                         path=node.path,
@@ -308,6 +348,7 @@ def _stale_suppression(
 ) -> Finding:
     return Finding(
         check=ProseFileReferenceCheck.name,
+        code=CODE_STALE_SUPPRESSION,
         severity=Severity.info,
         category="stale-suppression",
         message=(f"{scope} suppression no longer hides an unlinked local Markdown reference"),
@@ -319,9 +360,56 @@ def _stale_suppression(
     )
 
 
+CODE_EVIDENCE_NOT_REPO_RELATIVE = "claim-provenance/evidence-not-repo-relative"
+CODE_EVIDENCE_PATH_MISSING = "claim-provenance/evidence-path-missing"
+CODE_EVIDENCE_STATE_MISMATCH = "claim-provenance/evidence-state-mismatch"
+CODE_UNKNOWN_CLAIM_REF = "claim-provenance/unknown-claim-ref"
+CODE_RISKY_PROSE_UNCLAIMED = "claim-provenance/risky-prose-unclaimed"
+CODE_STRUCTURED_SECTION_UNCLAIMED = "claim-provenance/structured-section-unclaimed"
+CODE_EVIDENCE_DRIFT = "claim-provenance/evidence-drift"
+CODE_PLANNED_CLAIM_RESOLVED = "claim-provenance/planned-claim-resolved"
+
+
 class ClaimProvenanceCheck:
+    """High-risk assertions need structured claims backed by evidence that fits their state."""
+
     name: ClassVar[str] = "claim-provenance"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_EVIDENCE_NOT_REPO_RELATIVE: (
+            "A claim's evidence path is absolute. Evidence must be a repo-relative path."
+        ),
+        CODE_EVIDENCE_PATH_MISSING: (
+            "A claim's evidence path does not exist in the repo. Point it at existing "
+            "source, config, CI, or doc evidence."
+        ),
+        CODE_EVIDENCE_STATE_MISMATCH: (
+            "A claim has no evidence appropriate for its declared state (planned, "
+            "implemented, available, enabled, external). Add evidence of the right kind, "
+            "or change the claim's state."
+        ),
+        CODE_UNKNOWN_CLAIM_REF: (
+            "A `claim:<id>` marker in the doc body references an id not declared in "
+            "frontmatter. Add the matching frontmatter claim or remove the marker."
+        ),
+        CODE_RISKY_PROSE_UNCLAIMED: (
+            "A paragraph makes a high-risk enforcement/automation claim (blocks, "
+            "guarantees, auto-generates, ...) without a structured `claim:<id>` "
+            "reference. Add a frontmatter claim and reference it."
+        ),
+        CODE_STRUCTURED_SECTION_UNCLAIMED: (
+            "A structured section (e.g. 'Mechanical Enforcement') has no `claim:<id>` "
+            "marker backing its assertions. Add at least one relevant claim reference."
+        ),
+        CODE_EVIDENCE_DRIFT: (
+            "A claim's evidence changed after the doc was last committed. Review whether "
+            "the claim is still true and update the doc."
+        ),
+        CODE_PLANNED_CLAIM_RESOLVED: (
+            "A 'planned' claim cites an RFC that has since reached a resolved state. "
+            "Update the claim's state to match reality, or reword/remove it."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None or graph.repo_root is None:
@@ -333,53 +421,85 @@ class ClaimProvenanceCheck:
                 continue
 
             claim_ids = {claim.id for claim in node.frontmatter.claims}
-            out.extend(self._validate_evidence(graph, node))
+            resolved = self._resolve_node_evidence(graph, node)
+            out.extend(self._validate_evidence(graph, node, resolved))
             out.extend(self._validate_body_claim_refs(node, claim_ids))
             out.extend(self._scan_risky_prose(node, claim_ids))
             out.extend(self._scan_structured_sections(node, claim_ids))
-            out.extend(self._scan_evidence_drift(graph, node))
+            out.extend(self._scan_evidence_drift(graph, node, resolved))
             out.extend(self._scan_planned_claim_lifecycle(graph, node))
 
         return out
 
-    def _validate_evidence(self, graph: DocGraph, node: DocNode) -> list[Finding]:
+    def _resolve_evidence(self, graph: DocGraph, evidence: str) -> Path | None:
+        assert graph.config is not None
+        assert graph.repo_root is not None
+        return resolve_display_path(graph.repo_root, graph.config.paths.source_roots, evidence)
+
+    def _resolve_node_evidence(self, graph: DocGraph, node: DocNode) -> dict[str, Path | None]:
+        """Every evidence spelling of the node, resolved once.
+
+        `_validate_evidence`, `_scan_evidence_drift`, and the source
+        classifiers all need the same answer; resolving here keeps it to one
+        disk probe per spelling instead of up to three per scan.
+        """
+        return {
+            evidence: self._resolve_evidence(graph, evidence)
+            for claim in node.frontmatter.claims
+            for evidence in claim.evidence
+        }
+
+    def _validate_evidence(
+        self, graph: DocGraph, node: DocNode, resolved: dict[str, Path | None]
+    ) -> list[Finding]:
         assert graph.config is not None
         assert graph.repo_root is not None
 
         out: list[Finding] = []
         for claim in node.frontmatter.claims:
-            evidence_paths = [Path(evidence) for evidence in claim.evidence]
-            for evidence, rel_path in zip(claim.evidence, evidence_paths, strict=True):
-                if Path(evidence).is_absolute():
+            evidence_refs = [
+                (Path(evidence), resolved.get(evidence)) for evidence in claim.evidence
+            ]
+            for evidence, (rel_path, resolved_path) in zip(
+                claim.evidence, evidence_refs, strict=True
+            ):
+                if rel_path.is_absolute() or ".." in rel_path.parts:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_EVIDENCE_NOT_REPO_RELATIVE,
                             severity=Severity.error,
                             message=(
-                                f"claim '{claim.id}' evidence must be repo-relative: '{evidence}'"
+                                f"claim '{claim.id}' evidence must not be absolute or "
+                                f"escape the tree with '..': '{evidence}'"
                             ),
                             path=node.path,
                             doc_id=node.id,
-                            suggestion="Use a repo-relative evidence path",
+                            suggestion=_EVIDENCE_SPELLING_SUGGESTION,
                         )
                     )
                     continue
-                if not (graph.repo_root / rel_path).exists():
+                if resolved_path is None:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_EVIDENCE_PATH_MISSING,
                             severity=Severity.error,
                             message=f"claim '{claim.id}' evidence path does not exist: '{evidence}'",
                             path=node.path,
                             doc_id=node.id,
-                            suggestion="Point the claim at existing source, config, CI, or doc evidence",
+                            suggestion=(
+                                "Point the claim at existing source, config, CI, or doc "
+                                f"evidence. {_EVIDENCE_SPELLING_SUGGESTION}"
+                            ),
                         )
                     )
 
-            if not self._has_state_appropriate_evidence(graph, claim.state, evidence_paths):
+            if not self._has_state_appropriate_evidence(graph, claim.state, evidence_refs):
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_EVIDENCE_STATE_MISMATCH,
                         severity=Severity.error,
                         message=(
                             f"claim '{claim.id}' has no evidence appropriate for "
@@ -396,20 +516,27 @@ class ClaimProvenanceCheck:
         self,
         graph: DocGraph,
         state: ClaimStateEnum,
-        evidence_paths: list[Path],
+        evidence_refs: list[tuple[Path, Path | None]],
     ) -> bool:
         if state == ClaimStateEnum.planned:
-            return any(self._is_rfc_evidence(graph, path) for path in evidence_paths)
+            return any(self._is_rfc_evidence(graph, path) for path, _ in evidence_refs)
         if state == ClaimStateEnum.implemented:
-            return any(self._is_implementation_evidence(graph, path) for path in evidence_paths)
+            return any(
+                self._is_implementation_evidence(graph, path, resolved)
+                for path, resolved in evidence_refs
+            )
         if state == ClaimStateEnum.available:
             return any(
-                self._is_implementation_evidence(graph, path) for path in evidence_paths
-            ) and any(self._is_enablement_doc_evidence(graph, path) for path in evidence_paths)
+                self._is_implementation_evidence(graph, path, resolved)
+                for path, resolved in evidence_refs
+            ) and any(self._is_enablement_doc_evidence(graph, path) for path, _ in evidence_refs)
         if state == ClaimStateEnum.enabled:
-            return any(self._is_enabled_evidence(path) for path in evidence_paths)
+            return any(self._is_enabled_evidence(path) for path, _ in evidence_refs)
         if state == ClaimStateEnum.external:
-            return any(self._is_external_process_evidence(graph, path) for path in evidence_paths)
+            return any(
+                self._is_external_process_evidence(graph, path, resolved)
+                for path, resolved in evidence_refs
+            )
         return False
 
     def _state_suggestion(self, state: ClaimStateEnum) -> str:
@@ -437,6 +564,7 @@ class ClaimProvenanceCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_UNKNOWN_CLAIM_REF,
                             severity=Severity.warning,
                             message=f"unknown structured claim reference: 'claim:{claim_id}'",
                             path=node.path,
@@ -457,6 +585,7 @@ class ClaimProvenanceCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_RISKY_PROSE_UNCLAIMED,
                     severity=Severity.warning,
                     message="high-risk enforcement or automation prose lacks a structured claim reference",
                     path=node.path,
@@ -478,6 +607,7 @@ class ClaimProvenanceCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_STRUCTURED_SECTION_UNCLAIMED,
                     severity=Severity.warning,
                     message=f"section '{section.heading}' needs a structured claim reference",
                     path=node.path,
@@ -488,7 +618,9 @@ class ClaimProvenanceCheck:
             )
         return out
 
-    def _scan_evidence_drift(self, graph: DocGraph, node: DocNode) -> list[Finding]:
+    def _scan_evidence_drift(
+        self, graph: DocGraph, node: DocNode, resolved: dict[str, Path | None]
+    ) -> list[Finding]:
         assert graph.repo_root is not None
 
         doc_time = last_commit_time_any_repo(graph.repo_root / node.path, graph.repo_root)
@@ -500,8 +632,8 @@ class ClaimProvenanceCheck:
             latest_path: str | None = None
             latest_time = None
             for evidence in claim.evidence:
-                evidence_abs = graph.repo_root / evidence
-                if not evidence_abs.exists():
+                evidence_abs = resolved.get(evidence)
+                if evidence_abs is None:
                     continue
                 evidence_time = last_commit_time_any_repo(evidence_abs, graph.repo_root)
                 if evidence_time is None or evidence_time.when is None:
@@ -514,6 +646,7 @@ class ClaimProvenanceCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_EVIDENCE_DRIFT,
                     severity=Severity.warning,
                     message=(
                         f"claim '{claim.id}' cites evidence changed after the doc: '{latest_path}'"
@@ -548,6 +681,7 @@ class ClaimProvenanceCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_PLANNED_CLAIM_RESOLVED,
                         severity=Severity.warning,
                         message=(
                             f"planned claim '{claim.id}' cites resolved RFC "
@@ -569,20 +703,67 @@ class ClaimProvenanceCheck:
             path.as_posix().startswith(f"{docs_root}/80-evolution/rfcs/") and path.suffix == ".md"
         )
 
-    def _is_source_evidence(self, graph: DocGraph, path: Path) -> bool:
+    def _is_source_evidence(self, graph: DocGraph, path: Path, resolved: Path | None) -> bool:
+        """True when the evidence spelling names a configured source tree.
+
+        Two spellings, because the source walk emits two. Inside the docs repo
+        a source file displays repo-relative, so the configured root is a
+        literal prefix and the test stays lexical — a not-yet-created
+        `src/new.py` still reads as source, and `_validate_evidence` reports
+        its absence once rather than twice. Outside the docs repo (`siblings`)
+        the display is source-root-relative and carries no prefix at all, so
+        membership is settled on disk instead — on `resolved`, the caller's
+        already-resolved location of the spelling, so nothing resolves twice.
+        """
         assert graph.config is not None
+        assert graph.repo_root is not None
         path_posix = path.as_posix()
-        return any(
-            path_posix == root.strip("/\\") or path_posix.startswith(f"{root.strip('/\\')}/")
-            for root in graph.config.paths.source_roots
-        )
+        source_roots = graph.config.paths.source_roots
+        for prefix in source_root_prefixes(graph.repo_root, source_roots):
+            if not prefix:
+                if self._is_repo_root_source(graph, path, path_posix):
+                    return True
+                continue
+            if path_posix == prefix or path_posix.startswith(f"{prefix}/"):
+                return True
+        return is_external_source_location(graph.repo_root, source_roots, resolved)
+
+    def _is_repo_root_source(self, graph: DocGraph, path: Path, path_posix: str) -> bool:
+        """Whether a source root that *is* the repo root claims this path.
+
+        `source_roots = ["."]` is what `irminsul init` writes for a flat Go
+        repo, and its repo-relative prefix is the empty string, which every
+        path starts with. Answering "yes, everything" there is wrong in the one
+        direction that matters: the docs tree, `irminsul.toml`, the Action and
+        the CI workflows sit under the repo root too, and each of them is the
+        evidence some *other* claim state is defined by. `state: external` is
+        "process evidence and not source", so an unconditional yes made every
+        external claim unsatisfiable, and `implemented`/`available` stopped
+        being checked at all.
+
+        The exclusions are the ones the source walk and the sibling evidence
+        classifiers already own — the docs tree, the enablement files, and the
+        walk's dot-directory and bytecode exclusions — so the answer here
+        matches the set of files `walk_source_files` actually returns for a
+        repo-root source root.
+        """
+        docs_root = _docs_root(graph)
+        if path_posix == docs_root or path_posix.startswith(f"{docs_root}/"):
+            return False
+        if self._is_enabled_evidence(path):
+            return False
+        return is_source_path(path_posix, [""])
 
     def _is_component_doc_evidence(self, graph: DocGraph, path: Path) -> bool:
         docs_root = _docs_root(graph)
         return path.as_posix().startswith(f"{docs_root}/20-components/")
 
-    def _is_implementation_evidence(self, graph: DocGraph, path: Path) -> bool:
-        return self._is_source_evidence(graph, path) or self._is_component_doc_evidence(graph, path)
+    def _is_implementation_evidence(
+        self, graph: DocGraph, path: Path, resolved: Path | None
+    ) -> bool:
+        return self._is_source_evidence(graph, path, resolved) or self._is_component_doc_evidence(
+            graph, path
+        )
 
     def _is_enablement_doc_evidence(self, graph: DocGraph, path: Path) -> bool:
         path_posix = path.as_posix()
@@ -600,7 +781,9 @@ class ClaimProvenanceCheck:
             or (path_posix.startswith(".github/workflows/") and path.suffix in {".yml", ".yaml"})
         )
 
-    def _is_external_process_evidence(self, graph: DocGraph, path: Path) -> bool:
+    def _is_external_process_evidence(
+        self, graph: DocGraph, path: Path, resolved: Path | None
+    ) -> bool:
         path_posix = path.as_posix()
         docs_root = _docs_root(graph)
         return (
@@ -609,12 +792,24 @@ class ClaimProvenanceCheck:
             or path_posix in {"action.yml", "action.yaml"}
             or path_posix in {".pre-commit-config.yaml", ".pre-commit-config.yml"}
             or path_posix.startswith(".github/")
-        ) and not self._is_source_evidence(graph, path)
+        ) and not self._is_source_evidence(graph, path, resolved)
+
+
+CODE_AMBIGUOUS_TERM = "terminology-overload/ambiguous-term"
 
 
 class TerminologyOverloadCheck:
+    """Configured overloaded terms must appear with an explicit disambiguating phrase."""
+
     name: ClassVar[str] = "terminology-overload"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_AMBIGUOUS_TERM: (
+            "A configured overloaded term appears without one of its explicit "
+            "disambiguating phrases. Use one of the configured explicit phrases, or "
+            "reword to remove the ambiguity."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         if graph.config is None:
@@ -640,6 +835,7 @@ class TerminologyOverloadCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_AMBIGUOUS_TERM,
                             severity=self.default_severity,
                             message=f"'{rule.term}' is ambiguous here",
                             path=node.path,
@@ -651,9 +847,35 @@ class TerminologyOverloadCheck:
         return out
 
 
+CODE_MANIFEST_MISSING = "agents-manifest/manifest-missing"
+CODE_MISSING_GENERATED_MARKERS = "agents-manifest/missing-generated-markers"
+CODE_GENERATED_SECTION_DRIFT = "agents-manifest/generated-section-drift"
+CODE_MISSING_REQUIRED_HEADING = "agents-manifest/missing-required-heading"
+
+
 class AgentsManifestCheck:
+    """The docs/AGENTS.md navigation manifest must exist where adopted and match regen output."""
+
     name: ClassVar[str] = "agents-manifest"
     default_severity: ClassVar[Severity] = Severity.error
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_MANIFEST_MISSING: (
+            "The repo has opted into `agents-manifest` (it's listed in `checks.hard`) but "
+            "`docs/AGENTS.md` does not exist. Run `irminsul regen agents-md`."
+        ),
+        CODE_MISSING_GENERATED_MARKERS: (
+            "The manifest is missing its generated-section start/end markers. Run "
+            "`irminsul regen agents-md`."
+        ),
+        CODE_GENERATED_SECTION_DRIFT: (
+            "The manifest's generated section no longer matches what the current doc "
+            "graph would produce. Run `irminsul regen agents-md`."
+        ),
+        CODE_MISSING_REQUIRED_HEADING: (
+            "The manifest is missing a required heading (Foundations or Protocol). Run "
+            "`irminsul regen agents-md`, or add the section manually."
+        ),
+    }
 
     _REQUIRED_HEADINGS: ClassVar[tuple[str, ...]] = ("Foundations", "Protocol")
 
@@ -674,6 +896,7 @@ class AgentsManifestCheck:
             return [
                 Finding(
                     check=self.name,
+                    code=CODE_MANIFEST_MISSING,
                     severity=self.default_severity,
                     message=f"agent manifest '{rel_path.as_posix()}' is missing",
                     path=rel_path,
@@ -690,6 +913,7 @@ class AgentsManifestCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_MISSING_GENERATED_MARKERS,
                     severity=self.default_severity,
                     message=(
                         f"agent manifest '{rel_path.as_posix()}' is missing the "
@@ -706,6 +930,7 @@ class AgentsManifestCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_GENERATED_SECTION_DRIFT,
                         severity=self.default_severity,
                         message=(
                             f"agent manifest '{rel_path.as_posix()}' generated section "
@@ -721,6 +946,7 @@ class AgentsManifestCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_MISSING_REQUIRED_HEADING,
                         severity=self.default_severity,
                         message=(
                             f"agent manifest '{rel_path.as_posix()}' is missing the "

@@ -65,6 +65,7 @@ HARD_REGISTRY: dict[str, type[Check]] = {
     ProseFileReferenceCheck.name: ProseFileReferenceCheck,
     AgentsManifestCheck.name: AgentsManifestCheck,
     RfcLifecycleIntegrityCheck.name: RfcLifecycleIntegrityCheck,
+    RetiredReferencesCheck.name: RetiredReferencesCheck,
 }
 
 SOFT_REGISTRY: dict[str, type[Check]] = {
@@ -91,7 +92,6 @@ SOFT_REGISTRY: dict[str, type[Check]] = {
     DocRefsCheck.name: DocRefsCheck,
     ChangeBindingCheck.name: ChangeBindingCheck,
     RequirementGrammarCheck.name: RequirementGrammarCheck,
-    RetiredReferencesCheck.name: RetiredReferencesCheck,
 }
 
 __all__ = [

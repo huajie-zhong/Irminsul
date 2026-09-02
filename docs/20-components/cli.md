@@ -31,13 +31,13 @@ inventory:
       - context
       - status
     omit:
-      - init-docs-only
       - seed
       - orient
       - refs
       - fix
       - surface
       - anchors
+      - explain
       - mcp
       - change status
       - change verify

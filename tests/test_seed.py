@@ -36,7 +36,18 @@ _FLAGS = [
 
 def _fresh_repo(tmp_path: Path) -> Path:
     target = tmp_path / "proj"
-    result = runner.invoke(app, ["init", "--fresh", "--no-interactive", "--path", str(target)])
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "--fresh",
+            "--language",
+            "python",
+            "--no-interactive",
+            "--path",
+            str(target),
+        ],
+    )
     assert result.exit_code == 0, result.stdout
     return target
 
@@ -313,8 +324,10 @@ def test_init_no_interactive_does_not_seed(tmp_path: Path) -> None:
 
 def test_init_fresh_interactive_offers_seed(tmp_path: Path) -> None:
     target = tmp_path / "proj"
-    # project name, confirm seed, then the six PIB prompts.
-    feed = "\n".join(["", "y", "Evolve together", "A CLI", "Prevent drift", "A maintainer", "", ""])
+    # language, project name, confirm seed, then the six PIB prompts.
+    feed = "\n".join(
+        ["python", "", "y", "Evolve together", "A CLI", "Prevent drift", "A maintainer", "", ""]
+    )
     result = runner.invoke(app, ["init", "--fresh", "--path", str(target)], input=feed + "\n")
     assert result.exit_code == 0, result.stdout
     principles = (target / "docs/00-foundation/principles.md").read_text(encoding="utf-8")
@@ -324,7 +337,7 @@ def test_init_fresh_interactive_offers_seed(tmp_path: Path) -> None:
 
 def test_init_fresh_interactive_can_decline_seed(tmp_path: Path) -> None:
     target = tmp_path / "proj"
-    feed = "\n".join(["", "n"])
+    feed = "\n".join(["python", "", "n"])
     result = runner.invoke(app, ["init", "--fresh", "--path", str(target)], input=feed + "\n")
     assert result.exit_code == 0, result.stdout
     principles = (target / "docs/00-foundation/principles.md").read_text(encoding="utf-8")

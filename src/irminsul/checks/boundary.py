@@ -9,10 +9,18 @@ from irminsul.docgraph import DocGraph
 
 _REQUIRED_HEADING = "scope & limitations"
 
+CODE_MISSING_SCOPE_LIMITATIONS = "boundary/missing-scope-limitations"
+
 
 class BoundaryCheck:
     name: ClassVar[str] = "boundary"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_MISSING_SCOPE_LIMITATIONS: (
+            "A tier-3 doc has no '## Scope & Limitations' section. Add one describing "
+            "what the component does NOT do."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         out: list[Finding] = []
@@ -24,6 +32,7 @@ class BoundaryCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_MISSING_SCOPE_LIMITATIONS,
                         severity=self.default_severity,
                         message="tier-3 doc is missing '## Scope & Limitations' section",
                         path=node.path,

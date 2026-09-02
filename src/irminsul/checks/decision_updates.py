@@ -43,9 +43,38 @@ def _docs_root_prefix(docs_root: str) -> str:
     return PurePosixPath(*parts).as_posix() if parts else ""
 
 
+CODE_NO_REQUIRED_UPDATES_FIELD = "decision-updates/no-required-updates-field"
+CODE_MISSING_REQUIRED_UPDATE_PATH = "decision-updates/missing-required-update-path"
+CODE_MISSING_BACKLINK = "decision-updates/missing-backlink"
+CODE_BROKEN_IMPLEMENTS = "decision-updates/broken-implements"
+CODE_STALE_CLAIM = "decision-updates/stale-claim"
+
+
 class DecisionUpdatesCheck:
     name: ClassVar[str] = "decision-updates"
     default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_NO_REQUIRED_UPDATES_FIELD: (
+            "An accepted or implemented RFC has no `required_updates` field. Add "
+            "`required_updates: []` if no downstream docs need updating, or list the "
+            "docs that must be created/updated/reviewed."
+        ),
+        CODE_MISSING_REQUIRED_UPDATE_PATH: (
+            "A `required_updates` path listed on the RFC does not exist in the graph. "
+            "Create the doc or correct the path."
+        ),
+        CODE_MISSING_BACKLINK: (
+            "A required-update doc does not link back to the driving RFC via "
+            '`implements`. Add `implements: ["<rfc-id>"]` to the doc.'
+        ),
+        CODE_BROKEN_IMPLEMENTS: (
+            "An `implements` entry does not match any doc in the graph. Correct the doc id."
+        ),
+        CODE_STALE_CLAIM: (
+            "A `planned` claim cites an RFC that is now accepted, implemented, "
+            "rejected, or withdrawn. Update the claim's state to match reality."
+        ),
+    }
 
     def run(self, graph: DocGraph) -> list[Finding]:
         out: list[Finding] = []
@@ -71,6 +100,7 @@ class DecisionUpdatesCheck:
             out.append(
                 Finding(
                     check=self.name,
+                    code=CODE_NO_REQUIRED_UPDATES_FIELD,
                     category="no-required-updates-field",
                     severity=Severity.warning,
                     message=(
@@ -95,6 +125,7 @@ class DecisionUpdatesCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_MISSING_REQUIRED_UPDATE_PATH,
                         category="missing-required-update-path",
                         severity=Severity.warning,
                         message=(
@@ -113,6 +144,7 @@ class DecisionUpdatesCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_MISSING_BACKLINK,
                         category="missing-backlink",
                         severity=Severity.warning,
                         message=(
@@ -179,6 +211,7 @@ class DecisionUpdatesCheck:
                 out.append(
                     Finding(
                         check=self.name,
+                        code=CODE_BROKEN_IMPLEMENTS,
                         category="broken-implements",
                         severity=Severity.warning,
                         message=(
@@ -211,6 +244,7 @@ class DecisionUpdatesCheck:
                     out.append(
                         Finding(
                             check=self.name,
+                            code=CODE_STALE_CLAIM,
                             category="stale-claim",
                             severity=Severity.warning,
                             message=(
