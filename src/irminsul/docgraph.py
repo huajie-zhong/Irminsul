@@ -52,6 +52,17 @@ class DocGraph:
     """(id, first_path, conflicting_path) tuples discovered during build."""
     config: IrminsulConfig | None = None
     repo_root: Path | None = None
+    """Root of the tree this graph was walked from. Every `path` on the graph is
+    relative to it."""
+    state_root: Path | None = None
+    """Root for run-spanning on-disk state (today: the `external-links` HTTP
+    cache). Equal to `repo_root` for an ordinary run. During a `--delta` base
+    pass `repo_root` is a scratch `git worktree` that is deleted on teardown,
+    while `state_root` stays the user's real working tree — so both passes of
+    one run read and write the same cache instead of re-fetching every URL and
+    discarding the result. Anything a check must *persist* belongs here;
+    anything it must *read from the tree under inspection* belongs under
+    `repo_root`."""
     inbound_strong: dict[str, set[str]] = field(default_factory=dict)
     inbound_weak: dict[str, set[str]] = field(default_factory=dict)
     headings: dict[str, list[Heading]] = field(default_factory=dict)
@@ -83,11 +94,20 @@ def build_graph(
     *,
     now: _dt.date | None = None,
     diff_changed_paths: frozenset[str] | None = None,
+    state_root: Path | None = None,
 ) -> DocGraph:
+    """Walk `repo_root` and build the graph every check runs over.
+
+    `state_root` names the root for run-spanning on-disk state and defaults to
+    `repo_root`; pass it explicitly only when the walked tree is a throwaway
+    checkout (the `--delta` base pass) and that state must still land in the
+    caller's real repository.
+    """
     docs_root_abs = (repo_root / config.paths.docs_root).resolve()
     graph = DocGraph(
         config=config,
         repo_root=repo_root,
+        state_root=state_root or repo_root,
         now=now,
         diff_changed_paths=diff_changed_paths,
     )
