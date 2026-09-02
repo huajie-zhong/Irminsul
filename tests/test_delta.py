@@ -78,6 +78,15 @@ def test_pristine_checkout_yields_base_rev_contents(tmp_path: Path) -> None:
         assert (base_root / "a.txt").read_text(encoding="utf-8") == "1\n"
         assert base_root != tmp_path
 
+        # The outer handle is closed before the yield, so assert what the caller
+        # actually depends on: the scratch tree is still a working linked
+        # worktree parked on the base rev, not just a pile of files.
+        linked_repo = Repo(base_root)
+        try:
+            assert linked_repo.head.commit.hexsha == base_sha
+        finally:
+            linked_repo.close()
+
     # The caller's working tree is never touched.
     assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "2\n"
 
