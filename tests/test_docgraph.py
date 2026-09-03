@@ -59,3 +59,23 @@ def test_build_graph_with_missing_docs_root(tmp_path: Path) -> None:
     cfg = load(tmp_path / "irminsul.toml")
     graph = build_graph(tmp_path, cfg)
     assert graph.nodes == {}
+
+
+def test_build_graph_skips_harness_files_when_docs_root_is_the_repo_root(
+    tmp_path: Path,
+) -> None:
+    """`irminsul init` writes `CLAUDE.md` and `.claude/skills/irminsul/SKILL.md`
+    at the repo root. With `docs_root = "."` both used to become graph nodes
+    and fail the hard gate, since neither carries doc frontmatter."""
+    (tmp_path / "CLAUDE.md").write_text("@AGENTS.md\n", encoding="utf-8")
+    skill = tmp_path / ".claude" / "skills" / "irminsul" / "SKILL.md"
+    skill.parent.mkdir(parents=True)
+    skill.write_text("---\nname: irminsul\n---\n", encoding="utf-8")
+    (tmp_path / "irminsul.toml").write_text(
+        '[paths]\ndocs_root = "."\nsource_roots = []\n', encoding="utf-8"
+    )
+    cfg = load(tmp_path / "irminsul.toml")
+    graph = build_graph(tmp_path, cfg)
+    assert graph.nodes == {}
+    assert graph.missing_frontmatter == []
+    assert graph.parse_failures == []

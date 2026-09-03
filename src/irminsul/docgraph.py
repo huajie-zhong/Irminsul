@@ -25,10 +25,14 @@ if TYPE_CHECKING:
     from irminsul.git.mtime import GitTime
 
 # Top-level docs that aren't doc atoms — `README.md`, the glossary, contributor
-# guidance, the agent manifest — and don't carry frontmatter. They're
-# navigation, not content. `AGENTS.md` is validated by the `agents-manifest`
-# check instead, which reads it directly from disk.
-EXEMPT_TOPLEVEL_NAMES = frozenset({"README.md", "GLOSSARY.md", "CONTRIBUTING.md", "AGENTS.md"})
+# guidance, the agent manifest, the Claude Code pointer — and don't carry
+# frontmatter. They're navigation, not content. `AGENTS.md` is validated by
+# the `agents-manifest` check instead, which reads it directly from disk.
+# `CLAUDE.md` matters when `docs_root` is the repo root, where the pointer
+# `irminsul init` writes would otherwise be walked as a doc.
+EXEMPT_TOPLEVEL_NAMES = frozenset(
+    {"README.md", "GLOSSARY.md", "CONTRIBUTING.md", "AGENTS.md", "CLAUDE.md"}
+)
 
 
 @dataclass(frozen=True)
@@ -117,6 +121,11 @@ def build_graph(
 
     for md in sorted(docs_root_abs.rglob("*.md")):
         rel_to_docs = md.relative_to(docs_root_abs)
+        # Dot-directories hold harness and tool state (`.claude/`, `.git/`,
+        # `.venv/`), never docs; the skip matters when `docs_root` is the
+        # repo root, where the scaffolded skill would otherwise be walked.
+        if any(part.startswith(".") for part in rel_to_docs.parts[:-1]):
+            continue
         if len(rel_to_docs.parts) == 1 and rel_to_docs.name in EXEMPT_TOPLEVEL_NAMES:
             continue
 
