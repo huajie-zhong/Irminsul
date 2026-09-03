@@ -30,11 +30,21 @@ implements:
 
 Templates live as Jinja files under `src/irminsul/init/scaffolds/` (`docs/` tree + `irminsul.toml`) and `src/irminsul/init/workflows/<topology>/` (CI workflows). Output paths mirror the template path with `.j2` stripped, and workflow templates flatten into `.github/workflows/`. The two topologies get separate workflow templates rather than one branching template: the sibling gate needs two checkouts under a common parent plus a `working-directory`, which the composite Action cannot express, so it installs and calls the CLI directly.
 
+Agent-harness wiring is written after the templates, from module constants rather than templates:
+
+```text
+.mcp.json                              registers the read-only MCP server
+.claude/skills/irminsul/SKILL.md       a trigger routing an agent to `irminsul orient`
+CLAUDE.md                              a pointer importing the root AGENTS.md for Claude Code
+```
+
+The registration wires the [MCP server](mcp-server.md); the skill points at orientation and the [agent protocol](../90-meta/agent-protocol.md) without restating either; the pointer imports the root [`AGENTS.md`](../../AGENTS.md) router, which Claude Code does not read on its own, so Claude Code sessions reach the entry point the skill assumes. The registration and the pointer are constants rather than templates because `--force` merges them: the `irminsul` entry is set in an existing `mcpServers` map and every other server the adopter registered survives, and a [`CLAUDE.md`](../../CLAUDE.md) that lacks the router import gains it at the top and keeps the adopter's content — neither of which the skip-or-replace template writer can express. Without `--force` all three follow the same skip-if-exists policy as the templates: an existing file is left byte-identical, the note names it, and a hint follows for each file that is not wired yet — the manual registration command unless the registration already names the server, the import line unless the pointer already carries it. A registration that is not a JSON object (a file with comments, say) is never rewritten, forced or not, because there is nothing to merge into and replacing it would delete whatever the adopter keeps there; only a blank file counts as absent, and a byte-order mark is tolerated. Every file init writes uses LF newlines on every platform. None of the three is governed by a check, because none is derived from anything ([ADR-0023](../50-decisions/0023-scaffold-agent-harness-wiring-statically.md)); this repository's own tracked copies are bound to the constants by a test instead.
+
 The scaffold is born compliant with its own configured checks: every layer (including `00-foundation/`, `10-architecture/`, and `80-evolution/rfcs/`) ships a navigation INDEX so sibling docs are never orphans, the tier-3 layer INDEXes carry a Scope & Limitations section, and the INDEX of each not-yet-filled layer is `status: draft`, which the `phantom-layer` check treats as under-construction rather than navigation rot. A freshly initialized same-repo scaffold reports zero errors and zero warnings under the configured check profile; a siblings scaffold whose code repo is not yet cloned beside it reports that missing source root as its one warning until the clone lands.
 
 `detector.detect_languages()` checks for marker files (`pyproject.toml`, `package.json`+`tsconfig.json`, etc.) — cheap heuristics, fast and resilient to weird repo shapes. `detect_source_roots()` filters each detected language's `source_root_candidates` to those that exist on disk, falling back to `["src"]` if nothing matches.
 
-By default, init refuses to overwrite existing files; pass `--force` to replace them. `--fresh` normally errors if code signals already exist, and `--allow-existing-code` makes that intent explicit.
+By default, init refuses to overwrite existing files; pass `--force` to replace the ones it owns — the registration and the pointer above are merged rather than replaced. `--fresh` normally errors if code signals already exist, and `--allow-existing-code` makes that intent explicit.
 
 The generated `irminsul.toml` enables `rfc-lifecycle-integrity` in its hard
 profile so implemented RFCs are sealed consistently from the first lifecycle.
@@ -43,4 +53,6 @@ and `honor_gitignore = true`.
 
 ## Scope & Limitations
 
-Init scaffolds doc/config/CI structure only — it does not scaffold application code or generate implementation stubs. It does not configure IDEs, editors, or local tooling beyond pre-commit hooks. It does not provision remote services such as GitHub repositories or CI runners.
+Init scaffolds doc/config/CI structure and agent-harness wiring only — it does not scaffold application code or generate implementation stubs. Harness wiring is limited to a project MCP registration, a harness skill, and a Claude Code pointer; it configures no IDE or editor settings, and nothing outside the target repository — a harness that keeps its server registration in a user-global file is deliberately not wired, because adoption has no business writing outside the repo. It does not provision remote services such as GitHub repositories or CI runners. In the `siblings` layout the wiring lands in the docs repo, where init runs; a session opened in the code repo has neither file, so the printed next steps give the registration command to run there, pointed back at the docs repo.
+
+Because the harness files are static constants with no drift check, a later change to the server's invocation will not mechanically flag already-adopted repositories.

@@ -11,7 +11,14 @@ from typing import Literal
 
 from pathspec import GitIgnoreSpec
 
-from irminsul.checks import HARD_REGISTRY, SOFT_REGISTRY, Check, Finding, sort_findings
+from irminsul.checks import (
+    HARD_REGISTRY,
+    SOFT_REGISTRY,
+    Check,
+    Finding,
+    fix_commands,
+    sort_findings,
+)
 from irminsul.checks.globs import (
     external_display_for_path,
     is_source_path,
@@ -260,6 +267,7 @@ def build_context_report(
             graph,
             item,
             findings,
+            profile=profile,
             include_active_changes=include_workflow,
             content_categories=categories if include_content else None,
         )
@@ -733,6 +741,7 @@ def _build_result(
     pending: _PendingResult,
     all_findings: list[Finding],
     *,
+    profile: ContextProfile = "configured",
     include_active_changes: bool = False,
     content_categories: tuple[ContentCategory, ...] | None = None,
 ) -> ContextResult:
@@ -765,7 +774,7 @@ def _build_result(
             if doc_id in graph.nodes
         ],
         findings=[_finding_summary(finding) for finding in relevant_findings],
-        hints=_hints(node, relevant_findings),
+        hints=_hints(graph, relevant_findings, profile),
         active_changes=active_changes if include_active_changes else [],
         content=(
             _build_context_content(graph, node, active_changes, content_categories)
@@ -1081,8 +1090,20 @@ def _relevant_findings(
     return out
 
 
-def _hints(node: DocNode, findings: list[Finding]) -> list[str]:
-    hints = ["irminsul check --profile hard"]
+def _hints(
+    graph: DocGraph,
+    findings: list[Finding],
+    profile: ContextProfile,
+) -> list[str]:
+    """Next commands for this result: remediations first, then the gate.
+
+    Remediations come from the same finding-to-fix mapping the findings surfaces
+    use, so a hint is only offered when the check actually harvests a fix for
+    that finding. The verification gate stays last because it is the terminal
+    step regardless of what precedes it.
+    """
+    hints = [command for command in fix_commands(findings, graph, profile=profile) if command]
+    hints.append("irminsul check --profile hard")
     return _unique(hints)
 
 

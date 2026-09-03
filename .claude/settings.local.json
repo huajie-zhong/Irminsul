@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(.venv/Scripts/pytest -q --tb=short)",
-      "Bash(.venv/Scripts/pytest -q)"
-    ]
-  }
-}

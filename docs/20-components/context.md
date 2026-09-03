@@ -26,7 +26,7 @@ The command supports exactly one input mode:
 - `irminsul context --changed` for staged, unstaged, and untracked git files
 - `irminsul context --change <rfc-id>` as an alias for the [change lifecycle](change.md) status report, so an agent oriented around one RFC gets the same evidence view without switching command groups
 
-Each result reports the owning doc, matching source claims, first declared entrypoint, tests, `depends_on`, docs that depend on it, relevant deterministic findings, and next command hints. `--profile hard|configured|all-available` controls deterministic finding breadth. Ordinary lookups default to `configured`; workflow aliases default to `hard` so the frequent edit loop does not pay for every soft audit unless requested.
+Each result reports the owning doc, matching source claims, first declared entrypoint, tests, `depends_on`, docs that depend on it, relevant deterministic findings, and next command hints. Hints are derived from that result's own relevant findings using the same finding-to-fix mapping the [findings surfaces](checks.md) use, so a `fix` invocation is offered only when the owning check actually harvests a fix for that finding; the `check --profile hard` gate is always the terminal hint. `--profile hard|configured|all-available` controls deterministic finding breadth. Ordinary lookups default to `configured`; workflow aliases default to `hard` so the frequent edit loop does not pay for every soft audit unless requested.
 
 ## Editing workflow
 

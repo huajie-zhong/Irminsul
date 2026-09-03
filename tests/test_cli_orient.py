@@ -102,6 +102,46 @@ def test_orient_json(tmp_path: Path) -> None:
         assert hint["when"]
 
 
+def test_orient_reports_root_router_first(tmp_path: Path) -> None:
+    repo = _make_orient_repo(tmp_path)
+    (repo / "AGENTS.md").write_text("# AGENTS.md\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["orient", "--format", "json", "--path", str(repo)])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["entry_docs"] == ["AGENTS.md", "docs/README.md", "docs/GLOSSARY.md"]
+
+
+def test_orient_reports_root_and_docs_router_separately(tmp_path: Path) -> None:
+    repo = _make_orient_repo(tmp_path)
+    (repo / "AGENTS.md").write_text("# AGENTS.md\n", encoding="utf-8")
+    (repo / "docs" / "AGENTS.md").write_text("# Manifest\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["orient", "--format", "json", "--path", str(repo)])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["entry_docs"] == [
+        "AGENTS.md",
+        "docs/AGENTS.md",
+        "docs/README.md",
+        "docs/GLOSSARY.md",
+    ]
+
+
+def test_orient_omits_root_router_when_absent(tmp_path: Path) -> None:
+    repo = _make_orient_repo(tmp_path)
+    (repo / "README.md").write_text("# Root readme\n", encoding="utf-8")
+    (repo / "CLAUDE.md").write_text("# Harness pointer\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["orient", "--format", "json", "--path", str(repo)])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["entry_docs"] == ["docs/README.md", "docs/GLOSSARY.md"]
+
+
 def test_orient_json_against_fixture_repo() -> None:
     result = runner.invoke(app, ["orient", "--format", "json", "--path", str(_GOOD_FIXTURE)])
     assert result.exit_code == 0, result.output

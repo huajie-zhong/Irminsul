@@ -14,6 +14,7 @@ Two repository layouts are supported, and `Topology` names them:
 from __future__ import annotations
 
 import datetime as _dt
+import json
 import os
 import posixpath
 import re
@@ -36,6 +37,61 @@ _GITHUB_USER_PLACEHOLDER = "huajie-zhong"
 
 _SCAFFOLDS_DIR = Path(__file__).parent / "scaffolds"
 _WORKFLOWS_DIR = Path(__file__).parent / "workflows"
+
+# Agent-harness wiring. The registration and the Claude Code pointer are
+# constants rather than scaffold templates because under `--force` each is
+# merged into an existing file — a registration may hold servers the adopter
+# needs, a `CLAUDE.md` the adopter's own guidance — and the template writer
+# only knows skip-or-replace. The skill sits beside them so the three harness
+# files share one writer and one skipped-file note (ADR-0023).
+_MCP_CONFIG_PATH = Path(".mcp.json")
+_SKILL_PATH = Path(".claude") / "skills" / "irminsul" / "SKILL.md"
+_CLAUDE_POINTER_PATH = Path("CLAUDE.md")
+
+# Bare console script and a relative path, so the file is committable and
+# byte-identical on every platform. An absolute or virtual-environment path
+# would be machine-specific.
+_MCP_CONFIG: dict[str, Any] = {
+    "mcpServers": {
+        "irminsul": {
+            "command": "irminsul",
+            "args": ["mcp", "--path", "."],
+        }
+    }
+}
+
+_MCP_MANUAL_COMMAND = "claude mcp add irminsul -- irminsul mcp --path ."
+
+# A trigger, not a copy. The command vocabulary is served live by `irminsul
+# orient` and the work order lives in the agent protocol doc; restating either
+# here would be a third copy in a format no check can read (ADR-0023).
+_SKILL_BODY = """---
+name: irminsul
+description: Use when editing code or docs in a repo with an irminsul.toml at the root.
+---
+
+Run `irminsul orient` first. It reports the docs tree, the configured checks, and
+which command to run when.
+
+Follow the work order in `docs/90-meta/agent-protocol.md`.
+
+Before committing, `irminsul check --profile=hard` must exit 0.
+"""
+
+#: The line that makes Claude Code load the router. Its presence is what
+#: counts as wired, so an adopter's own `CLAUDE.md` is left alone once it
+#: carries the import.
+_ROUTER_IMPORT = "@AGENTS.md"
+
+_CLAUDE_POINTER_BODY = f"""# CLAUDE.md
+
+Guidance for this repository lives in the root `AGENTS.md`, the harness-neutral
+entry point. This file only references it so the two cannot drift apart.
+
+{_ROUTER_IMPORT}
+
+If the import above is not resolved, read `AGENTS.md` at the repository root directly.
+"""
 
 #: Directory the sibling repos are checked out under in generated CI.
 _CI_WORKSPACE = "workspace"
@@ -453,8 +509,8 @@ def _scaffold_pairs(topology: Topology) -> list[tuple[Path, Path, Path]]:
 
 
 def write_scaffold(target_root: Path, answers: InitAnswers, *, force: bool = False) -> list[Path]:
-    """Render every scaffold template into `target_root`. Returns the list of
-    files written (repo-relative)."""
+    """Render every scaffold template into `target_root`, with LF newlines on
+    every platform. Returns the list of files written (repo-relative)."""
     context = {
         "project_name": answers.project_name,
         "languages": answers.languages,
@@ -473,9 +529,8 @@ def write_scaffold(target_root: Path, answers: InitAnswers, *, force: bool = Fal
         out_abs = target_root / output_rel
         if out_abs.exists() and not force:
             continue
-        out_abs.parent.mkdir(parents=True, exist_ok=True)
         rendered = _render_template(template_path, base_dir, context)
-        out_abs.write_text(rendered, encoding="utf-8")
+        _write_lf(out_abs, rendered)
         written.append(output_rel)
 
     return written
@@ -497,29 +552,198 @@ def generate_agents_manifest(target_root: Path, *, force: bool = False) -> list[
     return [rel_path]
 
 
+@dataclass(frozen=True)
+class HarnessWiring:
+    written: list[Path]
+    skipped: list[Path]
+    #: Whether `.mcp.json` names the `irminsul` server after the call — written
+    #: now, or already present in a registration that was left alone.
+    mcp_registered: bool
+    #: One line per skipped file that is not wired yet, saying what to do.
+    hints: list[str]
+
+
+def _read_text(path: Path) -> str | None:
+    """File content with its line endings intact and any BOM dropped, or None
+    when it cannot be read. Notepad and Windows PowerShell 5 write a BOM, and
+    `json.loads` rejects one."""
+    try:
+        with open(path, encoding="utf-8-sig", newline="") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def _load_mcp_config(text: str) -> dict[str, Any] | None:
+    """The parsed registration, or None when there is nothing to merge into:
+    not JSON, or not a JSON object."""
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _registers_irminsul(config: dict[str, Any] | None) -> bool:
+    servers = config.get("mcpServers") if config is not None else None
+    return isinstance(servers, dict) and "irminsul" in servers
+
+
+def _write_lf(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8", newline="\n")
+
+
+def _link_pointer(path: Path, current: str) -> None:
+    """Prepend the router import to an adopter's own `CLAUDE.md`, keeping its
+    content and its line endings."""
+    newline = "\r\n" if "\r\n" in current else "\n"
+    with open(path, "w", encoding="utf-8", newline="") as fh:
+        fh.write(f"{_ROUTER_IMPORT}{newline}{newline}{current}")
+
+
+def write_harness_files(target_root: Path, *, force: bool = False) -> HarnessWiring:
+    """Write the agent-harness wiring.
+
+    Every file is skipped when present. Under `force` the skill is replaced,
+    but the other two are merged, because both may hold content the adopter
+    needs: the `irminsul` entry is set in the existing `mcpServers` map and
+    every other server survives, and a `CLAUDE.md` that lacks the router
+    import gains it at the top and keeps the rest. A registration that is not
+    a JSON object is never rewritten, forced or not — there is nothing to
+    merge into, and replacing it would delete whatever the adopter keeps
+    there — so it is skipped with a hint; only a blank file counts as absent.
+    A `CLAUDE.md` that already imports the router is left alone. Everything is
+    written with LF newlines on every platform, so the committed bytes are
+    identical everywhere. None of the files is policed by a check: none is
+    derived from anything, and the cost would fall on adopters who
+    legitimately delete any of them (ADR-0023).
+    """
+    written: list[Path] = []
+    skipped: list[Path] = []
+    hints: list[str] = []
+
+    mcp_abs = target_root / _MCP_CONFIG_PATH
+    mcp_text = _read_text(mcp_abs) if mcp_abs.exists() else ""
+    blank = mcp_text is not None and mcp_text.strip() == ""
+    existing = _load_mcp_config(mcp_text) if mcp_text and not blank else None
+    registered = _registers_irminsul(existing)
+    if not blank and existing is None:
+        skipped.append(_MCP_CONFIG_PATH)
+        hints.append(
+            f"{_MCP_CONFIG_PATH.as_posix()} is not a JSON object, so nothing was merged "
+            f"into it; to register the MCP server manually: {_MCP_MANUAL_COMMAND}"
+        )
+    elif not blank and not force:
+        skipped.append(_MCP_CONFIG_PATH)
+        if not registered:
+            hints.append(f"to register the MCP server manually: {_MCP_MANUAL_COMMAND}")
+    else:
+        config: dict[str, Any] = dict(existing) if existing is not None else {}
+        servers = config.get("mcpServers")
+        merged = dict(servers) if isinstance(servers, dict) else {}
+        merged["irminsul"] = _MCP_CONFIG["mcpServers"]["irminsul"]
+        config["mcpServers"] = merged
+        _write_lf(mcp_abs, json.dumps(config, indent=2) + "\n")
+        written.append(_MCP_CONFIG_PATH)
+        registered = True
+
+    skill_abs = target_root / _SKILL_PATH
+    if skill_abs.exists() and not force:
+        skipped.append(_SKILL_PATH)
+    else:
+        _write_lf(skill_abs, _SKILL_BODY)
+        written.append(_SKILL_PATH)
+
+    pointer_abs = target_root / _CLAUDE_POINTER_PATH
+    pointer_text = _read_text(pointer_abs) if pointer_abs.exists() else None
+    if pointer_text is None:
+        _write_lf(pointer_abs, _CLAUDE_POINTER_BODY)
+        written.append(_CLAUDE_POINTER_PATH)
+    elif _ROUTER_IMPORT in pointer_text or not force:
+        skipped.append(_CLAUDE_POINTER_PATH)
+        if _ROUTER_IMPORT not in pointer_text:
+            hints.append(
+                f"to reach AGENTS.md from Claude Code, add a line `{_ROUTER_IMPORT}` "
+                f"to {_CLAUDE_POINTER_PATH.as_posix()}"
+            )
+    else:
+        _link_pointer(pointer_abs, pointer_text)
+        written.append(_CLAUDE_POINTER_PATH)
+
+    return HarnessWiring(written=written, skipped=skipped, mcp_registered=registered, hints=hints)
+
+
 def _scaffold_with_agent_wiring(
     target_root: Path, answers: InitAnswers, *, force: bool
-) -> list[Path]:
+) -> tuple[list[Path], bool]:
     """Render the scaffold, then wire the repo for agent harnesses.
 
-    Writes `docs/AGENTS.md` (the navigation manifest) via the regen machinery.
-    The root `AGENTS.md` pointer is part of the scaffold templates; if one
-    already exists it is skipped (with a note) unless `force` is given.
+    Writes `docs/AGENTS.md` (the navigation manifest) via the regen machinery,
+    then the harness wiring (`.mcp.json`, the harness skill, the `CLAUDE.md`
+    pointer). The root `AGENTS.md` router is a scaffold template. Anything
+    that already exists is skipped and named in a note, with a hint for each
+    skipped file that is not wired yet, unless `force` is given — and even
+    then a registration that cannot be parsed and a pointer that already
+    imports the router stay untouched and are named. Returns the files
+    written and whether `.mcp.json` ends up registering the server, so the
+    next steps can say which is the case.
     """
-    root_manifest_preexisting = (target_root / "AGENTS.md").exists()
+    root_router_preexisting = (target_root / "AGENTS.md").exists()
     written = write_scaffold(target_root, answers, force=force)
     written.extend(generate_agents_manifest(target_root, force=force))
-    if root_manifest_preexisting and not force:
+    harness = write_harness_files(target_root, force=force)
+    written.extend(harness.written)
+
+    preexisting = [Path("AGENTS.md")] if root_router_preexisting and not force else []
+    preexisting.extend(harness.skipped)
+    if preexisting:
+        names = ", ".join(p.as_posix() for p in preexisting)
         typer.echo(
             typer.style(
-                "note: AGENTS.md already exists at the repo root; leaving it untouched.",
+                f"note: already present, left untouched: {names}",
                 fg="yellow",
             )
         )
-    return written
+        for hint in harness.hints:
+            typer.echo(typer.style(f"      {hint}", fg="yellow"))
+    return written, harness.mcp_registered
 
 
-def print_next_steps(answers: InitAnswers, written: list[Path]) -> None:
+def _harness_next_step(
+    mcp_registered: bool, *, code_dir: str | None = None, docs_dir: str | None = None
+) -> str:
+    """Step 4 of the next steps, worded for what adoption actually did.
+
+    `code_dir` and `docs_dir` are the sibling layout's two directory names.
+    The wiring lands in the docs repo, where init ran, so a session opened in
+    the code repo has to register the server itself, pointed back here.
+    """
+    lead = (
+        "  4. Point your coding agent at AGENTS.md (repo root) — it routes to "
+        "docs/AGENTS.md and the agent loop. "
+    )
+    if mcp_registered:
+        body = ".mcp.json registers the MCP server"
+        if code_dir is not None and docs_dir is not None:
+            body += (
+                f" for sessions opened here; from {code_dir}/ run "
+                f"`claude mcp add irminsul -- irminsul mcp --path ../{docs_dir}`"
+            )
+        body += "."
+    else:
+        body = f"Register the MCP server with `{_MCP_MANUAL_COMMAND}`."
+    return (
+        lead
+        + body
+        + " The harness runs the `irminsul` on its own PATH, so that install needs "
+        + "`pip install 'irminsul[mcp]'`."
+    )
+
+
+def print_next_steps(
+    answers: InitAnswers, written: list[Path], *, mcp_registered: bool = True
+) -> None:
     typer.echo()
     typer.echo(typer.style("Created:", fg="green", bold=True))
     for p in written:
@@ -529,10 +753,7 @@ def print_next_steps(answers: InitAnswers, written: list[Path]) -> None:
     typer.echo("  1. Edit docs/00-foundation/principles.md")
     typer.echo("  2. Edit docs/10-architecture/overview.md")
     typer.echo("  3. Add CODEOWNERS coverage for /docs (project-specific; not auto-generated).")
-    typer.echo(
-        "  4. Point your coding agent at AGENTS.md (repo root) — "
-        "it routes to docs/AGENTS.md and the agent loop."
-    )
+    typer.echo(_harness_next_step(mcp_registered))
     typer.echo("  5. git add . && git commit -m 'Adopt Irminsul'")
     typer.echo("  6. Push — CI enforces from PR #1.")
 
@@ -545,8 +766,8 @@ def run_init(
     force: bool = False,
 ) -> None:
     answers = gather_answers(repo_root=target_root, interactive=interactive, languages=languages)
-    written = _scaffold_with_agent_wiring(target_root, answers, force=force)
-    print_next_steps(answers, written)
+    written, mcp_registered = _scaffold_with_agent_wiring(target_root, answers, force=force)
+    print_next_steps(answers, written, mcp_registered=mcp_registered)
 
 
 def run_init_fresh(
@@ -559,10 +780,10 @@ def run_init_fresh(
     answers = gather_answers_fresh(
         repo_root=target_root, interactive=interactive, languages=languages
     )
-    written = _scaffold_with_agent_wiring(target_root, answers, force=force)
+    written, mcp_registered = _scaffold_with_agent_wiring(target_root, answers, force=force)
     for root in answers.source_roots:
         (target_root / root).mkdir(parents=True, exist_ok=True)
-    print_next_steps(answers, written)
+    print_next_steps(answers, written, mcp_registered=mcp_registered)
 
 
 def run_init_siblings(
@@ -579,11 +800,19 @@ def run_init_siblings(
         code_repo=code_repo,
         languages=languages,
     )
-    written = _scaffold_with_agent_wiring(target_root, answers, force=force)
-    _print_siblings_next_steps(answers, written)
+    written, mcp_registered = _scaffold_with_agent_wiring(target_root, answers, force=force)
+    _print_siblings_next_steps(
+        answers, written, mcp_registered=mcp_registered, docs_dir=target_root.resolve().name
+    )
 
 
-def _print_siblings_next_steps(answers: InitAnswers, written: list[Path]) -> None:
+def _print_siblings_next_steps(
+    answers: InitAnswers,
+    written: list[Path],
+    *,
+    mcp_registered: bool = True,
+    docs_dir: str | None = None,
+) -> None:
     typer.echo()
     typer.echo(typer.style("Created:", fg="green", bold=True))
     for p in written:
@@ -599,10 +828,7 @@ def _print_siblings_next_steps(answers: InitAnswers, written: list[Path]) -> Non
         typer.echo(f"  1. Clone or place the code repo at {answers.code_dir}/")
     typer.echo("  2. Edit docs/00-foundation/principles.md")
     typer.echo("  3. Edit docs/10-architecture/overview.md")
-    typer.echo(
-        "  4. Point your coding agent at AGENTS.md (repo root) — "
-        "it routes to docs/AGENTS.md and the agent loop."
-    )
+    typer.echo(_harness_next_step(mcp_registered, code_dir=answers.code_dir, docs_dir=docs_dir))
     typer.echo("  5. git add . && git commit -m 'Adopt Irminsul (siblings)'")
     typer.echo("  6. Push — CI enforces from PR #1.")
     if answers.code_repo_spec is None:

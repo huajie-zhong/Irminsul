@@ -20,6 +20,15 @@ from irminsul.docgraph import build_graph
 # order. Only the ones that actually exist on disk are reported.
 _ENTRY_DOC_NAMES = ("AGENTS.md", "README.md", "CONTRIBUTING.md", "GLOSSARY.md")
 
+# The root-level harness router that `irminsul init` scaffolds. Cursor and Codex
+# read it natively; Claude Code reaches it through the scaffolded `CLAUDE.md`
+# import. Reported ahead of the docs-root entries because it is the first
+# read, not because it lives in the docs tree — it does not.
+# Deliberately narrower than `_ENTRY_DOC_NAMES`: a root README or CONTRIBUTING
+# duplicates its docs-root counterpart as noise, and harness-proprietary names
+# do not belong in a harness-neutral report.
+_ROOT_ENTRY_DOC_NAMES = ("AGENTS.md",)
+
 # Curated command vocabulary teaching an agent the workflow loop. Static by
 # design: the *surface* is derivable (`irminsul surface cli`), but the "when"
 # guidance is intent, which only a human can curate.
@@ -127,6 +136,30 @@ class OrientReport:
     commands: list[CommandHint]
 
 
+def _entry_docs(repo_root: Path, docs_root: str) -> list[str]:
+    """Navigation files an agent should read first, as repo-relative POSIX paths.
+
+    Root-level entries come first — the harness router is read before the
+    navigation manifest — then the docs-root entries in their own priority
+    order. Only files that exist are reported. The dedup below matters only
+    when `docs_root` is the repo root itself, where `AGENTS.md` is reachable
+    at both levels and would otherwise be listed twice; under a nested
+    `docs_root` the root router and the manifest are distinct files and both
+    are reported.
+    """
+    out: list[str] = []
+    for name in _ROOT_ENTRY_DOC_NAMES:
+        if (repo_root / name).is_file():
+            out.append(PurePosixPath(name).as_posix())
+    for name in _ENTRY_DOC_NAMES:
+        if not (repo_root / docs_root / name).is_file():
+            continue
+        rel = (PurePosixPath(docs_root) / name).as_posix()
+        if rel not in out:
+            out.append(rel)
+    return out
+
+
 def build_orient_report(repo_root: Path, config: IrminsulConfig) -> OrientReport:
     """Build the orientation report from one graph walk plus config.
 
@@ -146,11 +179,7 @@ def build_orient_report(repo_root: Path, config: IrminsulConfig) -> OrientReport
         if len(rel.parts) >= 2:
             layer_counts[rel.parts[0]] += 1
 
-    entry_docs = [
-        (PurePosixPath(docs_root) / name).as_posix()
-        for name in _ENTRY_DOC_NAMES
-        if (repo_root / docs_root / name).is_file()
-    ]
+    entry_docs = _entry_docs(repo_root, docs_root)
 
     return OrientReport(
         version=1,

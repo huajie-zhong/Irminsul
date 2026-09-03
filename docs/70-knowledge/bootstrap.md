@@ -15,6 +15,7 @@ To adopt this system on a new or existing codebase, in order:
 
 - [ ] Install Irminsul and run `irminsul init` (or `irminsul init --fresh` before code exists)
 - [ ] Run `irminsul orient` and read the generated [agent navigation manifest](../AGENTS.md)
+- [ ] Install the `mcp` extra (`pip install 'irminsul[mcp]'`) so the scaffolded `.mcp.json` resolves; if adoption left an existing registration untouched, wire the [MCP server](../20-components/mcp-server.md) by hand
 - [ ] Replace the prompts in [`00-foundation/principles.md`](../00-foundation/principles.md) with the project's intent
 - [ ] Describe the system boundary in [`10-architecture/overview.md`](../10-architecture/overview.md)
 - [ ] Add component docs whose `describes` and `tests` fields claim the current source and tests

@@ -11,8 +11,16 @@ inputs:
   strict:
     description: 'Promote warning findings to a non-zero exit code.'
     default: 'false'
+  format:
+    description: 'Output format: github | plain | json. Defaults to GitHub annotations on the failing line.'
+    default: github
   version:
-    description: Pin a specific irminsul release to install (default unpinned).
+    description: >-
+      Pin an irminsul release from PyPI. Leave empty to install the CLI from
+      the same ref of this repository that the workflow references, which is
+      the only way the inputs above are guaranteed to match the installed CLI.
+      A pinned release must accept `--profile` and `--format`; v0.2.0 and
+      earlier do not, and fail before any check runs.
     default: ''
 
 runs:
@@ -22,19 +30,34 @@ runs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
+    # Every context value is mapped through `env` rather than expanded into the
+    # script: inside a composite action's `run`, `github.action_repository` and
+    # `github.action_ref` expand to empty strings, and an input expanded straight
+    # into bash source is a script-injection point.
     - name: Install irminsul
       shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        ACTION_REPO: ${{ github.action_repository }}
+        ACTION_REF: ${{ github.action_ref }}
+        ACTION_PATH: ${{ github.action_path }}
       run: |
-        if [ -n "${{ inputs.version }}" ]; then
-          pip install "irminsul==${{ inputs.version }}"
+        if [ -n "$VERSION" ]; then
+          pip install "irminsul==$VERSION"
+        elif [ -n "$ACTION_REPO" ] && [ -n "$ACTION_REF" ]; then
+          pip install "irminsul @ git+https://github.com/$ACTION_REPO@$ACTION_REF"
         else
-          pip install irminsul
+          pip install "$ACTION_PATH"
         fi
     - name: Run irminsul check
       shell: bash
+      env:
+        PROFILE: ${{ inputs.profile }}
+        FORMAT: ${{ inputs.format }}
+        STRICT: ${{ inputs.strict }}
       run: |
-        if [ "${{ inputs.strict }}" = "true" ]; then
-          irminsul check --profile=${{ inputs.profile }} --strict
-        else
-          irminsul check --profile=${{ inputs.profile }}
-        fi
+        args=()
+        if [ -n "$PROFILE" ]; then args+=("--profile=$PROFILE"); fi
+        if [ -n "$FORMAT" ]; then args+=("--format=$FORMAT"); fi
+        if [ "$STRICT" = "true" ]; then args+=(--strict); fi
+        irminsul check "${args[@]}"

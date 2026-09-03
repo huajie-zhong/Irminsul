@@ -27,6 +27,6 @@ output.
 
 ## Harness notes
 
-Claude Code, Cursor, and Codex read a root `AGENTS.md` natively or can be
-pointed at it. If this repo also has a `CLAUDE.md`, reference this file from
-it with `@AGENTS.md`.
+Cursor and Codex read a root `AGENTS.md` natively. Claude Code reads `CLAUDE.md`,
+so the scaffolded `CLAUDE.md` imports this file with `@AGENTS.md`; keep that
+import if you replace it with your own.

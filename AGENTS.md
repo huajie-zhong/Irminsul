@@ -1,6 +1,25 @@
-# AGENTS.md
+# AGENTS.md — agent entry point for Irminsul
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This is the canonical guidance file for any coding agent working in this repository.
+Harness-specific files at the repo root reference this one rather than restating it.
+
+**Start at [`docs/AGENTS.md`](docs/AGENTS.md)** — the navigation manifest with the full
+documentation tree, the doc-system rules, and the editing protocol. The mandatory work
+order for lifecycle-bearing changes lives in
+[`docs/90-meta/agent-protocol.md`](docs/90-meta/agent-protocol.md).
+
+## The agent loop
+
+1. At the start of a session, run `irminsul orient` and read `docs/AGENTS.md`.
+2. Before editing, run `irminsul context <path>` for the files you intend to touch, or
+   `irminsul context --topic <query>` while locating them.
+3. Make the change. Keep doc updates **in the same commit** as the code they describe.
+4. After editing, run `irminsul context --changed` to confirm ownership and surface any
+   findings your edit introduced.
+5. Run `irminsul fix` to apply deterministic remediations for mechanical findings.
+6. Run `irminsul check --profile=hard` before committing; it must exit 0.
+
+`context`, `check`, and friends support `--format json` for machine-readable output.
 
 ## What this project is
 
@@ -57,8 +76,10 @@ irminsul regen agents-md                 # rebuild the docs/AGENTS.md manifest
 **The single data structure: `DocGraph`** (`src/irminsul/docgraph.py`). Built once per CLI invocation by `build_graph(repo_root, config)`. Walks `docs_root`, parses every `*.md` (skipping the `EXEMPT_TOPLEVEL_NAMES` set: `README.md`, `GLOSSARY.md`, `CONTRIBUTING.md`, `AGENTS.md`), validates frontmatter, and exposes nodes by id and by repo-relative POSIX path. Every check consumes a `DocGraph`; nothing else. If you're adding behavior, ask first whether it belongs *on the graph* or *in a check*.
 
 **Two check registries** (`src/irminsul/checks/__init__.py`). Names in `irminsul.toml` are resolved against these maps. `config.py` validates `checks.hard`/`checks.soft_deterministic` against its own known-name tuples at config-load time — a name that is not valid there is a hard error (red message, exit 2), with a did-you-mean suggestion, or a pointer to the other list when the check moved between them.
-- `HARD_REGISTRY` — 11 checks: `frontmatter`, `globs`, `uniqueness`, `links`, `schema-leak`, `coverage`, `liar`, `prose-file-reference`, `agents-manifest`, `rfc-lifecycle-integrity`, `retired-references`. Errors from these always block (exit 1) regardless of `--strict`.
-- `SOFT_REGISTRY` — 23 deterministic warnings: `mtime-drift`, `orphans`, `stale-reaper`, `supersession`, `parent-child`, `glossary-discipline`, `external-links`, `rfc-resolution`, `reality`, `claim-anchor`, … (full list in `checks/__init__.py`). Promoted to errors only with `--strict`.
+- `HARD_REGISTRY` — errors from these always block (exit 1) regardless of `--strict`.
+- `SOFT_REGISTRY` — deterministic warnings, promoted to errors only with `--strict`.
+
+The registries in `checks/__init__.py` are the full list, and `irminsul orient` reports the configured set live. This file deliberately carries neither the counts nor the names: both rotted here before, and nothing mechanical can catch it when they do.
 
 All checks subclass `Check` and return `list[Finding]` with `(check, severity, path, line, message, suggestion)`. Severity ordering and exit-code logic live in `cli.check`.
 
@@ -70,15 +91,17 @@ All checks subclass `Check` and return `list[Finding]` with `(check, severity, p
 
 **Language profiles** (`src/irminsul/languages/`) are pure-data records (source-root candidates + schema-leak regexes) keyed by language name. Adding a language = adding a file here, no check changes.
 
-**Init scaffolder** (`src/irminsul/init/`) walks Jinja2 templates under `init/scaffolds/` and `init/workflows/` to bootstrap a new repo. Two layouts: `same-repo` (docs/ inside the code repo, the default) and `siblings` (`irminsul init --topology siblings --code-repo <spec>`, a docs repo beside a separate code repo). `detect_code_signals()` guards which one fits the target directory.
+**Init scaffolder** (`src/irminsul/init/`) walks Jinja2 templates under `init/scaffolds/` and `init/workflows/` to bootstrap a new repo, then writes the agent-harness files (`.mcp.json`, merged into an existing registration under `--force`, and `.claude/skills/irminsul/SKILL.md`) from module constants; the root `AGENTS.md` router and the `CLAUDE.md` pointer are scaffold templates. Two layouts: `same-repo` (docs/ inside the code repo, the default) and `siblings` (`irminsul init --topology siblings --code-repo <spec>`, a docs repo beside a separate code repo). `detect_code_signals()` guards which one fits the target directory.
 
-**`context`, `refs`, `new`, `regen`, and `list`**. `irminsul context <path>|--topic <query>|--changed` (`src/irminsul/context.py`) returns ownership, tests, dependencies, relevant deterministic findings, and next command hints. `irminsul refs <doc-id|path>|--symbol <query>` (`src/irminsul/refs.py`) reports doc backlinks (strong `depends_on` plus weak markdown links) or symbol owners/references. `irminsul new {adr,component,rfc}` writes templated atoms from `src/irminsul/new/templates/`. `irminsul regen agents-md` (`src/irminsul/regen/agents_md.py`) is the only regen target — it rebuilds the `docs/AGENTS.md` navigation manifest. `irminsul list {orphans,stale,undocumented,lifecycle}` (`src/irminsul/listing/command.py`) wraps checks with custom filtering; each subcommand supports `--format plain|json`. The CLI also ships `seed` (PIB capture into the foundation layer), `surface` (derive cli/http/exports/env-var surfaces on demand), `anchors` (report or re-pin anchored prose claims), and `fix` (deterministic remediations).
+**`context`, `refs`, `new`, `regen`, and `list`**. `irminsul context <path>|--topic <query>|--changed` (`src/irminsul/context.py`) returns ownership, tests, dependencies, relevant deterministic findings, and next command hints. `irminsul refs <doc-id|path>|--symbol <query>` (`src/irminsul/refs.py`) reports doc backlinks (strong `depends_on` plus weak markdown links) or symbol owners/references. `irminsul new {adr,component,rfc}` writes templated atoms from `src/irminsul/new/templates/`. `irminsul regen agents-md` (`src/irminsul/regen/agents_md.py`) is the only regen target — it rebuilds the `docs/AGENTS.md` navigation manifest. `irminsul list {orphans,stale,undocumented,lifecycle}` (`src/irminsul/listing/command.py`) wraps checks with custom filtering; each subcommand supports `--format plain|json`. The CLI also ships `seed` (PIB capture into the foundation layer), `surface` (derive cli/http/exports/env-var surfaces on demand), `anchors` (report or re-pin anchored prose claims), `mcp` (read-only MCP stdio server), and `fix` (deterministic remediations).
 
-**The composite Action** (`action.yml`) is a thin shell wrapper: `pip install irminsul[==version]` → `irminsul check --profile=…`. Don't add logic here; add it to the CLI and let the Action call it.
+**The composite Action** (`action.yml`) is a thin shell wrapper: install the CLI (the pinned release when `version` is set, otherwise the same ref of this repository the workflow references) → `irminsul check --profile=… --format=…`. Don't add logic here; add it to the CLI and let the Action call it.
 
 ## The docs tree must obey the rules it enforces
 
 `docs/` is the project's documentation, and because we ship a tool that enforces a doc system, our own docs must obey it too. CI dogfoods `irminsul check --profile=hard` against this repo, so a doc change that breaks the rules breaks the build. The 9-layer structure (`00-foundation/`, `10-architecture/`, …, `90-meta/`) is enforced; doc IDs use bare slugs because the numeric prefixes namespace them. `docs/CONTRIBUTING.md` is the authoritative authoring guide. Before adding or moving a doc, read `docs/10-architecture/layers.md` and `docs/10-architecture/tiers.md`. If `irminsul check --profile=hard` fails on a doc change, the doc is wrong, not the check — fix the frontmatter, glob, or link rather than relaxing the check.
+
+Note the two distinct files named `AGENTS.md`: **this file** is the root harness router, and `docs/AGENTS.md` is the generated navigation manifest. Root-level files sit outside `docs_root`, so the doc-graph checks cannot see them; only `retired-references` reads the readme and the two agent files. Their accuracy is otherwise a review responsibility.
 
 ## Tests
 
@@ -89,3 +112,15 @@ CI matrix: ubuntu/macos/windows × Python 3.12/3.13. Code that touches paths mus
 ## Versioning and release
 
 Version is driven by `hatch-vcs` from git tags; the wheel writes `src/irminsul/_version.py` at build time. Don't hand-edit version strings. Release flow lives in `.github/workflows/release.yml` (builds wheel + sdist, idempotent PyPI publish, ghcr.io Docker image, and a Homebrew tap dispatch that needs the `HOMEBREW_TAP_TOKEN` secret).
+
+## Harness notes
+
+Cursor and Codex read a root `AGENTS.md` natively. Claude Code reads `CLAUDE.md`, so this
+repo's `CLAUDE.md` references this file with `@AGENTS.md` rather than duplicating it —
+the duplicate copy previously rotted, and root-level files are outside every check's reach.
+
+`.mcp.json` at the repo root registers Irminsul's read-only MCP server, which exposes the
+orientation, context, refs, check, list, surface, anchors, and change queries as tools. The
+harness runs the `irminsul` on its own PATH, not the one in `.venv`, and that install needs
+the optional extra (`pip install 'irminsul[mcp]'`, already in `[dev]`). Without it the harness
+reports only a closed connection; `irminsul mcp --path .` from the same shell prints the hint.

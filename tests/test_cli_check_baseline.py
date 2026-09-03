@@ -48,6 +48,20 @@ def test_baseline_flow_adopt_then_ratchet(fixture_repo: Callable[[str], Path]) -
     assert error_paths == {"docs/20-components/new-bad.md"}
 
 
+def test_github_format_reports_the_baseline_note(fixture_repo: Callable[[str], Path]) -> None:
+    """The Action defaults to `--format github`, and that branch printed the
+    annotations and the summary but not the baseline note, so CI showed no
+    sign that findings were suppressed or that stale entries could be
+    ratcheted down."""
+    repo = fixture_repo("bad-frontmatter")
+    assert _check(repo, "--update-baseline")[0] == 0
+
+    code, out = _check(repo, "--format", "github")
+
+    assert code == 0
+    assert "suppressed" in out
+
+
 def test_baseline_reports_stale_entries_after_debt_paid(
     fixture_repo: Callable[[str], Path],
 ) -> None:
