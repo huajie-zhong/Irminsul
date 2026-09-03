@@ -41,8 +41,9 @@ coverage.xml
 .mypy_cache/
 .ruff_cache/
 
-# Agent scratch worktrees; transient, never committed.
+# Agent scratch worktrees and per-person harness settings; never committed.
 .claude/worktrees/
+.claude/settings.local.json
 
 # Editors
 .vscode/
@@ -67,6 +68,3 @@ src/irminsul/_version.py
 .env
 .env.local
 .env.*.local
-
-# Agent harness scratch. `.claude/skills/` and `.claude/settings.local.json` are tracked.
-.claude/worktrees/

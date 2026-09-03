@@ -285,3 +285,21 @@ def test_fix_supersession_handles_crlf_and_closing_delimiter_at_eof(
     text = old_doc.read_text(encoding="utf-8")
     assert "status: deprecated" in text
     assert "superseded_by: new-system" in text
+
+
+def test_fix_check_selector_rejects_an_unknown_name(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    """A typo used to get the same "not active under profile" note as a real
+    check outside the profile, so retrying with a wider profile never revealed
+    that the name was wrong."""
+    repo = fixture_repo("soft-supersession")
+
+    result = runner.invoke(
+        app,
+        ["fix", "--check", "glossary-disipline", "--format", "json", "--path", str(repo)],
+    )
+
+    assert result.exit_code == 2, result.output
+    assert "unknown check 'glossary-disipline'" in result.output
+    assert "did you mean 'glossary-discipline'" in result.output

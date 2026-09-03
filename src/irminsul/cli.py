@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as _dt
+import difflib
 import glob
 import sys
 from collections.abc import Mapping
@@ -1379,6 +1380,14 @@ def fix(
         *[(name, SOFT_REGISTRY) for name in _soft_check_names(profile, config)],
     ]
     if check_name is not None:
+        # A typo used to get the same "not active under profile" note as a real
+        # check outside the profile, so widening the profile never revealed it.
+        known = sorted(set(HARD_REGISTRY) | set(SOFT_REGISTRY))
+        if check_name not in known:
+            match = difflib.get_close_matches(check_name, known, n=1)
+            hint = f" (did you mean '{match[0]}'?)" if match else ""
+            typer.echo(typer.style(f"unknown check '{check_name}'{hint}", fg="red"))
+            raise typer.Exit(code=2)
         selected = [(name, registry) for name, registry in selected if name == check_name]
         if not selected:
             note = f"check '{check_name}' is not active under profile '{profile.value}'"
