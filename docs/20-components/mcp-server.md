@@ -62,7 +62,7 @@ The server is strictly read-only: no tool writes files, and there is no MCP path
 
 ## Wiring it into an agent
 
-The optional dependency comes from the `mcp` extra: `pip install 'irminsul[mcp]'`. Without it, `irminsul mcp` exits 1 with that install hint. The extra requires the 2.x MCP SDK — the server targets `mcp.server.MCPServer`, which replaced the 1.x `mcp.server.fastmcp.FastMCP`. The constraint is bounded below the next major so an upstream breaking rename fails at dependency resolution rather than at import.
+The optional dependency comes from the `mcp` extra: `pip install 'irminsul[mcp]'`. Without it, `irminsul mcp` exits 1 with that install hint. The harness spawns the `irminsul` it finds on its own PATH — not the one in a project virtual environment — so that install is the one that needs the extra: `pipx install 'irminsul[mcp]'`, or `pip install 'irminsul[mcp]'` into the interpreter on PATH. The server's own exit is self-diagnosing, but a harness typically surfaces it only as a closed connection; run `irminsul mcp --path .` from the shell the harness starts from to see the hint. The extra requires the 2.x MCP SDK — the server targets `mcp.server.MCPServer`, which replaced the 1.x `mcp.server.fastmcp.FastMCP`. The constraint is bounded below the next major so an upstream breaking rename fails at dependency resolution rather than at import.
 
 [Adoption](init.md) already writes the project registration below as `.mcp.json`, so a scaffolded repo needs no manual wiring. What follows is the fallback: a repo adopted before the registration was scaffolded, one whose `.mcp.json` already existed and was therefore left untouched, or a client that reads its own config location.
 
@@ -85,7 +85,7 @@ Any other MCP client, via the generic `mcpServers` shape:
 }
 ```
 
-`--path` is resolved once at startup and points at the repo the server answers for; run one server per repo.
+`--path` is resolved once at startup and points at the repo the server answers for; run one server per repo. The scaffolded `.` relies on the harness starting the server in the project root, which Claude Code does for a project-scoped `.mcp.json`.
 
 ## Scope & Limitations
 

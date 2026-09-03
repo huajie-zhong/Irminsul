@@ -115,10 +115,12 @@ Version is driven by `hatch-vcs` from git tags; the wheel writes `src/irminsul/_
 
 ## Harness notes
 
-Claude Code, Cursor, and Codex read a root `AGENTS.md` natively or can be pointed at it.
-This repo's `CLAUDE.md` references this file with `@AGENTS.md` rather than duplicating it —
+Cursor and Codex read a root `AGENTS.md` natively. Claude Code reads `CLAUDE.md`, so this
+repo's `CLAUDE.md` references this file with `@AGENTS.md` rather than duplicating it —
 the duplicate copy previously rotted, and root-level files are outside every check's reach.
 
 `.mcp.json` at the repo root registers Irminsul's read-only MCP server, which exposes the
-orientation, context, refs, check, list, surface, anchors, and change queries as tools. It
-needs the optional extra: `pip install 'irminsul[mcp]'` (already in `[dev]`).
+orientation, context, refs, check, list, surface, anchors, and change queries as tools. The
+harness runs the `irminsul` on its own PATH, not the one in `.venv`, and that install needs
+the optional extra (`pip install 'irminsul[mcp]'`, already in `[dev]`). Without it the harness
+reports only a closed connection; `irminsul mcp --path .` from the same shell prints the hint.

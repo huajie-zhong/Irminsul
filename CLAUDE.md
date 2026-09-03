@@ -1,7 +1,7 @@
 # CLAUDE.md
 
-Guidance for this repository lives in the root `AGENTS.md`, which every harness reads.
-This file only references it so the two cannot drift apart.
+Guidance for this repository lives in the root `AGENTS.md`, the harness-neutral
+entry point. This file only references it so the two cannot drift apart.
 
 @AGENTS.md
 

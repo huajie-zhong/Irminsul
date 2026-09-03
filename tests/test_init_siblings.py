@@ -588,3 +588,18 @@ def test_non_interactive_siblings_stays_scriptable(tmp_path: Path) -> None:
 
     assert result.exit_code == 0, result.stdout
     assert "principle, idea, and belief" not in result.stdout
+
+
+def test_siblings_next_steps_name_the_code_repo_registration(tmp_path: Path) -> None:
+    """The harness files land in the docs repo, where init runs. A session
+    opened in the code repo has neither, so step 4 says how to register the
+    server from there, pointed back at this repo."""
+    repo = _docs_repo(tmp_path)
+    result = _init_siblings(repo, "acme/app")
+    assert result.exit_code == 0, result.output
+
+    output = unstyle(result.output)
+    assert ".mcp.json registers the MCP server for sessions opened here" in output
+    assert "from ../app/ run `claude mcp add irminsul -- irminsul mcp --path ../docs`" in output
+    assert (repo / ".mcp.json").is_file()
+    assert not (repo.parent / "app" / ".mcp.json").exists()

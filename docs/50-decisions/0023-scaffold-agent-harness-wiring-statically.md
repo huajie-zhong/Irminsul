@@ -3,7 +3,7 @@ id: 0023-scaffold-agent-harness-wiring-statically
 title: "ADR-0023: Scaffold agent harness wiring statically"
 audience: adr
 tier: 2
-status: stable
+status: draft
 describes: []
 summary: Write harness wiring at adoption as unpoliced static constants, and repair the agent-facing surfaces that state something untrue.
 ---
@@ -12,7 +12,7 @@ summary: Write harness wiring at adoption as unpoliced static constants, and rep
 
 ## Status
 
-Accepted, 2026-07-29. Resolves
+Proposed. Resolves
 [`0043-wire-agent-harnesses-at-setup-and-repair-agent-facing-claims`](../80-evolution/rfcs/0043-wire-agent-harnesses-at-setup-and-repair-agent-facing-claims.md).
 
 ## Context
@@ -38,29 +38,37 @@ structurally blind exactly where its own entry point decayed.
 
 ## Decision
 
-Write two harness files at adoption: a project-scoped MCP registration and a
-trigger-only skill. Hold both as module constants in the init package rather than as
-scaffold templates, because the registration has to be merged into an existing file
-under `--force` — a registration may hold servers the adopter needs — and the template
-writer only knows skip-or-replace; the skill sits beside it so the two share one writer
-and one skipped-file note. Neither file carries a project-specific value, so neither
-needs substitution. Scaffold a pointer file for Claude Code that imports the root entry point,
-as a template, so the harness that reads that file reaches the router the skill assumes.
+Write three harness files at adoption: a project-scoped MCP registration, a
+trigger-only skill, and a pointer file for Claude Code that imports the root entry
+point, so the harness that reads that file reaches the router the skill assumes. Hold
+all three as module constants in the init package rather than as scaffold templates,
+because two of them have to be merged into an existing file under `--force` — a
+registration may hold servers the adopter needs, a pointer file the adopter's own
+guidance — and the template writer only knows skip-or-replace; the skill sits beside
+them so the three share one writer and one skipped-file note. None carries a
+project-specific value, so none needs substitution.
 
 Keep the skill a trigger. It carries its activation condition and two pointers: run
 orientation first, then follow the recorded work order. It carries no command table and
 no restatement of that work order, because both already have a single home and a live
 retrieval path.
 
-Leave both files unpoliced. Neither is derived from anything, so a drift check would
+Leave the files unpoliced. None is derived from anything, so a drift check would
 compare a constant against itself, and its cost would fall on adopters who legitimately
-delete either file. Accept the optional server dependency's absence as a self-diagnosing
-failure rather than moving it into the base dependency set.
+delete any of them. Accept the optional server dependency's absence as a failure the
+CLI diagnoses itself rather than moving it into the base dependency set; a harness may
+surface that failure only as a closed connection, so the server's component page and
+the adoption next steps name the install the harness's PATH needs and the command that
+reproduces the diagnosis.
 
-Skip both files when present, unless forced. Reuse the existing skip-if-exists policy
+Skip the files when present, unless forced. Reuse the existing skip-if-exists policy
 and the pre-existing-file note, and print the manual registration command as the fallback
 unless the existing registration already names the server. Under `--force`, replace the
-skill but merge the registration, keeping every other server.
+skill but merge the other two: set the `irminsul` entry in the registration, keeping
+every other server, and prepend the import to a pointer file that lacks it, keeping its
+content. Never rewrite a registration that cannot be parsed, forced or not: leave it
+alone and name it in the note, since overwriting it would delete whatever the adopter
+keeps there.
 
 Collapse the duplicated root entry point to one canonical document and one reference,
 rather than re-synchronizing the pair. Add no check for the result: after the collapse
@@ -103,8 +111,8 @@ exit code unchanged for every format.
 - Adoption now writes outside the docs tree and the CI directory, widening its
   responsibility.
 - The registration content exists both as an init constant and as an illustrative block
-  in the server's component page, and this repository tracks its own copies of both
-  harness files. A repository-local test binds all of them to the constants, so drift
+  in the server's component page, and this repository tracks its own copies of all
+  three harness files. A repository-local test binds all of them to the constants, so drift
   fails this suite without adding an adopter-facing check.
 - A change to the server's invocation will not mechanically flag already-adopted
   repositories, and the skill is stale without signal if harness conventions change.

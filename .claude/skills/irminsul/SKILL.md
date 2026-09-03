@@ -1,6 +1,6 @@
 ---
 name: irminsul
-description: Use when editing code in a repo with an irminsul.toml at the root.
+description: Use when editing code or docs in a repo with an irminsul.toml at the root.
 ---
 
 Run `irminsul orient` first. It reports the docs tree, the configured checks, and

@@ -20,9 +20,10 @@ from irminsul.docgraph import build_graph
 # order. Only the ones that actually exist on disk are reported.
 _ENTRY_DOC_NAMES = ("AGENTS.md", "README.md", "CONTRIBUTING.md", "GLOSSARY.md")
 
-# The root-level harness router, which every agent harness reads natively and
-# `irminsul init` scaffolds. Reported ahead of the docs-root entries because it
-# is the first read, not because it lives in the docs tree — it does not.
+# The root-level harness router that `irminsul init` scaffolds. Cursor and Codex
+# read it natively; Claude Code reaches it through the scaffolded `CLAUDE.md`
+# import. Reported ahead of the docs-root entries because it is the first
+# read, not because it lives in the docs tree — it does not.
 # Deliberately narrower than `_ENTRY_DOC_NAMES`: a root README or CONTRIBUTING
 # duplicates its docs-root counterpart as noise, and harness-proprietary names
 # do not belong in a harness-neutral report.
