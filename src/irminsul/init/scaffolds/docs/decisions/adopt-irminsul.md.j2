@@ -1,0 +1,31 @@
+---
+id: adopt-irminsul
+title: "Adopt the Irminsul doc system"
+status: stable
+describes: []
+---
+
+# Adopt the Irminsul doc system
+
+## Status
+
+Accepted, {{ today }}.
+
+## Context
+
+Documentation rots when the right place to write something isn't obvious and when CI doesn't enforce structural rules. Without enforcement, things drift.
+
+## Decision
+
+Adopt Irminsul as the canonical doc system for {{ project_name }}. CI runs `irminsul check` on every PR, and certain findings fail it.
+
+## Alternatives Considered
+
+- **[`README.md`](../README.md) alone** — fine until it isn't. Doesn't scale past one or two contributors.
+- **Confluence / Notion** — separate repo, separate workflow. Drifts from code within weeks.
+
+## Consequences
+
+- Every PR that adds source code without doc updates gets flagged.
+- New contributors have an obvious place to put each kind of writing.
+- Schema definitions cannot live in component docs; facts reconstructable from code are derived on demand rather than hand-copied.

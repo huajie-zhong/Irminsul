@@ -1,0 +1,110 @@
+"""Co-change enforcement — docs ship in the same change as the code they claim.
+
+Not a registered graph check: it needs the changed-file set from
+`git diff <base>...HEAD`, which only the CLI's `--diff <base>` flag supplies.
+Ownership is resolved through the exact `describes` glob logic the uniqueness
+check uses (`resolve_claims` / `most_specific_claims`), so "who owns this
+file?" has one answer everywhere. Findings are warnings and flow through the
+normal printing/JSON/summary pipeline, so `--strict` makes them fail the run like any
+other hint.
+"""
+
+from __future__ import annotations
+
+from typing import ClassVar, Final
+
+from irminsul.checks.base import Finding, FindingClass, Severity
+from irminsul.checks.uniqueness import most_specific_claims, resolve_claims
+from irminsul.docgraph import DocGraph, DocNode
+
+CHECK_NAME: Final = "co-change"
+CODE_UNREFLECTED_CHANGE: Final = "co-change/unreflected-change"
+
+
+class CoChangeCheck:
+    """Docs must ship in the same change as the code they claim.
+
+    Deliberately absent from both registries: the check cannot run from a
+    `DocGraph` alone — it needs the changed-file set only the CLI's `--diff`
+    flag supplies, so the CLI calls `run_co_change` directly. The class
+    exists to give co-change the same `name`/`explanations` surface as a
+    registered check, so `irminsul explain` resolves every code the CLI can
+    print, including this one.
+    """
+
+    name: ClassVar[str] = CHECK_NAME
+    default_severity: ClassVar[Severity] = Severity.warning
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_UNREFLECTED_CHANGE: (
+            "A source file this doc claims via `describes` changed in the diff, but "
+            "the doc itself did not. Update the doc in the same change, or run "
+            "`irminsul context <changed-file>` to see what it claims."
+        ),
+    }
+    classes: ClassVar[dict[str, FindingClass]] = {
+        CODE_UNREFLECTED_CHANGE: FindingClass.hint,
+    }
+
+    def run(self, graph: DocGraph) -> list[Finding]:
+        raise NotImplementedError(
+            "co-change needs the changed-file set; call run_co_change(graph, changed)"
+        )
+
+
+def run_co_change(
+    graph: DocGraph, changed: frozenset[str], cosmetic: frozenset[str] = frozenset()
+) -> list[Finding]:
+    """Warn for each owning doc whose claimed sources changed without it.
+
+    `changed` is the repo-relative POSIX path set from `git diff --name-only`.
+    A changed source file is "unreflected" when none of its most-specific
+    owning docs appear in the changed set; findings are grouped per owning
+    doc, listing every unreflected file it claims.
+
+    `cosmetic` names docs whose change was whitespace only. They do not count as
+    having shipped with the code: one blank line in the owning doc satisfied this
+    check, which made the cheapest way to pass it an edit that says nothing.
+    """
+    if graph.config is None or graph.repo_root is None:
+        return []
+
+    # Resolve claims against the changed set directly rather than walking the
+    # whole source tree: faster on large repos, and a deleted claimed file
+    # (absent from any walk) still triggers enforcement on its owning doc.
+    source_files = [(graph.repo_root / f, f) for f in sorted(changed)]
+    claims_by_file = resolve_claims(graph, source_files)
+
+    unreflected_by_doc: dict[str, tuple[DocNode, list[str]]] = {}
+    for source_file in sorted(changed):
+        claims = claims_by_file.get(source_file)
+        if not claims:
+            continue  # unclaimed file — nothing owns it, nothing to enforce
+        owners = {node.path.as_posix(): node for node, _, _ in most_specific_claims(claims)}
+        if any(doc_path in changed and doc_path not in cosmetic for doc_path in owners):
+            continue  # an owning doc shipped in the same change
+        for doc_path, node in owners.items():
+            _, files = unreflected_by_doc.setdefault(doc_path, (node, []))
+            files.append(source_file)
+
+    out: list[Finding] = []
+    for doc_path in sorted(unreflected_by_doc):
+        node, files = unreflected_by_doc[doc_path]
+        listed = ", ".join(files)
+        out.append(
+            Finding(
+                check=CHECK_NAME,
+                code=CODE_UNREFLECTED_CHANGE,
+                severity=Severity.warning,
+                path=node.path,
+                doc_id=node.id,
+                message=(
+                    f"source file(s) claimed by this doc changed in the diff "
+                    f"but the doc did not: {listed}"
+                ),
+                suggestion=(
+                    "update the doc in the same change, or run "
+                    "`irminsul context <changed-file>` to see what it claims"
+                ),
+            )
+        )
+    return out

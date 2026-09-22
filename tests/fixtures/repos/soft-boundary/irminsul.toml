@@ -1,0 +1,5 @@
+project_name = "soft-boundary"
+
+[paths]
+docs_root = "docs"
+source_roots = ["app"]

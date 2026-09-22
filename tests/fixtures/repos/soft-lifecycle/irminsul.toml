@@ -1,0 +1,14 @@
+project_name = "soft-lifecycle"
+
+[paths]
+docs_root = "docs"
+source_roots = ["src"]
+
+[checks]
+enabled = [
+    "frontmatter",
+    "globs",
+    "uniqueness",
+    "links",
+    "rfc-follow-through",
+]

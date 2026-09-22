@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "irminsul": {
+      "command": "irminsul",
+      "args": [
+        "mcp",
+        "--path",
+        "."
+      ]
+    }
+  }
+}

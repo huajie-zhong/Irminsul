@@ -1,0 +1,591 @@
+"""Configured source discovery and `describes` glob validation."""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
+from typing import ClassVar, Literal
+
+from pathspec import GitIgnoreSpec
+
+from irminsul.checks.base import Finding, FindingClass, Severity
+from irminsul.config import IrminsulConfig
+from irminsul.docgraph import DocGraph
+from irminsul.git.mtime import git_root_for
+
+
+@dataclass(frozen=True)
+class SourceWalkIssue:
+    kind: Literal["broken-symlink", "source-root-escape"]
+    root: str
+    path: str
+    message: str
+
+
+@dataclass(frozen=True)
+class SourceWalkResult:
+    files: list[tuple[Path, str]]
+    missing_roots: list[str]
+    issues: list[SourceWalkIssue]
+
+
+def walk_configured_source_files(
+    repo_root: Path,
+    config: IrminsulConfig,
+) -> SourceWalkResult:
+    """Walk the configured source roots under the configured source policy.
+
+    A missing root is returned in `missing_roots` rather than raising. A file's
+    display is repo-relative for same-repo files and source-root-relative for
+    cross-repo files (a source root outside the repo); callers match globs
+    against the display and use the absolute path for git and file I/O.
+    """
+    return _walk_source_files(
+        repo_root,
+        config.paths.source_roots,
+        source_includes=config.paths.source_includes,
+        source_excludes=config.paths.source_excludes,
+        honor_gitignore=config.paths.honor_gitignore,
+    )
+
+
+def _walk_source_files(
+    repo_root: Path,
+    source_roots: list[str],
+    *,
+    source_includes: list[str],
+    source_excludes: list[str],
+    honor_gitignore: bool,
+) -> SourceWalkResult:
+    files: list[tuple[Path, str]] = []
+    missing: list[str] = []
+    issues: list[SourceWalkIssue] = []
+    include_spec = GitIgnoreSpec.from_lines(source_includes) if source_includes else None
+    exclude_spec = GitIgnoreSpec.from_lines(source_excludes) if source_excludes else None
+
+    for root in source_roots:
+        abs_root = (repo_root / root).resolve()
+        if not abs_root.is_dir():
+            missing.append(root)
+            continue
+        ignore_matcher = _GitIgnoreMatcher(abs_root) if honor_gitignore else None
+
+        for dirpath, dirnames, filenames in os.walk(abs_root, followlinks=False):
+            current = Path(dirpath)
+            kept_dirs: list[str] = []
+            for name in dirnames:
+                path = current / name
+                parts = path.relative_to(abs_root).parts
+                display = _display_path(path, repo_root, abs_root)
+                if path.is_symlink() or _is_excluded(parts):
+                    continue
+                if _matches(exclude_spec, display, is_dir=True):
+                    continue
+                if ignore_matcher is not None and ignore_matcher.matches(path, is_dir=True):
+                    continue
+                kept_dirs.append(name)
+            dirnames[:] = kept_dirs
+
+            for name in filenames:
+                path = current / name
+                parts = path.relative_to(abs_root).parts
+                display = _display_path(path, repo_root, abs_root)
+                if _is_excluded(parts):
+                    continue
+                if _matches(exclude_spec, display):
+                    continue
+                if include_spec is not None and not _matches(include_spec, display):
+                    continue
+                if ignore_matcher is not None and ignore_matcher.matches(path):
+                    continue
+
+                if path.is_symlink():
+                    try:
+                        target = path.resolve(strict=True)
+                    except (OSError, RuntimeError):
+                        issues.append(
+                            SourceWalkIssue(
+                                kind="broken-symlink",
+                                root=root,
+                                path=display,
+                                message=f"source symlink '{display}' has no readable target",
+                            )
+                        )
+                        continue
+                    if not _is_within_source_root(target, abs_root):
+                        issues.append(
+                            SourceWalkIssue(
+                                kind="source-root-escape",
+                                root=root,
+                                path=display,
+                                message=(
+                                    f"source symlink '{display}' resolves outside configured "
+                                    f"root '{root}'"
+                                ),
+                            )
+                        )
+                        continue
+                    if not target.is_file():
+                        continue
+                elif not path.is_file():
+                    continue
+
+                files.append((path, display))
+
+    files.sort(key=lambda item: item[1])
+    issues.sort(key=lambda issue: (issue.path, issue.kind))
+    return SourceWalkResult(files=files, missing_roots=missing, issues=issues)
+
+
+def _display_path(path: Path, repo_root: Path, source_root: Path) -> str:
+    try:
+        relative = path.relative_to(repo_root.resolve())
+    except ValueError:
+        relative = path.relative_to(source_root)
+    return PurePosixPath(*relative.parts).as_posix()
+
+
+def resolve_display_path(repo_root: Path, source_roots: list[str], display: str) -> Path | None:
+    """Absolute path for a `display_posix` spelling, or None when it names nothing.
+
+    A left inverse of `_display_path` — exact wherever the display is
+    unambiguous, which is everywhere a configuration produces one display per
+    file. `_display_path` itself is not injective: two configured roots outside
+    the repo that both hold `a.py`, or a sibling file whose name collides with
+    a repo-relative one, encode to the same spelling, and no implementation can
+    invert that. `GlobsCheck` warns when the walk produces such a collision
+    rather than leaving the resolver to guess.
+
+    It is the single place that decodes the one spelling the whole tool speaks,
+    so it answers the way the walk does. A file the walk returns from a root
+    outside `repo_root` — the code repo of the `siblings` layout — is what its
+    source-root-relative display means, even when the docs repo holds a file
+    of the same name that no root covers: `describes:`, `coverage` and
+    `mtime-drift` already read the walked file, and `claims[].evidence` has to
+    mean the same one. A spelling the walk never emits — the docs tree,
+    `irminsul.toml`, a workflow under `.github/`, which the walk prunes even
+    inside a sibling root — is repo-relative. A sibling file the walk excludes
+    resolves last, so an unexcluded spelling never lands on it by accident.
+
+    Roots inside `repo_root` are not searched: their files already display
+    repo-relative, so searching them would make a second spelling resolve.
+    """
+    relative = Path(*PurePosixPath(display.replace("\\", "/")).parts)
+    if relative.is_absolute() or ".." in relative.parts:
+        return None
+
+    external = _external_candidates(repo_root, source_roots, relative)
+    if relative.parts and not _is_excluded(relative.parts):
+        for candidate in external:
+            if candidate.is_file():
+                return candidate
+
+    candidate = repo_root / relative
+    if candidate.exists():
+        return candidate
+
+    for candidate in external:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _external_candidates(repo_root: Path, source_roots: list[str], relative: Path) -> list[Path]:
+    repo_abs = repo_root.resolve()
+    out: list[Path] = []
+    for root in source_roots:
+        abs_root = (repo_root / root).resolve()
+        if abs_root.is_relative_to(repo_abs):
+            continue
+        out.append(abs_root / relative)
+    return out
+
+
+def external_display_for_path(
+    repo_root: Path, source_roots: list[str], resolved: Path
+) -> str | None:
+    """The display spelling of an on-disk file under an external source root.
+
+    The encode direction of `resolve_display_path`, for the one case where a
+    user holds a filesystem path the tool refuses: a sibling source file's
+    real location (`../code/src/app/main.py`) is outside the repo, but the
+    tool speaks its source-root-relative display (`app/main.py`). Returns None
+    when no configured external root contains the file, or when the spelling
+    would decode to a *different* file — two external roots both holding
+    `app/main.py` (which `GlobsCheck` warns about) make the display mean the
+    first root's file, and mapping the second root's file to it would silently
+    answer about the wrong one.
+    """
+    resolved_abs = resolved.resolve()
+    repo_abs = repo_root.resolve()
+    for root in source_roots:
+        abs_root = (repo_root / root).resolve()
+        if abs_root.is_relative_to(repo_abs):
+            continue
+        if not resolved_abs.is_relative_to(abs_root):
+            continue
+        display = PurePosixPath(*resolved_abs.relative_to(abs_root).parts).as_posix()
+        decoded = resolve_display_path(repo_root, source_roots, display)
+        if decoded is not None and decoded.resolve() == resolved_abs:
+            return display
+    return None
+
+
+def is_external_source_location(
+    repo_root: Path, source_roots: list[str], resolved: Path | None
+) -> bool:
+    """Whether an already-resolved path is source under an external root.
+
+    The `siblings` counterpart to the lexical prefix test that classifies
+    in-repo source: a source-root-relative display carries no prefix to match,
+    so membership can only be settled on disk. It takes the resolved location
+    rather than the display because `ClaimProvenanceCheck` resolves each
+    evidence spelling once and should not pay for a second resolution.
+
+    Containment alone is not enough: the walk never returns files under a dot
+    directory, `__pycache__`, or bytecode suffixes, and the in-repo classifier
+    refuses the identical spelling through `is_source_path`, so the same
+    built-in exclusions apply here: `.github/workflows/ci.yml` resolving into
+    the sibling repo is not source, just as it is not in-repo. `None` (an
+    unresolvable display) is never source.
+    """
+    if resolved is None:
+        return False
+    resolved_abs = resolved.resolve()
+    repo_abs = repo_root.resolve()
+    for root in source_roots:
+        abs_root = (repo_root / root).resolve()
+        if abs_root.is_relative_to(repo_abs):
+            continue
+        if not resolved_abs.is_relative_to(abs_root):
+            continue
+        parts = resolved_abs.relative_to(abs_root).parts
+        if parts and not _is_excluded(parts):
+            return True
+    return False
+
+
+def _is_within_source_root(target: Path, source_root: Path) -> bool:
+    return target.resolve(strict=False).is_relative_to(source_root.resolve())
+
+
+def _matches(spec: GitIgnoreSpec | None, display: str, *, is_dir: bool = False) -> bool:
+    if spec is None:
+        return False
+    candidate = f"{display.rstrip('/')}" + ("/" if is_dir else "")
+    return bool(spec.match_file(candidate))
+
+
+class _GitIgnoreMatcher:
+    def __init__(self, source_root: Path) -> None:
+        self.source_root = source_root
+        # `git_root_for` walks up, returning `source_root` itself or one of its
+        # parents, so the boundary is always an ancestor of the source root and
+        # needs no containment fallback.
+        self.boundary = git_root_for(source_root) or source_root
+        self._cache: dict[Path, GitIgnoreSpec | None] = {}
+
+    def matches(self, path: Path, *, is_dir: bool = False) -> bool:
+        parent = path.parent
+        try:
+            relative_parent = parent.relative_to(self.boundary)
+        except ValueError:
+            return False
+
+        directories = [self.boundary]
+        current = self.boundary
+        for part in relative_parent.parts:
+            current /= part
+            directories.append(current)
+
+        ignored: bool | None = None
+        for directory in directories:
+            spec = self._spec_for(directory)
+            if spec is None:
+                continue
+            relative = path.relative_to(directory).as_posix()
+            if is_dir:
+                relative = f"{relative.rstrip('/')}" + "/"
+            result = spec.check_file(relative)
+            if result.include is not None:
+                ignored = result.include
+        return ignored is True
+
+    def _spec_for(self, directory: Path) -> GitIgnoreSpec | None:
+        if directory in self._cache:
+            return self._cache[directory]
+
+        ignore_file = directory / ".gitignore"
+        if not ignore_file.is_file():
+            self._cache[directory] = None
+            return None
+
+        lines = ignore_file.read_text(encoding="utf-8", errors="replace").splitlines()
+        if directory != self.source_root and self.source_root.is_relative_to(directory):
+            root_relative = self.source_root.relative_to(directory).as_posix()
+            lines = [
+                line for line in lines if not _pattern_ignores_explicit_root(line, root_relative)
+            ]
+        spec = GitIgnoreSpec.from_lines(lines)
+        self._cache[directory] = spec
+        return spec
+
+
+def _pattern_ignores_explicit_root(pattern: str, root_relative: str) -> bool:
+    result = GitIgnoreSpec.from_lines([pattern]).check_file(f"{root_relative.rstrip('/')}/")
+    return result.include is True
+
+
+def source_root_prefixes(repo_root: Path, source_roots: list[str]) -> list[str]:
+    """Repo-relative POSIX prefixes of the source roots that live inside the repo.
+
+    An empty string means the repo root itself. Roots outside the repo (the
+    code repo of the siblings layout) are omitted: a repo-relative diff path
+    can never fall under them, and their on-disk files already carry a
+    source-root-relative display from `walk_configured_source_files`.
+    """
+    prefixes: list[str] = []
+    root_abs = repo_root.resolve()
+    for root in source_roots:
+        try:
+            rel = (repo_root / root).resolve().relative_to(root_abs)
+        except ValueError:
+            continue
+        prefixes.append(PurePosixPath(*rel.parts).as_posix() if rel.parts else "")
+    return prefixes
+
+
+def is_source_path(display: str, prefixes: list[str]) -> bool:
+    """Whether a display falls under one of `prefixes`, with built-in exclusions only."""
+    path = PurePosixPath(display.replace("\\", "/"))
+    for prefix in prefixes:
+        if prefix:
+            if not path.is_relative_to(prefix):
+                continue
+            parts = path.relative_to(prefix).parts
+        else:
+            parts = path.parts
+        if parts and not _is_excluded(parts):
+            return True
+    return False
+
+
+def is_configured_source_path(
+    repo_root: Path,
+    config: IrminsulConfig,
+    display: str,
+) -> bool:
+    normalized = PurePosixPath(display.replace("\\", "/")).as_posix()
+    include_spec = (
+        GitIgnoreSpec.from_lines(config.paths.source_includes)
+        if config.paths.source_includes
+        else None
+    )
+    exclude_spec = (
+        GitIgnoreSpec.from_lines(config.paths.source_excludes)
+        if config.paths.source_excludes
+        else None
+    )
+    if _matches(exclude_spec, normalized):
+        return False
+    if include_spec is not None and not _matches(include_spec, normalized):
+        return False
+
+    path = PurePosixPath(normalized)
+    repo_abs = repo_root.resolve()
+    for root in config.paths.source_roots:
+        abs_root = (repo_abs / root).resolve()
+        try:
+            root_relative = abs_root.relative_to(repo_abs)
+        except ValueError:
+            continue
+        prefix = PurePosixPath(*root_relative.parts)
+        if prefix.parts:
+            if not path.is_relative_to(prefix):
+                continue
+            parts = path.relative_to(prefix).parts
+        else:
+            parts = path.parts
+        if not parts or _is_excluded(parts):
+            continue
+
+        candidate = (repo_abs / Path(*path.parts)).resolve(strict=False)
+        if not candidate.is_relative_to(abs_root):
+            continue
+        if config.paths.honor_gitignore and _GitIgnoreMatcher(abs_root).matches(candidate):
+            continue
+        return True
+    return False
+
+
+def _is_excluded(parts: tuple[str, ...]) -> bool:
+    if any(part.startswith(".") or part == "__pycache__" for part in parts):
+        return True
+    return PurePosixPath(parts[-1]).suffix in {".pyc", ".pyo"}
+
+
+CODE_MISSING_SOURCE_ROOT = "globs/missing-source-root"
+CODE_BROKEN_SYMLINK = "globs/broken-symlink"
+CODE_SOURCE_ROOT_ESCAPE = "globs/source-root-escape"
+CODE_EMPTY_DESCRIBES_PATTERN = "globs/empty-describes-pattern"
+CODE_AMBIGUOUS_SOURCE_DISPLAY = "globs/ambiguous-source-display"
+
+_ISSUE_KIND_TO_CODE = {
+    "broken-symlink": CODE_BROKEN_SYMLINK,
+    "source-root-escape": CODE_SOURCE_ROOT_ESCAPE,
+}
+
+
+def _ambiguous_display_findings(
+    source_files: list[tuple[Path, str]], repo_root: Path
+) -> list[Finding]:
+    """Warn when one display path names two files.
+
+    `_display_path` is not injective, so `resolve_display_path` is only a left
+    inverse: two files can produce the same spelling, and then no resolver can
+    be right about which one a `describes:` pattern or a `claims[].evidence`
+    entry meant. Two configured roots outside the repo that both hold `a.py`
+    is the plain case. The other is a sibling file whose display collides with
+    a repo-relative name the walk never visits — the docs repo's own
+    `README.md` beside the code repo's. The resolver reads the sibling file
+    there, so the docs-repo file becomes unnameable, and that is reported here
+    rather than discovered by a claim quietly citing the wrong repository.
+
+    It becomes realistic as soon as a configured root widens from `../code/src`
+    to `../code`: the code repo's `README.md` and `AGENTS.md` then collide with
+    the docs repo's own. Nothing can disambiguate them, so the only honest move
+    is to say so and let the configuration change.
+
+    One file is never a collision with itself. Overlapping in-repo roots —
+    `["src", "src/sub"]`, or `[".", "src"]` — walk the file under the nested
+    root twice, and both walks emit the same repo-relative display for the
+    same file. The resolver has nothing to guess at there, so identical
+    resolved paths are collapsed before counting.
+    """
+    repo_abs = repo_root.resolve()
+    by_display: dict[str, dict[Path, None]] = {}
+    for abs_path, display in source_files:
+        resolved = abs_path.resolve(strict=False)
+        seen = by_display.setdefault(display, {})
+        seen.setdefault(resolved, None)
+        if resolved.is_relative_to(repo_abs):
+            continue
+        shadowed = repo_root / Path(*PurePosixPath(display).parts)
+        if shadowed.is_file():
+            seen.setdefault(shadowed.resolve(strict=False), None)
+
+    out: list[Finding] = []
+    for display, unique_paths in sorted(by_display.items()):
+        paths = list(unique_paths)
+        if len(paths) < 2:
+            continue
+        collisions = ", ".join(path.as_posix() for path in sorted(paths))
+        out.append(
+            Finding(
+                check=GlobsCheck.name,
+                code=CODE_AMBIGUOUS_SOURCE_DISPLAY,
+                severity=Severity.warning,
+                category="ambiguous-source-display",
+                message=(f"source display path '{display}' names {len(paths)} files: {collisions}"),
+                suggestion=(
+                    "Narrow or rename the configured source roots so each file has one "
+                    "display path — `describes` and `claims[].evidence` can only mean one"
+                ),
+                data={
+                    "problem": "ambiguous-source-display",
+                    "display": display,
+                    "paths": collisions,
+                },
+            )
+        )
+    return out
+
+
+class GlobsCheck:
+    name: ClassVar[str] = "globs"
+    default_severity: ClassVar[Severity] = Severity.error
+    explanations: ClassVar[dict[str, str]] = {
+        CODE_MISSING_SOURCE_ROOT: (
+            "A configured `paths.source_roots` entry does not exist on disk. Fix the path "
+            "in `irminsul.toml` or create the directory."
+        ),
+        CODE_BROKEN_SYMLINK: (
+            "A symlink under a source root has no readable target. Fix or remove the symlink."
+        ),
+        CODE_SOURCE_ROOT_ESCAPE: (
+            "A symlink under a source root resolves outside the configured root, which "
+            "would let source discovery walk arbitrary filesystem locations. Point the "
+            "symlink back inside the source root, or remove it."
+        ),
+        CODE_EMPTY_DESCRIBES_PATTERN: (
+            "A doc's `describes` glob matched zero files. Fix the glob, or remove the "
+            "claim if the source no longer exists."
+        ),
+        CODE_AMBIGUOUS_SOURCE_DISPLAY: (
+            "Two files share one display path — two source files under the configured "
+            "roots, or a sibling source file and a docs-repo file of the same name — so "
+            "`describes` patterns and `claims[].evidence` entries cannot say which file "
+            "they mean. Narrow or rename the configured source roots so each file has "
+            "one display path."
+        ),
+    }
+    classes: ClassVar[dict[str, FindingClass]] = {
+        CODE_MISSING_SOURCE_ROOT: FindingClass.hint,
+        CODE_BROKEN_SYMLINK: FindingClass.certain,
+        CODE_SOURCE_ROOT_ESCAPE: FindingClass.certain,
+        CODE_EMPTY_DESCRIBES_PATTERN: FindingClass.certain,
+        CODE_AMBIGUOUS_SOURCE_DISPLAY: FindingClass.hint,
+    }
+
+    def run(self, graph: DocGraph) -> list[Finding]:
+        if graph.config is None or graph.repo_root is None:
+            return []
+
+        result = walk_configured_source_files(graph.repo_root, graph.config)
+        source_files = result.files
+
+        out: list[Finding] = []
+
+        for root in result.missing_roots:
+            out.append(
+                Finding(
+                    check=self.name,
+                    code=CODE_MISSING_SOURCE_ROOT,
+                    severity=Severity.warning,
+                    message=f"source root '{root}' does not exist",
+                )
+            )
+
+        for issue in result.issues:
+            out.append(
+                Finding(
+                    check=self.name,
+                    code=_ISSUE_KIND_TO_CODE[issue.kind],
+                    severity=(
+                        Severity.error if issue.kind == "source-root-escape" else Severity.warning
+                    ),
+                    message=issue.message,
+                    path=Path(issue.path),
+                    data={"problem": issue.kind, "source_root": issue.root},
+                )
+            )
+
+        out.extend(_ambiguous_display_findings(source_files, graph.repo_root))
+
+        for node in graph.nodes.values():
+            for pattern in node.frontmatter.describes:
+                spec = GitIgnoreSpec.from_lines([pattern])
+                if not any(spec.match_file(display) for _, display in source_files):
+                    out.append(
+                        Finding(
+                            check=self.name,
+                            code=CODE_EMPTY_DESCRIBES_PATTERN,
+                            severity=Severity.error,
+                            message=(f"describes pattern '{pattern}' matched zero files"),
+                            path=node.path,
+                            doc_id=node.id,
+                        )
+                    )
+
+        return out

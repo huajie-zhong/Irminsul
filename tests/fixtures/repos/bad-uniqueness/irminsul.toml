@@ -1,0 +1,5 @@
+project_name = "bad-uniqueness-fixture"
+
+[paths]
+docs_root = "docs"
+source_roots = ["app"]

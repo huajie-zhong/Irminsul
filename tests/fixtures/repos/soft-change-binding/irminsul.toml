@@ -1,0 +1,24 @@
+project_name = "soft-change-binding-fixture"
+
+[paths]
+docs_root = "docs"
+source_roots = ["app"]
+
+[checks]
+enabled = [
+    "frontmatter",
+    "globs",
+    "uniqueness",
+    "links",
+    "schema-leak",
+    "coverage",
+    "liar",
+    "prose-file-reference",
+    "rfc-lifecycle",
+    "retired-references",
+    "change-binding",
+]
+[[checks.inventory_drift.generic]]
+kind = "events"
+glob = "app/**/events.py"
+pattern = 'EVENT\("([^"]+)"\)'

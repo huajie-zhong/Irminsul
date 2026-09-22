@@ -1,0 +1,21 @@
+name: docs-nightly
+
+# A nightly run reports the findings pull requests leave out: time findings, such as
+# a deprecated doc past its threshold, and hints on docs no recent change touched. It
+# fails only on time findings; certain findings fail the pull request that made them.
+
+on:
+  schedule:
+    - cron: "23 6 * * *"   # daily at 06:23 UTC
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: {{ github_user }}/irminsul@{{ action_ref }}
+        with:
+          fail-on: time

@@ -1,0 +1,74 @@
+# AGENTS.md — agent entry point for {{ project_name }}
+
+This repository's documentation lives in `docs/` and is managed by
+[Irminsul](https://github.com/huajie-zhong/irminsul). The docs tree is a
+machine-verified contract between humans and coding agents: structural
+invariants (ownership, links, frontmatter, coverage) are enforced in CI, so
+what the docs claim about the code is checked, not hoped.
+
+**Start at [`docs/AGENTS.md`](docs/AGENTS.md)** — the navigation manifest with
+the full documentation tree, the doc-system rules, and the editing protocol.
+
+## The agent loop
+
+1. At the start of a session, run `irminsul orient` and read `docs/AGENTS.md`.
+2. Before editing, run `irminsul context <path>` for the files you intend to
+   touch, or `irminsul context --topic <query>` while locating them. Then read
+   the owning docs it names, and the decision records they link, before
+   changing code.
+3. Make the change. Keep doc updates **in the same commit** as the code they
+   describe.
+4. After editing, run `irminsul context --after-edit` to confirm ownership
+   and surface any findings your edit introduced, and
+   `irminsul list review --changed` to re-read every claim you added or
+   changed against the code it names. On a branch whose work is committed,
+   pass `--base-ref origin/<base>`: HEAD already holds those commits, so a
+   comparison with it compares the change with itself.
+5. Run `irminsul fix` to apply deterministic remediations for mechanical
+   findings.
+6. Run `irminsul check` and the tests your change touches before committing;
+   it must exit 0.
+7. Before opening the pull request, run `irminsul check --diff origin/<base>`.
+   That is what CI enforces, and it adds the passes that judge the change
+   rather than the tree as it stands.
+
+`context`, `check`, and friends support `--format json` for machine-readable
+output.
+
+## Follow the foundation layer
+
+The `foundation/` layer — principles, anti-patterns, and what the project will not do —
+binds your choices, not just your prose. Follow it unless a principle is wrong for the
+change at hand; then say so to the user and let them decide, rather than quietly working
+around it. A principle you had to break is worth reporting even when the build is green.
+
+## What a finding tells you
+
+Every harness loads this file — Cursor and Codex read it natively, `CLAUDE.md`
+imports it — so the posture lives here rather than in one harness's skill. The
+full procedure is in `docs/guides/agent-protocol.md`.
+
+- **A finding is right about its fact and silent about the meaning.** It reports
+  something mechanical: this link resolves to nothing, this symbol is absent, no
+  doc claims this file. Take that fact as true. Whether the prose is *correct* is
+  what no check knows, so "the check is wrong" is almost never the answer.
+- **A green run does not mean the docs are right.** It means nothing provable is
+  broken.
+- **A suggestion is a menu, not a ranking.** Several end "...or remove it", which
+  is for when the thing really is gone — not a shortcut to clearing the finding.
+- **When doc and code disagree, decide which is wrong before editing either.** A
+  sentence describing what the code *should* do is a bug to report, not a doc to
+  rewrite.
+
+These clear a finding while making the tree less true, and none is a repair:
+deleting a claim, anchor or `inventory:` entry; narrowing a `describes:` glob;
+setting `status: draft`; an ignore comment as the first move or one without a
+real reason; re-running `check --init-baseline`; editing an implemented RFC;
+re-pinning an anchor before re-reading it; removing a check from
+`checks.enabled` or from the workflow.
+
+## Harness notes
+
+Cursor and Codex read a root `AGENTS.md` natively. Claude Code reads `CLAUDE.md`,
+so the scaffolded `CLAUDE.md` imports this file with `@AGENTS.md`; keep that
+import if you replace it with your own.

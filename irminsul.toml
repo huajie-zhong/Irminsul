@@ -1,0 +1,115 @@
+project_name = "Irminsul"
+
+[paths]
+docs_root = "docs"
+source_roots = ["src"]
+source_includes = []
+# Fixture repositories under tests/fixtures/ are miniature codebases with their own
+# irminsul.toml. Their test files belong to those repositories, not to this one.
+source_excludes = ["tests/fixtures/**"]
+honor_gitignore = true
+# Declaring the test root closes the ownership invariant over it: every test file here
+# needs a maintaining doc, not only the ones beside a test already owned.
+test_roots = ["tests"]
+
+[checks]
+enabled = [
+    "frontmatter",
+    "globs",
+    "uniqueness",
+    "links",
+    "schema-leak",
+    "coverage",
+    "liar",
+    "prose-file-reference",
+    "agents-manifest",
+    "rfc-lifecycle",
+    "retired-references",
+    "mtime-drift",
+    "stale-reaper",
+    "orphans",
+    "supersession",
+    "parent-child",
+    "glossary-discipline",
+    "external-links",
+    "reality",
+    "boundary",
+    "phantom-layer",
+    "requires-env",
+    "import-deps",
+    "terminology-overload",
+    "claim-provenance",
+    "foundation-readiness",
+    "rfc-follow-through",
+    "inventory-drift",
+    "claim-anchor",
+    "doc-refs",
+    "change-binding",
+    "requirement-grammar",
+    "adr-structure",
+    "duplicate-block",
+    "section-reference",
+    "code-references",
+    "test-ownership",
+]
+
+[checks.external_links]
+enabled = false
+timeout_seconds = 5.0
+cache_path = ".irminsul-cache/external-links.json"
+ttl_hours = 168
+
+[checks.stale_reaper]
+deprecated_threshold_days = 180
+
+[checks.glossary_discipline]
+glossary_path = "docs/GLOSSARY.md"
+
+[checks.parent_child]
+length_warning_lines = 300
+
+[[checks.terminology_overload.rules]]
+term = "coverage"
+explicit_phrases = [
+    "source ownership coverage",
+    "source-file coverage",
+    "source file",
+    "source files",
+    "source paths",
+    "coveragecheck",
+    "`coverage`",
+    "tests:",
+    "`tests:`",
+    "recommended_tests:",
+    "`recommended_tests:`",
+    "owns_tests:",
+    "`owns_tests:`",
+]
+suggestion = "Clarify whether this means source ownership coverage or the `CoverageCheck` recommended_tests: rule"
+
+[overrides]
+mtime_drift_days = 30
+
+[languages]
+enabled = ["python"]
+
+[[checks.inventory_drift.generic]]
+kind = "config-keys"
+glob = "src/irminsul/config.py"
+pattern = '^    ([a-z_]+): [A-Za-z]'
+# The last segments of a dotted key such as `checks.external_links.ttl_hours`, so a key
+# the schema no longer declares is reported where a doc still names it.
+mention_pattern = '(?<=[a-z_]\.)(?!(?:toml|py|md|json|ya?ml|txt|lock)(?![a-z0-9_]))[a-z][a-z0-9_]*'
+prose_named = true
+
+[[checks.inventory_drift.generic]]
+kind = "checks"
+glob = "src/irminsul/checks/*.py"
+pattern = '^\s+name: ClassVar\[str\] = "([a-z-]+)"'
+prose_named = true
+
+[[checks.inventory_drift.generic]]
+kind = "frontmatter-fields"
+glob = "src/irminsul/frontmatter.py"
+pattern = '^    ([a-z_]+): [A-Za-z]'
+prose_named = true

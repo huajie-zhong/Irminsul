@@ -1,0 +1,71 @@
+name: irminsul-docs-gate
+
+# ---------------------------------------------------------------------------
+# THIS FILE DOES NOT RUN WHERE IT WAS WRITTEN.
+#
+# `irminsul init` scaffolded it into the docs repository because that is where
+# init ran, but it is a workflow for the **code repository**. Copy it to
+# `.github/workflows/` in the code repo{% if code_repo_spec %} ({{ code_repo_spec }}){% endif %} and commit it there.
+#
+# Why it is needed: Irminsul's gate lives in the docs repository, and the two
+# repositories have separate histories. A pull request in the code repo
+# produces no docs-repo diff and fires no docs-repo workflow, so without this
+# file a code change is judged by nothing until somebody happens to open a docs
+# pull request. `docs-pr.yml` in the docs repo covers the other direction.
+#
+# Two things this cannot do for you, because they are repository settings:
+#   1. Reading a **private** docs repo needs a credential. Create a token with
+#      read access to it and add it as a secret in the code repo, then keep the
+#      `token:` line below. A public docs repo does not need it.
+#   2. Making this a **required** check is a branch-protection setting on the
+#      code repo's default branch. Until it is required, this workflow reports
+#      and does not gate.
+# ---------------------------------------------------------------------------
+
+# Deliberately unfiltered. A `paths:` filter here would be written once, from the
+# configuration as it stood the day `irminsul init` ran, and it would then go on
+# matching that shape forever: `paths.test_roots` is not something init writes, so a
+# test tree added to the docs repo's config afterwards would never appear here, and a
+# pull request touching only that tree would start nothing at all. The docs repo can
+# afford a filter because `diff-integrity` compares it against what the gate reads and
+# reports a narrowing; nothing seals this file, which lives in the other repository, so
+# a filter that stopped matching would be invisible. Judging a few unrelated pull
+# requests is the cheaper mistake.
+on:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      # The code repo, at this pull request's head. `fetch-depth: 0` so the
+      # source range below can reach its merge base.
+      - uses: actions/checkout@v4
+        with:
+          path: {{ code_checkout_path }}
+          fetch-depth: 0
+
+      # The docs repo, at its default branch: the ownership rules, the adoption
+      # record and its pinned boundary all come from here.
+      - uses: actions/checkout@v4
+        with:
+          repository: OWNER/DOCS-REPO   # TODO: the docs repository's coordinate
+          path: {{ docs_checkout_path }}
+          fetch-depth: 0
+          # Delete this line if the docs repository is public.
+          token: {% raw %}${{ secrets.DOCS_REPO_TOKEN }}{% endraw %}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install {{ cli_requirement }}
+
+      # `--diff HEAD` is the docs repository comparing with itself: nothing is
+      # under review there, so that range is empty on purpose, and it needs no
+      # knowledge of the docs default branch. `--source-diff` is the range that
+      # matters here — this pull request's own — and it is what lets touch-to-own
+      # see that a recorded unowned file was edited.
+      - run: irminsul check --diff HEAD --source-diff "origin/$BASE_REF"
+        working-directory: {{ docs_checkout_path }}
+        env:
+          BASE_REF: {% raw %}${{ github.base_ref }}{% endraw %}

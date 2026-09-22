@@ -1,0 +1,1035 @@
+"""Tests for deterministic doc-reality audits."""
+
+from __future__ import annotations
+
+import time
+from pathlib import Path
+
+from git import Repo
+
+from irminsul.checks.doc_reality import (
+    _IGNORE_RE,
+    CODE_RISKY_PROSE_UNCLAIMED,
+    CODE_STRUCTURED_SECTION_UNCLAIMED,
+    CODE_UNKNOWN_CLAIM_REF,
+    AgentsManifestCheck,
+    ClaimProvenanceCheck,
+    ProseFileReferenceCheck,
+    TerminologyOverloadCheck,
+    _without_ignore_comment,
+)
+from irminsul.config import load
+from irminsul.docgraph import build_graph
+from irminsul.regen.agents_md import regen_agents_md
+
+
+def _write_config(
+    repo: Path, *, coverage_rule: bool = False, source_roots: str = '["src"]'
+) -> None:
+    base = (
+        'project_name = "doc-reality"\n[paths]\ndocs_root = "docs"\n'
+        f"source_roots = {source_roots}\n"
+    )
+    if coverage_rule:
+        base += (
+            "[[checks.terminology_overload.rules]]\n"
+            'term = "coverage"\n'
+            'explicit_phrases = ["source ownership coverage"]\n'
+            'suggestion = "Say source ownership coverage"\n'
+        )
+    (repo / "irminsul.toml").write_text(base, encoding="utf-8")
+
+
+def test_without_ignore_comment_preserves_unrelated_html_comments() -> None:
+    line = "<!-- comment 1 --> irminsul:ignore prose-file-reference <!-- comment 2 -->"
+    marker = _IGNORE_RE.search(line)
+
+    assert marker is not None
+    assert _without_ignore_comment(line, marker) == "<!-- comment 1 -->  <!-- comment 2 -->"
+
+
+def _write_doc(
+    repo: Path,
+    rel: str,
+    *,
+    doc_id: str,
+    status: str = "stable",
+    body: str,
+    frontmatter_extra: list[str] | None = None,
+) -> None:
+    path = repo / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "\n".join(
+            [
+                "---",
+                f"id: {doc_id}",
+                f"title: {doc_id}",
+                f"status: {status}",
+                "describes: []",
+                *(frontmatter_extra or []),
+                "---",
+                "",
+                f"# {doc_id}",
+                "",
+                body,
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def _graph(repo: Path):
+    return build_graph(repo, load(repo / "irminsul.toml"))
+
+
+def _init_repo(root: Path) -> Repo:
+    repo = Repo.init(root)
+    with repo.config_writer() as cw:
+        cw.set_value("user", "name", "Test")
+        cw.set_value("user", "email", "test@example.com")
+    return repo
+
+
+def _commit(repo: Repo, rel_path: str, content: str, message: str) -> None:
+    fp = Path(repo.working_dir) / rel_path
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    fp.write_text(content, encoding="utf-8")
+    repo.index.add([rel_path])
+    repo.index.commit(message)
+
+
+def test_claim_provenance_accepts_valid_claim_states(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    (tmp_path / "src" / "checks").mkdir(parents=True)
+    (tmp_path / "src" / "checks" / "claim.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "action.yml").write_text("name: docs\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/components/claim-check.md",
+        doc_id="claim-check",
+        body="Implementation docs.",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/components/checks.md",
+        doc_id="checks",
+        body="Enablement docs.",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/rfcs/0001-thing.md",
+        doc_id="0001-thing",
+        status="draft",
+        body="Future work.",
+        frontmatter_extra=["rfc_state: open"],
+    )
+    _write_doc(
+        tmp_path,
+        "docs/foundation/enforcement.md",
+        doc_id="enforcement",
+        body=(
+            "CI blocks invalid docs. <!-- claim:enabled-claim -->\n\n"
+            "A planned feature exists. <!-- claim:planned-claim -->"
+        ),
+        frontmatter_extra=[
+            "claims:",
+            "  - id: planned-claim",
+            "    state: planned",
+            "    kind: feature",
+            "    claim: Planned feature.",
+            "    evidence:",
+            "      - docs/rfcs/0001-thing.md",
+            "  - id: implemented-claim",
+            "    state: implemented",
+            "    kind: check",
+            "    claim: Source exists.",
+            "    evidence:",
+            "      - src/checks/claim.py",
+            "  - id: available-claim",
+            "    state: available",
+            "    kind: check",
+            "    claim: Source and docs exist.",
+            "    evidence:",
+            "      - src/checks/claim.py",
+            "      - docs/components/checks.md",
+            "  - id: enabled-claim",
+            "    state: enabled",
+            "    kind: ci_gate",
+            "    claim: Workflow evidence exists.",
+            "    evidence:",
+            "      - action.yml",
+            "  - id: external-claim",
+            "    state: external",
+            "    kind: local_tool",
+            "    claim: External config exists.",
+            "    evidence:",
+            "      - action.yml",
+        ],
+    )
+
+    assert ClaimProvenanceCheck().run(_graph(tmp_path)) == []
+
+
+def test_claim_provenance_accepts_a_repo_root_source_root(tmp_path: Path) -> None:
+    """`irminsul init` writes `source_roots = ["."]` for a flat Go repo, whose
+    repo-relative prefix is the empty string — a prefix every path starts with.
+    Classifying by that prefix alone made every path source evidence, and
+    `state: external` is "process evidence that is *not* source", so no
+    external claim could be satisfied. The docs tree, `irminsul.toml`, the
+    Action and the workflows are not source even when the source root is the
+    repo root."""
+    _write_config(tmp_path, source_roots='["."]')
+    (tmp_path / "main.go").write_text("package main\n", encoding="utf-8")
+    (tmp_path / "action.yml").write_text("name: docs\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/guides/release.md",
+        doc_id="release",
+        body="The release runbook.",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/foundation/enforcement.md",
+        doc_id="enforcement",
+        body=(
+            "The runbook exists. <!-- claim:process-claim -->\n\n"
+            "The tool is configured. <!-- claim:config-claim -->\n\n"
+            "The binary exists. <!-- claim:code-claim -->\n\n"
+            "CI enforces it. <!-- claim:gate-claim -->"
+        ),
+        frontmatter_extra=[
+            "claims:",
+            "  - id: process-claim",
+            "    state: external",
+            "    kind: local_tool",
+            "    claim: The runbook is documented.",
+            "    evidence:",
+            "      - docs/guides/release.md",
+            "  - id: config-claim",
+            "    state: external",
+            "    kind: local_tool",
+            "    claim: The tool is configured.",
+            "    evidence:",
+            "      - irminsul.toml",
+            "  - id: code-claim",
+            "    state: implemented",
+            "    kind: check",
+            "    claim: Source exists.",
+            "    evidence:",
+            "      - main.go",
+            "  - id: gate-claim",
+            "    state: enabled",
+            "    kind: ci_gate",
+            "    claim: Action evidence exists.",
+            "    evidence:",
+            "      - action.yml",
+        ],
+    )
+
+    assert ClaimProvenanceCheck().run(_graph(tmp_path)) == []
+
+
+def test_repo_root_source_root_does_not_make_every_doc_implementation(tmp_path: Path) -> None:
+    """The mirror: widening "everything is source" would also stop
+    `implemented` and `available` from being checked at all."""
+    _write_config(tmp_path, source_roots='["."]')
+    (tmp_path / "main.go").write_text("package main\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/guides/notes.md",
+        doc_id="notes",
+        body="Background reading.",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/foundation/enforcement.md",
+        doc_id="enforcement",
+        body="The feature is built. <!-- claim:code-claim -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: code-claim",
+            "    state: implemented",
+            "    kind: check",
+            "    claim: Source exists.",
+            "    evidence:",
+            "      - docs/guides/notes.md",
+        ],
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert [f.message for f in findings] == [
+        "claim 'code-claim' has no evidence appropriate for state 'implemented'"
+    ]
+
+
+def test_claim_provenance_flags_state_inappropriate_evidence(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "claim.py").write_text("x = 1\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/foundation/enforcement.md",
+        doc_id="enforcement",
+        body="CI blocks invalid docs. <!-- claim:enabled-claim -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: enabled-claim",
+            "    state: enabled",
+            "    kind: ci_gate",
+            "    claim: Workflow evidence exists.",
+            "    evidence:",
+            "      - src/claim.py",
+        ],
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert findings[0].severity.value == "error"
+    assert "state 'enabled'" in findings[0].message
+
+
+def test_claim_provenance_rejects_evidence_that_escapes_the_repo(tmp_path: Path) -> None:
+    """In `same-repo` every source file is addressable repo-relative, so a `..`
+    segment names nothing the tool is willing to reason about, and the guard
+    must reject it as well as an absolute path."""
+    _write_config(tmp_path)
+    (tmp_path / "src").mkdir()
+    outside = tmp_path.parent / "outside"
+    outside.mkdir(exist_ok=True)
+    (outside / "claim.py").write_text("x = 1\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/foundation/enforcement.md",
+        doc_id="enforcement",
+        body="The module exists. <!-- claim:escaping-claim -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: escaping-claim",
+            "    state: implemented",
+            "    kind: check",
+            "    claim: Source exists.",
+            "    evidence:",
+            "      - ../outside/claim.py",
+        ],
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert any("must not be absolute or escape the tree with '..'" in f.message for f in findings)
+    assert all(f.severity.value == "error" for f in findings)
+
+
+def test_claim_provenance_rejects_absolute_evidence(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "claim.py").write_text("x = 1\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/foundation/enforcement.md",
+        doc_id="enforcement",
+        body="The module exists. <!-- claim:absolute-claim -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: absolute-claim",
+            "    state: implemented",
+            "    kind: check",
+            "    claim: Source exists.",
+            "    evidence:",
+            f"      - {(tmp_path / 'src' / 'claim.py').as_posix()}",
+        ],
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert any("must not be absolute or escape the tree with '..'" in f.message for f in findings)
+
+
+def test_claim_provenance_warns_on_risky_prose_without_reference(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/foundation/enforcement.md",
+        doc_id="enforcement",
+        body="CI automatically rewrites old docs.",
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert findings[0].severity.value == "warning"
+    assert "high-risk" in findings[0].message
+
+
+def test_claim_provenance_warns_on_unknown_claim_reference(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/foundation/enforcement.md",
+        doc_id="enforcement",
+        body="CI blocks invalid docs. <!-- claim:missing -->",
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert any("unknown structured claim reference" in finding.message for finding in findings)
+    assert any(finding.code == CODE_RISKY_PROSE_UNCLAIMED for finding in findings)
+
+
+def test_claim_provenance_reports_unknown_claim_ref_in_any_layer(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body="CI blocks invalid docs. <!-- claim:missing -->",
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert [finding.code for finding in findings] == [CODE_UNKNOWN_CLAIM_REF]
+
+
+def test_claim_provenance_reads_risky_words_only_in_prose(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/foundation/enforcement.md",
+        doc_id="enforcement",
+        body=(
+            "Read [Finding classes decide what blocks](../decisions/finding-classes.md) and "
+            "[the rewrites section](#rewrites) first. <!-- this guarantees nothing --> "
+            "The `blocks` key is data, and so is [a target](../x/fails-the-build.txt)."
+        ),
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert [finding.code for finding in findings] == []
+
+
+def test_claim_provenance_still_reads_prose_beside_a_doc_link(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/foundation/enforcement.md",
+        doc_id="enforcement",
+        body="CI blocks invalid docs; [Checks](../components/checks.md) lists them.",
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert [finding.code for finding in findings] == [CODE_RISKY_PROSE_UNCLAIMED]
+
+
+def test_claim_provenance_reads_a_structured_section_nested_under_the_title(
+    tmp_path: Path,
+) -> None:
+    _write_config(tmp_path)
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "gate.py").write_text("GATE = True\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/foundation/enforcement.md",
+        doc_id="enforcement",
+        body="\n".join(
+            [
+                "The gate exists. <!-- claim:gate -->",
+                "",
+                "## CI Pipeline (run on every PR)",
+                "",
+                "The pipeline runs the checks.",
+            ]
+        ),
+        frontmatter_extra=[
+            "claims:",
+            "  - id: gate",
+            "    state: implemented",
+            "    kind: gate",
+            "    claim: The gate exists.",
+            "    evidence:",
+            "      - src/gate.py",
+        ],
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert [(finding.code, finding.message) for finding in findings] == [
+        (
+            CODE_STRUCTURED_SECTION_UNCLAIMED,
+            "section 'CI Pipeline (run on every PR)' needs a structured claim reference",
+        )
+    ]
+
+
+def test_claim_provenance_warns_on_resolved_planned_rfc(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/decisions/0001-thing.md",
+        doc_id="0001-thing-decision",
+        body="Accepted.",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/rfcs/0001-thing.md",
+        doc_id="0001-thing",
+        status="draft",
+        body="Future work.",
+        frontmatter_extra=[
+            "rfc_state: rejected",
+            "resolved_by: docs/decisions/0001-thing.md",
+        ],
+    )
+    _write_doc(
+        tmp_path,
+        "docs/foundation/enforcement.md",
+        doc_id="enforcement",
+        body="A planned feature exists. <!-- claim:planned-claim -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: planned-claim",
+            "    state: planned",
+            "    kind: feature",
+            "    claim: Planned feature.",
+            "    evidence:",
+            "      - docs/rfcs/0001-thing.md",
+        ],
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert "resolved RFC" in findings[0].message
+
+
+def test_claim_provenance_warns_when_evidence_changed_after_doc(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    repo = _init_repo(tmp_path)
+    _commit(repo, "irminsul.toml", (tmp_path / "irminsul.toml").read_text(), "config")
+    _commit(
+        repo,
+        "action.yml",
+        "name: docs\n",
+        "workflow",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/foundation/enforcement.md",
+        doc_id="enforcement",
+        body="CI blocks invalid docs. <!-- claim:enabled-claim -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: enabled-claim",
+            "    state: enabled",
+            "    kind: ci_gate",
+            "    claim: Workflow evidence exists.",
+            "    evidence:",
+            "      - action.yml",
+        ],
+    )
+    repo.index.add(["docs/foundation/enforcement.md"])
+    repo.index.commit("doc claim")
+    time.sleep(1.1)
+    _commit(repo, "action.yml", "name: docs\non: [push]\n", "workflow update")
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert "changed after the doc" in findings[0].message
+
+
+def test_prose_file_reference_flags_unlinked_md(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body="See `neighbor.md` for details.",
+    )
+
+    findings = ProseFileReferenceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert findings[0].severity.value == "error"
+    assert "neighbor.md" in findings[0].message
+
+
+def test_prose_file_reference_reads_a_draft(tmp_path: Path) -> None:
+    """A bare file name rots as quietly in a draft as in a stable doc."""
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        status="draft",
+        body="See `neighbor.md` for details.",
+    )
+
+    findings = ProseFileReferenceCheck().run(_graph(tmp_path))
+
+    assert [f.code for f in findings] == ["prose-file-reference/unlinked-reference"]
+
+
+def test_prose_file_reference_skips_a_deprecated_doc(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        status="deprecated",
+        body="See `neighbor.md` for details.",
+    )
+
+    assert ProseFileReferenceCheck().run(_graph(tmp_path)) == []
+
+
+def test_prose_file_reference_allows_links_and_ignores(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body=(
+            "See [neighbor](neighbor.md).\n"
+            "`example.md` <!-- irminsul:ignore prose-file-reference "
+            'reason="example skeleton" -->'
+        ),
+    )
+
+    assert ProseFileReferenceCheck().run(_graph(tmp_path)) == []
+
+
+def test_prose_file_reference_allows_reference_links_definitions_and_images(
+    tmp_path: Path,
+) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body=("See [neighbor][neighbor-doc].\n![diagram](diagram.md)\n[neighbor-doc]: neighbor.md"),
+    )
+
+    assert ProseFileReferenceCheck().run(_graph(tmp_path)) == []
+
+
+def test_prose_file_reference_allows_block_ignore(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body=(
+            '<!-- irminsul:ignore-start prose-file-reference reason="example skeleton" -->\n'
+            "`example-a.md`\n"
+            "`example-b.md`\n"
+            "<!-- irminsul:ignore-end prose-file-reference -->"
+        ),
+    )
+
+    assert ProseFileReferenceCheck().run(_graph(tmp_path)) == []
+
+
+def test_prose_file_reference_reports_stale_line_ignore(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body=(
+            "No local file reference remains. "
+            '<!-- irminsul:ignore prose-file-reference reason="old example.md" -->'
+        ),
+    )
+
+    findings = ProseFileReferenceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert findings[0].severity.value == "error"
+    assert findings[0].category == "stale-suppression"
+    assert findings[0].data == {"problem": "stale-suppression", "scope": "line"}
+
+
+def test_prose_file_reference_reports_linked_only_line_ignore_as_stale(
+    tmp_path: Path,
+) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body=(
+            "See [neighbor](neighbor.md). "
+            '<!-- irminsul:ignore prose-file-reference reason="legacy" -->'
+        ),
+    )
+
+    findings = ProseFileReferenceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert findings[0].category == "stale-suppression"
+
+
+def test_prose_file_reference_reports_stale_block_ignore(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body=(
+            '<!-- irminsul:ignore-start prose-file-reference reason="legacy" -->\n'
+            "See [neighbor](neighbor.md).\n"
+            "<!-- irminsul:ignore-end prose-file-reference -->"
+        ),
+    )
+
+    findings = ProseFileReferenceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    doc_lines = (tmp_path / "docs/components/widget.md").read_text(encoding="utf-8").splitlines()
+    assert findings[0].line is not None
+    assert "irminsul:ignore-start" in doc_lines[findings[0].line - 1]
+    assert findings[0].data == {"problem": "stale-suppression", "scope": "block"}
+
+
+def test_prose_file_reference_reports_same_line_empty_block_as_stale(
+    tmp_path: Path,
+) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body=(
+            "<!-- irminsul:ignore-start prose-file-reference "
+            "--><!-- irminsul:ignore-end prose-file-reference -->"
+        ),
+    )
+
+    findings = ProseFileReferenceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert findings[0].category == "stale-suppression"
+
+
+def test_prose_file_reference_ignores_suppression_markers_in_fences(
+    tmp_path: Path,
+) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body=(
+            "```markdown\n"
+            "<!-- irminsul:ignore prose-file-reference -->\n"
+            "<!-- irminsul:ignore-start prose-file-reference -->\n"
+            "<!-- irminsul:ignore-end prose-file-reference -->\n"
+            "```"
+        ),
+    )
+
+    assert ProseFileReferenceCheck().run(_graph(tmp_path)) == []
+
+
+def test_prose_file_reference_flags_unclosed_block_ignore(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body=(
+            '<!-- irminsul:ignore-start prose-file-reference reason="example skeleton" -->\n'
+            "`example.md`"
+        ),
+    )
+
+    findings = ProseFileReferenceCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert "without matching ignore-end" in findings[0].message
+
+
+def test_terminology_overload_flags_ambiguous_coverage(tmp_path: Path) -> None:
+    _write_config(tmp_path, coverage_rule=True)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body="Coverage must stay high.",
+    )
+
+    findings = TerminologyOverloadCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert "ambiguous" in findings[0].message
+
+
+def test_terminology_overload_ignores_code_spans_and_link_targets(tmp_path: Path) -> None:
+    _write_config(tmp_path, coverage_rule=True)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body=("See [RFC 0022](../rfcs/0022-universal-fix-coverage.md) and the `coverage` check."),
+    )
+
+    assert TerminologyOverloadCheck().run(_graph(tmp_path)) == []
+
+
+def test_terminology_overload_allows_explicit_coverage(tmp_path: Path) -> None:
+    _write_config(tmp_path, coverage_rule=True)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body="Source ownership coverage tracks source files claimed by docs.",
+    )
+
+    assert TerminologyOverloadCheck().run(_graph(tmp_path)) == []
+
+
+def _agents_repo(tmp_path: Path) -> Path:
+    # Opt in to `agents-manifest` so a missing manifest is treated as an error.
+    (tmp_path / "irminsul.toml").write_text(
+        "\n".join(
+            [
+                'project_name = "agents"',
+                "[paths]",
+                'docs_root = "docs"',
+                'source_roots = ["src"]',
+                "[checks]",
+                'enabled = ["agents-manifest"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body="A component.",
+    )
+    return tmp_path
+
+
+def test_agents_manifest_missing(tmp_path: Path) -> None:
+    _agents_repo(tmp_path)
+
+    findings = AgentsManifestCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert findings[0].severity.value == "error"
+    assert "missing" in findings[0].message
+
+
+def test_agents_manifest_current_after_regen(tmp_path: Path) -> None:
+    repo = _agents_repo(tmp_path)
+    regen_agents_md(repo, load(repo / "irminsul.toml"))
+
+    assert AgentsManifestCheck().run(_graph(repo)) == []
+
+
+def test_agents_manifest_flags_drift(tmp_path: Path) -> None:
+    repo = _agents_repo(tmp_path)
+    regen_agents_md(repo, load(repo / "irminsul.toml"))
+    manifest = repo / "docs" / "AGENTS.md"
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace("| Summary |", "| Sum |"),
+        encoding="utf-8",
+    )
+
+    findings = AgentsManifestCheck().run(_graph(repo))
+
+    assert len(findings) == 1
+    assert "drifted" in findings[0].message
+
+
+def test_agents_manifest_flags_missing_markers(tmp_path: Path) -> None:
+    repo = _agents_repo(tmp_path)
+    (repo / "docs" / "AGENTS.md").write_text(
+        "# Agent Navigation Manifest\n\n## Foundations\n\n## Protocol\n",
+        encoding="utf-8",
+    )
+
+    findings = AgentsManifestCheck().run(_graph(repo))
+
+    assert any("markers" in finding.message for finding in findings)
+
+
+def test_agents_manifest_flags_missing_heading(tmp_path: Path) -> None:
+    repo = _agents_repo(tmp_path)
+    regen_agents_md(repo, load(repo / "irminsul.toml"))
+    manifest = repo / "docs" / "AGENTS.md"
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace("## Protocol", "## Process"),
+        encoding="utf-8",
+    )
+
+    findings = AgentsManifestCheck().run(_graph(repo))
+
+    assert len(findings) == 1
+    assert "Protocol" in findings[0].message
+
+
+def test_terminology_overload_uses_configured_rules(tmp_path: Path) -> None:
+    (tmp_path / "irminsul.toml").write_text(
+        "\n".join(
+            [
+                'project_name = "doc-reality"',
+                "[paths]",
+                'docs_root = "docs"',
+                'source_roots = ["src"]',
+                "[[checks.terminology_overload.rules]]",
+                'term = "latency"',
+                'explicit_phrases = ["p95 latency"]',
+                'suggestion = "Clarify which latency metric this means."',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body="Latency must stay low.\nP95 latency is tracked separately.",
+    )
+
+    findings = TerminologyOverloadCheck().run(_graph(tmp_path))
+
+    assert len(findings) == 1
+    assert findings[0].message == "'latency' is ambiguous here"
+    assert findings[0].suggestion == "Clarify which latency metric this means."
+
+
+def test_claim_provenance_hints_at_a_claim_that_denies_its_state(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    (tmp_path / "action.yml").write_text("name: docs\n", encoding="utf-8")
+    _write_doc(
+        tmp_path,
+        "docs/foundation/enforcement.md",
+        doc_id="enforcement",
+        body="CI runs. <!-- claim:no-dashboard --> <!-- claim:gate -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: no-dashboard",
+            "    state: enabled",
+            "    kind: generated_report",
+            "    claim: This repository has no dashboard workflow.",
+            "    evidence:",
+            "      - action.yml",
+            "  - id: gate",
+            "    state: enabled",
+            "    kind: ci_gate",
+            "    claim: Deleting a claimed file without its doc is reported.",
+            "    evidence:",
+            "      - action.yml",
+        ],
+    )
+
+    negated = [
+        f
+        for f in ClaimProvenanceCheck().run(_graph(tmp_path))
+        if f.code == "claim-provenance/negated-claim"
+    ]
+    assert [f.data for f in negated] == [{"problem": "negated-claim", "claim": "no-dashboard"}]
+
+
+def test_claim_provenance_validates_evidence_in_a_component_doc(tmp_path: Path) -> None:
+    """A governing claim in a component doc is enforced against change, so its evidence has
+    to exist; checking that says nothing about whether the claim is true."""
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body="The widget keeps no state.",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: widget-stateless",
+            "    state: implemented",
+            "    kind: invariant",
+            "    relation: governs-evidence",
+            "    claim: The widget keeps no state.",
+            "    evidence:",
+            "      - src/gone.py",
+        ],
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert [finding.code for finding in findings] == ["claim-provenance/evidence-path-missing"]
+
+
+def test_claim_provenance_does_not_ask_a_component_doc_for_claims(tmp_path: Path) -> None:
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/components/widget.md",
+        doc_id="widget",
+        body="CI blocks invalid docs.",
+    )
+
+    assert ClaimProvenanceCheck().run(_graph(tmp_path)) == []
+
+
+def test_agents_manifest_unreadable_is_a_finding_not_a_traceback(tmp_path: Path) -> None:
+    """A manifest that cannot be decoded, such as one saved as UTF-16, is one finding, so
+    the run goes on and the other checks' findings are still reported."""
+    repo = _agents_repo(tmp_path)
+    regen_agents_md(repo, load(repo / "irminsul.toml"))
+    manifest = repo / "docs" / "AGENTS.md"
+    manifest.write_text(manifest.read_text(encoding="utf-8"), encoding="utf-16")
+
+    findings = AgentsManifestCheck().run(_graph(repo))
+
+    assert [f.code for f in findings] == ["agents-manifest/manifest-unreadable"]
+    assert findings[0].severity.value == "error"
+
+
+def test_claim_provenance_reports_certain_codes_on_a_draft(tmp_path: Path) -> None:
+    """A marker naming no claim and evidence that does not exist are wrong about something
+    outside the doc, so `status: draft` does not excuse them."""
+    _write_config(tmp_path)
+    _write_doc(
+        tmp_path,
+        "docs/foundation/enforcement.md",
+        doc_id="enforcement",
+        status="draft",
+        body="The gate holds. <!-- claim:missing -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: gate-holds",
+            "    state: implemented",
+            "    kind: invariant",
+            "    claim: The gate holds.",
+            "    evidence:",
+            "      - src/gone.py",
+        ],
+    )
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert sorted(f.code for f in findings) == [
+        "claim-provenance/evidence-path-missing",
+        "claim-provenance/unknown-claim-ref",
+    ]
+
+
+def test_claim_provenance_keeps_its_hints_for_stable_docs(tmp_path: Path) -> None:
+    """Whether finished prose is backed by a claim is a question a draft cannot answer yet."""
+    _write_config(tmp_path)
+    body = "CI automatically rewrites old docs."
+    _write_doc(tmp_path, "docs/foundation/stable.md", doc_id="stable", body=body)
+    _write_doc(tmp_path, "docs/foundation/draft.md", doc_id="draft", status="draft", body=body)
+
+    findings = ClaimProvenanceCheck().run(_graph(tmp_path))
+
+    assert [(f.code, f.path.as_posix()) for f in findings] == [
+        ("claim-provenance/risky-prose-unclaimed", "docs/foundation/stable.md")
+    ]

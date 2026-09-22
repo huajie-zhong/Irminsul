@@ -1,0 +1,19 @@
+project_name = "rfc-relations-fixture"
+
+[paths]
+docs_root = "docs"
+source_roots = ["app"]
+
+[checks]
+enabled = [
+    "frontmatter",
+    "globs",
+    "uniqueness",
+    "links",
+    "schema-leak",
+    "coverage",
+    "liar",
+    "prose-file-reference",
+    "rfc-lifecycle",
+    "retired-references",
+]

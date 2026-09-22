@@ -1,0 +1,33 @@
+# {{ project_name }} — documentation
+
+This tree follows the [Irminsul](https://github.com/huajie-zhong/Irminsul) layout.
+
+## Navigation Protocol
+
+The documentation is organized by layer, and each layer sets the rules its docs follow.
+
+| Layer | Purpose |
+|-------|---------|
+| [foundation/](foundation/INDEX.md) | Why the system exists; core principles. |
+| [architecture/](architecture/INDEX.md) | How the parts fit and how data flows between them. |
+| [components/](components/INDEX.md) | One doc per architectural piece; maps code to concepts. |
+| [decisions/](decisions/INDEX.md) | ADRs; the record of trade-offs. |
+| [rfcs/](rfcs/INDEX.md) | Proposals moving through the change lifecycle. |
+| [guides/](guides/INDEX.md) | How-tos, operations, and docs about this doc system. |
+
+## For AI Agents and Contributors
+
+- **Code Mapping:** Every component doc in `components/` contains a `describes:` frontmatter field mapping it to source files.
+- **Stability:** Refer to the `status:` field (draft | stable | deprecated | removed) to understand the reliability of a document.
+- **Discovery:** Start with `irminsul orient`, run `irminsul context <path>` before editing a known source or doc path, and use `irminsul context --changed` after editing.
+
+## Editing Rules (Anti-Rot Protocol)
+
+To prevent "truth rot," all contributors (human and AI) must follow these rules:
+
+1. **Strict SSOT:** Every fact has exactly one canonical home. **Never re-explain or paraphrase** a concept defined in another doc; use a direct link instead. Duplication-by-paraphrase is a "hallucination trap" and will be rejected.
+2. **Reality Only:** Foundation, architecture, and component docs must reflect the current state of the main branch. Never document "planned" or "deferred" features as reality.
+3. **Atomic PRs:** A feature and its corresponding documentation changes must land in the same PR.
+4. **Silence is Intentional:** If a limitation is not documented, it is a bug in the doc. Explicitly document what a component *cannot* do.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [GLOSSARY.md](GLOSSARY.md).

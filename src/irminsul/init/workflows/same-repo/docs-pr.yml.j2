@@ -1,0 +1,30 @@
+name: docs-pr
+
+# The gate runs only when a pull request touches a file it judges: every source root,
+# the guidance files, the baseline, and every workflow, since weakening any workflow
+# that runs the check is itself a finding.
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "irminsul.toml"
+{%- for root in source_roots %}
+      - "{{ "**" if root == "." else root ~ "/**" }}"
+{%- endfor %}
+{%- for doc in extra_docs %}
+      - "{{ doc }}"
+{%- endfor %}
+      - "{{ baseline }}"
+      - "{{ adoption }}"
+      - ".github/workflows/**"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # mtime drift needs full history
+      - uses: {{ github_user }}/irminsul@{{ action_ref }}
+        with:
+          diff: {% raw %}origin/${{ github.base_ref }}{% endraw %}

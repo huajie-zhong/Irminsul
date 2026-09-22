@@ -1,0 +1,33 @@
+---
+id: leaky
+title: Leaky
+status: stable
+describes:
+  - app/thing.py
+---
+
+# Leaky
+
+This component doc accidentally pastes a Pydantic model and an interface,
+which belong in code (derivable via `irminsul surface`), not in component docs.
+
+```python
+class Thing(BaseModel):
+    name: str
+```
+
+And here is some TS:
+
+```typescript
+interface Thing {
+  name: string;
+}
+```
+
+But this fenced block is `toml` and should be ignored:
+
+```toml
+[section]
+class = "ok"
+interface = "ok"
+```

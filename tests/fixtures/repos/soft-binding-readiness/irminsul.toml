@@ -1,0 +1,22 @@
+project_name = "soft-binding-readiness-fixture"
+
+[paths]
+docs_root = "docs"
+source_roots = ["app"]
+
+[checks]
+enabled = [
+    "frontmatter",
+    "globs",
+    "uniqueness",
+    "links",
+    "schema-leak",
+    "coverage",
+    "liar",
+    "prose-file-reference",
+    "rfc-lifecycle",
+    "retired-references",
+    "claim-anchor",
+    "rfc-follow-through",
+    "change-binding",
+]

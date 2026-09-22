@@ -1,0 +1,25 @@
+---
+id: {{ id }}
+title: {{ title | yaml_scalar }}
+status: draft
+describes:{% if not describes %} []{% else %}{% for item in describes %}
+  - {{ item | yaml_scalar }}{% endfor %}{% endif %}
+recommended_tests:{% if not tests %} []{% else %}{% for item in tests %}
+  - {{ item | yaml_scalar }}{% endfor %}{% endif %}
+---
+
+# {{ title }}
+{% if split_from %}
+Split from {% for doc in split_from %}{% if not loop.first %}, {% endif %}[{{ doc.title }}]({{ doc.link }}){% endfor %}.
+{% endif %}
+{% if surface %}
+## Surface
+
+Derived from the claimed sources at scaffold time.
+{% for group in surface %}
+### {{ group.kind }}
+
+{% for row in group.rows %}- `{{ row.identity }}` — [`{{ row.display }}`]({{ row.link }})
+{% endfor %}{% endfor %}{% endif %}
+## Scope & Limitations
+<!-- Describe what this component does NOT do. -->

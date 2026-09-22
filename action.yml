@@ -1,0 +1,78 @@
+name: irminsul
+description: Run irminsul checks against your /docs tree.
+branding:
+  icon: book-open
+  color: green
+
+inputs:
+  profile:
+    description: 'Checks to run: enabled (checks.enabled) | all-available.'
+    default: enabled
+  strict:
+    description: 'Fail on hint and time findings too; certain findings always fail.'
+    default: 'false'
+  fail-on:
+    description: >-
+      Finding classes that fail the run beyond certain, which always fails:
+      comma-separated hint, time. Leave empty for the default, certain alone;
+      a nightly run passes time.
+    default: ''
+  format:
+    description: 'Output format: github | plain | json. Defaults to GitHub annotations on the failing line.'
+    default: github
+  diff:
+    description: >-
+      Base git ref for the diff-aware checks, co-change and diff-integrity, such as
+      origin/main. The checkout needs enough history to reach it (fetch-depth: 0).
+    default: ''
+  version:
+    description: >-
+      Pin an irminsul release from PyPI. Leave empty to install the CLI from
+      the same ref of this repository that the workflow references, which is
+      the only way the inputs above are guaranteed to match the installed CLI.
+      A pinned release must accept `--profile` and `--format`; v0.2.0 and
+      earlier do not, and fail before any check runs.
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    # Every context value is mapped through `env` rather than expanded into the
+    # script: inside a composite action's `run`, `github.action_repository` and
+    # `github.action_ref` expand to empty strings, and an input expanded straight
+    # into bash source is a script-injection point.
+    - name: Install irminsul
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        ACTION_REPO: ${{ github.action_repository }}
+        ACTION_REF: ${{ github.action_ref }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        if [ -n "$VERSION" ]; then
+          pip install "irminsul==$VERSION"
+        elif [ -n "$ACTION_REPO" ] && [ -n "$ACTION_REF" ]; then
+          pip install "irminsul @ git+https://github.com/$ACTION_REPO@$ACTION_REF"
+        else
+          pip install "$ACTION_PATH"
+        fi
+    - name: Run irminsul check
+      shell: bash
+      env:
+        PROFILE: ${{ inputs.profile }}
+        FORMAT: ${{ inputs.format }}
+        STRICT: ${{ inputs.strict }}
+        FAIL_ON: ${{ inputs.fail-on }}
+        DIFF: ${{ inputs.diff }}
+      run: |
+        args=()
+        if [ -n "$PROFILE" ]; then args+=("--profile=$PROFILE"); fi
+        if [ -n "$FORMAT" ]; then args+=("--format=$FORMAT"); fi
+        if [ "$STRICT" = "true" ]; then args+=(--strict); fi
+        if [ -n "$FAIL_ON" ]; then args+=("--fail-on=$FAIL_ON"); fi
+        if [ -n "$DIFF" ]; then args+=("--diff=$DIFF"); fi
+        irminsul check "${args[@]}"

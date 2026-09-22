@@ -1,0 +1,85 @@
+project_name = "{{ project_name }}"
+
+[paths]
+docs_root = "docs"
+source_roots = {{ source_roots | tojson }}
+source_includes = []
+source_excludes = []
+honor_gitignore = true
+{% if code_dir and source_name %}
+# The code repository, named so the adoption record can bind each entry to it instead of
+# re-deriving one from the roots above — which a later edit to `source_roots` could change
+# underneath existing entries. `ref` is the history an adoption boundary has to be a point
+# on; `origin/main` is what a CI checkout has. A bare `main` is refused, because in a
+# checkout that means the local branch, which anyone can move and nobody sees move.
+# Naming a ref is not a claim that it is protected: that is a repository setting, and
+# Irminsul checks only that a pin is contained in the ref's history.
+[[paths.sources]]
+name = "{{ source_name }}"
+path = "{{ code_dir }}"
+ref = "origin/main"
+{% endif %}
+
+[checks]
+enabled = [
+    "frontmatter",
+    "globs",
+    "uniqueness",
+    "links",
+    "schema-leak",
+    "coverage",
+    "liar",
+    "prose-file-reference",
+    "rfc-lifecycle",
+    "retired-references",
+    "mtime-drift",
+    "stale-reaper",
+    "orphans",
+    "supersession",
+    "parent-child",
+    "glossary-discipline",
+    "external-links",
+    "reality",
+    "boundary",
+    "phantom-layer",
+    "requires-env",
+    "import-deps",
+    "terminology-overload",
+    "claim-provenance",
+    "foundation-readiness",
+    "rfc-follow-through",
+    "inventory-drift",
+    "claim-anchor",
+    "doc-refs",
+    "change-binding",
+    "requirement-grammar",
+    "adr-structure",
+    "duplicate-block",
+    "section-reference",
+    "code-references",
+    "test-ownership",
+]
+
+[checks.external_links]
+enabled = false
+timeout_seconds = 5.0
+cache_path = ".irminsul-cache/external-links.json"
+ttl_hours = 168
+
+[checks.stale_reaper]
+deprecated_threshold_days = 180
+
+[checks.glossary_discipline]
+glossary_path = "docs/GLOSSARY.md"
+
+[checks.parent_child]
+length_warning_lines = 300
+
+# terminology-overload ships with no rules; add [[checks.terminology_overload.rules]]
+# entries for terms that mean different things in different parts of your project.
+
+[overrides]
+mtime_drift_days = 30
+
+[languages]
+enabled = {{ languages | tojson }}

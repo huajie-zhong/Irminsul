@@ -1,0 +1,994 @@
+"""Change lifecycle reports: `change status` and `change verify`.
+
+One builder produces one report shape for both commands. The report separates
+three categories deliberately: mechanical blockers (deterministic, block a
+transition), evidence (derived facts an agent can inspect), and semantic-review
+clues (questions only an agent or human can answer). The deterministic result
+may say `mechanically_ready_for`; it never claims behavior is correct.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from irminsul.change.footprint import Footprint, touched_components
+from irminsul.checks import Finding, Severity, sort_findings
+from irminsul.checks.pipeline import enabled_findings
+from irminsul.config import IrminsulConfig
+from irminsul.docgraph import DocGraph, DocNode, build_graph, is_rfc
+from irminsul.docgraph_index import Task as TaskType
+from irminsul.docgraph_index import TasksSection
+from irminsul.frontmatter import (
+    RFC_STATE_TRANSITIONS,
+    RfcStateEnum,
+)
+from irminsul.git.changes import GitChangesError, working_tree_changed_paths
+from irminsul.git.mtime import diff_name_only
+
+REPORT_VERSION = 1
+
+# Environment variables consulted for a CI-provided diff base, in order.
+_CI_BASE_ENV_VARS = ("IRMINSUL_BASE_REF", "GITHUB_BASE_REF")
+
+
+class ChangeError(Exception):
+    """User-facing change command error."""
+
+    def __init__(self, message: str, *, code: int = 1) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+@dataclass(frozen=True)
+class Blocker:
+    code: str
+    message: str
+    path: str | None = None
+    suggestion: str | None = None
+
+
+@dataclass(frozen=True)
+class EvidenceItem:
+    kind: str  # changed-source | changed-test | changed-doc | unowned-source
+    """What was observed in the diff. `changed-test` means a recommended test file
+    changed — not that it ran, passed, or covers the task it sits beside."""
+    path: str
+    component: str | None = None
+
+
+@dataclass(frozen=True)
+class ReviewClue:
+    question: str
+    evidence: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ChangeBaseline:
+    source: str  # base-ref | ci | local | unknown
+    ref: str | None
+    changed_paths: tuple[str, ...] | None
+    """None when no baseline could be resolved — never rendered as a clean diff."""
+
+
+@dataclass(frozen=True)
+class ChangeReport:
+    version: int
+    change: str
+    path: str
+    title: str
+    state: str
+    affects: tuple[str, ...] | None
+    direction: str | None
+    resolved_by: str | None
+    valid_transitions: tuple[str, ...]
+    baseline: ChangeBaseline
+    footprint: Footprint | None
+    declared_untouched: tuple[str, ...] = ()
+    touched_undeclared: tuple[str, ...] = ()
+    blockers: tuple[Blocker, ...] = ()
+    evidence: tuple[EvidenceItem, ...] = ()
+    semantic_review: tuple[ReviewClue, ...] = ()
+    mechanically_ready_for: str = "none"  # accepted | implemented | none
+    repository_debt: tuple[tuple[str, int], ...] = ()
+    """(check, finding count) for configured findings unrelated to this change —
+    visible without gating the transition. Soft checks emit errors as
+    well as warnings, so the count is not warnings-only."""
+    next_actions: tuple[str, ...] = ()
+    extra: dict[str, object] = field(default_factory=dict)
+    """Escape hatch for later RFCs (requirements, tasks, impact) to extend the
+    report without changing this dataclass on every iteration."""
+
+
+def find_rfc_artifact(graph: DocGraph, config: IrminsulConfig, change: str) -> DocNode:
+    """Resolve an RFC by doc id or repo-relative path."""
+    node = graph.nodes.get(change)
+    if node is None:
+        normalized = change.replace("\\", "/")
+        node = graph.by_path.get(Path(normalized))
+
+    if node is None:
+        raise ChangeError(f"no RFC found for '{change}'", code=2)
+    if not is_rfc(node, config):
+        raise ChangeError(f"'{change}' resolves to {node.path.as_posix()}, not an RFC", code=2)
+    return node
+
+
+def find_rfc_node(graph: DocGraph, config: IrminsulConfig, change: str) -> DocNode:
+    """Resolve a structured lifecycle RFC for ordinary change commands."""
+    node = find_rfc_artifact(graph, config, change)
+    if node.frontmatter.rfc_state is None:
+        raise ChangeError(f"'{node.id}' has no rfc_state; it is not a change artifact", code=2)
+    return node
+
+
+def resolve_change_baseline(
+    repo_root: Path,
+    base_ref: str | None,
+    *,
+    env: Mapping[str, str] | None = None,
+) -> ChangeBaseline:
+    """Resolve the diff baseline: explicit `--base-ref`, CI base ref, or the
+    local working tree. Never guesses a clean result — an unresolvable baseline
+    is `unknown`, not empty."""
+    if base_ref is not None:
+        changed = diff_name_only(repo_root, base_ref, "HEAD")
+        if changed is None:
+            return ChangeBaseline(source="unknown", ref=base_ref, changed_paths=None)
+        return ChangeBaseline(source="base-ref", ref=base_ref, changed_paths=tuple(sorted(changed)))
+
+    environ = env if env is not None else os.environ
+    for var in _CI_BASE_ENV_VARS:
+        ci_ref = environ.get(var, "").strip()
+        if not ci_ref:
+            continue
+        for candidate in (ci_ref, f"origin/{ci_ref}"):
+            changed = diff_name_only(repo_root, candidate, "HEAD")
+            if changed is not None:
+                return ChangeBaseline(
+                    source="ci", ref=candidate, changed_paths=tuple(sorted(changed))
+                )
+        return ChangeBaseline(source="unknown", ref=ci_ref, changed_paths=None)
+
+    try:
+        local = working_tree_changed_paths(repo_root)
+    except GitChangesError:
+        return ChangeBaseline(source="unknown", ref=None, changed_paths=None)
+    return ChangeBaseline(source="local", ref=None, changed_paths=tuple(local))
+
+
+def build_change_report(
+    repo_root: Path,
+    config: IrminsulConfig,
+    change: str,
+    *,
+    base_ref: str | None = None,
+    env: Mapping[str, str] | None = None,
+    graph: DocGraph | None = None,
+) -> ChangeReport:
+    if graph is None:
+        graph = build_graph(repo_root, config)
+    node = find_rfc_node(graph, config, change)
+    fm = node.frontmatter
+    assert fm.rfc_state is not None
+    state = fm.rfc_state
+
+    baseline = resolve_change_baseline(repo_root, base_ref, env=env)
+    footprint: Footprint | None = None
+    if baseline.changed_paths is not None:
+        footprint = touched_components(graph, config, frozenset(baseline.changed_paths))
+
+    blockers: list[Blocker] = []
+    clues: list[ReviewClue] = []
+    evidence: list[EvidenceItem] = []
+    next_actions: list[str] = []
+
+    affects = tuple(fm.affects) if fm.affects is not None else None
+    findings = enabled_findings(graph)
+
+    if state in (RfcStateEnum.accepted, RfcStateEnum.implemented) and affects is None:
+        blockers.append(
+            Blocker(
+                code="missing-affects",
+                message=(
+                    f"{state.value} RFC must declare `affects` explicitly; "
+                    "use `affects: []` when no owned source changes"
+                ),
+                path=node.path.as_posix(),
+                suggestion="add `affects: [<component ids>]` to the RFC frontmatter",
+            )
+        )
+    for declared in affects or ():
+        if declared not in graph.nodes:
+            blockers.append(
+                Blocker(
+                    code="unknown-component",
+                    message=f"`affects` entry '{declared}' does not match any doc id",
+                    path=node.path.as_posix(),
+                    suggestion="correct the component id in `affects`",
+                )
+            )
+
+    resolved_target = None
+    if fm.resolved_by is not None:
+        resolved_target = graph.by_path.get(Path(fm.resolved_by.replace("\\", "/")))
+        if resolved_target is None:
+            blockers.append(
+                Blocker(
+                    code="unresolved-adr",
+                    message=f"resolved_by '{fm.resolved_by}' does not exist in the graph",
+                    path=node.path.as_posix(),
+                    suggestion="fix the path or create the decision doc",
+                )
+            )
+    elif state == RfcStateEnum.draft:
+        blockers.append(
+            Blocker(
+                code="missing-adr",
+                message="an accepted RFC must resolve to a decision record; none is declared",
+                path=node.path.as_posix(),
+                suggestion=(
+                    "create it with `irminsul new adr <title>` and pass "
+                    "--resolved-by <adr path> to `change transition`"
+                ),
+            )
+        )
+
+    if state == RfcStateEnum.accepted and not any(
+        h.slug == "resolution" for h in graph.headings.get(node.id, [])
+    ):
+        blockers.append(
+            Blocker(
+                code="missing-resolution-section",
+                message="finalization needs a '## Resolution' section on the RFC",
+                path=node.path.as_posix(),
+                suggestion="record the outcome and link the decision doc",
+            )
+        )
+
+    accepted = state == RfcStateEnum.accepted
+    anchor_scope = _anchor_scope(graph, node, affects) if accepted else None
+    for finding in _check_errors(graph, findings, node, anchor_scope, decision_updates=accepted):
+        blockers.append(
+            Blocker(
+                code=f"check-error:{finding.check}",
+                message=finding.message,
+                path=finding.path.as_posix() if finding.path else None,
+                suggestion=finding.suggestion,
+            )
+        )
+
+    extra: dict[str, object] = {}
+    section = graph.requirements.get(node.id)
+    if state in (RfcStateEnum.draft, RfcStateEnum.accepted):
+        blockers.extend(requirement_blockers(graph, node))
+    if section is not None:
+        extra["requirements"] = {
+            "disposition": section.disposition,
+            "items": [
+                {
+                    "id": req.req_id,
+                    "global_id": f"{node.id}#{req.req_id}" if req.req_id else None,
+                    "title": req.title,
+                    "provenance": req.provenance,
+                    "scenarios": len(req.scenarios),
+                    "binding": (
+                        "planned/unbound"
+                        if req.provenance == "code"
+                        and state in (RfcStateEnum.draft, RfcStateEnum.accepted)
+                        else None
+                    ),
+                }
+                for req in section.requirements
+            ],
+        }
+        for req in section.requirements:
+            if len(req.scenarios) == 1:
+                clues.append(
+                    ReviewClue(
+                        question=(
+                            f"requirement '{req.req_id or req.title}' has a single "
+                            "scenario; is a negative or failure scenario missing?"
+                        ),
+                        evidence=(node.path.as_posix(),),
+                    )
+                )
+
+    tasks_section = graph.tasks.get(node.id)
+    if tasks_section is not None:
+        extra["tasks"] = _task_evidence(node, tasks_section, affects, footprint, clues)
+
+    from irminsul.change.impact import build_impact_report, impact_summary
+
+    impact = build_impact_report(
+        repo_root,
+        config,
+        node.id,
+        graph=graph,
+        baseline=baseline,
+        footprint=footprint,
+    )
+    extra["impact"] = {"level": impact.level, "summary": impact_summary(impact)}
+
+    declared_untouched: tuple[str, ...] = ()
+    touched_undeclared: tuple[str, ...] = ()
+    if footprint is not None:
+        for component, files in footprint.touched.items():
+            evidence.extend(
+                EvidenceItem(kind="changed-source", path=f, component=component) for f in files
+            )
+        for component, files in footprint.changed_tests.items():
+            evidence.extend(
+                EvidenceItem(kind="changed-test", path=f, component=component) for f in files
+            )
+        evidence.extend(EvidenceItem(kind="changed-doc", path=d) for d in footprint.changed_docs)
+        evidence.extend(
+            EvidenceItem(kind="unowned-source", path=u) for u in footprint.unowned_source
+        )
+
+        if affects is not None:
+            touched_set = set(footprint.touched)
+            declared_set = set(affects)
+            declared_untouched = tuple(sorted(declared_set - touched_set))
+            touched_undeclared = tuple(sorted(touched_set - declared_set))
+            for component in declared_untouched:
+                clues.append(
+                    ReviewClue(
+                        question=(
+                            f"declared component '{component}' has no implementation "
+                            "evidence in this baseline — not started, or planned scope "
+                            "that was dropped?"
+                        ),
+                        evidence=(node.path.as_posix(),),
+                    )
+                )
+            for component in touched_undeclared:
+                clues.append(
+                    ReviewClue(
+                        question=(
+                            f"component '{component}' changed but is absent from "
+                            "`affects` — intended scope expansion or accidental side "
+                            "effect?"
+                        ),
+                        evidence=footprint.touched[component],
+                    )
+                )
+    else:
+        blockers.append(
+            Blocker(
+                code="missing-baseline",
+                message=(
+                    "no diff baseline could be resolved, so no implementation evidence "
+                    "can be derived"
+                ),
+                path=node.path.as_posix(),
+                suggestion=(
+                    "pass --base-ref <ref>, set IRMINSUL_BASE_REF, or run from a git worktree"
+                ),
+            )
+        )
+
+    if state == RfcStateEnum.accepted:
+        blockers.extend(_decision_update_blockers(graph, node))
+        blockers.extend(_anchor_blockers(graph, node, affects))
+        if footprint is not None:
+            blockers.extend(_unowned_change_blockers(footprint))
+
+    scoped_findings, repository_debt = _partition_configured_findings(
+        graph, findings, node, affects, baseline, state
+    )
+    if scoped_findings:
+        extra["scoped_findings"] = scoped_findings
+
+    mechanically_ready_for = "none"
+    if state == RfcStateEnum.draft and not blockers and affects is not None:
+        mechanically_ready_for = "accepted"
+    if (
+        state == RfcStateEnum.accepted
+        and not blockers
+        and baseline.changed_paths is not None
+        and not touched_undeclared
+    ):
+        mechanically_ready_for = "implemented"
+
+    if state == RfcStateEnum.draft:
+        if affects is None:
+            next_actions.append("declare `affects` in the RFC frontmatter (use [] for none)")
+        if fm.resolved_by is None:
+            next_actions.append(
+                "create the decision record (`irminsul new adr <title>`), then "
+                f"`irminsul change transition {node.id} accepted "
+                "--resolved-by <adr path> --confirm`"
+            )
+        else:
+            next_actions.append(f"irminsul change transition {node.id} accepted --confirm")
+    elif state == RfcStateEnum.accepted:
+        if mechanically_ready_for == "implemented":
+            next_actions.append(
+                f"irminsul change finalize {node.id} "
+                "--anchor <req>=<path>#<symbol> --confirm (after semantic review)"
+            )
+        else:
+            next_actions.append(f"irminsul change verify {node.id} --base-ref <ref>")
+        next_actions.append(f"irminsul change impact {node.id}")
+
+    return ChangeReport(
+        version=REPORT_VERSION,
+        change=node.id,
+        path=node.path.as_posix(),
+        title=fm.title,
+        state=state.value,
+        affects=affects,
+        direction=fm.direction.value if fm.direction else None,
+        resolved_by=fm.resolved_by,
+        valid_transitions=tuple(
+            sorted(s.value for s in RFC_STATE_TRANSITIONS.get(state, frozenset()))
+        ),
+        baseline=baseline,
+        footprint=footprint,
+        declared_untouched=declared_untouched,
+        touched_undeclared=touched_undeclared,
+        blockers=tuple(blockers),
+        evidence=tuple(evidence),
+        semantic_review=tuple(clues),
+        mechanically_ready_for=mechanically_ready_for,
+        repository_debt=repository_debt,
+        next_actions=tuple(next_actions),
+        extra=extra,
+    )
+
+
+_PROMOTED_DECISION_CATEGORIES = frozenset(
+    {
+        "no-required-updates-field",
+        "missing-required-update-path",
+        "update-missing-implements",
+    }
+)
+
+
+def _relates_to_rfc(finding: Finding, node: DocNode) -> bool:
+    return finding.doc_id == node.id or f"'{node.id}'" in finding.message
+
+
+def _promotes_decision_update(finding: Finding, node: DocNode) -> bool:
+    """The exact rfc-follow-through findings `_decision_update_blockers` promotes."""
+    return _relates_to_rfc(finding, node) and finding.category in _PROMOTED_DECISION_CATEGORIES
+
+
+def _anchor_scope(graph: DocGraph, node: DocNode, affects: tuple[str, ...] | None) -> set[str]:
+    """The docs whose anchors gate this RFC's finalization: the RFC itself and
+    the component docs it declares in `affects`."""
+    scope = {node.path.as_posix()}
+    for component in affects or ():
+        owner = graph.nodes.get(component)
+        if owner is not None:
+            scope.add(owner.path.as_posix())
+    return scope
+
+
+def _promotes_anchor(finding: Finding, scope: set[str]) -> bool:
+    """The exact claim-anchor findings `_anchor_blockers` promotes."""
+    if finding.severity not in (Severity.warning, Severity.error):
+        return False
+    return (finding.path.as_posix() if finding.path else None) in scope
+
+
+def _decision_update_blockers(graph: DocGraph, node: DocNode) -> list[Blocker]:
+    """This RFC's unresolved required updates block finalization readiness.
+
+    Runs the check directly (like `plan_finalize`) so the gate does not depend
+    on which checks a project enables, and drops what the baseline records.
+    """
+    from irminsul.checks.pipeline import without_baselined
+    from irminsul.checks.rfc_follow_through import RfcFollowThroughCheck
+
+    return [
+        Blocker(
+            code=f"rfc-follow-through:{finding.category}",
+            message=finding.message,
+            path=finding.path.as_posix() if finding.path else None,
+            suggestion=finding.suggestion,
+        )
+        for finding in without_baselined(graph, RfcFollowThroughCheck().run(graph))
+        if _promotes_decision_update(finding, node)
+    ]
+
+
+def _anchor_blockers(
+    graph: DocGraph, node: DocNode, affects: tuple[str, ...] | None
+) -> list[Blocker]:
+    """Anchors in the affected scope must resolve and be fresh before
+    finalization. A broken anchor (missing file or symbol) is an
+    error and blocks at least as hard as a stale one."""
+    from irminsul.checks.claim_anchor import ClaimAnchorCheck
+
+    scope = _anchor_scope(graph, node, affects)
+    return [
+        Blocker(
+            code="broken-anchor" if finding.severity == Severity.error else "stale-anchor",
+            message=finding.message,
+            path=finding.path.as_posix() if finding.path else None,
+            suggestion=finding.suggestion,
+        )
+        for finding in sort_findings(ClaimAnchorCheck().run(graph))
+        if _promotes_anchor(finding, scope)
+    ]
+
+
+def _unowned_change_blockers(footprint: Footprint) -> list[Blocker]:
+    """Changed source no component claims is unreconciled scope.
+
+    Mirrors the `plan_finalize` gate exactly, so `change verify` cannot report
+    ready for a tree that `change finalize` will refuse.
+    """
+    return [
+        Blocker(
+            code="unowned-change",
+            message=f"changed source '{unowned}' has no component claim",
+            path=unowned,
+            suggestion="extend a component doc's `describes` (curated, not automatic)",
+        )
+        for unowned in footprint.unowned_source
+    ]
+
+
+def _partition_configured_findings(
+    graph: DocGraph,
+    findings: list[Finding],
+    node: DocNode,
+    affects: tuple[str, ...] | None,
+    baseline: ChangeBaseline,
+    state: RfcStateEnum,
+) -> tuple[list[dict[str, object]], tuple[tuple[str, int], ...]]:
+    """Split enabled warnings into change-scoped findings and repository debt. A finding is skipped here only when it was
+    *actually* promoted to a blocker above — the skip predicates are the same
+    ones the blocker passes use, so nothing can fall between the two and
+    disappear. Everything unrelated to this change stays visible as debt
+    without gating the transition."""
+    from collections import Counter
+
+    anchor_scope = _anchor_scope(graph, node, affects)
+    scope_paths = set(anchor_scope)
+    if baseline.changed_paths is not None:
+        scope_paths.update(baseline.changed_paths)
+
+    scoped: list[dict[str, object]] = []
+    debt: Counter[str] = Counter()
+    for finding in sort_findings(findings):
+        # Errors are already blockers; only warnings are scoped or counted as debt.
+        if finding.severity is not Severity.warning:
+            continue
+        finding_path = finding.path.as_posix() if finding.path else None
+        in_scope = finding_path in scope_paths or finding.doc_id == node.id
+
+        if state == RfcStateEnum.accepted:
+            if finding.check == "rfc-follow-through" and _promotes_decision_update(finding, node):
+                continue
+            if finding.check == "claim-anchor" and _promotes_anchor(finding, anchor_scope):
+                continue
+        if in_scope:
+            scoped.append(
+                {
+                    "check": finding.check,
+                    "message": finding.message,
+                    "path": finding_path,
+                    "suggestion": finding.suggestion,
+                }
+            )
+        else:
+            debt[finding.check] += 1
+
+    return scoped, tuple(sorted(debt.items()))
+
+
+def _task_evidence(
+    node: DocNode,
+    tasks_section: TasksSection,
+    affects: tuple[str, ...] | None,
+    footprint: Footprint | None,
+    clues: list[ReviewClue],
+) -> dict[str, object]:
+    """Per-task mechanical evidence: evidence labels, never
+    completion labels. Several tasks may share one requirement and therefore
+    the same changed files — semantics stay with the reviewer.
+
+    With no diff baseline nothing was measured, so evidence and counts are
+    `None` (unknown), never an empty list that reads as a measured zero.
+    """
+    tasks = tasks_section.tasks
+    declared = tuple(affects or ())
+    items: list[dict[str, object]] = []
+    tasks_with_source = 0
+    tasks_with_test = 0
+    measured = footprint is not None
+
+    for task in tasks:
+        related = (task.component_ref,) if task.component_ref else declared
+        source_evidence: list[str] = []
+        test_evidence: list[str] = []
+        review_clue: str | None = None
+
+        if footprint is not None:
+            for component in related:
+                source_evidence.extend(footprint.touched.get(component, ()))
+                test_evidence.extend(footprint.changed_tests.get(component, ()))
+            source_evidence = sorted(set(source_evidence))
+            test_evidence = sorted(set(test_evidence))
+            tasks_with_source += bool(source_evidence)
+            tasks_with_test += bool(test_evidence)
+
+            if not source_evidence:
+                review_clue = f"no changed source is associated with {_task_scope(task)}"
+            elif not test_evidence:
+                review_clue = "inspect implementation and add or identify scenario coverage"
+            else:
+                review_clue = "confirm the changed tests assert this task's scenario, and run them"
+            clues.append(
+                ReviewClue(
+                    question=f"task '{task.task_id}': {review_clue}",
+                    evidence=tuple(source_evidence + test_evidence) or (node.path.as_posix(),),
+                )
+            )
+
+        items.append(
+            {
+                "id": task.task_id,
+                "text": task.text,
+                "req": task.req_ref,
+                "component": task.component_ref,
+                "source_evidence": source_evidence if measured else None,
+                "changed_tests": test_evidence if measured else None,
+                # The older spelling, kept for readers written against it and saying the
+                # same thing. `context`'s validation JSON keeps `checks_passed` the same
+                # way; a rename that breaks every consumer on upgrade is not a rename
+                # anyone asked for.
+                "test_evidence": test_evidence if measured else None,
+                "review_clue": review_clue,
+            }
+        )
+
+    return {
+        "items": items,
+        "evidence_measured": measured,
+        "summary": {
+            "total": len(tasks),
+            "with_source_evidence": tasks_with_source if measured else None,
+            "with_changed_tests": tasks_with_test if measured else None,
+            "with_test_evidence": tasks_with_test if measured else None,
+        },
+    }
+
+
+def _task_scope(task: TaskType) -> str:
+    if task.component_ref:
+        return "this task's component"
+    if task.req_ref:
+        return "this task's requirement"
+    return (
+        "any declared affected component (this task references neither a "
+        "requirement nor a component)"
+    )
+
+
+def requirement_blockers(graph: DocGraph, node: DocNode) -> list[Blocker]:
+    """Requirement-contract blockers shared by reports and transitions.
+
+    Acceptance freezes the contract to implement: the RFC needs either
+    well-formed requirements or an explicit no-new-behavior disposition, and
+    grammar findings that warn elsewhere block here.
+    """
+    from irminsul.checks.requirement_grammar import (
+        RequirementGrammarCheck,
+        requirement_grammar_findings,
+    )
+
+    section = graph.requirements.get(node.id)
+    if section is None:
+        return [
+            Blocker(
+                code="missing-requirements",
+                message=(
+                    "no `## Requirements` section: add requirement blocks or the "
+                    "explicit sentence 'No new behavioral requirements: ...'"
+                ),
+                path=node.path.as_posix(),
+                suggestion=(
+                    "each block is `### Requirement: <title>`, then `ID:`, `Provenance: "
+                    "code|adr|citation`, SHALL/MUST text, and `#### Scenario:` bullets "
+                    "with **WHEN** and **THEN**"
+                ),
+            )
+        ]
+
+    findings = requirement_grammar_findings(node, section, check_name=RequirementGrammarCheck.name)
+    tasks_section = graph.tasks.get(node.id)
+    if tasks_section is not None:
+        from irminsul.checks.requirement_grammar import task_grammar_findings
+
+        findings.extend(
+            task_grammar_findings(
+                node, tasks_section, section, check_name=RequirementGrammarCheck.name
+            )
+        )
+    return [
+        Blocker(
+            code=f"requirement-grammar:{finding.category}",
+            message=finding.message,
+            path=node.path.as_posix(),
+            suggestion=finding.suggestion,
+        )
+        for finding in findings
+    ]
+
+
+def _check_errors(
+    graph: DocGraph,
+    findings: list[Finding],
+    node: DocNode,
+    anchor_scope: set[str] | None,
+    *,
+    decision_updates: bool,
+) -> list[Finding]:
+    """Enabled errors, without those a more specific blocker already reports: with
+    `decision_updates`, this RFC's required-update findings, and, given `anchor_scope`,
+    the claim-anchor findings in it."""
+    return sort_findings(
+        [
+            f
+            for f in findings
+            if f.severity == Severity.error
+            and not (
+                decision_updates
+                and f.check == "rfc-follow-through"
+                and _promotes_decision_update(f, node)
+            )
+            and not (
+                anchor_scope is not None
+                and f.check == "claim-anchor"
+                and _promotes_anchor(f, anchor_scope)
+            )
+        ]
+    )
+
+
+def change_report_to_json(report: ChangeReport) -> str:
+    payload: dict[str, object] = {
+        "version": report.version,
+        "change": report.change,
+        "path": report.path,
+        "title": report.title,
+        "state": report.state,
+        "affects": list(report.affects) if report.affects is not None else None,
+        "direction": report.direction,
+        "resolved_by": report.resolved_by,
+        "valid_transitions": list(report.valid_transitions),
+        "baseline": {
+            "source": report.baseline.source,
+            "ref": report.baseline.ref,
+            "changed_paths": (
+                list(report.baseline.changed_paths)
+                if report.baseline.changed_paths is not None
+                else None
+            ),
+        },
+        "declared_untouched": list(report.declared_untouched),
+        "touched_undeclared": list(report.touched_undeclared),
+        "blockers": [
+            {
+                "code": b.code,
+                "message": b.message,
+                "path": b.path,
+                "suggestion": b.suggestion,
+            }
+            for b in report.blockers
+        ],
+        "evidence": [
+            {"kind": e.kind, "path": e.path, "component": e.component} for e in report.evidence
+        ],
+        "semantic_review": [
+            {"question": c.question, "evidence": list(c.evidence)} for c in report.semantic_review
+        ],
+        "mechanically_ready_for": report.mechanically_ready_for,
+        "repository_debt": [
+            {"check": check, "findings": count} for check, count in report.repository_debt
+        ],
+        "next_actions": list(report.next_actions),
+    }
+    payload.update(report.extra)
+    return json.dumps(payload, indent=2)
+
+
+def format_change_status_plain(report: ChangeReport) -> str:
+    lines = [
+        f"{report.change}: {report.title}",
+        f"  state: {_state_line(report)}",
+        f"  affects: {_affects_line(report.affects)}",
+        f"  resolved_by: {report.resolved_by or '-'}",
+        f"  valid transitions: {', '.join(report.valid_transitions) or '(terminal)'}",
+        f"  baseline: {_baseline_line(report.baseline)}",
+    ]
+    if report.blockers:
+        lines.append("  blockers:")
+        lines.extend(f"    [{b.code}] {b.message}" for b in report.blockers)
+    lines.append(f"  mechanically ready for: {report.mechanically_ready_for}")
+    summary = _task_summary(report)
+    if summary is not None:
+        lines.append(f"  tasks: {summary}")
+    impact_line = _impact_summary_line(report)
+    if impact_line is not None:
+        lines.append(impact_line)
+    if report.evidence:
+        lines.append(f"  evidence: {len(report.evidence)} item(s); run `change verify` for detail")
+    scoped = _scoped_findings(report)
+    if scoped:
+        lines.append(f"  findings about this change: {len(scoped)}; run `change verify` for detail")
+    if report.next_actions:
+        lines.append("  next:")
+        lines.extend(f"    {action}" for action in report.next_actions)
+    return "\n".join(lines)
+
+
+def format_change_verify_plain(report: ChangeReport) -> str:
+    lines = [
+        f"{report.change}: {report.title}",
+        f"  state: {_state_line(report)}",
+        f"  affects: {_affects_line(report.affects)}",
+        f"  baseline: {_baseline_line(report.baseline)}",
+    ]
+    lines.extend(_requirements_lines(report))
+    lines.extend(_tasks_lines(report))
+    if report.blockers:
+        lines.append("  blockers:")
+        for b in report.blockers:
+            lines.append(f"    [{b.code}] {b.message}")
+            if b.suggestion:
+                lines.append(f"      -> {b.suggestion}")
+    else:
+        lines.append("  blockers: (none)")
+    if report.evidence:
+        lines.append("  evidence:")
+        for e in report.evidence:
+            component = f" ({e.component})" if e.component else ""
+            lines.append(f"    {e.kind}: {e.path}{component}")
+    else:
+        lines.append("  evidence: (none)")
+    if report.declared_untouched:
+        lines.append(f"  declared but untouched: {', '.join(report.declared_untouched)}")
+    if report.touched_undeclared:
+        lines.append(f"  touched but undeclared: {', '.join(report.touched_undeclared)}")
+    if report.semantic_review:
+        lines.append("  semantic review:")
+        lines.extend(f"    - {c.question}" for c in report.semantic_review)
+    lines.append(f"  mechanically ready for: {report.mechanically_ready_for}")
+    impact_line = _impact_summary_line(report)
+    if impact_line is not None:
+        lines.append(impact_line)
+    scoped = _scoped_findings(report)
+    if scoped:
+        lines.append(f"  findings about this change: {len(scoped)}")
+        for item in scoped:
+            location = f"{item['path']}: " if item.get("path") else ""
+            lines.append(f"    [{item['check']}] {location}{item['message']}")
+            if item.get("suggestion"):
+                lines.append(f"      -> {item['suggestion']}")
+    if report.repository_debt:
+        debt = ", ".join(f"{check} {count}" for check, count in report.repository_debt)
+        lines.append(f"  repository debt (unrelated): {debt}")
+    if report.next_actions:
+        lines.append("  next:")
+        lines.extend(f"    {action}" for action in report.next_actions)
+    return "\n".join(lines)
+
+
+def _scoped_findings(report: ChangeReport) -> list[dict[str, object]]:
+    payload = report.extra.get("scoped_findings")
+    if not isinstance(payload, list):
+        return []
+    return [item for item in payload if isinstance(item, dict)]
+
+
+def _impact_summary_line(report: ChangeReport) -> str | None:
+    payload = report.extra.get("impact")
+    if not isinstance(payload, dict):
+        return None
+    summary = payload.get("summary")
+    if not isinstance(summary, dict) or not summary:
+        return None
+    parts = ", ".join(f"{layer} {count}" for layer, count in summary.items())
+    return f"  impact ({payload.get('level')}): {parts} - run `change impact` for detail"
+
+
+def _task_summary(report: ChangeReport) -> str | None:
+    payload = report.extra.get("tasks")
+    if not isinstance(payload, dict):
+        return None
+    summary = payload.get("summary")
+    if not isinstance(summary, dict):
+        return None
+    total = summary.get("total")
+    if not payload.get("evidence_measured"):
+        return f"{total} declared; evidence unknown (no diff baseline)"
+    return (
+        f"{summary.get('with_source_evidence')}/{total} with source evidence, "
+        f"{summary.get('with_changed_tests')}/{total} with changed tests"
+    )
+
+
+def _evidence_line(label: str, paths: object, measured: bool) -> str:
+    if not measured:
+        value = "unknown (no diff baseline)"
+    elif isinstance(paths, list) and paths:
+        value = ", ".join(str(p) for p in paths)
+    else:
+        value = "none"
+    return f"      {label} {value}"
+
+
+def _tasks_lines(report: ChangeReport) -> list[str]:
+    payload = report.extra.get("tasks")
+    if not isinstance(payload, dict):
+        return []
+    items = payload.get("items")
+    if not isinstance(items, list):
+        return []
+    measured = bool(payload.get("evidence_measured"))
+    summary = _task_summary(report)
+    lines = [f"  tasks: {summary}" if summary else "  tasks:"]
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        ref = ""
+        if item.get("req"):
+            ref = f" (req: {item['req']})"
+        elif item.get("component"):
+            ref = f" (component: {item['component']})"
+        lines.append(f"    {item.get('id')} {item.get('text')}{ref}")
+        lines.append(_evidence_line("source evidence:", item.get("source_evidence"), measured))
+        lines.append(_evidence_line("changed tests:  ", item.get("changed_tests"), measured))
+        if item.get("review_clue"):
+            lines.append(f"      review clue:     {item['review_clue']}")
+    return lines
+
+
+def _requirements_lines(report: ChangeReport) -> list[str]:
+    payload = report.extra.get("requirements")
+    if not isinstance(payload, dict):
+        return []
+    disposition = payload.get("disposition")
+    if disposition:
+        return [f"  requirements: {disposition}"]
+    items = payload.get("items")
+    if not isinstance(items, list):
+        return []
+    lines = [f"  requirements: {len(items)}"]
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        binding = f" [{item['binding']}]" if item.get("binding") else ""
+        lines.append(
+            f"    {item.get('id') or '(no id)'}: {item.get('title')} "
+            f"(provenance {item.get('provenance') or '?'}, "
+            f"{item.get('scenarios')} scenario(s)){binding}"
+        )
+    return lines
+
+
+def _state_line(report: ChangeReport) -> str:
+    return report.state
+
+
+def _affects_line(affects: tuple[str, ...] | None) -> str:
+    if affects is None:
+        return "(not declared)"
+    return ", ".join(affects) if affects else "[] (no owned source)"
+
+
+def _baseline_line(baseline: ChangeBaseline) -> str:
+    if baseline.changed_paths is None:
+        return f"unknown{f' (ref {baseline.ref})' if baseline.ref else ''}"
+    ref = f" {baseline.ref}" if baseline.ref else ""
+    return f"{baseline.source}{ref}, {len(baseline.changed_paths)} changed path(s)"

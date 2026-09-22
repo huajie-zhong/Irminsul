@@ -1,0 +1,23 @@
+project_name = "soft-parent-child-fixture"
+
+[paths]
+docs_root = "docs"
+source_roots = ["app"]
+
+[checks]
+enabled = [
+    "frontmatter",
+    "globs",
+    "uniqueness",
+    "links",
+    "schema-leak",
+    "coverage",
+    "liar",
+    "prose-file-reference",
+    "rfc-lifecycle",
+    "retired-references",
+    "parent-child",
+]
+
+[checks.parent_child]
+length_warning_lines = 300

@@ -1,0 +1,73 @@
+---
+id: orient
+title: Agent orientation command
+status: stable
+depends_on:
+  - config
+  - docgraph
+describes:
+  - src/irminsul/orient.py
+owns_tests:
+  - tests/test_cli_orient.py
+summary: The recommended first call for agents — repo structure, doc totals, entry docs, and the command vocabulary as one stable report.
+inventory:
+  - kind: cli
+    source: src/irminsul/cli.py
+    complete: true
+    items:
+      - context
+      - refs
+      - surface
+      - check
+      - status
+      - fix
+      - list undocumented
+      - list lifecycle
+      - list review
+      - change status
+      - change graph
+      - new rfc
+    omit:
+      - anchors
+      - explain
+      - change finalize
+      - change impact
+      - change transition
+      - change verify
+      - init
+      - list baseline
+      - list orphans
+      - list stale
+      - mcp
+      - new adr
+      - new component
+      - orient
+      - regen agents-md
+      - seed
+---
+
+# Agent orientation command
+
+`irminsul orient` is the single entry point for agents working in an Irminsul-managed repo: run it first, before reading or editing anything. It builds the [DocGraph](docgraph.md) once, reads [config](config.md), and runs only the enabled checks that report time findings without the network, so it is fast enough to run at the start of every session.
+
+The report contains:
+
+- the project name and docs root
+- each folder that contains docs, with its doc count: a layer's configured folder (which may be nested) or another top-level folder
+- doc totals, broken down by frontmatter `status`
+- the entry docs that exist on disk, as repo-relative paths: the root harness router ([`AGENTS.md`](../../AGENTS.md)) first, then the docs-root entries ([`AGENTS.md`](../AGENTS.md), [`README.md`](../README.md), [`CONTRIBUTING.md`](../CONTRIBUTING.md), [`GLOSSARY.md`](../GLOSSARY.md)). Only the router is probed at the repo root — other conventional names would duplicate their docs-root counterparts, and harness-proprietary names do not belong in a harness-neutral report.
+- the enabled check names
+- the time findings: what elapsed time made stale, such as a deprecated doc past its threshold or an accepted RFC nothing followed up, which no pull request shows because a diff leaves time findings out; `external-links` is not run, and `irminsul check --fail-on time` covers it
+- a curated command vocabulary: which command to run when, phrased for an agent working the edit-verify loop
+
+The vocabulary teaches `context --before-edit <path...>` and
+`context --after-edit` first, then exposes focused context, refs, lifecycle,
+surface, check, and fix commands as power tools.
+
+## The JSON contract
+
+Every agent-facing read command — `orient`, plus the existing `context`, `refs`, `surface`, `check`, `list`, and the `anchors` report — supports `--format json`. Their JSON shapes are command-specific; consumers must not assume fields that a command does not document. Versioned envelopes are currently provided by some reports, not as a universal CLI contract. `orient` is the recommended first call; its `commands` field teaches the rest of the vocabulary, so an agent that knows only `irminsul orient --format json` can discover the entire workflow loop from the output.
+
+## Scope & Limitations
+
+The report is a snapshot of structure, not health: apart from time findings it reports no findings — use the check pipeline for that. The command vocabulary is curated and static — the full command surface is derivable on demand instead (`irminsul surface cli`) — but its command *identities* are kept honest against that live surface by the `inventory:` block above, which opts into being a watched surface (`complete: true`): the `inventory-drift` check flags a renamed or removed taught command, a new command that is neither taught (`items`) nor explicitly excluded (`omit`), and a stale `omit` entry — all in `irminsul check` itself. The check is name-based, so it does not catch a command that keeps its name but changes behavior — a stale `when` description is left to human review (or an opt-in `fingerprints` pin). Entry docs are detected by filename convention only.

@@ -1,0 +1,5 @@
+project_name = "bad-anchors-fixture"
+
+[paths]
+docs_root = "docs"
+source_roots = ["app"]
