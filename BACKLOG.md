@@ -69,15 +69,39 @@ Within one document a surviving claim id is now matched on its own
 claim moved to another document *and* reworded in the same change reads as removed —
 certain `governing-claim-removed` for a claim that exists one file over.
 
-## Release setup
+## Release pipeline
 
-- **Tag `v0.3.0`.** The repository has no tags, so `hatch-vcs` has no release to count from
-  and builds `0.1.dev<N>+g<hash>`. Check with `git tag`, not `irminsul --version`: that reads
-  a generated `_version.py` when an editable install has written one, and falls back to
-  `0.0.0+unknown` only when none exists.
-- **`HOMEBREW_TAP_TOKEN`** as a repository secret; `.github/workflows/release.yml`
-  dispatches the Homebrew tap update with it.
-- **PyPI trusted publisher** pointed at this repository.
+v0.3.0 was tagged and published on 2026-09-25. The tag, the `HOMEBREW_TAP_TOKEN` secret and
+the PyPI trusted publisher are in place, and PyPI carries the wheel and sdist with
+provenance attestations. Two jobs in `.github/workflows/release.yml` are not fine.
+
+### `ghcr-package-stranded-by-the-rename`
+
+`Push image to ghcr.io` failed with `denied: permission_denied: write_package` even though
+the job declares `packages: write`. The package was created by this project's previous
+repository, which has since been renamed, and a ghcr package's Actions access is bound to a
+repository by **id** — so the package stayed with the renamed repository while the name
+moved here.
+
+The contrast with PyPI is the lesson. A trusted publisher matches on the repository *name*,
+so the same rename handed publish rights to whatever repository inherited the name, and that
+job succeeded without being reconfigured. One identity is a string, the other a number, and
+a rename moves only the string.
+
+Fix by hand: grant this repository Write on the existing package under Manage Actions
+access, or delete the package and let this repository create it, then re-run the failed job.
+Nothing in the workflow can detect the condition, so it cannot be fixed in the workflow.
+
+### `homebrew-dispatch-reports-success-for-nothing`
+
+`Bump Homebrew tap` reports success when the `repository_dispatch` call is *accepted*, which
+is not the same as a formula being updated. The tap repository is **empty** — no branch, no
+formula, nothing listening for `irminsul-release` — so the event has gone nowhere since
+v0.1.0 while every release recorded a green Homebrew job. Either populate the tap with a
+workflow on that event type, or drop the job. A step that cannot fail is worse than no step,
+because it reads as coverage.
+
+- The workflow creates no GitHub Release object for a tag.
 
 ## Review debt
 
