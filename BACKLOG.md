@@ -71,8 +71,10 @@ certain `governing-claim-removed` for a claim that exists one file over.
 
 ## Release setup
 
-- **Tag `v0.3.0`.** The repository has no tags, so `hatch-vcs` has nothing to read and
-  `irminsul --version` reports `0.0.0+unknown`.
+- **Tag `v0.3.0`.** The repository has no tags, so `hatch-vcs` has no release to count from
+  and builds `0.1.dev<N>+g<hash>`. Check with `git tag`, not `irminsul --version`: that reads
+  a generated `_version.py` when an editable install has written one, and falls back to
+  `0.0.0+unknown` only when none exists.
 - **`HOMEBREW_TAP_TOKEN`** as a repository secret; `.github/workflows/release.yml`
   dispatches the Homebrew tap update with it.
 - **PyPI trusted publisher** pointed at this repository.
