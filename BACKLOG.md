@@ -28,17 +28,6 @@ ran. A fix has to settle: one audit per invocation after the last pass that will
 `ran` as the passes that actually ran; use accumulated across passes; what suppressing a
 finding that carries no line even means; and whether `run_check` callers audit at all.
 
-### `delta-not-scored-in-gate-strength`
-
-`_gate_strength` (`src/irminsul/checks/diff_integrity.py:1131`) measures `--strict`,
-`--fail-on`, `--diff`, `--base-ref` and `--profile`, but not `--delta`, which stops
-pre-existing errors from failing the run. Adding it to a gate step scores identically to
-not adding it.
-
-The louder half of this is already closed and should not be re-reported: a step switched
-off with `continue-on-error: true` or a statically false `if:` stops counting via
-`_switched_off` (`:1179`), and `irminsul check || true` via `_neutralised` (`:1202`).
-
 ### `claim-move-and-reword-across-docs`
 
 Within one document a surviving claim id is now matched on its own
@@ -49,26 +38,10 @@ certain `governing-claim-removed` for a claim that exists one file over.
 
 ## Release pipeline
 
-v0.3.0 was tagged and published on 2026-09-25. The tag, the `HOMEBREW_TAP_TOKEN` secret and
-the PyPI trusted publisher are in place, and PyPI carries the wheel and sdist with
-provenance attestations. Two jobs in `.github/workflows/release.yml` are not fine.
-
-### `ghcr-package-stranded-by-the-rename`
-
-`Push image to ghcr.io` failed with `denied: permission_denied: write_package` even though
-the job declares `packages: write`. The package was created by this project's previous
-repository, which has since been renamed, and a ghcr package's Actions access is bound to a
-repository by **id** — so the package stayed with the renamed repository while the name
-moved here.
-
-The contrast with PyPI is the lesson. A trusted publisher matches on the repository *name*,
-so the same rename handed publish rights to whatever repository inherited the name, and that
-job succeeded without being reconfigured. One identity is a string, the other a number, and
-a rename moves only the string.
-
-Fix by hand: grant this repository Write on the existing package under Manage Actions
-access, or delete the package and let this repository create it, then re-run the failed job.
-Nothing in the workflow can detect the condition, so it cannot be fixed in the workflow.
+v0.3.0 was tagged and published on 2026-09-25: PyPI carries the wheel and sdist with
+provenance attestations, and `ghcr.io/huajie-zhong/irminsul` carries `0.3.0` and `latest`.
+The tag, the `HOMEBREW_TAP_TOKEN` secret and the PyPI trusted publisher are all in place.
+One job in `.github/workflows/release.yml` still reports a success it has not earned.
 
 ### `homebrew-dispatch-reports-success-for-nothing`
 
