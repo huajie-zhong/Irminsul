@@ -1182,8 +1182,8 @@ def test_this_repositorys_own_action_is_scored_as_a_gate() -> None:
         "      - uses: ./\n        with:\n          strict: true\n          diff: origin/main\n"
     )
 
-    assert _gate_strength(workflow, read) == (1, 3, 2, 1)
-    assert _gate_strength(workflow) == (0, 0, 0, 0)
+    assert _gate_strength(workflow, read) == (1, 3, 2, 1, 1)
+    assert _gate_strength(workflow) == (0, 0, 0, 0, 0)
 
 
 _SCAFFOLDED_PATHS = (
@@ -1714,11 +1714,11 @@ def test_gate_strength_scores_the_composite_action() -> None:
     the words `irminsul check`, so the seal read every adopter's gate as absent."""
     from irminsul.checks.diff_integrity import _gate_strength
 
-    assert _gate_strength(_ACTION_WORKFLOW) == (1, 2, 2, 1)
+    assert _gate_strength(_ACTION_WORKFLOW) == (1, 2, 2, 1, 1)
     strict = _ACTION_WORKFLOW.replace("fail-on: hint", "strict: true")
-    assert _gate_strength(strict) == (1, 3, 2, 1)
+    assert _gate_strength(strict) == (1, 3, 2, 1, 1)
     lookalike = _ACTION_WORKFLOW.replace("acme/irminsul@v1", "acme/irminsul-lint@v1")
-    assert _gate_strength(lookalike) == (0, 0, 0, 0)
+    assert _gate_strength(lookalike) == (0, 0, 0, 0, 0)
 
 
 def test_the_scaffolded_pr_workflow_is_scored_as_a_gate(tmp_path: Path) -> None:
@@ -1735,9 +1735,15 @@ def test_the_scaffolded_pr_workflow_is_scored_as_a_gate(tmp_path: Path) -> None:
     write_scaffold(tmp_path, answers)
 
     workflows = tmp_path / ".github" / "workflows"
-    assert _gate_strength((workflows / "docs-pr.yml").read_text(encoding="utf-8")) == (1, 1, 2, 1)
+    assert _gate_strength((workflows / "docs-pr.yml").read_text(encoding="utf-8")) == (
+        1,
+        1,
+        2,
+        1,
+        1,
+    )
     nightly = (workflows / "docs-nightly.yml").read_text(encoding="utf-8")
-    assert _gate_strength(nightly) == (1, 2, 0, 1)
+    assert _gate_strength(nightly) == (1, 2, 0, 1, 1)
 
 
 def test_dropping_the_diff_input_from_the_action_is_an_error(tmp_path: Path) -> None:
@@ -1803,3 +1809,12 @@ def test_a_freshly_initialized_repo_seals_its_scaffolded_gate(tmp_path: Path) ->
     _commit(root, "stop gating the diff")
 
     assert "diff-integrity/gate-weakened" in _codes(root, base)
+
+
+def test_gate_strength_scores_delta_as_letting_standing_findings_pass() -> None:
+    """Only the fifth total moves: every flag the other axes count stays where it was."""
+    from irminsul.checks.diff_integrity import _gate_strength
+
+    step = '      - run: irminsul check --strict --diff "origin/main"\n'
+    assert _gate_strength(_workflow("pull_request", step)) == (1, 3, 2, 1, 1)
+    assert _gate_strength(_workflow("pull_request", step[:-1] + " --delta\n")) == (1, 3, 2, 1, 0)

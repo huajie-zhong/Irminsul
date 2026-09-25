@@ -266,7 +266,9 @@ class DiffIntegrityCheck:
         ),
         CODE_GATE_WEAKENED: (
             "A workflow dropped an `irminsul check` invocation or a step running the "
-            "composite Action, or one of the flags or Action inputs that makes it a gate. "
+            "composite Action, or one of the flags or Action inputs that makes it a gate — "
+            "or added `--delta`, which leaves every flag in place and narrows the gate to "
+            "the findings this change introduced. "
             "The checks that seal records and compare a change with its "
             "base run only when CI asks for them, so a change that edits its own workflow "
             "can otherwise switch off the thing judging it. Restore the invocation, or add "
@@ -1027,8 +1029,8 @@ def _live_workflow_text(text: str) -> str:
 
 #: Invocations, the finding classes that fail, how strictly the diff range is gated,
 #: and how many checks run.
-_Strength = tuple[int, int, int, int]
-_NO_STRENGTH: Final[_Strength] = (0, 0, 0, 0)
+_Strength = tuple[int, int, int, int, int]
+_NO_STRENGTH: Final[_Strength] = (0, 0, 0, 0, 0)
 
 
 def _breadth(profile: object) -> int:
@@ -1079,7 +1081,12 @@ def _action_gate_strength(
     read: Callable[[str], str | None] | None = None,
     data: object | None = None,
 ) -> _Strength:
-    """The same four totals for steps that run the composite Action.
+    """The same five totals for steps that run the composite Action.
+
+    No input produces `--delta`, so an Action invocation always fails on the findings the
+    tree already had and scores the standing axis at 1. A *local* action that hardcodes the
+    flag in its own `run:` is not read: `_local_action_flags` reports only the four inputs
+    the published Action forwards.
 
     A workflow `irminsul init` scaffolds gates through `uses: <owner>/irminsul@<ref>` and
     `with:` inputs, which never contain the words `irminsul check`, so reading only command
@@ -1096,7 +1103,7 @@ def _action_gate_strength(
     if data is None:
         return _NO_STRENGTH
     jobs = data.get("jobs") if isinstance(data, dict) else None
-    invocations = strictness = diff_rank = breadth = 0
+    invocations = strictness = diff_rank = breadth = standing = 0
     for job in jobs.values() if isinstance(jobs, dict) else ():
         steps = job.get("steps") if isinstance(job, dict) else None
         for step in steps if isinstance(steps, list) else ():
@@ -1115,6 +1122,7 @@ def _action_gate_strength(
             inputs = step.get("with")
             inputs = inputs if isinstance(inputs, dict) else {}
             invocations += 1
+            standing += 1
             fail_on = {c.strip() for c in str(inputs.get("fail-on") or "").split(",")}
             if str(inputs.get("strict", "")).strip().lower() == "true" and "--strict" in passed:
                 strictness += 3
@@ -1125,17 +1133,22 @@ def _action_gate_strength(
             if str(inputs.get("diff") or "").strip() and "--diff" in passed:
                 diff_rank += 2
             breadth += _breadth(inputs.get("profile")) if "--profile" in passed else 1
-    return invocations, strictness, diff_rank, breadth
+    return invocations, strictness, diff_rank, breadth, standing
 
 
 def _gate_strength(text: str, read: Callable[[str], str | None] | None = None) -> _Strength:
-    """How hard the `irminsul check` invocations in a workflow gate, as four totals.
+    """How hard the `irminsul check` invocations in a workflow gate, as five totals.
 
     Counting flag *tokens* treated interchangeable spellings as equal, which they are
     not: `--strict` fails on certain, hint and time, while `--fail-on time` lets hints
     pass, and `--diff` exits 2 on a range it cannot resolve where `--base-ref` only
     warns and skips the diff-aware passes. Both swaps are weakenings that a token count
     reads as a migration, so strength is measured rather than presence.
+
+    The last total counts the invocations that still fail on findings the tree already had.
+    `--delta` reports only what the change introduced, which every other axis reads as
+    untouched — each flag stays exactly where it was — so adding it was the quietest way
+    left to widen what the gate lets through.
     """
     # One parse for both halves: reading run steps as YAML, which is what lets a step
     # switched off with `continue-on-error` or `if: false` stop counting, otherwise
@@ -1144,7 +1157,7 @@ def _gate_strength(text: str, read: Callable[[str], str | None] | None = None) -
     commands = _live_run_commands(text, data)
     if commands is None:
         commands = [_live_workflow_text(text)]
-    invocations = strictness = diff_rank = breadth = 0
+    invocations = strictness = diff_rank = breadth = standing = 0
     for command in commands:
         # Two things the raw script still needs. A `run: |` block may wrap its flags over
         # continuation lines, which puts `--strict` on a line with no `irminsul check` on
@@ -1155,6 +1168,7 @@ def _gate_strength(text: str, read: Callable[[str], str | None] | None = None) -
             if "irminsul check" not in line:
                 continue
             invocations += 1
+            standing += 0 if "--delta" in line else 1
             if "--strict" in line:
                 strictness += 3
             elif match := _FAIL_ON_RE.search(line):
@@ -1173,6 +1187,7 @@ def _gate_strength(text: str, read: Callable[[str], str | None] | None = None) -
         strictness + action[1],
         diff_rank + action[2],
         breadth + action[3],
+        standing + action[4],
     )
 
 
@@ -2057,6 +2072,7 @@ def _strength_by_event(workflows: _Workflows) -> dict[str, _Strength]:
                 held[1] + strength[1],
                 held[2] + strength[2],
                 held[3] + strength[3],
+                held[4] + strength[4],
             )
     return totals
 
@@ -2105,6 +2121,7 @@ def _weakened_workflows(
         (1, "--strict", "fail on fewer finding classes (`--strict` / `--fail-on`)"),
         (2, "--diff", "gate the diff range less strictly (`--diff` / `--base-ref`)"),
         (3, "--profile", "run fewer checks (`--profile`)"),
+        (4, "--delta", "stop failing on findings the tree already had (`--delta`)"),
     )
     where = ", ".join(touched)
     out: list[Finding] = []

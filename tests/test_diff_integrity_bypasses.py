@@ -257,3 +257,26 @@ def test_an_unchanged_gate_is_still_no_weakening(tmp_path: Path) -> None:
     _replace_workflow(tmp_path, _GATE + "        name: gate\n", "name the step")
 
     assert _weakenings(tmp_path, base) == []
+
+
+_DELTA_GATE = '      - run: irminsul check --strict --diff "origin/main" --delta\n'
+
+
+def test_letting_pre_existing_findings_pass_is_a_weakening(tmp_path: Path) -> None:
+    """`--delta` reports only what the change introduced, so the gate stops failing on
+    every finding the tree already had. Each flag the scorer counted stayed where it was,
+    which is what made this the quietest way left to widen what the gate lets through."""
+    base = _gated_repo(tmp_path)
+    _replace_workflow(tmp_path, _DELTA_GATE, "report only new findings")
+
+    assert _weakenings(tmp_path, base)
+
+
+def test_dropping_delta_is_not_a_weakening(tmp_path: Path) -> None:
+    """The other direction is a gate that fails on more than it did, not less."""
+    _repo(tmp_path)
+    _write(tmp_path, ".github/workflows/docs.yml", _workflow("pull_request", _DELTA_GATE))
+    base = _commit(tmp_path, "gated with delta")
+    _replace_workflow(tmp_path, _GATE, "fail on the standing findings again")
+
+    assert _weakenings(tmp_path, base) == []
