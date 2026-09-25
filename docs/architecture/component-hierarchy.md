@@ -67,7 +67,7 @@ Without doctrine, no mechanical check rescues this — every parent accumulates 
 
 Several checks make the highest-frequency doctrine violations costly and visible:
 
-1. **Schema/code-leak detection.** `schema-leak` scans every doc in the components layer, parents and children alike, with the enabled language profiles' patterns for type and schema definitions outside code fences. <!-- claim:schema-leak-enabled -->
+1. **Schema/code-leak detection.** `schema-leak` scans every doc in the components layer, parents and children alike, with the enabled language profiles' patterns for type and schema definitions. It reads prose and any fenced block a scan should see — one with no language label, or one labelled with a language this project scans — while a block labelled `toml`, `json`, `yaml` or `text` is exempt, so a configuration sample is not read as a leak. An unlabelled fence is exactly where a leaked schema would hide, which is why it is read rather than skipped. <!-- claim:schema-leak-enabled -->
 2. **No-broad-globs in parents-with-children.** If a folder has children, its index doc's `describes` field must be empty or an explicit list of files — never directory wildcards. The parent-child check reports broad globs in parent docs as a hint. <!-- claim:parent-child-check-available -->
 3. **Length cap as smell.** Warn if an index doc exceeds ~300 lines. Architecture writing should be concise; long parents indicate accumulated implementation detail. Advisory.
 4. **Folder auto-ownership.** An `INDEX.md` auto-owns sibling docs in its folder. No `children:` registry is required. <!-- irminsul:ignore prose-file-reference reason="literal filename rule" -->
