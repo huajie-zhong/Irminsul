@@ -21,16 +21,21 @@ one: "did *this symbol* change since this paragraph was last verified?"
 
 A paragraph carries an inline marker naming a file and (optionally) a symbol, plus a
 content hash. In a Python file the hash is taken over the symbol's **AST-normalized**
-body, not its raw text, so reformatting or editing comments does not trip the claim —
-only a real change to the code does, and resolution supports a top-level name or a
-dotted `Class.method`. In a file of any other language the symbol resolves when its
-name appears as a whole token, and the hash covers the indented block that starts at
-the line defining it, with whitespace normalized: a line with a definition keyword such
-as `func` or `class`, or an assignment, else its first mention outside a comment. A
+definition, not its raw text, so reformatting or editing comments does not trip the
+claim — only a real change to the code does. A name is bound by a function, a class, or
+an assignment, so a threshold, a registry or a compiled pattern can be anchored as
+readily as a function; resolution supports such a name at the top level or a dotted
+`Class.member`. A constant's hash covers the whole assignment statement, so two names
+bound by one `A, B = ...` share a hash and an edit to either re-asks both claims. In a
+file of any other language the symbol resolves when its name appears as a whole token,
+and the hash covers the indented block that starts at the line defining it, with
+whitespace normalized: a line with a definition keyword such as `func` or `class`, or
+an assignment, else its first mention outside a comment. A
 dotted name is looked for after its parent's first mention, a brace on the line after a
 signature stays in the block, and a file that is not UTF-8 does not resolve. A marker
 written inside a code span is an example and is not read.
 <!-- anchor: src/irminsul/anchors.py#resolve @sha256:6c8fc06b0650 -->
+<!-- anchor: src/irminsul/anchors.py#_find_symbol @sha256:98cbd402a571 -->
 
 ## Binding the code a doc names
 

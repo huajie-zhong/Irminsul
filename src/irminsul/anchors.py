@@ -6,8 +6,9 @@ A paragraph can pin itself to a specific code symbol with an inline marker:
 
 `file#symbol` is hand-written; the `@<algo>:<hash>` pin is written and refreshed by
 the re-pin command, never by hand. In a Python file the hash is taken over the
-**AST-normalized** body of the symbol (`ast.unparse`), so formatting and comment churn do
-not trip it — only a real change to the code the claim describes does. In any other text
+**AST-normalized** definition of the symbol (`ast.unparse`) — a function's or class's body,
+or the whole assignment statement that binds a constant — so formatting and comment churn
+do not trip it, and only a real change to the code the claim describes does. In any other text
 file the symbol resolves when its name appears as a whole token, and the hash is taken
 over the indented block starting at its first occurrence, with whitespace normalized. A
 marker inside a code span is an example, not an anchor.
@@ -21,6 +22,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -73,21 +75,46 @@ def parse_anchors(body: str) -> list[Anchor]:
     return anchors
 
 
+def _target_names(target: ast.expr) -> Iterator[str]:
+    """The plain names one assignment target binds, unpacking tuples and lists.
+
+    An attribute or subscript target is deliberately not a definition: `cfg.limit = 5`
+    mentions `cfg` without binding it, so anchoring `#cfg` to that line would pin a claim
+    to a statement that does not define what it names.
+    """
+    if isinstance(target, ast.Name):
+        yield target.id
+    elif isinstance(target, ast.Starred):
+        yield from _target_names(target.value)
+    elif isinstance(target, ast.Tuple | ast.List):
+        for element in target.elts:
+            yield from _target_names(element)
+
+
+def _defines(node: ast.stmt, name: str) -> bool:
+    """Whether this statement is the definition of `name` in its own scope."""
+    if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+        return node.name == name
+    if isinstance(node, ast.AnnAssign):
+        return name in _target_names(node.target)
+    if isinstance(node, ast.Assign):
+        return any(name in _target_names(target) for target in node.targets)
+    return False
+
+
 def _find_symbol(tree: ast.Module, symbol: str) -> ast.AST | None:
-    """Resolve a top-level name or a dotted `Class.method`."""
+    """Resolve a name bound at the top level, or a dotted `Class.member`.
+
+    A name is bound by a function, a class, or an assignment, so a threshold or a registry
+    can be anchored as readily as a function. Only a class opens a scope to descend into:
+    an assignment binds no members, so `LIMIT.attr` resolves to nothing rather than to the
+    statement that binds `LIMIT`.
+    """
     parts = symbol.split(".")
     scope: list[ast.stmt] = tree.body
     node: ast.AST | None = None
     for part in parts:
-        node = next(
-            (
-                child
-                for child in scope
-                if isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef)
-                and child.name == part
-            ),
-            None,
-        )
+        node = next((child for child in scope if _defines(child, part)), None)
         if node is None:
             return None
         scope = node.body if isinstance(node, ast.ClassDef) else []

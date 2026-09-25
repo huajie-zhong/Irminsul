@@ -173,3 +173,57 @@ def test_suggest_only_offers_markers_that_resolve(tmp_path: Path) -> None:
     sources = load_sources(tmp_path, load(tmp_path / "irminsul.toml"))
     assert suggest(tmp_path, sources, "field_name") == []
     assert [c.path for c in suggest(tmp_path, sources, "A")] == ["src/m.py"]
+
+
+PY = """\
+LIMIT = 60
+TIMEOUT: int = 5
+FIRST, SECOND = 1, 2
+
+
+class Cfg:
+    RETRIES = 3
+
+    def run(self) -> None:
+        return None
+
+
+def helper() -> int:
+    return LIMIT
+"""
+
+
+def _py_module(root: Path) -> Path:
+    (root / "src").mkdir(parents=True, exist_ok=True)
+    source = root / "src" / "mod.py"
+    source.write_text(PY, encoding="utf-8")
+    return source
+
+
+def test_a_python_constant_resolves_and_pins_only_its_own_statement(tmp_path: Path) -> None:
+    source = _py_module(tmp_path)
+    anchor = Anchor(1, "", "src/mod.py", "LIMIT", None)
+    first = resolve(tmp_path, anchor)
+    assert first.status == "ok"
+
+    source.write_text(PY.replace("return LIMIT", "return LIMIT + 1"), encoding="utf-8")
+    assert resolve(tmp_path, anchor).current == first.current
+
+    source.write_text(PY.replace("LIMIT = 60", "LIMIT = 90"), encoding="utf-8")
+    assert resolve(tmp_path, anchor).current != first.current
+
+
+def test_an_annotated_constant_a_tuple_target_and_a_class_attribute_resolve(
+    tmp_path: Path,
+) -> None:
+    _py_module(tmp_path)
+    for symbol in ("TIMEOUT", "FIRST", "SECOND", "Cfg.RETRIES", "Cfg.run", "helper"):
+        got = resolve(tmp_path, Anchor(1, "", "src/mod.py", symbol, None))
+        assert got.status == "ok", f"{symbol} -> {got.status}"
+
+
+def test_a_name_no_python_statement_binds_is_still_a_missing_symbol(tmp_path: Path) -> None:
+    _py_module(tmp_path)
+    for symbol in ("ABSENT", "Cfg.ABSENT", "LIMIT.attr", "helper.inner", "self"):
+        got = resolve(tmp_path, Anchor(1, "", "src/mod.py", symbol, None))
+        assert got.status == "missing_symbol", f"{symbol} -> {got.status}"

@@ -43,13 +43,6 @@ ran. A fix has to settle: one audit per invocation after the last pass that will
 `ran` as the passes that actually ran; use accumulated across passes; what suppressing a
 finding that carries no line even means; and whether `run_check` callers audit at all.
 
-### `python-anchor-cannot-bind-constant`
-
-`_find_symbol` (`src/irminsul/anchors.py:76`) matches only
-`ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef` at line 86, so `mod.py#LIMIT` is
-`missing_symbol` while `mod.js#LIMIT` resolves. A certain error on a correct anchor, which
-means thresholds, registries and regexes cannot be anchored in Python at all.
-
 ### `delta-not-scored-in-gate-strength`
 
 `_gate_strength` (`src/irminsul/checks/diff_integrity.py:1131`) measures `--strict`,
