@@ -26,11 +26,12 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+from irminsul.fences import FenceTracker
+
 ANCHOR_RE = re.compile(
     r"<!--\s*anchor:\s*(?P<path>[^\s#@]+)(?:#(?P<symbol>[^\s@]+))?"
     r"(?:\s+@(?P<algo>[a-z0-9]+):(?P<hash>[0-9a-f]+))?\s*-->"
 )
-_FENCE_RE = re.compile(r"^\s*(```|~~~)")
 _CODE_SPAN_RE = re.compile(r"(`+)(.+?)\1")
 _BLOCK_LINE_LIMIT = 200
 _HASH_LEN = 12
@@ -55,12 +56,9 @@ class Resolution:
 def parse_anchors(body: str) -> list[Anchor]:
     """Find anchor markers in a doc body, skipping fenced code blocks."""
     anchors: list[Anchor] = []
-    in_fence = False
+    fence = FenceTracker()
     for lineno, line in enumerate(body.splitlines(), start=1):
-        if _FENCE_RE.match(line):
-            in_fence = not in_fence
-            continue
-        if in_fence:
+        if fence.consume(line):
             continue
         for match in ANCHOR_RE.finditer(_mask_code_spans(line)):
             anchors.append(
@@ -266,13 +264,9 @@ def repin_text(repo_root: Path, body: str) -> tuple[str, int]:
     """
     updated = 0
     out_lines: list[str] = []
-    in_fence = False
+    fence = FenceTracker()
     for line in body.splitlines():
-        if _FENCE_RE.match(line):
-            in_fence = not in_fence
-            out_lines.append(line)
-            continue
-        if in_fence:
+        if fence.consume(line):
             out_lines.append(line)
             continue
 

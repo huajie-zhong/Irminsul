@@ -2,17 +2,19 @@
 id: docgraph
 title: DocGraph
 status: stable
-summary: The in-memory model of the docs tree that every check receives — what it holds, what it records instead of raising, and how data beyond the docs reaches a check.
+summary: The in-memory model of the docs tree that every check receives — what it holds, what it records instead of raising, how data beyond the docs reaches a check, and the one reader that decides what counts as fenced code.
 depends_on:
   - config
   - frontmatter
 describes:
   - src/irminsul/docgraph.py
   - src/irminsul/docgraph_index.py
+  - src/irminsul/fences.py
   - src/irminsul/clock.py
 owns_tests:
   - tests/test_docgraph.py
   - tests/test_docgraph_index.py
+  - tests/test_fences.py
 ---
 
 <!-- irminsul:ignore glossary-discipline/redefined-term reason="the component doc for the DocGraph, titled by its name" -->
@@ -38,7 +40,8 @@ The CLI passes the paths changed in its diff range as `diff_changed_paths`, or l
 
 `graph.source_map` is the one derived index that is *not* built during the walk. It resolves which repository and revision each managed file answers to, which costs a walk of the configured source roots, and most commands — `list`, `refs`, `new` — never ask. So it is built on first use and cached for the life of the graph, which is the right lifetime for the configuration (this graph's own object) and for the tree (what this graph walked), and the wrong one for the [adoption record](adoption-record.md), which the graph never reads: the map is rebuilt when a digest of that file changes. Its whole reason for existing on the graph is that there be one answer — see [where an entry is verified](adoption-record.md#where-an-entry-is-verified-decided-once).
 
-Structured body sections are a graph concern, not a per-check regex ([Change lifecycle](../decisions/change-lifecycle.md)): `graph.requirements` holds the parsed `## Requirements` section (requirement blocks with stable ids, provenance, and WHEN/THEN scenarios, or the explicit no-new-behavior disposition) for every doc that has one, so the grammar check, transitions, and change reports share one line-accurate parser. Fenced code blocks are skipped, so a doc can quote the grammar without declaring requirements. The other derived indexes — backlinks, headings, and task lists — follow the same rule: `docgraph_index.py` builds each one once, with a pure builder, at the end of `build_graph`, and its module docstring names them and the code that reads them.
+Structured body sections are a graph concern, not a per-check regex ([Change lifecycle](../decisions/change-lifecycle.md)): `graph.requirements` holds the parsed `## Requirements` section (requirement blocks with stable ids, provenance, and WHEN/THEN scenarios, or the explicit no-new-behavior disposition) for every doc that has one, so the grammar check, transitions, and change reports share one line-accurate parser. Fenced code blocks are skipped, so a doc can quote the grammar without declaring requirements — and every consumer skips them through one reader, `src/irminsul/fences.py`, which depends on nothing but the standard library so the anchor parser can share it too. A fence closes only on the same character, at least as long as the marker that opened it, and with no info string, so a four-backtick block quotes a three-backtick example verbatim. That reader classifies each line as the fence itself, what it wraps, or ordinary prose, because a caller deriving the distinction for itself is how a second reading gets written. The other derived indexes — backlinks, headings, and task lists — follow the same rule: `docgraph_index.py` builds each one once, with a pure builder, at the end of `build_graph`, and its module docstring names them and the code that reads them.
+<!-- anchor: src/irminsul/fences.py#FenceTracker @sha256:6d34a74a97e4 -->
 
 ## Scope & Limitations
 

@@ -13,6 +13,7 @@ from irminsul.checks.code_spans import is_live_doc
 from irminsul.code_references import CodeResolver, Reference
 from irminsul.config import IrminsulConfig, docs_root_prefix, find_config, in_layer, load
 from irminsul.docgraph import DocGraph, DocNode, build_graph, guidance_files
+from irminsul.fences import FenceTracker
 from irminsul.frontmatter_edit import is_frontmatter_delimiter
 from irminsul.git.blame import LineTimes
 
@@ -49,7 +50,6 @@ _GLOSSARY_META_RE = re.compile(r"^\s*(?:match|forbidden_synonyms|case_sensitive)
 _NEEDS_REFERENCE = frozenset({"enforcement", "future", "scope"})
 _FUTURE_WORK_RE = re.compile(r"\b(?:planned|not yet|arrives? with|in the future)\b", re.IGNORECASE)
 _ENUMERATION_MIN = 3
-_FENCE_RE = re.compile(r"^\s*(```|~~~)")
 _SPAN_RE = re.compile(r"(`+)(.+?)\1")
 _SENTENCE_END_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z`\[*(])")
 _TABLE_SEPARATOR_RE = re.compile(r"^\s*\|?[\s:|-]+\|?\s*$")
@@ -125,13 +125,12 @@ def _text_sentences(text_body: str) -> list[tuple[int, int, str]]:
                 out.append((first, first + piece.count("\n"), sentence))
         block.clear()
 
-    in_fence = False
+    fence = FenceTracker()
     for lineno, line in enumerate(text_body.splitlines(), start=1):
-        if _FENCE_RE.match(line):
+        if fence.consume(line):
             flush()
-            in_fence = not in_fence
             continue
-        if not in_fence and line.lstrip().startswith("|"):
+        if line.lstrip().startswith("|"):
             flush()
             if not _TABLE_SEPARATOR_RE.match(line):
                 cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
@@ -139,7 +138,7 @@ def _text_sentences(text_body: str) -> list[tuple[int, int, str]]:
                 if row:
                     out.append((lineno, lineno, row))
             continue
-        if in_fence or not line.strip() or line.lstrip().startswith(("#", "<!--")):
+        if not line.strip() or line.lstrip().startswith(("#", "<!--")):
             flush()
             continue
         if re.match(r"^\s*(?:[-*+]|\d+[.)])\s+", line):

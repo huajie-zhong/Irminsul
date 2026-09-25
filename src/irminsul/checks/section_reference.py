@@ -9,8 +9,8 @@ from typing import ClassVar
 
 from irminsul.checks.base import Finding, FindingClass, Severity
 from irminsul.docgraph import DocGraph, DocNode
+from irminsul.fences import FenceTracker
 
-_FENCE_RE = re.compile(r"^\s*(```|~~~)")
 _HEADING_RE = re.compile(r"^#{1,6}\s+(.+?)\s*#*\s*$")
 _TABLE_RE = re.compile(r"^\s*\|")
 _LIST_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
@@ -68,13 +68,9 @@ CODE_MISSING_TARGET = "section-reference/missing-target"
 
 def _lines(node: DocNode) -> list[tuple[int, str, bool]]:
     out: list[tuple[int, str, bool]] = []
-    in_fence = False
+    fence = FenceTracker()
     for lineno, line in enumerate(node.body.splitlines(), start=1):
-        if _FENCE_RE.match(line):
-            in_fence = not in_fence
-            out.append((lineno, line, True))
-            continue
-        out.append((lineno, line, in_fence))
+        out.append((lineno, line, fence.consume(line)))
     return out
 
 
@@ -97,7 +93,7 @@ def _heading_has_words(heading: str, words: list[str]) -> bool:
 
 def _block_kind_present(lines: list[tuple[int, str, bool]], kind: str) -> bool:
     for _, line, fenced in lines:
-        if kind == "fence" and _FENCE_RE.match(line):
+        if kind == "fence" and fenced:
             return True
         if fenced:
             continue

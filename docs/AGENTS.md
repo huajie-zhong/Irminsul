@@ -54,7 +54,7 @@ automatically once any doc declares one.
 | `config` | [Config](components/config.md) |  |
 | `context` | [Agent context command](components/context.md) | Runtime map of what governs a path — owning doc, recommended tests, dependencies, active RFCs, findings, and next commands — for the start and end of an edit. |
 | `doc-atom` | [The Doc Atom Specification](components/doc-atom.md) |  |
-| `docgraph` | [DocGraph](components/docgraph.md) | The in-memory model of the docs tree that every check receives — what it holds, what it records instead of raising, and how data beyond the docs reaches a check. |
+| `docgraph` | [DocGraph](components/docgraph.md) | The in-memory model of the docs tree that every check receives — what it holds, what it records instead of raising, how data beyond the docs reaches a check, and the one reader that decides what counts as fenced code. |
 | `frontmatter` | [Frontmatter](components/frontmatter.md) |  |
 | `git` | [Git helpers](components/git.md) |  |
 | `init` | [Init scaffolder](components/init.md) |  |

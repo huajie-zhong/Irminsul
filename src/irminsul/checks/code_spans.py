@@ -7,9 +7,9 @@ from dataclasses import dataclass
 
 from irminsul.config import IrminsulConfig, in_layer
 from irminsul.docgraph import DocNode
+from irminsul.fences import FenceTracker
 from irminsul.frontmatter import StatusEnum
 
-_FENCE_RE = re.compile(r"^\s*(```|~~~)")
 _INLINE_SPAN_RE = re.compile(r"(`+)(.+?)\1")
 # A dot is a boundary so `protected_paths` is named by `checks.schema_leak.protected_paths`;
 # a hyphen is not, so `--format` is not named by `--format-json`.
@@ -28,13 +28,12 @@ class CodeSpan:
 
 def code_spans(body: str) -> list[CodeSpan]:
     spans: list[CodeSpan] = []
-    in_fence = False
+    fence = FenceTracker()
     for lineno, line in enumerate(body.splitlines(), start=1):
-        if _FENCE_RE.match(line):
-            in_fence = not in_fence
-            continue
-        if in_fence:
-            spans.append(CodeSpan(lineno, line))
+        kind = fence.classify(line)
+        if kind != "outside":
+            if kind == "content":
+                spans.append(CodeSpan(lineno, line))
             continue
         spans.extend(CodeSpan(lineno, m.group(2)) for m in _INLINE_SPAN_RE.finditer(line))
     return spans

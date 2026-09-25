@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from irminsul.docgraph_index import FenceTracker, extract_section, parse_requirements
+from irminsul.docgraph_index import extract_section, parse_requirements
+from irminsul.fences import FenceTracker
 
 _GOOD = """# RFC
 

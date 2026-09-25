@@ -21,11 +21,11 @@ from markdown_it import MarkdownIt
 from irminsul.checks.base import Finding, FindingClass, Fix, Severity
 from irminsul.docgraph import DocGraph, DocNode
 from irminsul.docgraph_index import slugify
+from irminsul.fences import FenceTracker
 from irminsul.frontmatter_edit import split_frontmatter
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$", re.MULTILINE)
 _KNOWN_METADATA_KEYS = frozenset({"match", "forbidden_synonyms", "case_sensitive"})
-_FENCE_RE = re.compile(r"(?ms)^ {0,3}(```|~~~).*?^ {0,3}\1\s*$")
 _INLINE_CODE_RE = re.compile(r"`[^`\n]+`")
 _LINK_RE = re.compile(r"!?\[[^\]\n]*\]\([^)\n]*\)")
 _HEADING_LINE_RE = re.compile(r"(?m)^#{1,6}[^\n]*$")
@@ -232,9 +232,15 @@ def _redefinition_line(body: str, term: str) -> int | None:
     return body.count("\n", 0, start if start >= 0 else match.start()) + 1
 
 
+def _mask_fenced_lines(body: str) -> str:
+    """Blank every fenced line, keeping each line's length so offsets still map to lines."""
+    fence = FenceTracker()
+    return "\n".join(" " * len(line) if fence.consume(line) else line for line in body.split("\n"))
+
+
 def _masked_body(body: str) -> str:
-    masked = body
-    for pattern in (_FENCE_RE, _INLINE_CODE_RE, _HTML_COMMENT_RE):
+    masked = _mask_fenced_lines(body)
+    for pattern in (_INLINE_CODE_RE, _HTML_COMMENT_RE):
         masked = pattern.sub(lambda match: _blank_preserve_newlines(match.group(0)), masked)
     return masked
 

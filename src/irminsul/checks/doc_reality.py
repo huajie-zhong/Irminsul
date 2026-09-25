@@ -16,6 +16,7 @@ from irminsul.checks.globs import (
 )
 from irminsul.config import TerminologyRule, in_layer
 from irminsul.docgraph import DocGraph, DocNode, is_rfc
+from irminsul.fences import FenceTracker
 from irminsul.frontmatter import ClaimStateEnum, StatusEnum
 from irminsul.git.mtime import last_commit_time_any_repo
 from irminsul.regen.agents_md import (
@@ -31,7 +32,6 @@ _LOCAL_MD_RE = re.compile(r"(?<![\w.-])((?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.md
 _LABEL = r"(?:\\.|[^\]\n\\])*"
 _MARKDOWN_LINK_RE = re.compile(rf"!?\[{_LABEL}\](?:\([^\)\n]*\)|\[{_LABEL}\])")
 _LINK_DEFINITION_RE = re.compile(r"^\s{0,3}\[[^\]\n]+\]:\s+\S+")
-_FENCE_RE = re.compile(r"^\s*(```|~~~)")
 _IGNORE_RE = re.compile(r"irminsul:ignore\s+prose-file-reference")
 _IGNORE_START_RE = re.compile(r"irminsul:ignore-start\s+prose-file-reference")
 _IGNORE_END_RE = re.compile(r"irminsul:ignore-end\s+prose-file-reference")
@@ -146,7 +146,7 @@ def _body_paragraphs(body: str) -> list[_BodyParagraph]:
     paragraphs: list[_BodyParagraph] = []
     current: list[str] = []
     start_line: int | None = None
-    in_fence = False
+    fence = FenceTracker()
 
     def flush() -> None:
         nonlocal current, start_line
@@ -156,11 +156,8 @@ def _body_paragraphs(body: str) -> list[_BodyParagraph]:
         start_line = None
 
     for lineno, line in enumerate(body.splitlines(), start=1):
-        if _FENCE_RE.match(line):
+        if fence.consume(line):
             flush()
-            in_fence = not in_fence
-            continue
-        if in_fence:
             continue
         if not line.strip():
             flush()
@@ -180,12 +177,9 @@ def _body_sections(body: str) -> list[_BodySection]:
     """
     lines = body.splitlines()
     headings: list[tuple[int, int, str]] = []
-    in_fence = False
+    fence = FenceTracker()
     for index, line in enumerate(lines):
-        if _FENCE_RE.match(line):
-            in_fence = not in_fence
-            continue
-        if in_fence:
+        if fence.consume(line):
             continue
         match = _HEADING_RE.match(line)
         if match:
@@ -266,15 +260,12 @@ class ProseFileReferenceCheck:
             if is_rfc(node, graph.config):
                 continue
 
-            in_fence = False
+            fence = FenceTracker()
             in_ignore_block = False
             ignore_block_start: int | None = None
             ignore_block_used = False
             for lineno, line in enumerate(node.body.splitlines(), start=1):
-                if _FENCE_RE.match(line):
-                    in_fence = not in_fence
-                    continue
-                if in_fence:
+                if fence.consume(line):
                     continue
                 if _IGNORE_START_RE.search(line):
                     in_ignore_block = True
@@ -623,12 +614,9 @@ class ClaimProvenanceCheck:
 
     def _validate_body_claim_refs(self, node: DocNode, claim_ids: set[str]) -> list[Finding]:
         out: list[Finding] = []
-        in_fence = False
+        fence = FenceTracker()
         for lineno, line in enumerate(node.body.splitlines(), start=1):
-            if _FENCE_RE.match(line):
-                in_fence = not in_fence
-                continue
-            if in_fence:
+            if fence.consume(line):
                 continue
             for match in _CLAIM_REF_RE.finditer(line):
                 claim_id = match.group(1)
@@ -891,12 +879,9 @@ class TerminologyOverloadCheck:
         for node in _stable_audit_nodes(graph):
             if is_rfc(node, graph.config):
                 continue
-            in_fence = False
+            fence = FenceTracker()
             for lineno, line in enumerate(node.body.splitlines(), start=1):
-                if _FENCE_RE.match(line):
-                    in_fence = not in_fence
-                    continue
-                if in_fence:
+                if fence.consume(line):
                     continue
                 for rule in rules:
                     if not _line_has_term(line, rule.term):

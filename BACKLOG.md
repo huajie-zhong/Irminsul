@@ -13,21 +13,6 @@ before working it.
 
 ## Enforcement and correctness
 
-### `naive-fence-toggles`
-
-Ten modules decide whether a line sits inside a fenced code block by toggling on any line
-opening with three backticks or tildes, rather than using `FenceTracker`
-(`src/irminsul/docgraph_index.py:212`) — none of them reference it:
-`checks/code_spans.py`, `checks/doc_reality.py`, `checks/duplicate_block.py`,
-`checks/liar.py`, `checks/reality.py`, `checks/retired_references.py`,
-`checks/schema_leak.py`, `checks/section_reference.py`, `anchors.py`,
-`listing/review.py`.
-
-A four-backtick fence quoting a three-backtick example — the only way to document the
-anchor syntax — reads as live prose, so documenting the syntax raises a certain
-`claim-anchor/missing-file` that no ignore comment can silence. Migrate all ten in one
-change, or the codebase keeps two fence dialects.
-
 ### `ignore-audit-blind-to-unran-passes`
 
 `cli.check` calls `pipeline.finish` (`src/irminsul/checks/pipeline.py:146`) three times —

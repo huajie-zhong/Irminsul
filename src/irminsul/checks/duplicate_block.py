@@ -8,8 +8,8 @@ from typing import ClassVar
 from irminsul.checks.base import Finding, FindingClass, Severity
 from irminsul.checks.code_spans import is_live_doc
 from irminsul.docgraph import DocGraph, DocNode
+from irminsul.fences import FenceTracker
 
-_FENCE_RE = re.compile(r"^\s*(```|~~~)")
 _LIST_ITEM_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 _MIN_CHARS = 80
 
@@ -28,13 +28,9 @@ def _blocks(body: str) -> list[tuple[int, str]]:
             blocks.append((start, " ".join(" ".join(lines).split())))
         start, lines = None, []
 
-    in_fence = False
+    fence = FenceTracker()
     for lineno, line in enumerate(body.splitlines(), start=1):
-        if _FENCE_RE.match(line):
-            flush()
-            in_fence = not in_fence
-            continue
-        if in_fence or not line.strip() or line.lstrip().startswith("#"):
+        if fence.consume(line) or not line.strip() or line.lstrip().startswith("#"):
             flush()
             continue
         if _LIST_ITEM_RE.match(line):

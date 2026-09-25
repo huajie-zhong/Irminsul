@@ -12,6 +12,7 @@ from urllib.parse import unquote, urlsplit
 from irminsul.checks.base import Finding, FindingClass, Severity, carries_certain_findings
 from irminsul.config import IrminsulConfig
 from irminsul.docgraph import DocGraph, DocNode, guidance_files, is_decision, is_rfc
+from irminsul.fences import FenceTracker
 from irminsul.frontmatter import (
     RetirementEntry,
     RetirementKindEnum,
@@ -28,7 +29,6 @@ _REFERENCE_LINK_RE = re.compile(r"(?<!!)\[([^\]\n]+)\]\[([^\]\n]*)\]")
 _AUTOLINK_RE = re.compile(r"<(?:(?:https?|mailto):[^>\n]+)>")
 _BARE_URL_RE = re.compile(r"(?:https?|mailto):[^\s)>]+")
 _MARKUP_RE = re.compile(r"[`*_~]")
-_FENCE_RE = re.compile(r"^\s*(```|~~~)")
 
 
 @dataclass(frozen=True)
@@ -472,12 +472,9 @@ def _file_lines(
 
     generated: set[int] = set()
     open_start: int | None = None
-    in_fence = False
+    fence = FenceTracker()
     for index, line in enumerate(lines):
-        if _FENCE_RE.match(line):
-            in_fence = not in_fence
-            continue
-        if in_fence:
+        if fence.consume(line):
             continue
         rest = line
         if open_start is None and GENERATED_START in rest:

@@ -19,6 +19,7 @@ from pathspec import GitIgnoreSpec
 from irminsul.checks.base import Finding, FindingClass, Severity
 from irminsul.config import layer_prefix
 from irminsul.docgraph import DocGraph
+from irminsul.fences import FenceTracker
 from irminsul.languages import LANGUAGE_REGISTRY, LanguageProfile
 
 # Languages whose code-blocks should be scanned for schema leaks. A markdown
@@ -29,8 +30,6 @@ _SCANNABLE_FENCE_LANGS = {
     "sql",
     *(label for profile in LANGUAGE_REGISTRY.values() for label in profile.fence_labels),
 }
-
-_FENCE_RE = re.compile(r"^\s*```(\S*)\s*$")
 
 
 def _truncate_pattern(pattern: re.Pattern[str], limit: int = 60) -> str:
@@ -78,21 +77,14 @@ class SchemaLeakCheck:
             if not protected_glob.match_file(node.path.as_posix()):
                 continue
 
-            in_fence = False
-            fence_scannable = True
+            fence = FenceTracker()
             for lineno, line in enumerate(node.body.splitlines(), start=1):
-                fence_match = _FENCE_RE.match(line)
-                if fence_match:
-                    if in_fence:
-                        in_fence = False
-                        fence_scannable = True
-                    else:
-                        in_fence = True
-                        lang = fence_match.group(1).lower()
-                        fence_scannable = lang in _SCANNABLE_FENCE_LANGS
+                kind = fence.classify(line)
+                if kind == "marker":
                     continue
-
-                if in_fence and not fence_scannable:
+                # A block labelled with a language this project scans is read like prose;
+                # anything else — a shell transcript, a diagram — is skipped.
+                if kind == "content" and fence.info.lower() not in _SCANNABLE_FENCE_LANGS:
                     continue
 
                 for profile in profiles:

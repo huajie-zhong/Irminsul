@@ -33,7 +33,9 @@ whitespace normalized: a line with a definition keyword such as `func` or `class
 an assignment, else its first mention outside a comment. A
 dotted name is looked for after its parent's first mention, a brace on the line after a
 signature stays in the block, and a file that is not UTF-8 does not resolve. A marker
-written inside a code span is an example and is not read.
+written inside a code span or a fenced block is an example and is not read,
+including one in a four-backtick block that quotes a three-backtick block, so this
+syntax can be documented without the example becoming a live anchor.
 <!-- anchor: src/irminsul/anchors.py#resolve @sha256:6c8fc06b0650 -->
 <!-- anchor: src/irminsul/anchors.py#_find_symbol @sha256:98cbd402a571 -->
 

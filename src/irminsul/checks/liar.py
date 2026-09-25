@@ -38,6 +38,7 @@ from irminsul.checks.base import Finding, FindingClass, Severity
 from irminsul.checks.globs import walk_configured_source_files
 from irminsul.config import IrminsulConfig, in_layer
 from irminsul.docgraph import DocGraph, DocNode, is_decision, is_rfc
+from irminsul.fences import FenceTracker
 from irminsul.frontmatter import StatusEnum
 from irminsul.inventory import available_kinds, get_extractor, kind_capabilities
 from irminsul.inventory.programs import program_names
@@ -46,7 +47,6 @@ _THRESHOLD = 3
 _BLOCK_THRESHOLD = 5
 _BLOCK_LINE_RE = re.compile(r"^\s*(?:[-*+]\s|\d+[.)]\s|\|)")
 _DISTINCTIVE_RE = re.compile(r"^[A-Za-z0-9-]*[-_.][A-Za-z0-9_.-]*[A-Za-z0-9]$")
-_FENCE_RE = re.compile(r"^\s*(```|~~~)")
 _BACKTICK_RE = re.compile(r"`([^`]+)`")
 
 
@@ -143,12 +143,12 @@ class LiarCheck:
         """Per kind, the largest single list or table naming enough identities of it."""
         blocks: list[list[tuple[int, str]]] = []
         current: list[tuple[int, str]] = []
-        in_fence = False
+        fence = FenceTracker()
         for lineno, line in enumerate(body.splitlines(), start=1):
-            if _FENCE_RE.match(line):
-                in_fence = not in_fence
+            line_kind = fence.classify(line)
+            if line_kind == "marker":
                 continue
-            if not in_fence and _BLOCK_LINE_RE.match(line):
+            if line_kind == "outside" and _BLOCK_LINE_RE.match(line):
                 current.append((lineno, line))
                 continue
             if current:
@@ -181,12 +181,9 @@ class LiarCheck:
     ) -> dict[str, dict[str, int]]:
         """Per kind, map each matched identity to the first body line it appears on."""
         found: dict[str, dict[str, int]] = {}
-        in_fence = False
+        fence = FenceTracker()
         for lineno, line in enumerate(body.splitlines(), start=1):
-            if _FENCE_RE.match(line):
-                in_fence = not in_fence
-                continue
-            if in_fence:
+            if fence.consume(line):
                 continue
             spans = _BACKTICK_RE.findall(line)
             if not spans:

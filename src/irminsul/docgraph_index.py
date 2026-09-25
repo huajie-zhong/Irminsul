@@ -30,6 +30,7 @@ from pathlib import Path, PurePosixPath
 from markdown_it import MarkdownIt
 
 from irminsul.docgraph import DocNode
+from irminsul.fences import FenceTracker
 
 
 @dataclass(frozen=True)
@@ -205,46 +206,7 @@ _BEHAVIOR_RE = re.compile(r"(?<![A-Za-z0-9])(SHALL|MUST)(?![A-Za-z0-9])")
 _WHEN_RE = re.compile(r"(?<![A-Za-z0-9])WHEN(?![A-Za-z0-9])")
 _THEN_RE = re.compile(r"(?<![A-Za-z0-9])THEN(?![A-Za-z0-9])")
 _DISPOSITION_RE = re.compile(r"^no new behavioral requirements\b", re.IGNORECASE)
-_FENCE_RE = re.compile(r"^\s*(?P<marker>`{3,}|~{3,})(?P<info>.*)$")
 _REQUIREMENTS_HINT_RE = re.compile(r"^##\s+requirements\b", re.IGNORECASE | re.MULTILINE)
-
-
-class FenceTracker:
-    """CommonMark fenced-code-block state, fed one body line at a time.
-
-    A fence closes only on the same character, at least as long as the opening
-    marker, and without an info string. So a ````-fenced quote may contain ```
-    blocks verbatim, and a stray ``` inside a ~~~ block is content rather than
-    a toggle.
-    """
-
-    __slots__ = ("_char", "_length")
-
-    def __init__(self) -> None:
-        self._char: str | None = None
-        self._length = 0
-
-    @property
-    def inside(self) -> bool:
-        return self._char is not None
-
-    def consume(self, line: str) -> bool:
-        """Feed one line; True when it is fence syntax or fenced content."""
-        match = _FENCE_RE.match(line)
-        if match is None:
-            return self.inside
-
-        marker = match.group("marker")
-        info = match.group("info")
-        if self._char is None:
-            if marker[0] == "`" and "`" in info:
-                return False
-            self._char = marker[0]
-            self._length = len(marker)
-        elif marker[0] == self._char and len(marker) >= self._length and not info.strip():
-            self._char = None
-            self._length = 0
-        return True
 
 
 @dataclass(frozen=True)

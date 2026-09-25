@@ -18,8 +18,8 @@ from irminsul.checks.base import Finding, FindingClass, Severity
 from irminsul.checks.code_spans import is_live_doc
 from irminsul.config import IrminsulConfig, layer_prefix
 from irminsul.docgraph import DocGraph, DocNode, layer_rules
+from irminsul.fences import FenceTracker
 
-_FENCE_RE = re.compile(r"^\s*(```|~~~)")
 _INLINE_CODE_RE = re.compile(r"`[^`\n]+`")
 _SPECULATIVE_RE = re.compile(
     r"\b(planned|deferred|sprint|roadmap|future|upcoming|v\d+\.\d+)\b",
@@ -159,14 +159,12 @@ class RealityCheck:
 
 def _prose_lines(body: str, *, keep_blank: bool = False) -> list[tuple[int, str]]:
     out: list[tuple[int, str]] = []
-    in_fence = False
+    fence = FenceTracker()
     for lineno, line in enumerate(body.splitlines(), 1):
-        if _FENCE_RE.match(line):
-            in_fence = not in_fence
-            if keep_blank:
+        kind = fence.classify(line)
+        if kind != "outside":
+            if kind == "marker" and keep_blank:
                 out.append((lineno, ""))
-            continue
-        if in_fence:
             continue
         if line.strip() or keep_blank:
             out.append((lineno, line))

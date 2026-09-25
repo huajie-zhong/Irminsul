@@ -24,7 +24,7 @@ from typing import ClassVar, Final
 
 from irminsul.checks.base import Check, Finding, FindingClass, Severity
 from irminsul.docgraph import DocGraph, guidance_files
-from irminsul.docgraph_index import FenceTracker
+from irminsul.fences import FenceTracker
 
 CHECK_NAME: Final = "ignore-comment"
 CODE_CERTAIN_FINDING: Final = "ignore-comment/certain-finding"
