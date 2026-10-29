@@ -35,9 +35,7 @@ def test_scaffolded_config_enables_every_default_check_and_the_manifest_check(
     assert result.exit_code == 0, result.output
 
     checks = tomllib.loads((target / "irminsul.toml").read_text(encoding="utf-8"))["checks"]
-    assert checks["enabled"] == [
-        name for name in REGISTRY if name in DEFAULT_CHECKS or name == "agents-manifest"
-    ]
+    assert checks["enabled"] == [*DEFAULT_CHECKS, "agents-manifest"]
 
 
 def _frontmatter(text: str) -> dict[str, object]:

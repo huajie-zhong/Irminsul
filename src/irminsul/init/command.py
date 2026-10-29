@@ -30,7 +30,7 @@ from urllib.parse import urlsplit
 import typer
 
 from irminsul.atomic import write_atomic
-from irminsul.checks import DEFAULT_CHECKS, REGISTRY, AgentsManifestCheck
+from irminsul.checks import DEFAULT_CHECKS, AgentsManifestCheck
 from irminsul.config import IrminsulConfig, find_config, load
 from irminsul.errors import UserError
 from irminsul.git.changes import GitChangesError, working_tree_changed_paths
@@ -128,9 +128,7 @@ _CODE_SIGNAL_DIRS = ("src", "app", "lib")
 #: is off unless listed but is what `irminsul fix` runs to keep the `docs/AGENTS.md` table
 #: that init writes current. Left out of `DEFAULT_CHECKS` so a repository with no
 #: `checks.enabled` and no manifest does not start failing.
-_SCAFFOLD_CHECKS: Final = tuple(
-    name for name in REGISTRY if name in DEFAULT_CHECKS or name == AgentsManifestCheck.name
-)
+_SCAFFOLD_CHECKS: Final = (*DEFAULT_CHECKS, AgentsManifestCheck.name)
 
 SUPPORTED_LANGUAGES = tuple(LANGUAGE_REGISTRY)
 
