@@ -39,7 +39,7 @@ claims:
       - src/irminsul/cli.py
     pinned:
       src/irminsul/checks/pipeline.py: sha256:48c24ad125b0
-      src/irminsul/cli.py: sha256:b0f3d20e3fa4
+      src/irminsul/cli.py: sha256:b5345df78693
   - id: fix-remediation-available
     state: implemented
     kind: auto_fix
@@ -49,7 +49,7 @@ claims:
       - src/irminsul/cli.py
       - src/irminsul/fix.py
     pinned:
-      src/irminsul/cli.py: sha256:b0f3d20e3fa4
+      src/irminsul/cli.py: sha256:b5345df78693
       src/irminsul/fix.py: sha256:cc4c24a9385c
   - id: source-deletion-reckoning-available
     state: enabled

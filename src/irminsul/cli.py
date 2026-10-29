@@ -283,6 +283,16 @@ def init(
             help="Allow --fresh even when code signals already exist.",
         ),
     ] = False,
+    name: Annotated[
+        str | None,
+        typer.Option(
+            "--name",
+            help=(
+                "Project name for irminsul.toml and the docs; answers the prompt for it. "
+                "Without it the name is the directory's."
+            ),
+        ),
+    ] = None,
     no_interactive: Annotated[
         bool,
         typer.Option(
@@ -330,6 +340,7 @@ def init(
             interactive=interactive,
             code_repo=code_repo,
             languages=language,
+            name=name,
             force=force,
         )
         _offer_seed_after_scaffold(target, interactive=interactive)
@@ -344,7 +355,7 @@ def init(
                 "Use `irminsul init` to adopt existing same-repo code, or pass "
                 "`--allow-existing-code` with `--fresh` if this is intentional."
             )
-        run_init_fresh(target, interactive=interactive, languages=language, force=force)
+        run_init_fresh(target, interactive=interactive, languages=language, name=name, force=force)
         _offer_seed_after_scaffold(target, interactive=interactive)
         return
 
@@ -355,7 +366,9 @@ def init(
         typer.echo("  [3] Cancel")
         answer = typer.prompt("Choose", default="1")
         if answer == "1":
-            run_init_fresh(target, interactive=interactive, languages=language, force=force)
+            run_init_fresh(
+                target, interactive=interactive, languages=language, name=name, force=force
+            )
             _offer_seed_after_scaffold(target, interactive=interactive)
             return
         if answer == "2":
@@ -364,6 +377,7 @@ def init(
                 interactive=interactive,
                 code_repo=code_repo,
                 languages=language,
+                name=name,
                 force=force,
             )
             _offer_seed_after_scaffold(target, interactive=interactive)
@@ -378,7 +392,7 @@ def init(
             "for a docs repo beside a separate code repo."
         )
 
-    run_init(target, interactive=interactive, languages=language, force=force)
+    run_init(target, interactive=interactive, languages=language, name=name, force=force)
 
 
 def _init_siblings(
@@ -387,6 +401,7 @@ def _init_siblings(
     interactive: bool,
     code_repo: str | None,
     languages: list[str] | None,
+    name: str | None,
     force: bool,
 ) -> None:
     """Guard the siblings scaffold against being run inside a code repo.
@@ -413,6 +428,7 @@ def _init_siblings(
         interactive=interactive,
         code_repo=code_repo,
         languages=languages,
+        name=name,
         force=force,
     )
 

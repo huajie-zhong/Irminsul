@@ -369,11 +369,25 @@ def _select_languages(
             typer.echo(typer.style(str(exc), fg="red"))
 
 
+def _project_name(repo_root: Path, *, explicit: str | None, interactive: bool) -> str:
+    """The name written into `irminsul.toml` and the docs: `--name` when given, otherwise the
+    prompt's answer, whose default (and the whole answer under `--no-interactive`) is the
+    directory name."""
+    if explicit is not None:
+        name = explicit.strip()
+        if not name:
+            raise typer.BadParameter("must not be empty", param_hint="--name")
+        return name
+    default = repo_root.resolve().name or "untitled"
+    return typer.prompt("Project name", default=default) if interactive else default
+
+
 def gather_answers(
     *,
     repo_root: Path,
     interactive: bool,
     languages: Sequence[str] | None = None,
+    name: str | None = None,
 ) -> InitAnswers:
     selected_languages = _select_languages(
         explicit=languages,
@@ -383,13 +397,7 @@ def gather_answers(
     )
     source_roots = detect_source_roots(repo_root, selected_languages)
     today = _dt.date.today().isoformat()
-
-    default_project_name = repo_root.resolve().name or "untitled"
-
-    if interactive:
-        project_name = typer.prompt("Project name", default=default_project_name)
-    else:
-        project_name = default_project_name
+    project_name = _project_name(repo_root, explicit=name, interactive=interactive)
 
     return InitAnswers(
         project_name=project_name,
@@ -404,20 +412,16 @@ def gather_answers_fresh(
     repo_root: Path,
     interactive: bool,
     languages: Sequence[str] | None = None,
+    name: str | None = None,
 ) -> InitAnswers:
     today = _dt.date.today().isoformat()
-    default_project_name = repo_root.resolve().name or "untitled"
     selected_languages = _select_languages(
         explicit=languages,
         detected=[],
         interactive=interactive,
         unavailable_reason="No code exists yet, so languages cannot be detected.",
     )
-
-    if interactive:
-        project_name = typer.prompt("Project name", default=default_project_name)
-    else:
-        project_name = default_project_name
+    project_name = _project_name(repo_root, explicit=name, interactive=interactive)
 
     return InitAnswers(
         project_name=project_name,
@@ -433,6 +437,7 @@ def gather_answers_siblings(
     interactive: bool,
     code_repo: str | None,
     languages: Sequence[str] | None = None,
+    name: str | None = None,
 ) -> InitAnswers:
     """Gather answers for the siblings layout.
 
@@ -441,20 +446,16 @@ def gather_answers_siblings(
     languages explicitly; unavailable or undetected code requires a declaration.
     """
     today = _dt.date.today().isoformat()
-    default_project_name = repo_root.resolve().name or "untitled"
 
-    if interactive:
-        if code_repo is None:
-            code_repo = typer.prompt(
-                "Sibling code repo (GitHub owner/repo or path, e.g. acme/my-public-code)"
-            )
-        project_name = typer.prompt("Project name", default=default_project_name)
-    else:
-        if code_repo is None:
+    if code_repo is None:
+        if not interactive:
             raise typer.BadParameter(
                 "--code-repo is required in non-interactive mode", param_hint="--code-repo"
             )
-        project_name = default_project_name
+        code_repo = typer.prompt(
+            "Sibling code repo (GitHub owner/repo or path, e.g. acme/my-public-code)"
+        )
+    project_name = _project_name(repo_root, explicit=name, interactive=interactive)
 
     github_spec, code_dir = parse_code_repo(code_repo, docs_root=repo_root)
 
@@ -1110,9 +1111,12 @@ def run_init(
     *,
     interactive: bool,
     languages: Sequence[str] | None = None,
+    name: str | None = None,
     force: bool = False,
 ) -> None:
-    answers = gather_answers(repo_root=target_root, interactive=interactive, languages=languages)
+    answers = gather_answers(
+        repo_root=target_root, interactive=interactive, languages=languages, name=name
+    )
     written, mcp_registered = _scaffold_with_agent_wiring(target_root, answers, force=force)
     finish_init(answers, written, mcp_registered=mcp_registered)
 
@@ -1122,10 +1126,11 @@ def run_init_fresh(
     *,
     interactive: bool,
     languages: Sequence[str] | None = None,
+    name: str | None = None,
     force: bool = False,
 ) -> None:
     answers = gather_answers_fresh(
-        repo_root=target_root, interactive=interactive, languages=languages
+        repo_root=target_root, interactive=interactive, languages=languages, name=name
     )
     written, mcp_registered = _scaffold_with_agent_wiring(target_root, answers, force=force)
     for root in answers.source_roots:
@@ -1139,6 +1144,7 @@ def run_init_siblings(
     interactive: bool,
     code_repo: str | None,
     languages: Sequence[str] | None = None,
+    name: str | None = None,
     force: bool = False,
 ) -> None:
     answers = gather_answers_siblings(
@@ -1146,6 +1152,7 @@ def run_init_siblings(
         interactive=interactive,
         code_repo=code_repo,
         languages=languages,
+        name=name,
     )
     written, mcp_registered = _scaffold_with_agent_wiring(target_root, answers, force=force)
     finish_init(

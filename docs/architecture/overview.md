@@ -26,7 +26,7 @@ claims:
       - src/irminsul/cli.py
     pinned:
       action.yml: sha256:565555652eab
-      src/irminsul/cli.py: sha256:b0f3d20e3fa4
+      src/irminsul/cli.py: sha256:b5345df78693
 ---
 
 # Architecture overview

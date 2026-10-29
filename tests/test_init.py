@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 from click import unstyle
-from typer.testing import CliRunner
+from typer.testing import CliRunner, Result
 
 from irminsul.cli import app
 from irminsul.init.command import (
@@ -1266,24 +1266,87 @@ def test_a_scaffolded_repository_enables_the_check_that_keeps_its_manifest_curre
     assert "`store`" in (target / "docs" / "AGENTS.md").read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize("layout", ["same-repo", "fresh", "siblings"])
+def _init_in_layout(target: Path, layout: str, *extra: str) -> Result:
+    """`init --no-interactive` for one of the three ways a project is started."""
+    target.mkdir()
+    args = ["--language", "python", "--no-interactive", "--path", str(target), *extra]
+    if layout == "same-repo":
+        (target / "src").mkdir()
+        return runner.invoke(app, ["init", *args])
+    if layout == "fresh":
+        return runner.invoke(app, ["init", "--fresh", *args])
+    return runner.invoke(app, ["init", "--topology", "siblings", "--code-repo", "../code", *args])
+
+
+_LAYOUTS = ["same-repo", "fresh", "siblings"]
+
+
+@pytest.mark.parametrize("layout", _LAYOUTS)
 def test_every_layout_enables_agents_manifest(tmp_path: Path, layout: str) -> None:
     import tomllib
 
-    target = tmp_path / "demo"
-    target.mkdir()
-    args = ["--language", "python", "--no-interactive", "--path", str(target)]
-    if layout == "same-repo":
-        (target / "src").mkdir()
-        argv = ["init", *args]
-    elif layout == "fresh":
-        argv = ["init", "--fresh", *args]
-    else:
-        argv = ["init", "--topology", "siblings", "--code-repo", "../code", *args]
-    assert runner.invoke(app, argv).exit_code == 0
+    assert _init_in_layout(tmp_path / "demo", layout).exit_code == 0
 
-    enabled = tomllib.loads((target / "irminsul.toml").read_text(encoding="utf-8"))["checks"][
-        "enabled"
-    ]
+    enabled = tomllib.loads((tmp_path / "demo" / "irminsul.toml").read_text(encoding="utf-8"))[
+        "checks"
+    ]["enabled"]
 
     assert "agents-manifest" in enabled
+
+
+@pytest.mark.parametrize("layout", _LAYOUTS)
+def test_name_sets_the_project_name_instead_of_the_directory_name(
+    tmp_path: Path, layout: str
+) -> None:
+    import tomllib
+
+    target = tmp_path / "scratch-dir"
+    result = _init_in_layout(target, layout, "--name", "Ledger")
+    assert result.exit_code == 0, cli_output(result)
+
+    assert (
+        tomllib.loads((target / "irminsul.toml").read_text(encoding="utf-8"))["project_name"]
+        == "Ledger"
+    )
+    principles = (target / "docs" / "foundation" / "principles.md").read_text(encoding="utf-8")
+    assert "Ledger" in principles
+    assert "scratch-dir" not in principles
+
+
+def test_without_name_the_project_is_named_for_its_directory(tmp_path: Path) -> None:
+    import tomllib
+
+    target = tmp_path / "scratch-dir"
+    assert _init_in_layout(target, "same-repo").exit_code == 0
+
+    parsed = tomllib.loads((target / "irminsul.toml").read_text(encoding="utf-8"))
+    assert parsed["project_name"] == "scratch-dir"
+
+
+def test_name_answers_the_prompt_for_it(tmp_path: Path) -> None:
+    """A name on the command line is the answer, so an interactive run does not ask for it."""
+    import tomllib
+
+    target = tmp_path / "scratch-dir"
+    target.mkdir()
+    (target / "src").mkdir()
+
+    result = runner.invoke(
+        app, ["init", "--language", "python", "--name", "Ledger", "--path", str(target)], input=""
+    )
+
+    assert result.exit_code == 0, cli_output(result)
+    assert "Project name" not in result.output
+    parsed = tomllib.loads((target / "irminsul.toml").read_text(encoding="utf-8"))
+    assert parsed["project_name"] == "Ledger"
+
+
+def test_an_empty_name_is_refused_before_anything_is_written(tmp_path: Path) -> None:
+    target = tmp_path / "demo"
+
+    result = _init_in_layout(target, "same-repo", "--name", "  ")
+
+    assert result.exit_code == 2
+    assert "--name" in unstyle(cli_output(result))
+    assert "empty" in unstyle(cli_output(result))
+    assert not (target / "irminsul.toml").exists()
