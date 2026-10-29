@@ -33,7 +33,7 @@ claims:
       - src/irminsul/context.py
       - src/irminsul/git/mtime.py
     pinned:
-      src/irminsul/context.py: sha256:dd662a46a12a
+      src/irminsul/context.py: sha256:25a24aa74203
       src/irminsul/git/mtime.py: sha256:c71794836a12
 ---
 

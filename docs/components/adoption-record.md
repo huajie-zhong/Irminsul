@@ -83,8 +83,8 @@ claims:
       - src/irminsul/context.py
       - src/irminsul/mcp_server.py
     pinned:
-      src/irminsul/checks/pipeline.py: sha256:48c24ad125b0
-      src/irminsul/context.py: sha256:dd662a46a12a
+      src/irminsul/checks/pipeline.py: sha256:a6ad7c0bc40d
+      src/irminsul/context.py: sha256:25a24aa74203
       src/irminsul/mcp_server.py: sha256:d5097f13b089
 ---
 
