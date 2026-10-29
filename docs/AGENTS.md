@@ -39,7 +39,7 @@ file is curated and survives it.
 | `mcp-server` | [MCP server](components/mcp-server.md) | Read-only MCP stdio server that lets AI agents query the doc graph natively instead of shelling out to the CLI. |
 | `new-list-regen` | [New / List / Fix commands](components/new-list-regen.md) | `new`, `list`, and `fix` commands, and the agent manifest `fix` rewrites. |
 | `orient` | [Agent orientation command](components/orient.md) | The first call for agents — repo structure, doc totals, source ownership coverage, entry docs and commands as one report. |
-| `refs` | [Refs backlink query](components/refs.md) | Every doc and guidance file that names or links to a doc or a guidance file, from the current DocGraph. |
+| `refs` | [Refs backlink query](components/refs.md) | Every doc and guidance file that names or links to a doc or a Markdown file, from the current DocGraph. |
 | `seed` | [Seed command](components/seed.md) | Capture starting intent into the foundation docs. |
 | `surface` | [Surface extraction & on-demand derivation](components/surface.md) | Code surfaces derived on demand. |
 | `user-errors` | [User errors](components/user-errors.md) | The one error type a command reports as a message and exit status, shared by CLI and MCP server. |

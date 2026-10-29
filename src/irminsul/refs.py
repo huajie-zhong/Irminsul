@@ -77,11 +77,22 @@ def format_doc_refs_plain(report: DocRefsReport) -> str:
 
 
 def _resolve_target(repo_root: Path, graph: DocGraph, target: str) -> str:
+    """A doc's or guidance file's path, else the path of any other Markdown file in the repo.
+
+    A Markdown file with no frontmatter is no doc, yet a link to it breaks when it moves, so
+    it answers to its path like a guidance file does.
+    """
     wanted = resolve_doc_target(graph, target)
     if wanted is not None:
         return wanted
-    if _is_outside_repo(repo_root, target):
-        raise RefsError(f"path is outside the repo: {target}")
+    raw = Path(target)
+    absolute = raw if raw.is_absolute() else repo_root / raw
+    try:
+        relative = absolute.resolve().relative_to(repo_root.resolve())
+    except ValueError:
+        raise RefsError(f"path is outside the repo: {target}") from None
+    if relative.suffix.lower() == ".md" and absolute.is_file():
+        return relative.as_posix()
     raise RefsError(_unknown_target_message(target))
 
 
@@ -98,16 +109,6 @@ def _unknown_target_message(target: str) -> str:
         f"unknown doc target: {target}; "
         f"`irminsul context --topic {topic}` finds the docs that cover a topic"
     )
-
-
-def _is_outside_repo(repo_root: Path, target: str) -> bool:
-    raw = Path(target)
-    absolute = raw if raw.is_absolute() else repo_root / raw
-    try:
-        absolute.resolve().relative_to(repo_root.resolve())
-    except ValueError:
-        return True
-    return False
 
 
 def _weak_refs_to(graph: DocGraph, target: Path) -> list[RefHit]:

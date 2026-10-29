@@ -177,3 +177,29 @@ def test_refs_a_guidance_file_target_is_reported_by_its_path(tmp_path: Path) -> 
     assert [(hit["doc_id"], hit["path"]) for hit in data["weak"]] == [
         ("map", "docs/components/map.md")
     ]
+
+
+def test_refs_a_markdown_file_with_no_frontmatter_is_reported_by_its_path(tmp_path: Path) -> None:
+    repo = _make_refs_repo(tmp_path)
+    write(repo, "docs/usage.md", "# Usage\n\nRun it.\n")
+    write(repo, "notes/plan.md", "# Plan\n")
+    write_doc(repo, "docs/components/map.md", doc_id="map", body="Read [usage](../usage.md).")
+    write(repo, "src/mylib/helper.py", "x = 1\n")
+
+    result = runner.invoke(app, ["refs", "docs/usage.md", "--format", "json", "--path", str(repo)])
+    elsewhere = runner.invoke(
+        app, ["refs", "notes/plan.md", "--format", "json", "--path", str(repo)]
+    )
+    code = runner.invoke(app, ["refs", "src/mylib/helper.py", "--path", str(repo)])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["target"] == "docs/usage.md"
+    assert data["strong"] == []
+    assert [(hit["doc_id"], hit["path"]) for hit in data["weak"]] == [
+        ("map", "docs/components/map.md")
+    ]
+    assert elsewhere.exit_code == 0, elsewhere.output
+    assert json.loads(elsewhere.output) == {"target": "notes/plan.md", "strong": [], "weak": []}
+    assert code.exit_code == 2
+    assert "unknown doc target: src/mylib/helper.py" in code.output

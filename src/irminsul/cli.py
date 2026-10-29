@@ -1092,7 +1092,7 @@ def orient_command(
 def refs_command(
     target: Annotated[
         str,
-        typer.Argument(help="Doc id, or repo-relative path of a doc or guidance file, to inspect."),
+        typer.Argument(help="Doc id, or repo-relative path of any Markdown file, to inspect."),
     ],
     fmt: FormatOpt = OutputFormat.plain,
     path: PathOpt = Path("."),
