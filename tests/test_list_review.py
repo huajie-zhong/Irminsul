@@ -16,7 +16,7 @@ from irminsul.git.changes import changed_line_numbers
 from irminsul.git.reader import GitReader
 from irminsul.listing.review import build_review, review_json
 
-from .conftest import commit_all, git_init, load_graph, seed_repo, write, write_config
+from .conftest import commit_all, git, git_init, load_graph, seed_repo, write, write_config
 
 runner = CliRunner()
 
@@ -967,3 +967,68 @@ def test_before_the_first_commit_every_sentence_that_names_code_is_new(tmp_path:
 
     assert len(shown) == 2
     assert all(item["markers"] == ["names-code", "edited"] for item in shown)
+
+
+def _changed_report(root: Path, *args: str) -> dict:
+    result = runner.invoke(
+        app, ["list", "review", "--changed", "--format", "json", *args, "--path", str(root)]
+    )
+    assert result.exit_code == 0, result.output
+    return json.loads(result.output)
+
+
+def _branch_with_two_commits(root: Path) -> None:
+    """`origin/main` at the seed, and a branch that committed twice since."""
+    _repo(root)
+    seed = seed_repo(root, "seed")
+    git(root, "update-ref", "refs/remotes/origin/main", seed)
+    git(root, "checkout", "-qb", "feature")
+    write(root, "docs/components/more.md", _doc("more", "`check` exits 1.\n"))
+    commit_all(root, "first")
+    write(root, "docs/components/more.md", _doc("more", "`check` exits 2.\n"))
+    commit_all(root, "second")
+
+
+def test_changed_without_a_base_says_it_compared_with_head(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    seed_repo(root, "seed")
+
+    result = runner.invoke(app, ["list", "review", "--changed", "--path", str(root)])
+    assert result.exit_code == 0, result.output
+    assert "0 items this change asks to re-read (compared with HEAD)" in result.output
+
+    report = _changed_report(root)
+    assert (report["base"], report["note"]) == ("HEAD", None)
+
+
+def test_changed_without_a_base_names_the_commits_it_did_not_read(tmp_path: Path) -> None:
+    root = tmp_path
+    _branch_with_two_commits(root)
+
+    report = _changed_report(root)
+    assert report["items"] == []
+    assert report["base"] == "HEAD"
+    assert "2 commits" in report["note"] and "origin/main" in report["note"]
+    assert "--base-ref origin/main" in report["note"]
+
+    plain = runner.invoke(app, ["list", "review", "--changed", "--path", str(root)])
+    assert "note: " in plain.output and "--base-ref origin/main" in plain.output
+
+    covered = _changed_report(root, "--base-ref", "origin/main")
+    assert covered["base"] == "origin/main" and covered["note"] is None
+    assert {item["path"] for item in covered["items"]} == {"docs/components/more.md"}
+    named = runner.invoke(
+        app, ["list", "review", "--changed", "--base-ref", "origin/main", "--path", str(root)]
+    )
+    assert "compared with the merge base of origin/main and HEAD" in named.output
+    assert "note: " not in named.output
+
+
+def test_changed_adds_no_note_when_the_branch_holds_nothing_the_default_branch_lacks(
+    tmp_path: Path,
+) -> None:
+    root = _repo(tmp_path)
+    seed = seed_repo(root, "seed")
+    git(root, "update-ref", "refs/remotes/origin/main", seed)
+
+    assert _changed_report(root)["note"] is None

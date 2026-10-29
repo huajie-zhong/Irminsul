@@ -198,6 +198,26 @@ def merge_base(git: GitReader, repo_root: Path, first: str, second: str) -> str 
     return result.stdout.strip() or None
 
 
+def unmerged_branch_commits(git: GitReader, repo_root: Path) -> tuple[str, int] | None:
+    """The default branch's remote ref and how many commits `HEAD` holds that it lacks.
+
+    For a command run without a base, which compares the working tree with `HEAD` and so
+    cannot see work this branch already committed. The ref is `origin/HEAD`'s target, else
+    `origin/main`, else `origin/master`, whichever this checkout has first: a guess at the
+    base, offered to the reader and never used as one. None when no such ref exists or the
+    branch holds nothing it lacks.
+    """
+    target = _run_git(git, repo_root, "symbolic-ref", "--short", "-q", "refs/remotes/origin/HEAD")
+    named = target.stdout.strip() if target.returncode == 0 else ""
+    for ref in dict.fromkeys([*([named] if named else []), "origin/main", "origin/master"]):
+        if resolve_ref(git, repo_root, ref) is None:
+            continue
+        counted = _run_git(git, repo_root, "rev-list", "--count", f"{ref}..HEAD")
+        count = int(counted.stdout.strip() or 0) if counted.returncode == 0 else 0
+        return (ref, count) if count else None
+    return None
+
+
 def commit_trailers(
     git: GitReader, repo_root: Path, base_ref: str, head_ref: str, key: str
 ) -> list[tuple[str, str]]:

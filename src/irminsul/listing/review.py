@@ -14,7 +14,7 @@ import re
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 import typer
 
@@ -33,8 +33,12 @@ from irminsul.errors import UserError
 from irminsul.fences import FenceTracker
 from irminsul.frontmatter_edit import is_frontmatter_delimiter
 from irminsul.git.blame import LineTimes
+from irminsul.git.changes import unmerged_branch_commits
 from irminsul.git.mtime import git_root_for
 from irminsul.marked_region import MalformedRegion, find_region
+
+if TYPE_CHECKING:
+    from irminsul.git.reader import GitReader
 
 REVIEW_VERSION = 1
 
@@ -583,22 +587,47 @@ def marker_meanings(items: list[ReviewItem]) -> dict[str, str]:
     return {name: meanings[name] for name in MARKER_MEANINGS if name in meanings}
 
 
-def review_to_json(items: list[ReviewItem], *, show_all: bool = False) -> str:
+def unread_commits_note(git: GitReader, repo_root: Path) -> str | None:
+    """What a queue run without a base cannot see, when the branch has committed work.
+
+    Without a base the queue compares the working tree with `HEAD`, so a commit the branch
+    already holds changes nothing in it. The note names the ref that would cover them.
+    """
+    unmerged = unmerged_branch_commits(git, repo_root)
+    if unmerged is None:
+        return None
+    ref, count = unmerged
+    return (
+        f"this branch has {count} commit{'s' if count != 1 else ''} that {ref} does not, "
+        f"and without a base the queue does not read them; --base-ref {ref} covers them"
+    )
+
+
+def review_to_json(
+    items: list[ReviewItem],
+    *,
+    show_all: bool = False,
+    compared_with: str | None = None,
+    note: str | None = None,
+) -> str:
+    """The queue as JSON. A queue of one change also says what it compared with, and the
+    `note` that a base other than the one it used would read more."""
     shown = (
         items
         if show_all
         else [item for item in items if item.code_changed_after_doc or "edited" in item.markers]
     )
-    return json.dumps(
-        {
-            "version": REVIEW_VERSION,
-            "total": len(items),
-            "shown": len(shown),
-            "items": [asdict(item) for item in shown],
-            "markers": marker_meanings(shown),
-        },
-        indent=2,
-    )
+    payload: dict[str, object] = {
+        "version": REVIEW_VERSION,
+        "total": len(items),
+        "shown": len(shown),
+        "items": [asdict(item) for item in shown],
+        "markers": marker_meanings(shown),
+    }
+    if compared_with is not None:
+        payload["base"] = compared_with
+        payload["note"] = note
+    return json.dumps(payload, indent=2)
 
 
 def _touches(changed: ChangedLines, path: str, first: int, last: int) -> bool:
@@ -617,6 +646,8 @@ def review_json(
     changed: ChangedLines | None = None,
     base_ref: str = "HEAD",
     committed_only: bool = False,
+    compared_with: str | None = None,
+    note: str | None = None,
 ) -> str:
     graph = build_graph(repo_root, config, committed_only=committed_only)
     items = build_review(repo_root, config, graph, changed, base_ref, committed_only=committed_only)
@@ -627,7 +658,7 @@ def review_json(
         if wanted is None:
             raise UnknownDocError(f"--doc: no doc with id or path {doc}")
         items = [item for item in items if item.path == wanted]
-    return review_to_json(items, show_all=show_all)
+    return review_to_json(items, show_all=show_all, compared_with=compared_with, note=note)
 
 
 def list_review(
@@ -640,6 +671,8 @@ def list_review(
     changed: ChangedLines | None = None,
     base_ref: str = "HEAD",
     committed_only: bool = False,
+    compared_with: str | None = None,
+    note: str | None = None,
 ) -> None:
     report = review_json(
         repo_root,
@@ -649,6 +682,8 @@ def list_review(
         changed=changed,
         base_ref=base_ref,
         committed_only=committed_only,
+        compared_with=compared_with,
+        note=note,
     )
     if fmt == "json":
         typer.echo(report)
@@ -656,7 +691,11 @@ def list_review(
     data = json.loads(report)
     items = data["items"]
     if changed is not None:
-        typer.echo(f"{data['shown']} items this change asks to re-read")
+        base = data.get("base", "HEAD")
+        against = "HEAD" if base == "HEAD" else f"the merge base of {base} and HEAD"
+        typer.echo(f"{data['shown']} items this change asks to re-read (compared with {against})")
+        if data.get("note"):
+            typer.echo(f"note: {data['note']}")
     elif not show_all:
         typer.echo(
             f"{data['shown']} of {data['total']} sentences naming code are new or name code "

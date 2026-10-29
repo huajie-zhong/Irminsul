@@ -2277,12 +2277,14 @@ def list_review(
     from irminsul.git.changes import changed_line_numbers, merge_base
     from irminsul.git.reader import GitReader
     from irminsul.listing.review import list_review as _list_review
+    from irminsul.listing.review import unread_commits_note
 
     repo_root, config = _load_repo(path)
 
     git = GitReader()
     changed_lines = None
     since: str | None = None
+    note: str | None = None
     if base_ref is not None:
         since = merge_base(git, repo_root, base_ref, "HEAD") or base_ref
         changed_lines = changed_line_numbers(git, repo_root, since, committed_only=committed_only)
@@ -2295,6 +2297,7 @@ def list_review(
         changed_lines = {}
     elif changed:
         changed_lines = changed_line_numbers(git, repo_root)
+        note = unread_commits_note(git, repo_root)
     _list_review(
         repo_root,
         config,
@@ -2304,6 +2307,8 @@ def list_review(
         changed=changed_lines,
         base_ref=since or "HEAD",
         committed_only=committed_only,
+        compared_with=(base_ref or "HEAD") if changed_lines is not None else None,
+        note=note,
     )
 
 

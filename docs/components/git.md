@@ -38,7 +38,9 @@ instant, and every reader of history returns to commits alone.
 `check --diff`, `--source-diff`, `context --after-edit`, `change status` and `verify` all
 ask it, so the commands that judge a change agree. The rest of the module answers questions
 at a ref (a file's content, whether it exists, every tracked path, a merge base, renames,
-trailers) and lists the working tree's staged, unstaged and untracked files.
+trailers) and lists the working tree's staged, unstaged and untracked files. For a command
+run with no base it can also say how many commits `HEAD` holds that the default branch's
+remote ref lacks, `unmerged_branch_commits`, so that command can name the base it did not use.
 
 `reader.py` holds `GitReader`, which every helper here asks through. It runs a git command
 at most once per reader and keeps only the answers a run cannot change (what a commit, a
