@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import datetime as _dt
+import errno
 import glob
 import os
 import re
@@ -166,11 +168,37 @@ def _configure_console_encoding(
             reconfigure(encoding="utf-8")
 
 
+def _closed_stdout(error: OSError, *, platform: str | None = None) -> bool:
+    """Whether `error` is a write to a stdout whose reader has gone away.
+
+    A pipe closed by `head` or a pager raises `BrokenPipeError` on POSIX but an `OSError`
+    with `EINVAL` on Windows, where that code also means a bad argument; only there is it
+    read as a closed pipe.
+    """
+    if error.errno == errno.EPIPE:
+        return True
+    current_platform = sys.platform if platform is None else platform
+    return current_platform == "win32" and error.errno == errno.EINVAL
+
+
+def _discard_output() -> None:
+    """Point stdout at the null device so the flush at interpreter exit has somewhere to
+    write instead of reporting the closed pipe again."""
+    with contextlib.suppress(OSError, ValueError):
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+
+
 def main() -> None:
     _configure_console_encoding()
-    # Click expands `*` in arguments on Windows, turning a quoted glob such as
-    # `--describes "src/**"` into a list of files.
-    app(windows_expand_args=False)
+    try:
+        # Click expands `*` in arguments on Windows, turning a quoted glob such as
+        # `--describes "src/**"` into a list of files.
+        app(windows_expand_args=False)
+    except OSError as error:
+        if not _closed_stdout(error):
+            raise
+        _discard_output()
+        sys.exit(1)
 
 
 def _load_repo(path: Path) -> tuple[Path, IrminsulConfig]:

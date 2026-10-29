@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import errno
 import json
 import os
 import subprocess
@@ -99,6 +100,62 @@ def test_windows_cp936_help_is_emitted_as_utf8() -> None:
     assert result.returncode == 0, result.stderr.decode("utf-8", errors="replace")
     assert "on demand — commands" in output
     assert "бк" not in output
+
+
+def test_a_closed_stdout_ends_the_output_without_a_traceback() -> None:
+    """`irminsul anchors --help | head -1` ended in an `OSError` traceback on Windows once
+    `head` closed the pipe. The read end is closed before the child writes anything, so
+    the first write meets a closed pipe on every platform."""
+    child = subprocess.Popen(
+        [sys.executable, "-c", "from irminsul.cli import main; main()", "anchors", "--help"],
+        cwd=Path(__file__).resolve().parents[1],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    assert child.stdout is not None and child.stderr is not None
+    child.stdout.close()
+    stderr = child.stderr.read().decode("utf-8", errors="replace")
+    child.stderr.close()
+
+    assert child.wait() == 1
+    assert stderr == ""
+
+
+@pytest.mark.parametrize(
+    ("error", "platform", "closed"),
+    [
+        (BrokenPipeError(errno.EPIPE, "Broken pipe"), "linux", True),
+        (BrokenPipeError(errno.EPIPE, "Broken pipe"), "win32", True),
+        (OSError(errno.EINVAL, "Invalid argument"), "win32", True),
+        (OSError(errno.EINVAL, "Invalid argument"), "linux", False),
+        (OSError(errno.ENOENT, "No such file"), "win32", False),
+    ],
+)
+def test_only_a_closed_pipe_is_read_as_the_end_of_output(
+    error: OSError, platform: str, closed: bool
+) -> None:
+    assert cli_module._closed_stdout(error, platform=platform) is closed
+
+
+def test_main_exits_1_quietly_on_a_closed_pipe_and_raises_other_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(cli_module, "_discard_output", lambda: None)
+
+    def closed(**_: Any) -> None:
+        raise BrokenPipeError(errno.EPIPE, "Broken pipe")
+
+    monkeypatch.setattr(cli_module, "app", closed)
+    with pytest.raises(SystemExit) as stopped:
+        cli_module.main()
+    assert stopped.value.code == 1
+
+    def failing(**_: Any) -> None:
+        raise PermissionError(errno.EACCES, "Permission denied")
+
+    monkeypatch.setattr(cli_module, "app", failing)
+    with pytest.raises(PermissionError):
+        cli_module.main()
 
 
 def test_check_rejects_an_unknown_only_name(fixture_repo: Callable[[str], Path]) -> None:

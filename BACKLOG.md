@@ -381,13 +381,6 @@ The edges are real, but the warning repeats one fact per importer. Report a new 
 module once, naming its importers, with one fix that writes every `depends_on`. Found by the
 PR 10b lane on 2026-10-28.
 
-### `closed-pipe-prints-a-traceback`
-
-`irminsul anchors --help | head -1` on Windows ends with `OSError: [Errno 22] Invalid
-argument` and an "Exception ignored" traceback on stderr once `head` closes the pipe, so a
-command piped into a pager or `head` looks like it crashed. Treat a closed stdout as the end
-of the output, once, at the CLI entry point. Found by the PR 12h lane on 2026-10-28.
-
 ## Release pipeline
 
 v0.3.0 was tagged and published on 2026-09-25: PyPI carries the wheel and sdist with
