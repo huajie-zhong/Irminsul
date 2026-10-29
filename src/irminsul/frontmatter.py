@@ -16,7 +16,7 @@ from typing import Any, Final, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from ruamel.yaml import YAML
-from ruamel.yaml.constructor import DuplicateKeyError
+from ruamel.yaml.constructor import ConstructorError, DuplicateKeyError
 from ruamel.yaml.error import MarkedYAMLError, YAMLError
 from ruamel.yaml.nodes import MappingNode, ScalarNode, SequenceNode
 
@@ -402,7 +402,19 @@ def _describe_yaml_error(error: MarkedYAMLError) -> str:
     problem = error.problem or "invalid YAML"
     if error.context and not isinstance(error, DuplicateKeyError):
         problem = f"{error.context}: {problem}"
+    if isinstance(error, ConstructorError) and mark is not None and _opens_with_tag(mark):
+        problem += "; a value that starts with `!` is read as a YAML tag, so put it in quotes"
     return f"{where}{problem}"
+
+
+def _opens_with_tag(mark: Any) -> bool:
+    """Whether the YAML text at `mark` starts with `!`, which the loader reads as a tag.
+
+    A node with an anchor ahead of its tag is marked at the anchor, so that spelling is not
+    recognised.
+    """
+    buffer = getattr(mark, "buffer", None)
+    return isinstance(buffer, str) and buffer[mark.pointer : mark.pointer + 1] == "!"
 
 
 def read_frontmatter(text: str) -> tuple[dict[str, Any], str, int] | None:

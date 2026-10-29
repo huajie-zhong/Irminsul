@@ -376,6 +376,30 @@ def test_a_yaml_syntax_error_names_its_file_line(tmp_path: Path) -> None:
     assert result.data == {"kind": "parse-error"}
 
 
+def test_a_value_that_starts_with_a_bang_is_said_to_need_quotes(tmp_path: Path) -> None:
+    """`- !src/foo/**` is a YAML tag, and the loader's own wording does not say so."""
+    result = _failed(tmp_path, f"---\n{_REQUIRED}describes:\n  - !src/foo/**\n---\nBody\n")
+
+    assert result.error == (
+        "line 6, column 5: could not determine a constructor for the tag '!src/foo/**'; "
+        "a value that starts with `!` is read as a YAML tag, so put it in quotes"
+    )
+    assert result.data == {"kind": "parse-error"}
+
+
+def test_a_quoted_value_that_starts_with_a_bang_parses(tmp_path: Path) -> None:
+    doc = _parsed(tmp_path, f'{_REQUIRED}describes:\n  - "!src/foo/**"\n')
+
+    assert doc.frontmatter.describes == ["!src/foo/**"]
+
+
+def test_a_constructor_error_that_is_not_a_tag_gets_no_quote_advice(tmp_path: Path) -> None:
+    result = _failed(tmp_path, f"---\n{_REQUIRED}merged:\n  <<: 1\n---\nBody\n")
+
+    assert result.error.startswith("line 6, column 7: while constructing a mapping")
+    assert "quotes" not in result.error
+
+
 def test_crlf_frontmatter_reads_like_lf(tmp_path: Path) -> None:
     text = "---\r\nid: x\r\ntitle: X\r\nstatus: stable\r\n---\r\n\r\nBody\r\nmore\r\n"
     doc = _parse(tmp_path, text)
