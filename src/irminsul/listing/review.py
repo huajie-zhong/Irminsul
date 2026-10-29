@@ -35,7 +35,6 @@ from irminsul.frontmatter_edit import is_frontmatter_delimiter
 from irminsul.git.blame import LineTimes
 from irminsul.git.changes import unmerged_branch_commits
 from irminsul.git.mtime import git_root_for
-from irminsul.marked_region import MalformedRegion, find_region
 
 if TYPE_CHECKING:
     from irminsul.git.reader import GitReader
@@ -220,7 +219,9 @@ def _guidance_prose(display: str, text: str, config: IrminsulConfig) -> str:
     """A guidance file's prose: the manifest's generated table and the glossary's metadata
     lines blanked, keeping line numbers."""
     if display == f"{docs_root_prefix(config)}/AGENTS.md":
-        text = _without_generated_region(text)
+        from irminsul.regen.agents_md import without_generated_region
+
+        text = without_generated_region(text)
     return "\n".join("" if _GLOSSARY_META_RE.match(line) else line for line in text.splitlines())
 
 
@@ -233,23 +234,6 @@ def _reviewed_path(path: str, graph: DocGraph, config: IrminsulConfig, guidance:
     return node is not None and (
         is_live_doc(node, config) or in_layer(config, node.path, "decisions")
     )
-
-
-def _without_generated_region(text: str) -> str:
-    """Blank the manifest's generated table, keeping line numbers. Markers that do not make
-    one region blank nothing."""
-    from irminsul.regen.agents_md import GENERATED_END, GENERATED_START
-
-    lines = text.splitlines()
-    try:
-        region = find_region(text, GENERATED_START, GENERATED_END)
-    except MalformedRegion:
-        region = None
-    if region is not None:
-        lines[region.start_line : region.end_line + 1] = [""] * (
-            region.end_line - region.start_line + 1
-        )
-    return "\n".join(lines)
 
 
 def _decision_prose(body: str) -> str:

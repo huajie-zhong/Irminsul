@@ -28,7 +28,8 @@ from typing import TYPE_CHECKING, ClassVar
 from irminsul.checks.base import Finding, FindingClass, Severity, carries_certain_findings
 from irminsul.checks.code_spans import code_spans, is_guidance, is_live_doc
 from irminsul.checks.file_paths import FileIndex, named_path, path_suffixes
-from irminsul.docgraph import DocGraph, DocNode
+from irminsul.docgraph import DocGraph
+from irminsul.frontmatter import entry_line
 from irminsul.regen.agents_md import manifest_rel_path, without_generated_region
 
 if TYPE_CHECKING:
@@ -48,7 +49,6 @@ _PATH_SUGGESTION = (
 _NAME_SUGGESTION = (
     "name what exists now; delete the sentence only if the behaviour it documents is gone"
 )
-_SUMMARY_KEY_RE = re.compile(r"^summary\s*:")
 _CALL_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\(\)$")
 _ENV_NAME_RE = re.compile(r"^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$")
 _PLACEHOLDER_START = ("-", "<", "[", "{", '"', "'", "$", "|", ">")
@@ -137,7 +137,7 @@ class CodeReferencesCheck:
                 )
             summary = node.frontmatter.summary or ""
             if "`" in summary:
-                line = _summary_line(graph.repo_root, node)
+                line = entry_line(graph.repo_root / node.path, "summary") or 1
                 sources.extend(
                     _Source(node.path.as_posix(), node.id, span.text, line, advisory, False)
                     for span in code_spans(summary)
@@ -191,22 +191,6 @@ class CodeReferencesCheck:
                     )
                 )
         return out
-
-
-def _summary_line(repo_root: Path, node: DocNode) -> int:
-    """The line of the doc's `summary:` key, or the first line when the file cannot be read."""
-    try:
-        lines = (repo_root / node.path).read_text(encoding="utf-8").splitlines()
-    except (OSError, UnicodeDecodeError):
-        return 1
-    return next(
-        (
-            number
-            for number, line in enumerate(lines[: node.body_offset], 1)
-            if _SUMMARY_KEY_RE.match(line)
-        ),
-        1,
-    )
 
 
 @dataclass(frozen=True)
