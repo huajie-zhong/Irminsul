@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Literal
 
+from irminsul.adoption import recorded_debt
 from irminsul.checks import Finding, finding_records
 from irminsul.checks.change_range import range_of
 from irminsul.checks.globs import (
@@ -240,10 +241,15 @@ class GoverningClaim:
 
 @dataclass(frozen=True)
 class UnmatchedPath:
+    """A path no doc owns. `recorded_debt` is set when the adoption record excepts it, and
+    says what editing it costs: `diff-integrity` fails a change that edits such a file
+    without giving it an owner, which an agent otherwise learns at the last step."""
+
     path: str
     reason: str
     candidates: list[DocRef]
     governed_by: list[GoverningClaim] = field(default_factory=list)
+    recorded_debt: str | None = None
 
 
 @dataclass(frozen=True)
@@ -503,6 +509,8 @@ def format_context_plain(report: ContextReport) -> str:
                     f"in {governing.doc.path}"
                 )
                 lines.append(f"      {governing.claim}")
+            if item.recorded_debt:
+                lines.append(f"    {item.recorded_debt}")
 
     if report.claim_reviews:
         if lines:
@@ -609,14 +617,40 @@ def _pending_for_path(
             )
         ], []
 
-    return [], [
-        UnmatchedPath(
-            path=display,
-            reason=ownership.reason or "no owning doc found",
-            candidates=[_doc_ref(node) for node in ownership.candidates],
-            governed_by=_governing_claims(graph, display),
-        )
-    ]
+    return [], [_unmatched(graph, display, ownership, _governing_claims(graph, display))]
+
+
+def _unmatched(
+    graph: DocGraph,
+    display: str,
+    ownership: _Ownership,
+    governed_by: list[GoverningClaim],
+) -> UnmatchedPath:
+    return UnmatchedPath(
+        path=display,
+        reason=ownership.reason or "no owning doc found",
+        candidates=[_doc_ref(node) for node in ownership.candidates],
+        governed_by=governed_by,
+        recorded_debt=None if ownership.candidates else _recorded_debt_note(graph, display),
+    )
+
+
+def _recorded_debt_note(graph: DocGraph, display: str) -> str | None:
+    """What editing `display` costs when the adoption record excepts it, else `None`.
+
+    Only a file the packet found no owner for is asked, and a tie has candidates: a file
+    that two docs claim is owned as far as `diff-integrity` is concerned, so its entry has
+    retired and nothing is owed.
+    """
+    debt = recorded_debt(graph)
+    if debt is None or graph.config is None or display not in debt:
+        return None
+    return (
+        f"recorded as pre-existing ownership debt in {graph.config.paths.adoption}; a change "
+        "that edits it must give it an owning doc in the same change (add it to a doc's "
+        "`describes:`, or `owns_tests:` for a test, or run `irminsul new component`), or "
+        "`check --diff` fails with `diff-integrity/adoption-debt-touched`"
+    )
 
 
 def _pending_for_topic(graph: DocGraph, topic: str) -> list[_PendingResult]:
@@ -703,14 +737,7 @@ def _pending_for_changed(
         governed_by = _governing_claims(graph, changed_path)
         if changed_path in unowned_by_design and not governed_by:
             continue
-        unmatched.append(
-            UnmatchedPath(
-                path=changed_path,
-                reason=ownership.reason or "no owning doc found",
-                candidates=[_doc_ref(node) for node in ownership.candidates],
-                governed_by=governed_by,
-            )
-        )
+        unmatched.append(_unmatched(graph, changed_path, ownership, governed_by))
 
     pending = [
         _PendingResult(
@@ -1748,6 +1775,7 @@ def _unmatched_to_dict(item: UnmatchedPath) -> dict[str, object]:
             }
             for governing in item.governed_by
         ],
+        "recorded_debt": item.recorded_debt,
     }
 
 

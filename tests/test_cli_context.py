@@ -708,6 +708,7 @@ def test_context_after_edit_groups_by_owner_and_reports_unmatched(tmp_path: Path
             "reason": "no owning doc found",
             "candidates": [],
             "governed_by": [],
+            "recorded_debt": None,
         }
     ]
 
@@ -812,6 +813,7 @@ def test_context_after_edit_reports_rename_destination_only(tmp_path: Path) -> N
             "reason": "no owning doc found",
             "candidates": [],
             "governed_by": [],
+            "recorded_debt": None,
         }
     ]
 
@@ -1760,3 +1762,47 @@ def test_context_after_edit_leaves_guidance_files_out_of_unmatched(tmp_path: Pat
     assert [item["path"] for item in json.loads(result.output)["unmatched"]] == [
         "src/mylib/new.py"
     ]
+
+
+def _debt_repo(tmp_path: Path) -> Path:
+    repo = _make_context_repo(tmp_path)
+    write(repo, "src/mylib/legacy.py", "def old(): pass\n")
+    write(repo, "src/mylib/fresh.py", "def new(): pass\n")
+    write(repo, ".irminsul-adoption.json", '{"version": 1, "unowned": ["src/mylib/legacy.py"]}\n')
+    seed_repo(repo, "initial")
+    return repo
+
+
+def test_a_recorded_debt_file_says_before_the_edit_what_editing_it_costs(tmp_path: Path) -> None:
+    repo = _debt_repo(tmp_path)
+
+    result = runner.invoke(
+        app,
+        ["context", "src/mylib/legacy.py", "src/mylib/fresh.py", "--format", "json"]
+        + ["--path", str(repo)],
+    )
+
+    fresh, legacy = json.loads(result.output)["unmatched"]
+    assert legacy["path"] == "src/mylib/legacy.py"
+    assert "pre-existing ownership debt in .irminsul-adoption.json" in legacy["recorded_debt"]
+    assert "diff-integrity/adoption-debt-touched" in legacy["recorded_debt"]
+    assert "owning doc in the same change" in legacy["recorded_debt"]
+    assert fresh["path"] == "src/mylib/fresh.py"
+    assert fresh["recorded_debt"] is None
+
+    plain = runner.invoke(app, ["context", "src/mylib/legacy.py", "--path", str(repo)])
+    assert "diff-integrity/adoption-debt-touched" in plain.output
+
+
+def test_after_an_edit_a_recorded_debt_file_still_carries_the_note(tmp_path: Path) -> None:
+    repo = _debt_repo(tmp_path)
+    write(repo, "src/mylib/legacy.py", "def old(): return 1\n")
+    write(repo, "src/mylib/fresh.py", "def new(): return 1\n")
+
+    result = runner.invoke(
+        app, ["context", "--after-edit", "--format", "json", "--path", str(repo)]
+    )
+
+    notes = {item["path"]: item["recorded_debt"] for item in json.loads(result.output)["unmatched"]}
+    assert "adoption-debt-touched" in (notes["src/mylib/legacy.py"] or "")
+    assert notes["src/mylib/fresh.py"] is None
