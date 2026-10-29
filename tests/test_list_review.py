@@ -704,6 +704,30 @@ def test_every_sentence_of_a_new_doc_is_edited_even_when_another_doc_says_it(
     assert _removed(report["items"]) == []
 
 
+def test_a_numbered_list_marker_is_not_a_sentence_of_its_own(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _commit_all_in_the_past(root)
+    write(
+        root,
+        "docs/components/fresh.md",
+        _doc(
+            "fresh",
+            "1. Run `check` first. It is fast.\n2. Fix what it names.\n10) Run it again.\n",
+        ),
+    )
+    report = json.loads(
+        review_json(
+            root, load(root / "irminsul.toml"), changed=changed_line_numbers(GitReader(), root)
+        )
+    )
+    assert _edited(report["items"]) == [
+        "1. Run `check` first.",
+        "It is fast.",
+        "2. Fix what it names.",
+        "10) Run it again.",
+    ]
+
+
 def _decision_record(context: str, decision: str) -> str:
     return (
         "---\nid: choice\ntitle: Choice\nstatus: stable\n---\n\n# Choice\n\n"

@@ -81,6 +81,7 @@ class UnknownDocError(UserError, ValueError):
 _GLOSSARY_META_RE = re.compile(r"^\s*(?:match|forbidden_synonyms|case_sensitive):")
 _SPAN_RE = re.compile(r"(`+)(.+?)\1")
 _SENTENCE_END_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z`\[*(])")
+_LIST_MARKER_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 _TABLE_SEPARATOR_RE = re.compile(r"^\s*\|?[\s:|-]+\|?\s*$")
 _LINK_RE = re.compile(r"\[([^\]]*)\]\(([^)]*)\)")
 _CODE_OR_COMMENT_RE = re.compile(r"(`+).+?\1|<!--.*?-->")
@@ -144,14 +145,19 @@ def _text_sentences(text_body: str) -> list[tuple[int, int, str]]:
             return
         start = block[0][0]
         text = "\n".join(line for _, line in block)
-        offset = 0
-        for piece in _SENTENCE_END_RE.split(text):
-            index = text.find(piece, offset)
-            offset = index + len(piece)
+        marker = _LIST_MARKER_RE.match(text)
+        begin = 0
+        ends = [
+            (boundary.start(), boundary.end())
+            for boundary in _SENTENCE_END_RE.finditer(text, marker.end() if marker else 0)
+        ]
+        for end, next_begin in [*ends, (len(text), len(text))]:
+            piece = text[begin:end]
             sentence = " ".join(piece.split())
             if sentence:
-                first = start + text.count("\n", 0, index)
+                first = start + text.count("\n", 0, begin)
                 out.append((first, first + piece.count("\n"), sentence))
+            begin = next_begin
         block.clear()
 
     fence = FenceTracker()
@@ -170,7 +176,7 @@ def _text_sentences(text_body: str) -> list[tuple[int, int, str]]:
         if not line.strip() or line.lstrip().startswith(("#", "<!--")):
             flush()
             continue
-        if re.match(r"^\s*(?:[-*+]|\d+[.)])\s+", line):
+        if _LIST_MARKER_RE.match(line):
             flush()
         block.append((lineno, line))
     flush()
