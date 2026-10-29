@@ -187,8 +187,17 @@ and was re-asked six times on 2026-10-21 and 2026-10-22, and re-pinned four more
 `--help` edit in `src/irminsul/cli.py` re-asked three foundation and architecture claims in
 the PR 12a and 12b lanes on 2026-10-28. Re-asking that often trains a reader to re-pin
 without reading. Let evidence name a section or a definition and pin only that part; the
-draft RFC `claim-evidence-names-a-part` (branch `rfc/claim-evidence-parts`, not on main)
-proposes it.
+accepted RFC `claim-evidence-names-a-part`, resolved into
+`code-is-named-in-code-spans-and-bound-by-anchors`, does it and is not yet implemented. The
+second reset hit it again on 2026-10-29: retargeting one link in `checks.md` re-asked that
+claim, and a help-string edit in the `refs` fix re-asked three claims citing `cli.py`.
+
+### `after-edit-buries-its-findings`
+
+`irminsul context --after-edit` prints the whole owner packet, excerpts and active RFC
+requirements included, before the findings the change introduced, so an agent greps for the
+findings section (the `refs` fix lane, 2026-10-29). Print the findings first, or give the
+packet a flag that leaves it out.
 
 ### `fix-buries-its-own-output`
 
@@ -284,15 +293,6 @@ without saying that it is one. Resolve a directory to the docs whose `describes`
 match files under it, and say "extra doc" for a guidance file. Found by the PR 12e lane and
 the PR 12 design survey, reproduced on 2026-10-28.
 
-### `refs-misses-guidance-files`
-
-`irminsul refs agent-protocol` lists one weak backlink, from a decision, though the root
-`AGENTS.md` (lines 44 and 57) and `docs/AGENTS.md` (lines 109 and 134) link to that doc.
-`refs` reads the links of doc bodies only (`_weak_refs_to`, `src/irminsul/refs.py:102`), not
-of the files `paths.extra_docs` names or of the manifest, so before deleting or moving a
-doc an agent still needs grep. Include those files among the weak backlinks, marked as
-guidance. Found by the PR 12 design survey and reproduced on 2026-10-28.
-
 ### `no-command-lists-declarations`
 
 No command lists a doc's anchors, its claim markers, or which doc is the only code-span
@@ -321,9 +321,13 @@ docstring that goes stale is found only by reading, and the survey found about a
 had. Two other hand-kept statements are unchecked too: the links in `CHANGELOG.md`, which
 `paths.extra_docs` does not name, and the status-check names that
 `docs/foundation/enforcement.md:89` lists as required, which nothing compares with the job
-names in `.github/workflows/ci.yml`. Name `CHANGELOG.md` in this repository's
-`extra_docs`; for the check names, derive the line from the workflow or compare it with
-it. Found by the PR 12 design survey on 2026-10-28.
+names in `.github/workflows/ci.yml`. For the check names, derive the line from the
+workflow or compare it with it. Found by the PR 12 design survey on 2026-10-28.
+
+The changelog is not guidance: naming it in `paths.extra_docs` raised 39 findings on
+2026-10-29, every one a removed name a changelog records on purpose. The draft RFC
+`a-history-file-is-checked-for-its-links` (branch `rfc/history-files`) checks its links
+alone.
 
 ### `manifest-table-is-the-working-tree`
 
