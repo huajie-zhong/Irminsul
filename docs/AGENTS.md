@@ -88,6 +88,7 @@ file is curated and survives it.
 
 | ID | Doc | Summary |
 |----|-----|---------|
+| `a-change-re-asks-the-sentences-that-name-its-code` | [A change re-asks the sentences that name its code](rfcs/a-change-re-asks-the-sentences-that-name-its-code.md) | When a change edits code, the review queue asks again about every sentence that names that code in a code span, and `context <path>` lists those sentences before the edit, so an agent finds the docs a change makes stale without searching for them. |
 | `a-gate-file-is-sealed-not-scored` | [A gate file is sealed, not scored](rfcs/a-gate-file-is-sealed-not-scored.md) | A changed workflow or action file that mentions irminsul is a certain finding until a decision record names it, replacing gate-strength scoring and the emulation of GitHub path filters. |
 | `a-path-is-named-when-git-lists-it` | [A path is named when git lists it](rfcs/a-path-is-named-when-git-lists-it.md) | A path a doc names exists when git lists it or the source walk holds it, not when a file happens to be on one machine's disk, so the same tree gives the same findings everywhere. |
 | `a-source-file-has-one-claim` | [A source file has one claim](rfcs/a-source-file-has-one-claim.md) | A source file matched by two docs' describes is a certain error answered by narrowing the broader claim, a doc may exclude files from its own glob, and the specificity tie-break and two overlap hints go. |
