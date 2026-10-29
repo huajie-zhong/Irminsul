@@ -15,20 +15,25 @@ loop points to: acting on a finding, and changing the project's direction.
 ## Acting on a finding
 
 Every finding has a class — **certain** (an error; the tree breaks a rule), **hint** (a
-warning or info; it needs judgment), **time** (elapsed time caused it). `irminsul
-explain <code>` describes any code. Then, in order:
+warning or info; it needs judgment), **time** (elapsed time caused it). Its code also
+declares one of four answers, and `irminsul explain <code>` prints both:
+
+- **fix** — the doc or the config is wrong; change it.
+- **line** — `<!-- irminsul:ignore <code> reason="..." -->` on the finding's line, or
+  alone above it, which above a fenced block covers the block; the reason says why the
+  doc is right.
+- **pin** — re-read, then run the `irminsul anchors --re-pin` command the finding prints.
+- **trailer** — re-read the doc, then add the commit trailer the suggestion prints, on
+  the commit that carries the last change to the files it lists or a later one.
+
+Then, in order:
 
 1. **Read the code the finding names**, not the doc you are about to edit.
 2. **The claim is false and the code is right** — rewrite the sentence.
 3. **The claim is false and the code is wrong** — fix the code, and say so.
-4. **The claim is true and the check cannot see why** — keep it and add
-   `<!-- irminsul:ignore <check-or-code> reason="..." -->` on that line; the reason
-   says why the doc is right.
-5. **The doc is right and the finding has no line** — re-read the doc, then answer a
-   `co-change` warning with the commit trailer its suggestion prints, in a commit made
-   after the files it lists last changed, and an `evidence-drift` warning with
-   `irminsul anchors --re-pin --doc <doc> --claim <id>`.
-6. **What it described is genuinely gone** — remove the claim *and* the code in the
+4. **The claim is true and the check cannot see why** — take the answer its code
+   declares, and no other.
+5. **What it described is genuinely gone** — remove the claim *and* the code in the
    same change.
 
 ## Changing direction

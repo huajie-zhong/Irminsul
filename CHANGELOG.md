@@ -24,6 +24,9 @@ making a feature, a refactor and an RFC-driven change in it.
 - `frontmatter/missing-frontmatter` carries a suggestion: add a block on line 1 with the `id` the
   filename implies, a `title`, a `status` and a `summary`, and, for a file outside every layer
   folder, move it into its layer after `irminsul refs` shows what links to it.
+- The agent protocol `irminsul init` scaffolds lists the four answers a finding code can declare,
+  and says to take the one `irminsul explain` names, in place of its two steps for an ignore
+  comment and for a finding with no line.
 
 **Findings and messages.**
 - `check --diff` with a base that does not resolve, such as `origin/main` in a repository with no

@@ -31,25 +31,31 @@ loop points to: acting on a finding, and changing the project's direction.
 
 Every finding has a class — **certain** (an error; the tree breaks a rule), **hint** (a
 warning or info; it needs judgment), **time** (elapsed time caused it, so report rather
-than fix it in passing). `irminsul explain <code>` describes any code. Then, in order:
+than fix it in passing). Its code also declares one of four answers, the one way a
+correct doc turns it green, and `irminsul explain <code>` prints both:
+
+- **fix** — the doc or the config is wrong whenever the finding fires; change it.
+- **line** — `<!-- irminsul:ignore <code> reason="..." -->` on the finding's line, or
+  alone on the line above it; one above a fenced block covers the whole block. The reason
+  is required and says why the doc is right.
+- **pin** — re-read the prose or the claim against its code, then run the
+  `irminsul anchors --re-pin` command the finding prints, which moves only that pin.
+- **trailer** — re-read the doc, then add the `Irminsul-Reviewed` commit trailer the
+  suggestion prints, on the commit that carries the last change to the files it lists or
+  a later one; an earlier commit's trailer does not count. The reason says why the doc did
+  not need to change.
+
+Then, in order:
 
 1. **Read the code the finding names.** Do not infer what it does from the doc you are
    about to edit.
 2. **The claim is false and the code is right** — rewrite the sentence to say what the
    code does.
 3. **The claim is false and the code is wrong** — fix the code, and say so.
-4. **The claim is true and the check cannot see why** — keep the claim and add
-   `<!-- irminsul:ignore <check-or-code> reason="..." -->` on that line. The reason is
-   required and must say why the doc is right.
-5. **The doc is right and the finding has no line** — no ignore comment reaches it. For
-   a `co-change` warning, re-read the doc, then add the commit trailer the finding
-   suggests, `Irminsul-Reviewed: co-change <doc> reason="..."`, to a commit made after
-   the last change to the files the warning lists; an earlier commit's trailer does not
-   count. The reason must say why the doc did not need to change. For an
-   `evidence-drift` warning, re-read the claim against its evidence, then run
-   `irminsul anchors --re-pin --doc <doc> --claim <id>`, which records that claim's
-   evidence as re-read and moves no other claim's pin.
-6. **What it described is genuinely gone** — remove the claim *and* the code in the same
+4. **The claim is true and the check cannot see why** — take the answer its code
+   declares, and no other: an ignore comment on a code that declares `fix` or `pin` hides
+   the next real mismatch too.
+5. **What it described is genuinely gone** — remove the claim *and* the code in the same
    change. That is the one case where removal costs nothing.
 
 ## Changing direction
