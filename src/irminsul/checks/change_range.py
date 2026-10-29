@@ -134,5 +134,7 @@ def _diff_failure_reason(git: GitReader, repo_root: Path, base: str) -> str:
         )
     return (
         f"could not compute `git diff {base}...HEAD`; "
-        "at least one ref could not be resolved in this repository"
+        f"at least one ref could not be resolved in this repository. Pass a ref that exists "
+        f"here, such as the base commit or `HEAD~1`, or fetch `{base}` first "
+        "(`fetch-depth: 0` in CI)"
     )

@@ -422,3 +422,15 @@ def test_explain_co_change_says_where_the_trailer_goes() -> None:
     assert "on a commit made after the last change to those files" in " ".join(
         result.output.split()
     )
+
+
+def test_cochange_unresolvable_base_says_what_to_pass_instead(tmp_path: Path) -> None:
+    repo_root, _base = _seed_repo(tmp_path)
+
+    result = runner.invoke(app, ["check", "--diff", "origin/main", "--path", str(repo_root)])
+
+    output = " ".join(cli_output(result).split())
+    assert result.exit_code == 2
+    assert "could not compute `git diff origin/main...HEAD`" in output
+    assert "Pass a ref that exists here, such as the base commit or `HEAD~1`" in output
+    assert "fetch `origin/main` first (`fetch-depth: 0` in CI)" in output
