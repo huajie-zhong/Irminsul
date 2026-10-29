@@ -576,7 +576,7 @@ def _call_tool(repo: Path, name: str, args: dict[str, object]) -> object:
         ("check", {"only": ["orphan"]}, ["check", "--only", "orphan"]),
         ("surface", {"kind": "zzz"}, ["surface", "zzz"]),
         ("change_status", {"change": "nope"}, ["change", "status", "nope"]),
-        ("context_for_path", {"paths": ["missing.py"]}, ["context", "missing.py"]),
+        ("context_for_path", {"paths": ["../missing.py"]}, ["context", "../missing.py"]),
     ],
     ids=["refs", "check", "surface", "change", "context"],
 )
