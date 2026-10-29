@@ -1,0 +1,17 @@
+name: docs-pr
+
+# No `paths:` filter: a required check whose workflow a filter skipped stays Pending,
+# so a pull request touching only a file the filter missed could never merge.
+on:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # mtime drift needs full history
+      - uses: {{ action_repository }}@{{ action_ref }}
+        with:
+          diff: {% raw %}origin/${{ github.base_ref }}{% endraw %}

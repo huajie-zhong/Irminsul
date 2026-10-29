@@ -1,0 +1,31 @@
+project_name = "hard-retired-references-fixture"
+
+[paths]
+docs_root = "docs"
+source_roots = ["app"]
+
+[checks]
+enabled = [
+    "retired-references",
+    "mtime-drift",
+    "stale-reaper",
+    "orphans",
+    "supersession",
+    "parent-child",
+    "glossary-discipline",
+    "external-links",
+    "boundary",
+    "phantom-layer",
+    "import-deps",
+    "claim-provenance",
+    "foundation-readiness",
+    "rfc-follow-through",
+    "inventory-drift",
+    "claim-anchor",
+    "doc-refs",
+    "change-binding",
+    "requirement-grammar",
+    "adr-structure",
+    "duplicate-block",
+    "code-references",
+]

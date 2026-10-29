@@ -1,0 +1,18 @@
+project_name = "bad-test-roots-fixture"
+
+[paths]
+docs_root = "docs"
+source_roots = ["src"]
+# Declaring the test root closes the ownership rule over it: every test file below
+# needs an owner, including one in a directory where nothing is owned yet.
+test_roots = ["tests"]
+
+[languages]
+enabled = ["python"]
+
+[checks]
+enabled = [
+    "frontmatter",
+    "uniqueness",
+    "test-ownership",
+]

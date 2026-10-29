@@ -1,0 +1,62 @@
+---
+id: agent-protocol
+title: Agent lifecycle protocol
+status: stable
+describes: []
+summary: How an agent acts on a finding and changes the project's direction; the edit loop every change follows is in the root AGENTS.md.
+---
+
+# Agent lifecycle protocol
+
+The root [`AGENTS.md`](../../AGENTS.md) carries the edit loop every change follows and
+what a finding does and does not tell you. This guide carries the two procedures that
+loop points to: acting on a finding, and changing the project's direction.
+
+## Acting on a finding
+
+Every finding has a class — **certain** (an error; the tree breaks a rule), **hint** (a
+warning or info; it needs judgment), **time** (elapsed time caused it). `irminsul
+explain <code>` describes any code. Then, in order:
+
+1. **Read the code the finding names**, not the doc you are about to edit.
+2. **The claim is false and the code is right** — rewrite the sentence.
+3. **The claim is false and the code is wrong** — fix the code, and say so.
+4. **The claim is true and the check cannot see why** — keep it and add
+   `<!-- irminsul:ignore <check-or-code> reason="..." -->` on that line; the reason
+   says why the doc is right.
+5. **The doc is right and the finding has no line** — re-read the doc, then answer a
+   `co-change` warning with the commit trailer its suggestion prints, in a commit made
+   after the files it lists last changed, and an `evidence-drift` warning with
+   `irminsul anchors --re-pin --doc <doc> --claim <id>`.
+6. **What it described is genuinely gone** — remove the claim *and* the code in the
+   same change.
+
+## Changing direction
+
+1. **Update the foundation before the implementation** when the request changes the
+   project's direction.
+2. **Create or update an RFC** for a significant behavior, architecture, lifecycle, CLI,
+   or check change. `irminsul new rfc "<title>"` writes it in two parts, or `--small` for
+   a sign-off: the owner's part first (Summary, Problem, How it works, Cost and risk,
+   Decisions), in plain words, then the agent's part from `## Design detail` on, which
+   holds every list of names, files and ids, then `## Requirements` and `## Tasks`.
+   `rfc-structure` keeps the shape.
+3. **Resolve an accepted RFC with an ADR** that links it, written with
+   `irminsul new adr "<title>"`. Accepting is the user's decision: run
+   `irminsul change transition <id> accepted --confirm` only after they approve.
+4. **Work an accepted RFC through the bound-change loop:** `irminsul list lifecycle
+   --queue`, `irminsul change status <id>`, implement, then `irminsul change verify <id>`.
+   Finalizing is the user's decision too; commit or stash first, because
+   `irminsul change finalize <id> --confirm` refuses a tree with uncommitted work.
+5. **Supersede deliberately:** set `supersedes` on the new doc and run `irminsul fix`.
+
+Before moving or renaming a doc, run `irminsul refs <doc>` and update every hit; it reads
+`depends_on` and Markdown links, so a doc named only in prose returns nothing.
+
+## Scope & Limitations
+
+- This guide does not enumerate doc-system rules (those live in
+  [`CONTRIBUTING.md`](../CONTRIBUTING.md)) or coding conventions, and does not define
+  which checks run — that is `irminsul.toml`, and `irminsul orient` reports it.
+- Neither procedure is one check; individual transitions are enforced by
+  `rfc-lifecycle`, `rfc-follow-through`, and `change-binding`.

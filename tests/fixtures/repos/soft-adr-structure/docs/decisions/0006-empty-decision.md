@@ -1,0 +1,27 @@
+---
+id: 0006-empty-decision
+title: "ADR-0006: Empty decision section"
+status: draft
+summary: "ADR-0006: Empty decision section."
+describes: []
+---
+
+# ADR-0006: Empty decision section
+
+## Status
+
+Proposed.
+
+## Context
+
+Some situation prompted a decision.
+
+## Decision
+
+## Alternatives Considered
+
+- No alternatives have been recorded yet.
+
+## Consequences
+
+The outcome is not yet known.

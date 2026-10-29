@@ -1,0 +1,38 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  # The project's own tools, run through `uv` so that their versions come from `uv.lock`
+  # (the versions CI runs) and not from a second pin kept here.
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff check
+        entry: uv run --locked --extra dev ruff check --fix --force-exclude
+        language: system
+        types_or: [python, pyi, jupyter]
+        require_serial: true
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --locked --extra dev ruff format --force-exclude
+        language: system
+        types_or: [python, pyi, jupyter]
+        require_serial: true
+      - id: mypy
+        name: mypy
+        entry: uv run --locked --extra dev mypy
+        language: system
+        files: ^src/
+        types: [python]
+        pass_filenames: false
+      - id: irminsul-check
+        name: irminsul check
+        entry: uv run python -m irminsul check
+        language: system
+        pass_filenames: false

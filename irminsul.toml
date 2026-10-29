@@ -1,0 +1,89 @@
+project_name = "Irminsul"
+
+[paths]
+docs_root = "docs"
+source_roots = ["src"]
+source_includes = []
+# Fixture repositories under tests/fixtures/ are miniature codebases with their own
+# irminsul.toml. Their test files belong to those repositories, not to this one.
+source_excludes = ["tests/fixtures/**"]
+honor_gitignore = true
+# Declaring the test root closes the ownership invariant over it: every test file here
+# needs a maintaining doc, not only the ones beside a test already owned.
+test_roots = ["tests"]
+
+[checks]
+enabled = [
+    "frontmatter",
+    "globs",
+    "uniqueness",
+    "links",
+    "schema-leak",
+    "coverage",
+    "prose-file-reference",
+    "agents-manifest",
+    "rfc-lifecycle",
+    "retired-references",
+    "mtime-drift",
+    "stale-reaper",
+    "orphans",
+    "supersession",
+    "parent-child",
+    "glossary-discipline",
+    "external-links",
+    "boundary",
+    "phantom-layer",
+    "import-deps",
+    "claim-provenance",
+    "foundation-readiness",
+    "rfc-follow-through",
+    "inventory-drift",
+    "claim-anchor",
+    "doc-refs",
+    "change-binding",
+    "requirement-grammar",
+    "adr-structure",
+    "rfc-structure",
+    "duplicate-block",
+    "code-references",
+    "test-ownership",
+]
+
+[checks.external_links]
+enabled = false
+timeout_seconds = 5.0
+cache_path = ".irminsul-cache/external-links.json"
+ttl_hours = 168
+
+[checks.stale_reaper]
+deprecated_threshold_days = 180
+
+[checks.glossary_discipline]
+glossary_path = "docs/GLOSSARY.md"
+
+[checks.parent_child]
+length_warning_lines = 300
+
+[overrides]
+mtime_drift_days = 30
+
+[languages]
+enabled = ["python"]
+
+[[surface.rules]]
+kind = "config-keys"
+globs = ["src/irminsul/config.py"]
+pattern = '^    ([a-z_]+): [A-Za-z]'
+# The last segments of a dotted key such as `checks.external_links.ttl_hours`, so a key
+# the schema no longer declares is reported where a doc still names it.
+mention_pattern = '(?<=[a-z_]\.)(?!(?:toml|py|md|json|ya?ml|txt|lock)(?![a-z0-9_]))[a-z][a-z0-9_]*'
+
+[[surface.rules]]
+kind = "checks"
+globs = ["src/irminsul/checks/*.py"]
+pattern = '^\s+name: ClassVar\[str\] = "([a-z-]+)"'
+
+[[surface.rules]]
+kind = "frontmatter-fields"
+globs = ["src/irminsul/frontmatter.py"]
+pattern = '^    ([a-z_]+): [A-Za-z]'

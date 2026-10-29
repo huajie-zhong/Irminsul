@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # A merge queue re-runs the gate on the combined result, which is the only state
+  # that is actually merged. Without this the queue would run nothing at all.
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      # `--locked` fails the job when `uv.lock` no longer matches `pyproject.toml`, so CI
+      # runs the versions the lock names and a stale lock is a red build, not a silent re-resolve.
+      - name: Install
+        run: uv sync --locked --extra dev
+      - name: Ruff
+        run: uv run --no-sync ruff check .
+      - name: Ruff format
+        run: uv run --no-sync ruff format --check .
+      - name: Mypy
+        run: uv run --no-sync mypy
+
+  test:
+    name: test (${{ matrix.os }}, ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.12"
+            coverage: true
+          - os: ubuntu-latest
+            python-version: "3.13"
+          - os: windows-latest
+            python-version: "3.12"
+          - os: macos-latest
+            python-version: "3.12"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - name: Install
+        run: uv sync --locked --extra dev
+      # One leg measures coverage, so the number is taken once and does not depend on
+      # which platform skips which tests.
+      - name: Pytest with coverage
+        if: matrix.coverage
+        run: uv run --no-sync pytest -q --cov=irminsul --cov-report=term-missing --cov-fail-under=94
+      - name: Pytest
+        if: ${{ !matrix.coverage }}
+        run: uv run --no-sync pytest -q
+
+  dogfood:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install
+        run: uv sync --locked --extra dev
+      # Each event runs the gate once. A `--diff` run reports everything a plain run does
+      # and adds the passes that judge a change, so a pull request needs only that one.
+      # Hints fail here: this repository holds itself to the strictest rule it ships.
+      # Time findings do not, because they move with the calendar and would turn main red
+      # with no change.
+      - name: irminsul check against the integration base (self)
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        env:
+          # The branch this change is being integrated into, from whichever event
+          # delivered it. Never HEAD: on a branch with commits, HEAD already holds the
+          # change, so the comparison would be with itself. The CLI takes the merge base
+          # of this ref and HEAD, so a base that has moved on does not report its own
+          # commits as ours.
+          BASE_REF: >-
+            ${{ github.event_name == 'merge_group'
+                && github.event.merge_group.base_ref
+                || github.base_ref }}
+        run: uv run --no-sync irminsul check --diff "origin/${BASE_REF#refs/heads/}" --fail-on hint
+      - name: irminsul check (self)
+        if: github.event_name == 'push'
+        run: uv run --no-sync irminsul check --fail-on hint
+
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the checks that read git history find none at depth 1
+      - name: Run the composite Action against this repository
+        uses: ./
+      - name: Run the composite Action on a directory
+        uses: ./
+        with:
+          path: tests/fixtures/repos/good
+
+  # The built wheel, installed alone on a clean virtualenv, and then the image made from it.
+  # The test job runs the source tree, so only this job would notice a wheel that omits a
+  # template or a dependency the project forgot to declare.
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the wheel's version comes from git history; so do the history-reading checks
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Build the wheel and sdist
+        run: uv build
+      - name: Install the wheel into a clean virtualenv
+        run: |
+          uv venv "$RUNNER_TEMP/clean"
+          uv pip install --python "$RUNNER_TEMP/clean" dist/*.whl
+      - name: Scaffold and check an empty repository with the installed CLI
+        run: |
+          export PATH="$RUNNER_TEMP/clean/bin:$PATH"
+          irminsul --version
+          cd "$(mktemp -d)"
+          git init -q
+          irminsul init --fresh --no-interactive --language python
+          irminsul check
+      - name: Build the image
+        run: docker build -t irminsul:ci .
+      - name: Run the image against this repository
+        run: docker run --rm -v "$PWD:/workspace" irminsul:ci check

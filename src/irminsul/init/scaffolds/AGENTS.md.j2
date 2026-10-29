@@ -1,0 +1,88 @@
+# AGENTS.md — agent entry point for {{ project_name }}
+
+This repository's documentation lives in `docs/` and is managed by
+[Irminsul](https://github.com/{{ action_repository }}). The docs tree is a
+machine-verified contract between humans and coding agents: structural
+invariants (ownership, links, frontmatter, coverage) are enforced in CI, so
+what the docs claim about the code is checked, not hoped.
+
+<!-- irminsul:agents-start -->
+## The agent loop
+
+Work every change in this order. `irminsul orient` lists the commands; each takes
+`--format json`.
+
+1. At the start of a session, run `irminsul orient` and read
+   [`docs/AGENTS.md`](docs/AGENTS.md), the map of the docs tree.
+2. Before editing, run `irminsul context <path...>` for the files you intend to touch,
+   or `irminsul context --topic <query>` while locating them, then read the owning docs
+   it names and the decision records they link. It runs no checks, so it is fast and it
+   is not a green light.
+3. Make the change, with the doc updates **in the same commit** as the code they
+   describe. When a sentence explains code — what it does, why it works this way, what
+   it guarantees — name that code in a code span, anchor the paragraph to it, or declare
+   it as a claim with evidence. A doc is re-asked about code only through those
+   connections.
+4. After editing, run `irminsul context --after-edit` for the findings your change
+   introduced, and `irminsul list review --changed` to re-read each sentence you added
+   or changed against the code it names. Both also queue the claims whose evidence you
+   touched, in docs you may never have opened: read the doc and the decisions it links,
+   and answer the question asked. The review queue is a reading list: fix a sentence
+   that is wrong, and leave one you re-read and found right. Only a finding needs a
+   recorded answer. On a branch with committed work, give both `--base-ref origin/<base>`.
+5. Run `irminsul fix` for the deterministic remediations of mechanical findings.
+6. Before committing, run `irminsul check` and the tests your change touches; it must
+   exit 0.
+7. Before opening the pull request, run `irminsul check --diff origin/<base>`, the run CI
+   enforces. It adds `co-change` and `diff-integrity`, which judge the change rather than
+   the tree and catch a weakened gate. It includes uncommitted work, so one run before
+   committing shows what the commit will trigger. A `co-change` warning on a doc you
+   re-read and found still right is answered by the commit trailer its suggestion
+   prints, in the commit that carries the files, not by an edit that says nothing.
+
+Report any warning you leave and any decision still open. Accepting or finalizing an RFC
+is the user's decision; the [agent protocol](docs/guides/agent-protocol.md) says how to
+act on a finding and how to change direction.
+
+## Follow the foundation layer
+
+The `foundation/` layer — principles, anti-patterns, and what the project will not do —
+binds your choices, not just your prose. Follow it unless a principle is wrong for the
+change at hand; then say so to the user and let them decide, rather than quietly working
+around it. A principle you had to break is worth reporting even when the build is green.
+
+## What a finding tells you
+
+`irminsul explain <code>` says what a finding code means, and
+[Acting on a finding](docs/guides/agent-protocol.md#acting-on-a-finding) what to do next.
+
+- **A finding is right about its fact and silent about the meaning.** It reports
+  something mechanical: this link resolves to nothing, this symbol is absent, no doc
+  claims this file. Take that fact as true. Whether the prose is *correct* is what no
+  check knows, so "the check is wrong" is almost never the answer.
+- **A green run does not mean the docs are right.** It means nothing provable is broken.
+- **A suggestion is a menu, not a ranking.** Several end "...or remove it", which is for
+  when the thing really is gone — not a shortcut to clearing the finding.
+- **When doc and code disagree, decide which is wrong before editing either.** A sentence
+  describing what the code *should* do is a bug to report, not a doc to rewrite.
+
+These clear a finding while making the tree less true, and none is a repair: deleting a
+claim, anchor or `inventory:` entry; narrowing a `describes:` glob; setting `status:
+draft`; an ignore comment as the first move or one without a real reason; running
+`irminsul baseline init` without a decision record that names the baseline; editing an
+implemented RFC; re-pinning an anchor or a claim before re-reading it, or a whole doc
+after re-reading one claim (`anchors --re-pin --doc <doc>` with `--claim <id>` or
+`--anchor <path#symbol>` re-pins only what you named), or acknowledging a `co-change`
+warning before re-reading the doc; removing a check from `checks.enabled` or from the
+workflow; adding a path to the adoption record, which names what was already unowned on
+the day of adoption and only ever shrinks; deleting that record, or adopting a second
+time, to get the first record's allowance back.
+
+## Harness notes
+
+Every harness loads this file: Cursor and Codex read a root `AGENTS.md` natively, and
+Claude Code reads `CLAUDE.md`, which imports it with `@AGENTS.md`; keep that import if <!-- irminsul:ignore code-references reason="an import directive of the harness, not a file path" -->
+you replace that file with your own. `.mcp.json` registers Irminsul's read-only MCP
+server; the harness runs the `irminsul` on its own PATH, so that install needs
+`pip install 'irminsul[mcp]'`.
+<!-- irminsul:agents-end -->

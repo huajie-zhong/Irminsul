@@ -1,0 +1,88 @@
+"""Derived change footprint: changed paths resolved to owning components.
+
+The footprint is recomputed from a diff and the graph on every call — it is
+never stored on the RFC. Ownership resolution reuses `resolve_claims`, the same
+primitive behind `uniqueness` and `context --after-edit`, so "which component owns
+this changed file" has exactly one answer everywhere.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path, PurePosixPath
+
+from irminsul.checks.globs import is_configured_source_path
+from irminsul.checks.uniqueness import most_specific_claims, resolve_claims
+from irminsul.config import docs_root_prefix
+from irminsul.declared_tests import matching_paths
+from irminsul.docgraph import DocGraph
+
+
+@dataclass(frozen=True)
+class Footprint:
+    """Where a set of changed paths landed, in component terms."""
+
+    changed_paths: tuple[str, ...]
+    touched: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    """Component doc id -> changed source files it owns (most-specific claim)."""
+    unowned_source: tuple[str, ...] = ()
+    """Changed source files no doc claims; finalization blocks on each as `unowned-change`."""
+    changed_docs: tuple[str, ...] = ()
+    changed_tests: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    """Component doc id -> changed files its recommended tests name.
+
+    That a recommended test file changed. Not that it ran, not that it passed, and not
+    that it covers what the change did — nothing in Irminsul executes a test."""
+
+
+def touched_components(graph: DocGraph, changed_paths: frozenset[str]) -> Footprint:
+    """Resolve `changed_paths` (repo-relative POSIX) to owning components.
+
+    A deleted file is not on disk, so it cannot come from the source walk — it
+    is resolved from its path alone. Removing a file is a change to the
+    component that owned it, and an undeclared removal must surface as loudly as
+    an undeclared edit.
+    """
+    assert graph.repo_root is not None and graph.config is not None
+    repo_root, config = graph.repo_root, graph.config
+    source_files = graph.source.files
+    on_disk = {display for _, display in source_files}
+
+    changed_source: list[tuple[Path, str]] = [
+        (abs_path, display) for abs_path, display in source_files if display in changed_paths
+    ]
+    changed_source.extend(
+        (repo_root / path, path)
+        for path in sorted(changed_paths)
+        if path not in on_disk and is_configured_source_path(repo_root, config, path)
+    )
+    claims_by_file = resolve_claims(graph, [display for _, display in changed_source])
+
+    touched: dict[str, list[str]] = {}
+    unowned: list[str] = []
+    for _, display in changed_source:
+        owners = most_specific_claims(claims_by_file.get(display, []))
+        if not owners:
+            unowned.append(display)
+            continue
+        for node, _, _ in owners:
+            touched.setdefault(node.id, []).append(display)
+
+    docs_root = docs_root_prefix(config)
+    changed_docs = sorted(
+        path for path in changed_paths if PurePosixPath(path).is_relative_to(docs_root)
+    )
+
+    changed_tests: dict[str, tuple[str, ...]] = {}
+    for node in graph.nodes.values():
+        hits = matching_paths(node.frontmatter.effective_recommended_tests, list(changed_paths))
+        if hits:
+            changed_tests[node.id] = tuple(hits)
+
+    return Footprint(
+        changed_paths=tuple(sorted(changed_paths)),
+        touched={doc_id: tuple(sorted(files)) for doc_id, files in sorted(touched.items())},
+        unowned_source=tuple(sorted(unowned)),
+        changed_docs=tuple(changed_docs),
+        changed_tests=changed_tests,
+    )

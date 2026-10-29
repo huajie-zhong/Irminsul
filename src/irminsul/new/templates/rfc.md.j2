@@ -1,0 +1,71 @@
+---
+id: {{ id }}
+title: {{ title | yaml_scalar }}
+status: draft
+# summary: one sentence saying what this doc covers; the agent manifest lists it.
+describes: []
+rfc_state: draft
+affects: []
+weight: {{ weight }}
+---
+
+# {{ title }}
+
+## Summary
+
+{% if weight == "small" -%}
+<!-- What changes, and what the owner signs off on. The owner reads this and Decisions in 5 to
+     30 seconds. -->
+{%- else -%}
+<!-- The gain, then how it works in a sentence, then how many decisions wait for the owner, so a
+     reader with no questions can stop here. -->
+{%- endif %}
+
+{% if weight == "large" -%}
+## Problem
+
+<!-- One worked example, with names and numbers, of what goes wrong today. Plain words; define a
+     term where it first appears. -->
+
+## How it works
+
+<!-- The mechanism at a level the owner can question: what is general, where it can grow, and what
+     it leaves out. Exact names, files and ids belong under Design detail. -->
+
+## Cost and risk
+
+<!-- What this costs in code, latency, money or adopters, and what could go wrong. -->
+
+{% endif -%}
+## Decisions
+
+<!-- Each choice that needs the owner: the options, the two or three factors that decide it, and a
+     recommendation. Record the owner's answer here once given. -->
+
+## Design detail
+
+<!-- The agent's part: every list of names, files, ids and migration steps, and what was not
+     chosen or is out of scope. -->
+
+## Requirements
+
+<!-- One block per behavior the change adds or alters, in this shape. A change that adds
+     none writes one sentence instead: "No new behavioral requirements: <why>."
+
+### Requirement: Export writes one row per record
+ID: export-writes-one-row-per-record
+Provenance: code
+
+`export` SHALL write one CSV row for each stored record.
+
+#### Scenario: Two records
+- **WHEN** `export` runs on a store holding two records
+- **THEN** the file holds a header row and two record rows
+-->
+
+## Tasks
+
+<!-- One item per step, each naming one requirement or affected component:
+
+- `T1` Write the CSV writer and its test. (req: export-writes-one-row-per-record)
+-->

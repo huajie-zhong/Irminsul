@@ -1,0 +1,14 @@
+project_name = "bad-test-ownership-fixture"
+
+[paths]
+docs_root = "docs"
+source_roots = ["parser", "render"]
+
+[languages]
+enabled = ["go"]
+
+[checks]
+enabled = [
+    "frontmatter",
+    "test-ownership",
+]

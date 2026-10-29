@@ -1,0 +1,52 @@
+---
+id: principles
+title: Principles
+status: draft
+summary: What the project is, what it isn't, and the design choices that follow from those answers.
+describes: []
+---
+
+# Principles
+
+What {{ project_name }} is, what it isn't, and the design choices that follow from those answers.
+{% if seed %}
+## Starting belief
+
+- **Principle** — {{ seed.principle }}
+- **Idea** — {{ seed.idea }}
+- **Belief** — {{ seed.belief }}
+
+## First user
+
+{{ seed.first_user }}
+
+## Non-goals
+
+{% if seed.non_goals %}{% for item in seed.non_goals %}- {{ item }}
+{% endfor %}{% else %}- None recorded yet.
+{% endif %}
+## Direction risks
+
+{% if seed.direction_risks %}{% for item in seed.direction_risks %}- {{ item }}
+{% endfor %}{% else %}- None recorded yet.
+{% endif %}{% else %}
+> _Replace this paragraph with your own principle, idea, or belief about the app. You do not need complete requirements yet. The useful starting point is the clearest statement you can make about what should exist, who it is for, and what direction would make it feel right._ <!-- irminsul:placeholder -->
+
+## Starting belief
+
+- _What do you believe this app should make possible?_ <!-- irminsul:placeholder -->
+- _Who should it serve first?_ <!-- irminsul:placeholder -->
+- _What should stay true even if features change later?_ <!-- irminsul:placeholder -->
+
+## Goals
+
+- _What is this system for?_ <!-- irminsul:placeholder -->
+
+## Non-goals
+
+- _What is this system explicitly not for?_ <!-- irminsul:placeholder -->
+
+## Design choices that follow
+
+- _e.g., we prefer X over Y because of goal Z._ <!-- irminsul:placeholder -->
+{% endif %}

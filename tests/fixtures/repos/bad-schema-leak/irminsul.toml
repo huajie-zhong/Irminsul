@@ -1,0 +1,8 @@
+project_name = "bad-schema-leak-fixture"
+
+[paths]
+docs_root = "docs"
+source_roots = ["app"]
+
+[languages]
+enabled = ["python", "typescript"]

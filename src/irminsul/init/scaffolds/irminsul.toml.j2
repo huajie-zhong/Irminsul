@@ -1,0 +1,47 @@
+project_name = {{ project_name | toml_string }}
+
+[paths]
+docs_root = {{ defaults.paths.docs_root | tojson }}
+source_roots = [{{ source_roots | map("toml_string") | join(", ") }}]
+source_includes = {{ defaults.paths.source_includes | tojson }}
+source_excludes = {{ defaults.paths.source_excludes | tojson }}
+honor_gitignore = {{ defaults.paths.honor_gitignore | tojson }}
+{% if code_dir and source_name %}
+# The code repository, named so the adoption record can bind each entry to it instead of
+# re-deriving one from the roots above — which a later edit to `source_roots` could change
+# underneath existing entries. `ref` is the history an adoption boundary has to be a point
+# on; `origin/main` is what a CI checkout has. A bare `main` is refused, because in a
+# checkout that means the local branch, which anyone can move and nobody sees move.
+# Naming a ref is not a claim that it is protected: that is a repository setting, and
+# Irminsul checks only that a pin is contained in the ref's history.
+[[paths.sources]]
+name = {{ source_name | toml_string }}
+path = {{ code_dir | toml_string }}
+ref = "origin/main"
+{% endif %}
+
+[checks]
+enabled = [
+{% for name in default_checks %}    {{ name | tojson }},
+{% endfor %}]
+
+[checks.external_links]
+enabled = {{ defaults.checks.external_links.enabled | tojson }}
+timeout_seconds = {{ defaults.checks.external_links.timeout_seconds | tojson }}
+cache_path = {{ defaults.checks.external_links.cache_path | tojson }}
+ttl_hours = {{ defaults.checks.external_links.ttl_hours | tojson }}
+
+[checks.stale_reaper]
+deprecated_threshold_days = {{ defaults.checks.stale_reaper.deprecated_threshold_days | tojson }}
+
+[checks.glossary_discipline]
+glossary_path = {{ defaults.checks.glossary_discipline.glossary_path | tojson }}
+
+[checks.parent_child]
+length_warning_lines = {{ defaults.checks.parent_child.length_warning_lines | tojson }}
+
+[overrides]
+mtime_drift_days = {{ defaults.overrides.mtime_drift_days | tojson }}
+
+[languages]
+enabled = [{{ languages | map("toml_string") | join(", ") }}]

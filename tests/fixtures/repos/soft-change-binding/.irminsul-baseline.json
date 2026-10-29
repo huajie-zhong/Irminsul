@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "findings": [
+    {
+      "check": "change-binding",
+      "path": "docs/rfcs/0002-accepted-missing-affects.md",
+      "message": "accepted RFC does not declare `affects`; declare the component ids it changes, or `affects: []` for no owned source",
+      "fingerprint": "00b2ff2077541049879337a2589f99c4303bc63facb5a53b7c2b70ae6a5410de"
+    },
+    {
+      "check": "change-binding",
+      "path": "docs/rfcs/0003-draft-unknown-component.md",
+      "message": "`affects` entry 'ghost' does not match any doc id in the graph",
+      "fingerprint": "3b1c401cec56b9cfe637541cb329da83bfdfc8e3fc56a23920954bd0acf874b6"
+    }
+  ]
+}

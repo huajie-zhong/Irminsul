@@ -1,0 +1,10 @@
+---
+id: 0005-implicit-adr-decision
+title: ADR for implicit required updates RFC
+status: stable
+summary: ADR for implicit required updates RFC.
+---
+
+# ADR-0005: Implicit ADR
+
+Resolves [RFC-0005](../rfcs/0005-implicit-adr.md).
