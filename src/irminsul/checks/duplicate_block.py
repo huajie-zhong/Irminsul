@@ -17,10 +17,22 @@ CODE_REPEATED_BLOCK = "duplicate-block/repeated-block"
 CODE_COPIED_BLOCK = "duplicate-block/copied-block"
 
 
-def _blocks(body: str) -> list[tuple[int, str]]:
+def _scenario_lines(graph: DocGraph, node: DocNode) -> frozenset[int]:
+    section = graph.requirements.get(node.id)
+    if section is None:
+        return frozenset()
+    return frozenset(s.line for r in section.requirements for s in r.scenarios)
+
+
+def _blocks(body: str, scenarios: frozenset[int] = frozenset()) -> list[tuple[int, str]]:
+    """The paragraphs and list items of `body` with their starting lines; everything under a
+    scenario heading, whose line is in `scenarios`, up to the next heading is one block,
+    because a scenario's WHEN and THEN items say one thing and scenarios of a requirement
+    often share an outcome."""
     blocks: list[tuple[int, str]] = []
     start: int | None = None
     lines: list[str] = []
+    in_scenario = False
 
     def flush() -> None:
         nonlocal start, lines
@@ -30,10 +42,18 @@ def _blocks(body: str) -> list[tuple[int, str]]:
 
     fence = FenceTracker()
     for lineno, line in enumerate(body.splitlines(), start=1):
-        if fence.consume(line) or not line.strip() or line.lstrip().startswith("#"):
+        if fence.consume(line):
             flush()
             continue
-        if _LIST_ITEM_RE.match(line):
+        if line.lstrip().startswith("#"):
+            flush()
+            in_scenario = lineno in scenarios
+            continue
+        if not line.strip():
+            if not in_scenario:
+                flush()
+            continue
+        if _LIST_ITEM_RE.match(line) and not in_scenario:
             flush()
             start, lines = lineno, [_LIST_ITEM_RE.sub("", line, count=1)]
             continue
@@ -50,8 +70,9 @@ class DuplicateBlockCheck:
     explanations: ClassVar[dict[str, str]] = {
         CODE_REPEATED_BLOCK: (
             f"A paragraph or list item of at least {_MIN_CHARS} characters appears more "
-            "than once in the same doc. One copy is usually a merge or edit leftover, and "
-            "the two will drift apart. Delete the repeat."
+            "than once in the same doc; a scenario's WHEN and THEN items together count as "
+            "one block, so scenarios that share an outcome are not repeats. One copy is "
+            "usually a merge or edit leftover, and the two will drift apart. Delete the repeat."
         ),
         CODE_COPIED_BLOCK: (
             f"A paragraph or list item of at least {_MIN_CHARS} characters in a live doc "
@@ -67,7 +88,7 @@ class DuplicateBlockCheck:
     def run(self, graph: DocGraph) -> list[Finding]:
         out: list[Finding] = []
         for node in graph.nodes.values():
-            out.extend(self._repeats(node))
+            out.extend(self._repeats(graph, node))
         out.extend(self._copies(graph))
         return out
 
@@ -77,7 +98,7 @@ class DuplicateBlockCheck:
         live = [n for n in graph.nodes.values() if is_live_doc(n, graph.config)]
         for node in sorted(live, key=lambda n: n.path.as_posix()):
             seen_here: set[str] = set()
-            for body_line, text in _blocks(node.body):
+            for body_line, text in _blocks(node.body, _scenario_lines(graph, node)):
                 if len(text) < _MIN_CHARS or text in seen_here:
                     continue
                 seen_here.add(text)
@@ -102,10 +123,10 @@ class DuplicateBlockCheck:
                 )
         return out
 
-    def _repeats(self, node: DocNode) -> list[Finding]:
+    def _repeats(self, graph: DocGraph, node: DocNode) -> list[Finding]:
         first_seen: dict[str, int] = {}
         out: list[Finding] = []
-        for body_line, text in _blocks(node.body):
+        for body_line, text in _blocks(node.body, _scenario_lines(graph, node)):
             if len(text) < _MIN_CHARS:
                 continue
             if text not in first_seen:

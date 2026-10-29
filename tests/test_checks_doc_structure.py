@@ -76,3 +76,63 @@ def test_a_paragraph_repeated_under_another_heading_is_reported(tmp_path: Path) 
 
     assert [f.code for f in findings] == ["duplicate-block/repeated-block"]
     assert findings[0].line == 15
+
+
+_RFC_TWO_SCENARIOS = """---
+id: r
+title: R
+status: draft
+---
+
+# R
+
+## Requirements
+
+### Requirement: Exit codes
+ID: exit-codes
+Provenance: code
+
+The run SHALL exit 2 when the invocation is wrong.
+
+#### Scenario: Unknown flag
+- **WHEN** {first_when}
+- **THEN** the run exits 2 and prints the usage line on stderr so a script can tell a refusal from a bad call
+
+#### Scenario: Missing argument
+- **WHEN** {second_when}
+- **THEN** the run exits 2 and prints the usage line on stderr so a script can tell a refusal from a bad call
+"""
+
+
+def _scenario_rfc(tmp_path: Path, *, first_when: str, second_when: str) -> list[Finding]:
+    write_config(tmp_path)
+    doc = tmp_path / "docs" / "rfcs" / "r.md"
+    doc.parent.mkdir(parents=True, exist_ok=True)
+    doc.write_text(
+        _RFC_TWO_SCENARIOS.format(first_when=first_when, second_when=second_when),
+        encoding="utf-8",
+    )
+    return run_check(DuplicateBlockCheck, tmp_path)
+
+
+def test_scenarios_that_share_an_outcome_are_not_repeats(tmp_path: Path) -> None:
+    """The requirement grammar puts a scenario's WHEN and THEN in two list items, and the
+    scenarios of one requirement often end the same way; the THEN item alone was reported as
+    a repeated block, with the advice to delete a scenario."""
+    findings = _scenario_rfc(
+        tmp_path,
+        first_when="the user passes a flag the command does not take",
+        second_when="the user omits an argument the command requires",
+    )
+
+    assert findings == []
+
+
+def test_a_whole_scenario_copied_is_still_a_repeat(tmp_path: Path) -> None:
+    when = "the user passes a flag the command does not take"
+
+    findings = _scenario_rfc(tmp_path, first_when=when, second_when=when)
+
+    assert [f.code for f in findings] == ["duplicate-block/repeated-block"]
+    assert findings[0].line == 22
+    assert "line 18" in findings[0].message
