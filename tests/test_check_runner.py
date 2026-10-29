@@ -25,7 +25,9 @@ from .conftest import (
     component_doc,
     config_toml,
     git_init,
+    invoke,
     load_graph,
+    take_answer_violations,
     write,
     write_config,
 )
@@ -169,6 +171,86 @@ def test_the_change_passes_are_the_passes_that_read_the_graphs_change() -> None:
 
     assert reads_change, "no pass reads graph.change, so the comparison below proves nothing"
     assert reads_change == set(CHANGE_PASSES)
+
+
+_W = "docs/components/w.md"
+
+
+def _copied_block(line: int | None) -> Finding:
+    return Finding(
+        check="duplicate-block",
+        code="duplicate-block/copied-block",
+        severity=Severity.warning,
+        message="m",
+        path=Path(_W),
+        doc_id="w",
+        line=line,
+    )
+
+
+def _reporting(monkeypatch: pytest.MonkeyPatch, finding: Finding) -> None:
+    from irminsul.checks.duplicate_block import DuplicateBlockCheck
+
+    monkeypatch.setattr(DuplicateBlockCheck, "run", lambda self, graph: [finding])
+
+
+@pytest.mark.parametrize("line", [None, 2], ids=["no-line", "frontmatter"])
+def test_the_guard_records_a_line_code_off_every_line_a_comment_covers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, line: int | None
+) -> None:
+    _reporting(monkeypatch, _copied_block(line))
+
+    _run(_repo(tmp_path), only=["duplicate-block"])
+
+    assert take_answer_violations() == [
+        f"duplicate-block/copied-block at {_W}:{line}: no line an ignore comment covers"
+    ]
+
+
+@pytest.mark.parametrize("line", [10, 13], ids=["prose", "fenced"])
+def test_the_guard_passes_a_line_code_on_a_line_a_comment_covers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, line: int
+) -> None:
+    _reporting(monkeypatch, _copied_block(line))
+
+    _run(_repo(tmp_path, "Prose.\n\n```text\nfenced\n```"), only=["duplicate-block"])
+
+    assert take_answer_violations() == []
+
+
+def test_the_guard_records_what_the_cli_reports(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`invoke` turns an exception into an exit code, which is why the guard records."""
+    _reporting(monkeypatch, _copied_block(None))
+
+    invoke(_repo(tmp_path), "check", "--only", "duplicate-block")
+
+    assert take_answer_violations() == [
+        f"duplicate-block/copied-block at {_W}:None: no line an ignore comment covers"
+    ]
+
+
+def test_the_guard_records_a_trailer_code_without_a_subject(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from irminsul.checks.co_change import CoChangePass
+
+    unsigned = Finding(
+        check="co-change",
+        code="co-change/unreflected-change",
+        severity=Severity.warning,
+        message="m",
+        path=Path(_W),
+        doc_id="w",
+    )
+    monkeypatch.setattr(CoChangePass, "run", lambda self, graph, selected: [unsigned])
+
+    _run(_repo(tmp_path))
+
+    assert take_answer_violations() == [
+        f"co-change/unreflected-change at {_W}:None: no subject for a trailer to name"
+    ]
 
 
 def test_one_run_audits_the_ignore_comments_of_the_checks_it_ran(tmp_path: Path) -> None:

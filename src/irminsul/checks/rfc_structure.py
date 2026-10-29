@@ -82,7 +82,7 @@ class RfcStructureCheck:
             "A paragraph of the owner's part holds four or more code spans, which usually "
             "means a list of names, files or ids that an agent needs and an owner skims. Move "
             "the names under `## Design detail` and say in the owner's part what they add up "
-            "to. A paragraph that needs its names can keep an ignore comment with a reason."
+            "to."
         ),
     }
     classes: ClassVar[dict[str, FindingClass]] = {
@@ -223,8 +223,7 @@ class RfcStructureCheck:
                     path=node.path,
                     doc_id=node.id,
                     line=node.file_line(first),
-                    suggestion="move the names under '## Design detail', or answer with "
-                    '`<!-- irminsul:ignore rfc-structure/dense-paragraph reason="..." -->`',
+                    suggestion="move the names under '## Design detail'",
                 )
             )
         return out

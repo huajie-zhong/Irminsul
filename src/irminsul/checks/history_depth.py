@@ -96,7 +96,7 @@ class HistoryDepthPass:
                     CODE_NO_HISTORY,
                     Severity.warning,
                     f"no git history here, so {named} read nothing and report nothing",
-                    "commit the tree, or disable the checks that read history",
+                    "commit the tree, or run --only with checks that read no history",
                 )
             ]
         if shallow:

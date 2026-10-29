@@ -94,6 +94,9 @@ class Finding:
     #: Machine-readable decomposition of the finding for agents, beyond what `code`
     #: names; all values are strings.
     data: dict[str, str] | None = None
+    #: The item a sign-off names: a claim id, a setting's dotted name, or the path itself
+    #: for a finding about a whole file. A finding of a code declared `trailer` carries one.
+    subject: str | None = None
 
 
 @dataclass(frozen=True)
@@ -259,8 +262,9 @@ def finding_records(findings: list[Finding], graph: DocGraph | None) -> list[dic
     Read `effective_class` to predict the exit code — `class` alone cannot, which is
     why both are reported.
 
-    `answer` is the kind of answer the code declares. `fixable` and `fix_command` come from
-    `fix_commands` over `graph`. A surface with no graph to ask claims nothing is fixable.
+    `answer` is the kind of answer the code declares, and `subject` the item a sign-off
+    names. `fixable` and `fix_command` come from `fix_commands` over `graph`. A surface with
+    no graph to ask claims nothing is fixable.
     """
     from irminsul.checks.pipeline import answer_of, class_of, effective_class
 
@@ -275,6 +279,7 @@ def finding_records(findings: list[Finding], graph: DocGraph | None) -> list[dic
             "class": finding_class.value if finding_class is not None else None,
             "effective_class": enforced.value if enforced is not None else None,
             "answer": answer_of(finding.code).kind.value,
+            "subject": finding.subject,
             "severity": finding.severity.value,
             "message": finding.message,
             "path": finding.path.as_posix() if finding.path else None,

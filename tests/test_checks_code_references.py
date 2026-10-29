@@ -299,7 +299,37 @@ def test_a_renamed_file_named_in_a_span_is_a_hint(tmp_path: Path) -> None:
     ]
     finding = run_check(CodeReferencesCheck, root)[0]
     assert finding.code == "code-references/unknown-path"
-    assert 'irminsul:ignore code-references reason="..."' in (finding.suggestion or "")
+    assert finding.suggestion == "correct the path"
+
+
+def test_a_reported_unknown_path_names_the_comment_that_waives_it(tmp_path: Path) -> None:
+    root = _repo(tmp_path, "See `docs/old-name.md`, now renamed.")
+
+    (finding,) = check_findings(root, "--only", "code-references")
+
+    assert finding["answer"] == "line"
+    assert finding["suggestion"] == (
+        "correct the path; an example path, such as a file a command would create, keeps a "
+        "reasoned ignore comment on its line: "
+        '`<!-- irminsul:ignore code-references/unknown-path reason="..." -->`'
+    )
+
+
+def test_a_summary_is_asked_only_the_certain_codes(tmp_path: Path) -> None:
+    """A summary's line is frontmatter, where no ignore comment reaches, so a hint reported
+    there would have no answer."""
+    root = _repo(tmp_path, "Nothing to see.")
+    write(
+        root,
+        "docs/guides/walkthrough.md",
+        _summary_doc("walkthrough", "Runs `tool publish`, reads `TOOL_GONE` and `docs/gone.md`."),
+    )
+
+    findings = run_check(CodeReferencesCheck, root)
+
+    assert [(f.code, (f.data or {})["name"]) for f in findings] == [
+        ("code-references/unknown-command", "publish")
+    ]
 
 
 def test_a_span_naming_a_file_passes(tmp_path: Path) -> None:

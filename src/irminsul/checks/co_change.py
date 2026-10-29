@@ -263,6 +263,7 @@ def run_co_change(
                 doc_id=node.id,
                 message=message,
                 suggestion=suggestion,
+                subject=doc_path,
             )
         )
     return out + notes

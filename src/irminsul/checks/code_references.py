@@ -42,10 +42,7 @@ CODE_OPTION_NOT_ON_COMMAND = "code-references/option-not-on-command"
 CODE_UNKNOWN_ENV_VAR = "code-references/unknown-env-var"
 CODE_UNKNOWN_PATH = "code-references/unknown-path"
 
-_PATH_SUGGESTION = (
-    "correct the path, or answer an intended example with "
-    '`<!-- irminsul:ignore code-references reason="..." -->`'
-)
+_PATH_SUGGESTION = "correct the path"
 _NAME_SUGGESTION = (
     "name what exists now; delete the sentence only if the behaviour it documents is gone"
 )
@@ -79,15 +76,13 @@ class CodeReferencesCheck:
         ),
         CODE_UNKNOWN_ENV_VAR: (
             "A code span names an environment variable that no source file reads. The code "
-            "stopped reading it, or the name is wrong; a variable read by CI or another "
-            "tool can keep a reasoned ignore comment."
+            "stopped reading it, or the name is wrong."
         ),
         CODE_UNKNOWN_PATH: (
             "A code span written like a file path names no file: none is tracked or on disk "
             "under that path or ending with it, and none is at it from the doc's own "
             "directory. The file was renamed or deleted, or the path is wrong; correct the "
-            "span. An example path, such as a file a command would create, can keep a "
-            "reasoned ignore comment."
+            "span."
         ),
     }
     classes: ClassVar[dict[str, FindingClass]] = {
@@ -147,11 +142,13 @@ class CodeReferencesCheck:
                         span.fenced,
                     )
                 )
+            # A summary is asked only the certain codes: its line is frontmatter, where no
+            # ignore comment reaches, so a hint there would have no answer.
             summary = node.frontmatter.summary or ""
             if "`" in summary:
                 line = entry_line(graph.repo_root / node.path, "summary") or 1
                 sources.extend(
-                    _Source(node.path.as_posix(), node.id, span.text, line, advisory, False)
+                    _Source(node.path.as_posix(), node.id, span.text, line, False, False)
                     for span in code_spans(summary)
                 )
         manifest = (graph.repo_root / manifest_rel_path(graph.config)).resolve()

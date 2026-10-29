@@ -14,8 +14,8 @@ claims:
       - src/irminsul/checks/parent_child.py
       - docs/components/checks.md
     pinned:
-      src/irminsul/checks/parent_child.py: sha256:5092bd72cb2c
-      docs/components/checks.md: sha256:12f07d245b13
+      src/irminsul/checks/parent_child.py: sha256:e7375b24cfe3
+      docs/components/checks.md: sha256:bf7eb5f90e00
   - id: schema-leak-enabled
     state: enabled
     kind: ci_gate

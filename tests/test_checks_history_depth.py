@@ -95,6 +95,22 @@ def test_no_history_is_only_a_hint(tmp_path: Path) -> None:
     assert result.exit_code == 0
 
 
+def test_no_history_offers_its_own_answer_rather_than_disabling_checks(tmp_path: Path) -> None:
+    """Disabling a check answers this finding with a gate weakening of its own."""
+    root = tmp_path / "loose"
+    _repo(root, '["frontmatter", "mtime-drift"]')
+    _remove_git_dir(root)
+
+    result = runner.invoke(app, ["check", "--format", "json", "--path", str(root)])
+    (finding,) = [
+        f for f in json.loads(result.output)["findings"] if f["code"] == "history-depth/no-history"
+    ]
+    assert (
+        finding["suggestion"] == "commit the tree, or run --only with checks that read no history"
+    )
+    assert finding["answer"] == "fix"
+
+
 def test_nothing_is_reported_when_no_enabled_check_reads_history(tmp_path: Path) -> None:
     root = tmp_path / "quiet"
     _repo(root, '["frontmatter"]')

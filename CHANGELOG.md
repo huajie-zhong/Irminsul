@@ -57,11 +57,19 @@ making a feature, a refactor and an RFC-driven change in it.
   (a reasoned ignore comment on its line), `pin` (a re-pin after re-reading) or `trailer` (an
   `Irminsul-Reviewed` commit trailer). `irminsul explain <code>` prints it, with the comment to
   write for a `line` code, `irminsul explain <check>` labels each code `(class, answer)`, and every
-  JSON finding carries `answer`.
+  JSON finding carries `answer` and `subject`, the item a sign-off names.
+- The suggestion of a finding answered on its line ends with the ignore comment that waives it,
+  naming its code, such as
+  `<!-- irminsul:ignore code-references/unknown-path reason="..." -->`.
 - An ignore comment standing alone above a fenced block covers every line of the block, and an
   `ignore-start`/`ignore-end` pair covers the fenced lines between them. A comment above a fence
   used to cover the first line after the fence instead, so one that relied on that is now
   reported as unused. A comment inside a fence is still part of the example and is not read.
+- `code-references` asks a doc's `summary:` only its certain codes: an unknown function,
+  variable or path there is no longer reported, because no ignore comment reaches a
+  frontmatter line to answer it.
+- `history-depth/no-history` suggests committing the tree, or running `--only` with checks that
+  read no history, instead of disabling the checks that do.
 
 **Queries.**
 - `context <path>` for a file the adoption record excepts says, before the edit, that a change

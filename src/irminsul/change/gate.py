@@ -14,13 +14,13 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from irminsul.change.footprint import Footprint, touched_components
+from irminsul.checks import pipeline
 from irminsul.checks.base import Finding, Severity, sort_findings
 from irminsul.checks.change_binding import CODE_MISSING_AFFECTS, CODE_UNKNOWN_COMPONENT
 from irminsul.checks.claim_anchor import ClaimAnchorCheck
 from irminsul.checks.pipeline import (
     RunResult,
     failing_findings,
-    finish,
     run_check,
     run_checks,
     without_baselined,
@@ -366,7 +366,7 @@ def _required_updates(graph: DocGraph, rfc: DocNode) -> list[Finding]:
     unreachable.
     """
     found = RfcFollowThroughCheck().required_update_findings(graph, rfc, as_implemented=True)
-    return without_baselined(graph, finish(found, graph))
+    return without_baselined(graph, pipeline.finish(found, graph))
 
 
 def declared_docs(graph: DocGraph, rfc: DocNode) -> frozenset[str]:

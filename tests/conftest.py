@@ -302,6 +302,68 @@ def aged_deprecated_repo(tmp_path: Path) -> Path:
     return root
 
 
+def answer_violations(findings: Sequence[Finding], graph: DocGraph) -> list[str]:
+    """The findings that break their code's declared answer: one of a code declared `line`
+    with no line an ignore comment can cover, and one of a code declared `trailer` with no
+    subject for a trailer to name."""
+    from irminsul.checks.base import AnswerKind
+    from irminsul.checks.ignore_comments import coverable_lines
+    from irminsul.checks.pipeline import answer_of
+
+    out: list[str] = []
+    for finding in findings:
+        kind = answer_of(finding.code).kind
+        where = f"{finding.path.as_posix() if finding.path else '<repo>'}:{finding.line}"
+        if kind is AnswerKind.line:
+            lines = coverable_lines(graph).get(finding.path) if finding.path else None
+            if finding.line is None or not lines or finding.line not in lines:
+                out.append(f"{finding.code} at {where}: no line an ignore comment covers")
+        elif kind is AnswerKind.trailer and not finding.subject:
+            out.append(f"{finding.code} at {where}: no subject for a trailer to name")
+    return out
+
+
+_answer_violations: list[str] = []
+
+
+def take_answer_violations() -> list[str]:
+    """What the guard recorded since the test began, which it then no longer fails on."""
+    taken = list(_answer_violations)
+    _answer_violations.clear()
+    return taken
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _guard_declared_answers() -> Iterator[None]:
+    """Records every finding that breaks its code's declared answer on its way to a report.
+
+    Every surface reports through `pipeline.finish`, and every caller looks it up on the
+    module, so wrapping it there sees the CLI, `context --after-edit`, the MCP server and the
+    change gates alike. It records rather than raises, because `invoke` turns an exception
+    into an exit code a test may not read.
+    """
+    from irminsul.checks import pipeline
+
+    finish = pipeline.finish
+
+    def guarded(findings: list[Finding], graph: DocGraph, **kwargs: Any) -> list[Finding]:
+        _answer_violations.extend(answer_violations(findings, graph))
+        return finish(findings, graph, **kwargs)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(pipeline, "finish", guarded)
+        yield
+
+
+@pytest.fixture(autouse=True)
+def _fail_on_answer_violations() -> Iterator[None]:
+    _answer_violations.clear()
+    yield
+    found = take_answer_violations()
+    if found:
+        pytest.fail("findings broke their code's declared answer:\n" + "\n".join(found))
+
+
 def cli_output(result: object) -> str:
     """Everything a CLI invocation printed, on either stream.
 

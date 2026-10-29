@@ -7,7 +7,9 @@ its code's class has the last word. A certain finding is an error, unless it sit
 draft doc *and* its code is one the check declares in `drafts_exempt` — a code reporting
 that the doc is unfinished rather than that it is wrong about something outside it. A
 hint or time finding is never an error. Given a diff range, time findings are left out,
-because a change cannot have caused them.
+because a change cannot have caused them. Last, each code's declared answer: `answer_of`
+says how a correct doc turns a finding green, and the suggestion of a finding whose code
+answers on its line names the ignore comment to write.
 
 Two classes, named apart because they answer different questions:
 
@@ -38,6 +40,7 @@ from irminsul.checks import REGISTRY
 from irminsul.checks.adoption_record import AdoptionRecordPass
 from irminsul.checks.base import (
     Answer,
+    AnswerKind,
     Check,
     Finding,
     FindingClass,
@@ -205,16 +208,37 @@ def finish(
     ran: Collection[str] | None = None,
     diff: bool = False,
 ) -> list[Finding]:
-    """Ignore comments, then classes — the path every finding takes before it is reported.
+    """Ignore comments, then classes, then answers — the path every finding takes before it
+    is reported.
 
     Ignore comments go first because which findings a comment may silence is decided by
     the class a code declares, never by the severity a check chose, so classifying first
     would change nothing. `ran` names the registered checks whose findings these are and
-    turns on the audit of misused comments; `diff` leaves out time findings.
+    turns on the audit of misused comments; `diff` leaves out time findings. Last, the
+    suggestion of a finding whose code declares `line` names the comment that waives it.
     """
     from irminsul.checks.ignore_comments import apply_ignore_comments
 
-    return apply_classes(apply_ignore_comments(findings, graph, ran=ran), graph, diff=diff)
+    classed = apply_classes(apply_ignore_comments(findings, graph, ran=ran), graph, diff=diff)
+    return _with_answer(classed)
+
+
+def _with_answer(findings: list[Finding]) -> list[Finding]:
+    """Each finding with the clause its code's answer adds to its suggestion. Only `line`
+    has one: `fix` and `pin` suggestions already name the act, and a finding that passes
+    through again keeps one clause."""
+    from irminsul.checks.ignore_comments import comment_for
+
+    out: list[Finding] = []
+    for finding in findings:
+        answer = answer_of(finding.code)
+        if answer.kind is AnswerKind.line:
+            clause = f"{answer.how}: `{comment_for(finding.code)}`"
+            own = finding.suggestion
+            if own is None or clause not in own:
+                finding = replace(finding, suggestion=f"{own}; {clause}" if own else clause)
+        out.append(finding)
+    return out
 
 
 def pass_findings(graph: DocGraph, selected: Collection[str]) -> list[Finding]:

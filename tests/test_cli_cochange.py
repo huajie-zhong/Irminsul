@@ -168,6 +168,8 @@ def test_cochange_findings_in_json_output(tmp_path: Path) -> None:
     assert cochange[0]["severity"] == "warning"
     assert cochange[0]["path"] == "docs/components/alpha.md"
     assert cochange[0]["doc_id"] == "alpha"
+    assert cochange[0]["answer"] == "trailer"
+    assert cochange[0]["subject"] == "docs/components/alpha.md"
     assert "app/alpha.py" in cochange[0]["message"]
     assert payload["summary"]["warnings"] == 1
 

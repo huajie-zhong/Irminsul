@@ -31,11 +31,11 @@ from irminsul.checks.base import (
 )
 from irminsul.checks.co_change import Trailer, run_co_change
 from irminsul.checks.external_links import _save_cache
-from irminsul.checks.pipeline import _on_draft, class_of, finding_sources
+from irminsul.checks.pipeline import _on_draft, answer_of, class_of, finding_sources
 from irminsul.config import ConfigError, find_config, load
 from irminsul.docgraph import DocGraph, build_graph
 
-from .conftest import commit_all, git_init, load_graph, write_config
+from .conftest import answer_violations, commit_all, git_init, load_graph, write_config
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "repos"
 
@@ -294,21 +294,28 @@ def _co_change_findings(root: Path) -> list[Finding]:
         Trailer("abc1234", "co-change alpha", frozenset()),
     ]
     unused = [Trailer("abc1234", 'co-change alpha reason="again"', frozenset())]
-    return [
+    found = [
         *run_co_change(graph, changed),
         *run_co_change(graph, changed, trailers=reviewed),
         *run_co_change(graph, frozenset(), trailers=unused),
     ]
+    _BY_GRAPH.append((graph, found))
+    return found
 
 
 #: ids of corpus findings that sit on a draft doc, where a certain finding may stay a warning.
 _ON_DRAFT: set[int] = set()
+
+#: Each corpus graph with the findings reported on it. The corpus calls `run` directly, so
+#: the suite's guard on `finish` never sees these, and the test below runs it over them.
+_BY_GRAPH: list[tuple[DocGraph, list[Finding]]] = []
 
 
 def _note_drafts(findings: list[Finding], graph: DocGraph) -> list[Finding]:
     for finding in findings:
         if _on_draft(finding, graph):
             _ON_DRAFT.add(id(finding))
+    _BY_GRAPH.append((graph, findings))
     return findings
 
 
@@ -335,7 +342,9 @@ def all_findings(tmp_path_factory: pytest.TempPathFactory) -> list[Finding]:
         repo_root = builder(root)
         config = load(find_config(repo_root))
         graph = build_graph(repo_root, config)
-        findings.extend(REGISTRY[check_name]().run(graph))
+        found = REGISTRY[check_name]().run(graph)
+        _BY_GRAPH.append((graph, found))
+        findings.extend(found)
 
     findings.extend(_co_change_findings(tmp_path_factory.mktemp("co_change")))
 
@@ -507,6 +516,17 @@ def test_the_declaration_test_passes_a_planted_source_that_declares_each_answer(
     assert _declaration_problems(source) == []
 
 
+def test_the_corpus_keeps_every_declared_answer(all_findings: list[Finding]) -> None:
+    """The guard on `finish` sees every run of the suite but not this corpus, whose checks
+    are called directly; here a line code must still sit on a line an ignore comment covers,
+    and a trailer code still carry a subject."""
+    violations = [v for graph, found in _BY_GRAPH for v in answer_violations(found, graph)]
+    kinds = {answer_of(f.code).kind for f in all_findings}
+
+    assert violations == []
+    assert {AnswerKind.line, AnswerKind.trailer} <= kinds
+
+
 def test_checks_emit_the_severity_their_class_demands(all_findings: list[Finding]) -> None:
     """A certain finding is an error unless it sits on a draft; hints and time findings never are."""
     for finding in all_findings:
@@ -547,6 +567,32 @@ def test_every_emitted_code_is_explainable(all_findings: list[Finding]) -> None:
             f"emitted code {finding.code!r} has no explanation on {finding.check!r}; "
             "`irminsul explain` would exit 1 on a code the CLI printed"
         )
+
+
+def test_a_record_names_its_codes_answer_and_its_subject() -> None:
+    signed = Finding(
+        check="co-change",
+        code="co-change/unreflected-change",
+        severity=Severity.warning,
+        message="m",
+        subject="docs/a.md",
+    )
+    waived = Finding(
+        check="code-references",
+        code="code-references/unknown-path",
+        severity=Severity.warning,
+        message="m",
+        line=3,
+    )
+    fixed = Finding(check="links", code="links/broken-link", severity=Severity.error, message="m")
+
+    records = finding_records([signed, waived, fixed], None)
+
+    assert [(r["answer"], r["subject"]) for r in records] == [
+        ("trailer", "docs/a.md"),
+        ("line", None),
+        ("fix", None),
+    ]
 
 
 def test_code_is_the_only_name_of_a_findings_kind(all_findings: list[Finding]) -> None:
