@@ -335,6 +335,7 @@ def test_cli_py_handles_a_user_error_in_one_place() -> None:
         "ImportError",
         "NoSuchOption",
         "OSError",
+        "OSError",
         "UserError",
         "ValueError",
     ]
