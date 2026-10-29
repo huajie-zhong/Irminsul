@@ -588,3 +588,50 @@ def test_refinalizing_never_blocks_on_the_back_link_it_writes(repo: Path) -> Non
     assert [f.description for f in plan.component_fixes] == [
         f"add implements: 0007-draft-disposition to {_OWNER_DOC}"
     ]
+
+
+def _declare_only(repo: Path, *components: str) -> None:
+    rfc = repo / "docs" / "rfcs" / f"{_RFC}.md"
+    text = rfc.read_text(encoding="utf-8")
+    assert "affects:\n  - auth\n" in text
+    rfc.write_text(
+        text.replace(
+            "affects:\n  - auth\n", "affects:\n" + "".join(f"  - {c}\n" for c in components)
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_finalize_names_who_claims_the_bindings_when_affects_declares_none_of_them(
+    repo: Path,
+) -> None:
+    _declare_only(repo, "billing", "login-flow")
+    graph, config = _graph(repo)
+
+    plan = plan_finalize(graph, config, repo, _RFC, bindings=_BINDINGS, env={})
+
+    [blocker] = [b for b in plan.blockers if b.code == "ambiguous-owner"]
+    assert blocker.message == (
+        "requirement 'sso-login' has no plausible owner: its bindings are claimed by auth, "
+        "which `affects` does not declare; an explicit choice is required"
+    )
+    assert blocker.suggestion == (
+        "pass --owner sso-login=<one of: billing, login-flow>, or declare auth in `affects`"
+    )
+
+
+def test_finalize_says_when_no_component_claims_the_bindings(repo: Path) -> None:
+    _declare_only(repo, "billing", "login-flow")
+    (repo / "docs" / "components" / "auth.md").write_text(
+        (repo / "docs" / "components" / "auth.md")
+        .read_text(encoding="utf-8")
+        .replace("  - app/auth/**\n", "  - app/auth/session.py\n"),
+        encoding="utf-8",
+    )
+    graph, config = _graph(repo)
+
+    plan = plan_finalize(graph, config, repo, _RFC, bindings=_BINDINGS, env={})
+
+    [blocker] = [b for b in plan.blockers if b.code == "ambiguous-owner"]
+    assert "no component claims any of its bindings" in blocker.message
+    assert blocker.suggestion == "pass --owner sso-login=<one of: billing, login-flow>"

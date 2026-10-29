@@ -252,6 +252,7 @@ def _plan_promotions(
 
         marker_payloads: list[str] = []
         binding_owner_candidates: set[str] = set()
+        binding_claimants: set[str] = set()
 
         if req.provenance == "code":
             if not req_bindings:
@@ -298,6 +299,7 @@ def _plan_promotions(
                     continue
                 marker_payloads.append(f"{target} @sha256:{resolution.current}")
                 for claim_node, _, _ in most_specific_claims(graph.claims.get(path_part, [])):
+                    binding_claimants.add(claim_node.id)
                     if claim_node.id in declared:
                         binding_owner_candidates.add(claim_node.id)
         elif req_bindings:
@@ -321,6 +323,7 @@ def _plan_promotions(
             req.req_id,
             owner_choices,
             sorted(binding_owner_candidates),
+            sorted(binding_claimants),
             declared,
             blockers,
             rfc_path,
@@ -357,6 +360,7 @@ def _choose_owner(
     req_id: str,
     owner_choices: list[str],
     candidates: list[str],
+    claimants: list[str],
     declared: list[str],
     blockers: list[Issue],
     rfc_path: str,
@@ -404,18 +408,27 @@ def _choose_owner(
             )
         )
         return None
-    blockers.append(
-        Issue(
-            code="ambiguous-owner",
-            message=(
-                f"requirement '{req_id}' has "
-                f"{'multiple' if candidates else 'no'} plausible owner(s)"
-                f"{': ' + ', '.join(candidates) if candidates else ''}; "
-                "an explicit choice is required"
-            ),
-            path=rfc_path,
-            suggestion=f"pass --owner {req_id}=<component id>",
+    if candidates:
+        message = (
+            f"requirement '{req_id}' has multiple plausible owners: {', '.join(candidates)}; "
+            "an explicit choice is required"
         )
+        suggestion = f"pass --owner {req_id}=<one of: {', '.join(candidates)}>"
+    else:
+        claimed = (
+            f"its bindings are claimed by {', '.join(claimants)}, which `affects` does not declare"
+            if claimants
+            else "no component claims any of its bindings, so `affects` is the only source of one"
+        )
+        message = (
+            f"requirement '{req_id}' has no plausible owner: {claimed}; "
+            "an explicit choice is required"
+        )
+        suggestion = f"pass --owner {req_id}=<one of: {', '.join(declared)}>"
+        if claimants:
+            suggestion += f", or declare {', '.join(claimants)} in `affects`"
+    blockers.append(
+        Issue(code="ambiguous-owner", message=message, path=rfc_path, suggestion=suggestion)
     )
     return None
 
