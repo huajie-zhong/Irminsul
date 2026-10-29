@@ -171,3 +171,34 @@ def test_a_sealed_rfc_is_not_asked_for_a_summary(tmp_path: Path) -> None:
         )
 
     assert [(f.doc_id, f.severity) for f in _missing_summary(repo)] == [("open", Severity.warning)]
+
+
+def _missing_frontmatter(repo: Path) -> list:
+    return [f for f in _run(repo) if f.code == "frontmatter/missing-frontmatter"]
+
+
+def test_a_doc_without_frontmatter_inside_a_layer_is_told_to_add_it(tmp_path: Path) -> None:
+    repo = _doc_repo(tmp_path, "summary: One line.\n")
+    (repo / "docs" / "components" / "bare.md").write_text("# Bare\n", encoding="utf-8")
+
+    (finding,) = _missing_frontmatter(repo)
+
+    assert finding.suggestion is not None
+    assert "`id: bare`" in finding.suggestion
+    assert "irminsul new" in finding.suggestion
+    assert "move" not in finding.suggestion
+
+
+def test_a_doc_without_frontmatter_outside_every_layer_is_also_told_to_move(
+    tmp_path: Path,
+) -> None:
+    repo = _doc_repo(tmp_path, "summary: One line.\n")
+    (repo / "docs" / "usage.md").write_text("# Usage\n", encoding="utf-8")
+
+    (finding,) = _missing_frontmatter(repo)
+
+    assert finding.suggestion is not None
+    assert "`id: usage`" in finding.suggestion
+    assert "outside every layer folder" in finding.suggestion
+    assert "`docs/guides/`" in finding.suggestion
+    assert "irminsul refs docs/usage.md" in finding.suggestion

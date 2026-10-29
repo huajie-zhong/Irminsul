@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import difflib
 import re
+from pathlib import Path
 from typing import ClassVar
 
 from irminsul.checks.base import Finding, FindingClass, Severity, certain_severity
+from irminsul.config import LAYER_NAMES, layer_of, layer_prefix
 from irminsul.docgraph import DocGraph, DocNode, is_rfc
 from irminsul.frontmatter import (
     RETIRED_FIELDS,
@@ -67,6 +69,27 @@ def _needs_summary(graph: DocGraph, node: DocNode) -> bool:
     )
 
 
+def _missing_frontmatter_suggestion(graph: DocGraph, path: Path) -> str:
+    """What to do about a doc with no frontmatter block, including where it belongs.
+
+    A file outside every layer folder is not a doc of any layer, so the frontmatter alone
+    would leave it unplaced; the move is named with the way to find what links to it.
+    """
+    suggestion = (
+        f"add a frontmatter block on line 1 with `id: {expected_id_for(path)}`, `title`, "
+        "`status` and `summary` (`irminsul new <kind>` writes the shape)"
+    )
+    config = graph.config
+    if config is None or layer_of(config, path) is not None:
+        return suggestion
+    folders = ", ".join(f"`{layer_prefix(config, name)}/`" for name in LAYER_NAMES)
+    return (
+        f"{suggestion}; the file sits outside every layer folder, so also move it into the "
+        f"layer it belongs to ({folders}) after `irminsul refs {path.as_posix()}` shows what "
+        "links to it"
+    )
+
+
 def _retired_replacement(field: str) -> tuple[str, str, bool]:
     """(key as written, what replaces it, whether it sits inside an inventory entry)."""
     if field.startswith("inventory."):
@@ -87,7 +110,8 @@ class FrontmatterCheck:
         ),
         CODE_MISSING_FRONTMATTER: (
             "Every doc atom needs a frontmatter block. Add one with the required fields "
-            "(id, title, status, ...)."
+            "(id, title, status, ...). A file outside every layer folder also needs moving "
+            "into the layer it belongs to."
         ),
         CODE_ID_MISMATCH: (
             "The frontmatter `id` must match the id derived from the file's path. "
@@ -147,6 +171,7 @@ class FrontmatterCheck:
                     severity=Severity.error,
                     message="missing frontmatter (required for every doc atom)",
                     path=path,
+                    suggestion=_missing_frontmatter_suggestion(graph, path),
                 )
             )
 
