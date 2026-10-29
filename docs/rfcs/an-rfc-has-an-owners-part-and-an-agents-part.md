@@ -3,7 +3,7 @@ id: an-rfc-has-an-owners-part-and-an-agents-part
 title: "An RFC has an owner's part and an agent's part"
 status: stable
 describes: []
-rfc_state: accepted
+rfc_state: implemented
 affects:
   - checks
   - new-list-regen

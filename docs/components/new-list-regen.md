@@ -2,7 +2,13 @@
 id: new-list-regen
 title: New / List / Fix commands
 status: stable
-summary: "`new`, `list`, and `fix` commands, and the agent manifest `fix` rewrites."
+describes:
+  - src/irminsul/new/**
+  - src/irminsul/listing/**
+  - src/irminsul/regen/**
+  - src/irminsul/fix.py
+  - src/irminsul/code_references.py
+  - src/irminsul/ownership_moves.py
 depends_on:
   - checks
   - config
@@ -11,13 +17,6 @@ depends_on:
   - file-writing
   - frontmatter
   - user-errors
-describes:
-  - src/irminsul/new/**
-  - src/irminsul/listing/**
-  - src/irminsul/regen/**
-  - src/irminsul/fix.py
-  - src/irminsul/code_references.py
-  - src/irminsul/ownership_moves.py
 owns_tests:
   - tests/test_cli_fix.py
   - tests/test_cli_list.py
@@ -29,6 +28,9 @@ owns_tests:
   - tests/test_fix_rfc_follow_through.py
   - tests/test_fix_rfc_required_updates.py
   - tests/test_list_review.py
+summary: "`new`, `list`, and `fix` commands, and the agent manifest `fix` rewrites."
+implements:
+  - an-rfc-has-an-owners-part-and-an-agents-part
 inventory:
   - kind: cli
     source: src/irminsul/cli.py
@@ -73,3 +75,10 @@ The [`docs/AGENTS.md`](../AGENTS.md) manifest is the one generated file, and `ag
 ## Scope & Limitations
 
 `list` subcommands are read-only — they report findings but do not modify any docs. `fix` applies deterministic, pre-coded remediations only, and the manifest table it writes is derived from the doc graph rather than from prose or source code.
+
+## Implemented requirements
+
+- **an-rfc-has-an-owners-part-and-an-agents-part#new-rfcs-are-written-in-two-parts** — `irminsul new rfc` SHALL write the owner's sections Summary, Problem, How it works, Cost and risk and Decisions, in that order, above `## Design detail`, followed by `## Requirements` and `## Tasks`. (provenance: code; [RFC](../rfcs/an-rfc-has-an-owners-part-and-an-agents-part.md))
+  <!-- anchor: src/irminsul/cli.py#new_rfc @sha256:aced4229a0cc -->
+  <!-- anchor: tests/test_cli_new.py#test_a_new_rfc_is_written_in_two_parts @sha256:7fea3564fc4f -->
+  <!-- anchor: tests/test_cli_new.py#test_a_new_small_rfc_is_written_in_two_parts @sha256:8ff92cc63c01 -->

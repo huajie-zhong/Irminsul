@@ -2,7 +2,6 @@
 id: checks
 title: Checks
 status: stable
-summary: Registered checks; exact names live in `src/irminsul/checks/__init__.py`.
 describes:
   - src/irminsul/checks/**
 depends_on:
@@ -68,9 +67,11 @@ owns_tests:
   - tests/test_ignore_comments.py
   - tests/test_owned_tests.py
   - tests/test_walk_source_files.py
+summary: Registered checks; exact names live in `src/irminsul/checks/__init__.py`.
 implements:
   - acknowledge-a-reviewed-co-change-or-evidence-drift
   - a-gate-file-is-sealed-not-scored
+  - an-rfc-has-an-owners-part-and-an-agents-part
 inventory:
   - kind: checks
     source: src/irminsul/checks/*.py
@@ -159,3 +160,15 @@ Two limits are deliberate, because each is a wide net on a finding that does not
   <!-- anchor: src/irminsul/checks/diff_integrity.py#_adopting @sha256:666fe5decf75 -->
 - **a-gate-file-is-sealed-not-scored#gate-scoring-removed** — `diff-integrity` SHALL NOT emit [`gate-weakened`](../decisions/a-change-may-not-lower-its-own-gates.md), [`filter-unreadable`](../decisions/a-change-may-not-lower-its-own-gates.md) or [`filter-not-compared`](../decisions/a-change-may-not-lower-its-own-gates.md), and `irminsul explain` SHALL report each as an unknown code. (provenance: code; [RFC](../rfcs/a-gate-file-is-sealed-not-scored.md))
   <!-- anchor: src/irminsul/checks/diff_integrity.py#_changed_gate_files @sha256:b5a77806e906 -->
+- **an-rfc-has-an-owners-part-and-an-agents-part#an-rfc-declares-its-weight** — `rfc-structure` SHALL report `rfc-structure/missing-weight` for an RFC whose `rfc_state` is `draft` or `accepted` and whose frontmatter has no `weight`, or one other than `small` or `large`. (provenance: code; [RFC](../rfcs/an-rfc-has-an-owners-part-and-an-agents-part.md))
+  <!-- anchor: src/irminsul/checks/rfc_structure.py#RfcStructureCheck._weight_findings @sha256:20fad80547ad -->
+  <!-- anchor: tests/test_checks_rfc_structure.py#test_no_weight_is_reported @sha256:6238c0676321 -->
+- **an-rfc-has-an-owners-part-and-an-agents-part#an-owners-section-is-required** — `rfc-structure` SHALL report `rfc-structure/missing-section` for each owner's section the RFC's weight requires (Summary and Decisions for `small`; Summary, Problem, How it works, Cost and risk and Decisions for `large`) that is absent, or empty apart from HTML comments and placeholder lines, in an RFC whose `rfc_state` is `draft` or `accepted`. (provenance: code; [RFC](../rfcs/an-rfc-has-an-owners-part-and-an-agents-part.md))
+  <!-- anchor: src/irminsul/checks/rfc_structure.py#RfcStructureCheck._section_findings @sha256:42dfb23b1f83 -->
+  <!-- anchor: tests/test_checks_rfc_structure.py#test_a_large_rfc_needs_all_five_owners_sections @sha256:155f503616df -->
+- **an-rfc-has-an-owners-part-and-an-agents-part#the-owners-part-comes-first** — `rfc-structure` SHALL report `rfc-structure/section-out-of-order` for an owner's section heading below `## Design detail`, and for an RFC that has `## Requirements` but no `## Design detail`. (provenance: code; [RFC](../rfcs/an-rfc-has-an-owners-part-and-an-agents-part.md))
+  <!-- anchor: src/irminsul/checks/rfc_structure.py#RfcStructureCheck._order_findings @sha256:a254276f44af -->
+  <!-- anchor: tests/test_checks_rfc_structure.py#test_an_owners_section_below_design_detail_is_out_of_order @sha256:19f411f5348d -->
+- **an-rfc-has-an-owners-part-and-an-agents-part#a-dense-owners-paragraph-is-a-hint** — `rfc-structure` SHALL report `rfc-structure/dense-paragraph`, a hint, for a paragraph of the owner's part that holds four or more code spans, and SHALL NOT report one in the agent's part. (provenance: code; [RFC](../rfcs/an-rfc-has-an-owners-part-and-an-agents-part.md))
+  <!-- anchor: src/irminsul/checks/rfc_structure.py#RfcStructureCheck._dense_findings @sha256:80cc10739544 -->
+  <!-- anchor: tests/test_checks_rfc_structure.py#test_a_paragraph_of_claim_ids_in_how_it_works_is_a_hint @sha256:590155ad6360 -->
