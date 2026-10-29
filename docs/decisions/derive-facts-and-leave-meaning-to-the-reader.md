@@ -137,3 +137,5 @@ its change connects to.
 
 - 2026-10-29: Accepted [Each finding code has one answer](../rfcs/every-warning-hint-has-an-answer.md):
   `foreign` goes, and a bare flag no program precedes becomes a hint.
+- 2026-10-29: Accepted [A change re-asks the sentences that name its code](../rfcs/a-change-re-asks-the-sentences-that-name-its-code.md):
+  `list review --changed` queues each sentence naming code the change touched.

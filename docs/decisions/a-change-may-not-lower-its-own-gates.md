@@ -137,3 +137,7 @@ exit status cannot be listed.
 - 2026-10-29: Accepted [Each finding code has one answer](../rfcs/every-warning-hint-has-an-answer.md):
   a trailer replaces the record excuse, four settings gain a direction, and a base config
   that does not load is compared through an earlier one.
+- 2026-10-29: Accepted [A history file is checked for its links](../rfcs/a-history-file-is-checked-for-its-links.md):
+  dropping a history file is sealed as dropping a guidance file is.
+- 2026-10-29: Accepted [A change to the foundation asks for the owner's sign-off](../rfcs/a-change-to-the-foundation-asks-for-the-owners-sign-off.md):
+  a change to a foundation doc's body is a hint under `--diff`, answered by a trailer.

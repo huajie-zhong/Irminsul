@@ -1,15 +1,17 @@
 ---
 id: a-history-file-is-checked-for-its-links
 title: "A history file is checked for its links"
-status: draft
-summary: A file that records history, such as a changelog, is named under `paths.history_docs` and checked for its links alone, so folding a decision record or an RFC no longer breaks a changelog link unseen.
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: accepted
 affects:
   - checks
   - config
   - docgraph
   - refs
+resolved_by: docs/decisions/docs-are-atoms-in-six-layers-and-code-has-one-owner.md
+summary: A file that records history, such as a changelog, is named under `paths.history_docs` and checked for its links alone, so folding a decision record or an RFC no longer breaks a changelog link unseen.
+required_updates: []
 weight: large
 ---
 
@@ -155,3 +157,7 @@ Under `--diff`, a change that removes a file from `paths.history_docs` SHALL be 
 - `T4` List history files' links in `refs`. (req: refs-lists-history-file-links)
 - `T5` Seal `paths.history_docs` against narrowing. (req: history-file-removal-sealed)
 - `T6` State the rules in the two governing records and update `docs/components/config.md` and `docs/components/refs.md`. (component: config)
+
+## Resolution
+
+Accepted by the owner on 2026-10-29, with the answer recorded under Decisions, and resolved by [Docs are atoms in six layers, and code has one owner](../decisions/docs-are-atoms-in-six-layers-and-code-has-one-owner.md), whose Changes item records it. [A change may not lower its own gates](../decisions/a-change-may-not-lower-its-own-gates.md) records its part too. Each rule joins its record's Decision with the implementation, as an edit in place once decision records are living topics.

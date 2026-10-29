@@ -195,3 +195,5 @@ way to add undocumented code would be to add it, or to narrow a `describes` glob
   one record governs each item.
 - 2026-10-29: Accepted [Each finding code has one answer](../rfcs/every-warning-hint-has-an-answer.md):
   `owner-changed`, a removed adoption record and an unlinked glossary term gain an answer.
+- 2026-10-29: Accepted [A history file is checked for its links](../rfcs/a-history-file-is-checked-for-its-links.md):
+  a history file, the changelog by default, is read for its links alone.

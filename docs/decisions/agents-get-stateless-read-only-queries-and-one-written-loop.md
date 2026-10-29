@@ -148,3 +148,7 @@ rate-limited and makes a run depend on the network.
   `context` names a path's governing record and its sign-offs.
 - 2026-10-29: Accepted [Each finding code has one answer](../rfcs/every-warning-hint-has-an-answer.md):
   the cached-link count moves into the run's summary.
+- 2026-10-29: Accepted [A change re-asks the sentences that name its code](../rfcs/a-change-re-asks-the-sentences-that-name-its-code.md):
+  `context <path>` lists the sentences that name the path's code.
+- 2026-10-29: Accepted [A topic search reads doc bodies](../rfcs/a-topic-search-reads-doc-bodies.md):
+  `context --topic` matches body prose, ranked below the other fields.

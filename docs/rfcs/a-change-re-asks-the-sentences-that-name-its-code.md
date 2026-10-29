@@ -1,14 +1,16 @@
 ---
 id: a-change-re-asks-the-sentences-that-name-its-code
 title: "A change re-asks the sentences that name its code"
-status: draft
-summary: When a change edits code, the review queue asks again about every sentence that names that code in a code span, and `context <path>` lists those sentences before the edit, so an agent finds the docs a change makes stale without searching for them.
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: accepted
 affects:
   - new-list-regen
   - context
   - init
+resolved_by: docs/decisions/derive-facts-and-leave-meaning-to-the-reader.md
+summary: When a change edits code, the review queue asks again about every sentence that names that code in a code span, and `context <path>` lists those sentences before the edit, so an agent finds the docs a change makes stale without searching for them.
+required_updates: []
 weight: large
 ---
 
@@ -20,8 +22,8 @@ An agent that changes code is shown every sentence, in any doc, that names that 
 code span: before the edit, in the packet `context` prints for the file, and after it, in the
 review queue. Today a sentence is asked about again only when its own doc owns the code,
 anchors it or claims it, so a guide that names a command is never asked about when the
-command changes, although the loop tells agents a code span is enough. Three decisions wait
-for the owner.
+command changes, although the loop tells agents a code span is enough. Three decisions, all
+answered.
 
 ## Problem
 
@@ -64,6 +66,9 @@ queues sentences about something else; how the pairing chooses is unchanged, and
 name such as `Ledger.add` avoids it.
 
 ## Decisions
+
+Answered by the owner on 2026-10-29, each as recommended: queue them; the packet lists them
+always, capped; a sentence naming a whole file is asked on any edit to it.
 
 1. **Queue the sentences that name changed code** in `list review --changed` and
    `context --after-edit`. Recommended: yes; it is the connection the loop already promises.
@@ -155,3 +160,7 @@ decision record's Decision or a guidance file whose code span names code in that
 - `T3` Add `named_by` to the packet. (req: packet-lists-sentences-naming-a-file)
 - `T4` Say it in step 4 of the root `AGENTS.md` and its template. (component: init)
 - `T5` State the rules in the two governing records with dated Changes items. (component: context)
+
+## Resolution
+
+Accepted by the owner on 2026-10-29, with the answers recorded under Decisions, and resolved by [Derive facts and leave meaning to the reader](../decisions/derive-facts-and-leave-meaning-to-the-reader.md), whose Changes item records it. [Agents get stateless read-only queries and one written loop](../decisions/agents-get-stateless-read-only-queries-and-one-written-loop.md) records its part too. Each rule joins its record's Decision with the implementation, as an edit in place once decision records are living topics.

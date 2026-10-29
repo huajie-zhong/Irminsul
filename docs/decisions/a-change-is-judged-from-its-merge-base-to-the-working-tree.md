@@ -109,3 +109,5 @@ comment can answer them: `co-change/unreflected-change` and `claim-provenance/ev
 
 - 2026-10-29: Accepted [Each finding code has one answer](../rfcs/every-warning-hint-has-an-answer.md):
   one step accepts commit trailers for every code declared to take one.
+- 2026-10-29: Accepted [An edit with no base is judged against HEAD](../rfcs/an-edit-with-no-base-is-judged-against-head.md):
+  `context --after-edit` with no base judges uncommitted work against `HEAD`.
