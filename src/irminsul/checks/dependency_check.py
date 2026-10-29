@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import ClassVar
 
-from irminsul.checks.base import Finding, FindingClass, Severity
+from irminsul.checks.base import Answer, Finding, FindingClass, Severity
 from irminsul.docgraph import DocGraph
 from irminsul.inventory.base import PythonModule
 from irminsul.languages import PYTHON_PROFILE
@@ -155,6 +155,12 @@ class DependencyCheck:
     }
     classes: ClassVar[dict[str, FindingClass]] = {
         CODE_HALLUCINATED_DEPENDENCY: FindingClass.hint,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_HALLUCINATED_DEPENDENCY: Answer.fix(
+            "remove the `depends_on` entry no import backs, or correct which doc owns the "
+            "imported module"
+        ),
     }
 
     def run(self, graph: DocGraph) -> list[Finding]:

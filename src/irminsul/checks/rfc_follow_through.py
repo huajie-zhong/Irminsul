@@ -15,7 +15,7 @@ from pathlib import Path, PurePosixPath
 from typing import ClassVar
 
 from irminsul import clock
-from irminsul.checks.base import CheckFlag, Finding, FindingClass, Fix, Severity
+from irminsul.checks.base import Answer, CheckFlag, Finding, FindingClass, Fix, Severity
 from irminsul.checks.code_spans import is_live_doc
 from irminsul.config import IrminsulConfig, layer_prefix
 from irminsul.docgraph import DocGraph, DocNode, rfc_nodes
@@ -118,6 +118,15 @@ class RfcFollowThroughCheck:
         CODE_UPDATE_MISSING_IMPLEMENTS: FindingClass.certain,
         CODE_STALE_CLAIM: FindingClass.certain,
         CODE_STABLE_DOC_LINKS_DRAFT_RFC: FindingClass.hint,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_STALE_TARGET_DATE: Answer.fix(
+            "decide or reject the RFC, or move `target_decision_date`"
+        ),
+        CODE_ACCEPTED_NOT_IMPLEMENTED: Answer.fix("implement and finalize the RFC, or reject it"),
+        CODE_STABLE_DOC_LINKS_DRAFT_RFC: Answer.fix(
+            "finalize the RFC once its behaviour has shipped, or stop presenting it as live"
+        ),
     }
 
     def run(self, graph: DocGraph) -> list[Finding]:

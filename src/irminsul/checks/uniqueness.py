@@ -19,7 +19,7 @@ from typing import ClassVar
 from pathspec import GitIgnoreSpec
 
 from irminsul.adoption import recorded_debt
-from irminsul.checks.base import CheckFlag, Finding, FindingClass, Severity
+from irminsul.checks.base import Answer, CheckFlag, Finding, FindingClass, Severity
 from irminsul.config import IrminsulConfig
 from irminsul.declared_tests import governed_as_test
 from irminsul.docgraph import DocGraph, DocNode
@@ -171,6 +171,9 @@ class UniquenessCheck:
         CODE_DUPLICATE_CLAIM: FindingClass.certain,
         CODE_UNDOCUMENTED_FILE: FindingClass.certain,
         CODE_UNLINKED_OVERLAP: FindingClass.hint,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_UNLINKED_OVERLAP: Answer.fix("link the two docs, or narrow the broader claim"),
     }
 
     def run(self, graph: DocGraph) -> list[Finding]:

@@ -53,6 +53,11 @@ making a feature, a refactor and an RFC-driven change in it.
 - A closed stdout ends the output: `irminsul anchors --help | head -1` exits 1 without a traceback
   on Windows and on POSIX, and never 0, so a gate cut short cannot pass. An error that names a file
   is still raised.
+- Every finding code declares its answer, the one way a correct doc turns it green: `fix`, `line`
+  (a reasoned ignore comment on its line), `pin` (a re-pin after re-reading) or `trailer` (an
+  `Irminsul-Reviewed` commit trailer). `irminsul explain <code>` prints it, with the comment to
+  write for a `line` code, `irminsul explain <check>` labels each code `(class, answer)`, and every
+  JSON finding carries `answer`.
 - An ignore comment standing alone above a fenced block covers every line of the block, and an
   `ignore-start`/`ignore-end` pair covers the fenced lines between them. A comment above a fence
   used to cover the first line after the fence instead, so one that relied on that is now

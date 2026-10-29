@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Final
 
 from irminsul.checks import flagged
-from irminsul.checks.base import CheckFlag, Finding, FindingClass, Severity
+from irminsul.checks.base import Answer, CheckFlag, Finding, FindingClass, Severity
 from irminsul.git.mtime import git_root_for, history_state
 
 if TYPE_CHECKING:
@@ -51,6 +51,11 @@ class HistoryDepthPass:
     classes: ClassVar[dict[str, FindingClass]] = {
         CODE_SHALLOW_CLONE: FindingClass.certain,
         CODE_NO_HISTORY: FindingClass.hint,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_NO_HISTORY: Answer.fix(
+            "commit the tree, or run `--only` with checks that read no history"
+        ),
     }
 
     def run(self, graph: DocGraph, selected: Collection[str]) -> list[Finding]:

@@ -43,6 +43,11 @@ _COMMENT_RE = re.compile(
 )
 
 
+def comment_for(code: str) -> str:
+    """The comment that waives `code` on its line, written in the grammar `_COMMENT_RE` reads."""
+    return f'<!-- irminsul:ignore {code} reason="..." -->'
+
+
 class IgnoreCommentFilter:
     """Ignore comments must name a known hint or time finding, give a reason, and suppress something.
 

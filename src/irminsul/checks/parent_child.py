@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from irminsul.checks.base import Finding, FindingClass, Severity
+from irminsul.checks.base import Answer, Finding, FindingClass, Severity
 from irminsul.docgraph import DocGraph
 
 _WILDCARD_CHARS = set("*?[")
@@ -48,6 +48,12 @@ class ParentChildCheck:
     classes: ClassVar[dict[str, FindingClass]] = {
         CODE_WILDCARD_WITH_CHILDREN: FindingClass.hint,
         CODE_INDEX_TOO_LONG: FindingClass.hint,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_WILDCARD_WITH_CHILDREN: Answer.fix(
+            "list the exact files, or drop the claim and let the children cover them"
+        ),
+        CODE_INDEX_TOO_LONG: Answer.fix("move the long-form content into a sibling doc"),
     }
 
     def run(self, graph: DocGraph) -> list[Finding]:

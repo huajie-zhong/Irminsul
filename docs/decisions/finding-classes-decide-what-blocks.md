@@ -12,6 +12,7 @@ governs:
   - src/irminsul/checks/pipeline.py#failing_findings
   - src/irminsul/checks/pipeline.py#_drafts_exempt
   - src/irminsul/checks/pipeline.py#_on_draft
+  - src/irminsul/checks/pipeline.py#answer_of
   - src/irminsul/checks/ignore_comments.py
   - src/irminsul/fix.py
   - src/irminsul/source_tree.py

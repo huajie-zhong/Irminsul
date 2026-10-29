@@ -55,7 +55,7 @@ from ruamel.yaml import YAML
 from irminsul import source_map
 from irminsul.adoption import AdoptionRecord, parse_record
 from irminsul.anchors import ANCHOR_RE
-from irminsul.checks.base import Finding, FindingClass, Severity
+from irminsul.checks.base import Answer, Finding, FindingClass, Severity
 from irminsul.checks.change_range import after_paths, after_text
 from irminsul.config import (
     CONFIG_FILENAME,
@@ -386,6 +386,39 @@ class DiffIntegrityPass:
         CODE_SETTING_WEAKENED: FindingClass.certain,
         CODE_UNREVIEWED_SETTING_CHANGE: FindingClass.hint,
         CODE_RULES_NARROWED: FindingClass.hint,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_DECISION_REWRITTEN: Answer.fix(
+            "restore the decision's wording, or record a changed decision in a new record that "
+            "supersedes this one"
+        ),
+        CODE_OWNER_CHANGED: Answer.fix(
+            "remove what the old owner still says about the moved files, or link the two docs"
+        ),
+        CODE_SOURCE_EXCLUDED: Answer.fix(
+            "confirm the files no longer read hold no documented code, then add a stable decision "
+            "record to this change whose `## Decision` names the setting"
+        ),
+        CODE_EXTRA_DOC_REMOVED: Answer.fix(
+            "confirm the file holds no guidance that must stay true, then add a stable decision "
+            "record to this change whose `## Decision` names `paths.extra_docs`"
+        ),
+        CODE_BASE_CONFIG_UNREADABLE: Answer.fix(
+            "review the config changes by hand; it ends once the change that repairs the config "
+            "merges"
+        ),
+        CODE_CLAIM_REWORDED: Answer.fix(
+            "re-read the new wording against the claim's evidence; a stable decision record this "
+            "change adds whose `## Decision` names the claim id accepts it"
+        ),
+        CODE_UNREVIEWED_SETTING_CHANGE: Answer.fix(
+            "confirm the change does not weaken the gate, then add a stable decision record to "
+            "this change whose `## Decision` names the setting's dotted name"
+        ),
+        CODE_RULES_NARROWED: Answer.fix(
+            "confirm nothing documented depended on the rule, then add a stable decision record "
+            "to this change whose `## Decision` names the setting"
+        ),
     }
 
     def run(self, graph: DocGraph, selected: Collection[str]) -> list[Finding]:

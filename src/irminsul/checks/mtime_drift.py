@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from irminsul.checks.base import CheckFlag, Finding, FindingClass, Severity
+from irminsul.checks.base import Answer, CheckFlag, Finding, FindingClass, Severity
 from irminsul.docgraph import DocGraph
 from irminsul.git.mtime import GitTime, last_commit_time_any_repo
 
@@ -36,6 +36,11 @@ class MtimeDriftCheck:
     classes: ClassVar[dict[str, FindingClass]] = {
         CODE_NO_GIT_HISTORY: FindingClass.certain,
         CODE_DRIFT_DETECTED: FindingClass.hint,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_DRIFT_DETECTED: Answer.fix(
+            "re-read the doc against what the source now does and correct what is no longer true"
+        ),
     }
 
     def run(self, graph: DocGraph) -> list[Finding]:

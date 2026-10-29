@@ -44,7 +44,7 @@ def test_explain_check_name_lists_only_that_checks_codes_with_class_and_summary(
     result = runner.invoke(app, ["explain", "prose-file-reference"])
     assert result.exit_code == 0, result.output
     assert "check: prose-file-reference" in result.output
-    assert "prose-file-reference/unlinked-reference (certain)" in result.output
+    assert "prose-file-reference/unlinked-reference (certain, fix)" in result.output
     assert "A local `.md` filename is named in plain text without a Markdown link." in result.output
     assert "Convert it to a link" not in result.output
     assert "links/broken-link" not in result.output
@@ -70,7 +70,34 @@ def test_explain_describes_the_unknown_path_hint() -> None:
 
     assert result.exit_code == 0, result.output
     assert "class: hint" in result.output
-    assert "ignore comment" in result.output
+    assert "answer: line — an example path" in result.output
+    assert (
+        'waive with: <!-- irminsul:ignore code-references/unknown-path reason="..." -->'
+        in result.output
+    )
+
+
+@pytest.mark.parametrize(
+    ("code", "answer"),
+    [
+        ("claim-anchor/pinned-drift", "answer: pin — re-read the prose against the code"),
+        ("co-change/unreflected-change", "answer: trailer — if you re-read the doc"),
+        ("uniqueness/undocumented-file", "answer: fix — the explanation below says what"),
+    ],
+)
+def test_explain_names_the_answer_a_code_declares(code: str, answer: str) -> None:
+    result = runner.invoke(app, ["explain", code])
+
+    assert result.exit_code == 0, result.output
+    assert answer in result.output
+    assert "waive with:" not in result.output
+
+
+def test_explain_of_a_check_labels_each_code_with_its_class_and_answer() -> None:
+    result = runner.invoke(app, ["explain", "co-change"])
+
+    assert result.exit_code == 0, result.output
+    assert "co-change/unreflected-change (hint, trailer)" in result.output
 
 
 def test_explain_says_how_to_answer_an_unverifiable_adoption_source() -> None:

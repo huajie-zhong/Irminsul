@@ -31,7 +31,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from irminsul.checks.base import CheckFlag, Finding, FindingClass, Severity
+from irminsul.checks.base import Answer, CheckFlag, Finding, FindingClass, Severity
 from irminsul.docgraph import DocGraph
 from irminsul.docgraph_index import is_external
 
@@ -176,6 +176,15 @@ class ExternalLinksCheck:
     classes: ClassVar[dict[str, FindingClass]] = {
         CODE_UNREACHABLE: FindingClass.time,
         CODE_CACHED_RESULTS: FindingClass.time,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_UNREACHABLE: Answer.line(
+            "a link that is right but refuses automated requests keeps a reasoned ignore comment "
+            "on its line"
+        ),
+        CODE_CACHED_RESULTS: Answer.fix(
+            "delete the cache file, or lower `ttl_hours`, to request every link again"
+        ),
     }
 
     def run(self, graph: DocGraph) -> list[Finding]:

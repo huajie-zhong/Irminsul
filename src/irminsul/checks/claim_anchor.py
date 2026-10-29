@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 from irminsul.anchors import parse_anchors, resolve
-from irminsul.checks.base import Finding, FindingClass, Severity
+from irminsul.checks.base import Answer, Finding, FindingClass, Severity
 from irminsul.docgraph import DocGraph
 
 CODE_MISSING_FILE = "claim-anchor/missing-file"
@@ -57,6 +57,17 @@ class ClaimAnchorCheck:
         CODE_UNREADABLE: FindingClass.hint,
         CODE_UNPINNED: FindingClass.hint,
         CODE_PINNED_DRIFT: FindingClass.hint,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_UNREADABLE: Answer.fix("fix the source file's syntax or the anchor's path"),
+        CODE_UNPINNED: Answer.pin(
+            "run `irminsul anchors --re-pin --doc <doc> --anchor <path#symbol>` to record the "
+            "code the prose was written against"
+        ),
+        CODE_PINNED_DRIFT: Answer.pin(
+            "re-read the prose against the code, then run `irminsul anchors --re-pin --doc <doc> "
+            "--anchor <path#symbol>`"
+        ),
     }
 
     def run(self, graph: DocGraph) -> list[Finding]:

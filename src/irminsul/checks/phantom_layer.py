@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import ClassVar
 
-from irminsul.checks.base import Finding, FindingClass, Severity
+from irminsul.checks.base import Answer, Finding, FindingClass, Severity
 from irminsul.config import docs_root_prefix
 from irminsul.docgraph import DocGraph
 from irminsul.frontmatter import StatusEnum
@@ -41,6 +41,11 @@ class PhantomLayerCheck:
     classes: ClassVar[dict[str, FindingClass]] = {
         CODE_LAYER_UNDER_CONSTRUCTION: FindingClass.hint,
         CODE_HOLLOW_LAYER: FindingClass.certain,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_LAYER_UNDER_CONSTRUCTION: Answer.fix(
+            "add the layer's content docs, or remove its draft INDEX"
+        ),
     }
 
     def run(self, graph: DocGraph) -> list[Finding]:

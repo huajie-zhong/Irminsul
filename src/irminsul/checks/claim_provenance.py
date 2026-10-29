@@ -9,6 +9,7 @@ from typing import ClassVar
 
 from irminsul.anchors import file_pin
 from irminsul.checks.base import (
+    Answer,
     CheckFlag,
     Finding,
     FindingClass,
@@ -90,6 +91,12 @@ class ClaimProvenanceCheck:
         CODE_EVIDENCE_STATE_MISMATCH: FindingClass.certain,
         CODE_UNKNOWN_CLAIM_REF: FindingClass.certain,
         CODE_EVIDENCE_DRIFT: FindingClass.hint,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_EVIDENCE_DRIFT: Answer.pin(
+            "re-read the claim against its evidence, then run `irminsul anchors --re-pin --doc "
+            "<doc> --claim <id>`"
+        ),
     }
 
     def run(self, graph: DocGraph) -> list[Finding]:

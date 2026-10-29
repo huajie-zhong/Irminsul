@@ -9,7 +9,7 @@ from typing import ClassVar, Literal
 
 from pathspec import GitIgnoreSpec
 
-from irminsul.checks.base import Finding, FindingClass, Severity
+from irminsul.checks.base import Answer, Finding, FindingClass, Severity
 from irminsul.config import IrminsulConfig
 from irminsul.docgraph import DocGraph
 from irminsul.git.mtime import git_root_for
@@ -541,6 +541,14 @@ class GlobsCheck:
         CODE_SOURCE_ROOT_ESCAPE: FindingClass.certain,
         CODE_EMPTY_DESCRIBES_PATTERN: FindingClass.certain,
         CODE_AMBIGUOUS_SOURCE_DISPLAY: FindingClass.hint,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_MISSING_SOURCE_ROOT: Answer.fix(
+            "correct the entry in `paths.source_roots`, or create the directory"
+        ),
+        CODE_AMBIGUOUS_SOURCE_DISPLAY: Answer.fix(
+            "narrow or rename the configured source roots so each file has one display path"
+        ),
     }
 
     def run(self, graph: DocGraph) -> list[Finding]:

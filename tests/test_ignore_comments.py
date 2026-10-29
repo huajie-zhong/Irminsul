@@ -198,3 +198,13 @@ def test_a_comment_inside_a_fence_covers_nothing_and_is_not_reported(tmp_path: P
         "```\n",
     )
     assert check_codes(root) == ["code-references/unknown-env-var"]
+
+
+def test_the_waiving_comment_is_written_in_the_grammar_the_pass_reads() -> None:
+    from irminsul.checks.ignore_comments import _COMMENT_RE, comment_for
+
+    match = _COMMENT_RE.fullmatch(comment_for("code-references/unknown-path"))
+
+    assert match is not None
+    assert match["names"].split() == ["code-references/unknown-path"]
+    assert match["kind"] is None

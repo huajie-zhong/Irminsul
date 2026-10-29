@@ -21,7 +21,14 @@ from pathlib import Path
 import pytest
 
 from irminsul.checks import REGISTRY, Finding
-from irminsul.checks.base import FindingClass, Severity, finding_records
+from irminsul.checks.base import (
+    Answer,
+    AnswerKind,
+    FindingClass,
+    FindingSource,
+    Severity,
+    finding_records,
+)
 from irminsul.checks.co_change import Trailer, run_co_change
 from irminsul.checks.external_links import _save_cache
 from irminsul.checks.pipeline import _on_draft, class_of, finding_sources
@@ -377,6 +384,129 @@ def test_every_explained_code_has_a_class() -> None:
         )
 
 
+def _declaration_problems(cls: type[FindingSource]) -> list[str]:
+    """What a source's `answers` gets wrong: a hint or time code, info included, with no
+    answer; an answer for a code it does not explain; a certain code declared anything but
+    `trailer`; a time code declared `trailer`, which a run given a diff range leaves out; and
+    an answer with no sentence to act on."""
+    answers: dict[str, Answer] = getattr(cls, "answers", {})
+    problems = [
+        f"{code}: declares an answer for a code {cls.name} does not explain"
+        for code in sorted(set(answers) - set(cls.explanations))
+    ]
+    for code, finding_class in sorted(cls.classes.items()):
+        answer = answers.get(code)
+        if answer is None:
+            if finding_class is not FindingClass.certain:
+                problems.append(f"{code}: a {finding_class.value} code with no answer")
+            continue
+        if finding_class is FindingClass.certain and answer.kind is not AnswerKind.trailer:
+            problems.append(f"{code}: certain, so declared trailer or not at all")
+        if finding_class is FindingClass.time and answer.kind is AnswerKind.trailer:
+            problems.append(f"{code}: a time code declared trailer")
+        if not answer.how.strip():
+            problems.append(f"{code}: declares {answer.kind.value} with no sentence to act on")
+    return problems
+
+
+def test_every_code_declares_its_answer() -> None:
+    problems = [p for cls in finding_sources().values() for p in _declaration_problems(cls)]
+    walked = [
+        code
+        for cls in finding_sources().values()
+        for code, finding_class in cls.classes.items()
+        if finding_class is not FindingClass.certain
+    ]
+
+    assert problems == []
+    assert len(walked) >= 40, "too few hint and time codes walked for the silence to mean much"
+
+
+def _planted(
+    classes: dict[str, FindingClass],
+    answers: dict[str, Answer] | None,
+    *,
+    severity: Severity = Severity.warning,
+) -> type[FindingSource]:
+    attrs: dict[str, object] = {
+        "name": "planted",
+        "default_severity": severity,
+        "explanations": {code: "A planted code." for code in classes},
+        "classes": classes,
+    }
+    if answers is not None:
+        attrs["answers"] = answers
+    return type("Planted", (), attrs)
+
+
+_LINE = Answer.line("a correct doc keeps a reasoned ignore comment on its line")
+
+
+@pytest.mark.parametrize(
+    ("source", "problem"),
+    [
+        (
+            _planted({"planted/a": FindingClass.hint}, None),
+            "planted/a: a hint code with no answer",
+        ),
+        (
+            _planted({"planted/a": FindingClass.hint}, {}, severity=Severity.info),
+            "planted/a: a hint code with no answer",
+        ),
+        (
+            _planted({"planted/a": FindingClass.time}, {}),
+            "planted/a: a time code with no answer",
+        ),
+        (
+            _planted({"planted/a": FindingClass.certain}, {"planted/a": _LINE}),
+            "planted/a: certain, so declared trailer or not at all",
+        ),
+        (
+            _planted({"planted/a": FindingClass.hint}, {"planted/a": _LINE, "planted/b": _LINE}),
+            "planted/b: declares an answer for a code planted does not explain",
+        ),
+        (
+            _planted({"planted/a": FindingClass.time}, {"planted/a": Answer.trailer("sign")}),
+            "planted/a: a time code declared trailer",
+        ),
+        (
+            _planted({"planted/a": FindingClass.hint}, {"planted/a": Answer.fix(" ")}),
+            "planted/a: declares fix with no sentence to act on",
+        ),
+    ],
+    ids=[
+        "hint",
+        "info-hint",
+        "time",
+        "certain-line",
+        "unexplained",
+        "time-trailer",
+        "empty-how",
+    ],
+)
+def test_the_declaration_test_catches_a_planted_gap(
+    source: type[FindingSource], problem: str
+) -> None:
+    assert _declaration_problems(source) == [problem]
+
+
+def test_the_declaration_test_passes_a_planted_source_that_declares_each_answer() -> None:
+    source = _planted(
+        {
+            "planted/a": FindingClass.hint,
+            "planted/b": FindingClass.time,
+            "planted/c": FindingClass.certain,
+            "planted/d": FindingClass.certain,
+        },
+        {
+            "planted/a": _LINE,
+            "planted/b": Answer.fix("move the date"),
+            "planted/c": Answer.trailer("sign the change off"),
+        },
+    )
+    assert _declaration_problems(source) == []
+
+
 def test_checks_emit_the_severity_their_class_demands(all_findings: list[Finding]) -> None:
     """A certain finding is an error unless it sits on a draft; hints and time findings never are."""
     for finding in all_findings:
@@ -435,7 +565,7 @@ def test_every_finding_source_class_is_in_a_registry() -> None:
     and four separate copies of it had drifted apart: a pass missing from a copy was
     unexplainable, unclassifiable, and its own ignore comment was an error.
 
-    This walks the source for classes that declare `classes` or `explanations` and asserts
+    This walks the source for classes that declare `classes`, `explanations` or `answers` and asserts
     the catalogue reaches each one, so a class added to neither `REGISTRY` nor `PASSES` fails.
     """
     import ast
@@ -455,7 +585,7 @@ def test_every_finding_source_class_is_in_a_registry() -> None:
                 for stmt in node.body
                 if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name)
             }
-            if {"explanations", "classes"} & names:
+            if {"explanations", "classes", "answers"} & names:
                 declared[node.name] = path.as_posix()
 
     assert declared, "the walk found no class declaring codes, so its silence proves nothing"

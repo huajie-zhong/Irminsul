@@ -20,6 +20,7 @@ from collections import Counter
 from typing import ClassVar
 
 from irminsul.checks.base import (
+    Answer,
     Finding,
     FindingClass,
     Severity,
@@ -89,6 +90,11 @@ class RfcStructureCheck:
         CODE_MISSING_SECTION: FindingClass.certain,
         CODE_SECTION_OUT_OF_ORDER: FindingClass.certain,
         CODE_DENSE_PARAGRAPH: FindingClass.hint,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_DENSE_PARAGRAPH: Answer.line(
+            "a paragraph that needs its names keeps a reasoned ignore comment on its line"
+        ),
     }
     drafts_exempt: ClassVar[frozenset[str]] = frozenset({CODE_MISSING_WEIGHT, CODE_MISSING_SECTION})
 

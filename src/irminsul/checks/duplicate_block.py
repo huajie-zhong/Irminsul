@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import ClassVar
 
-from irminsul.checks.base import Finding, FindingClass, Severity
+from irminsul.checks.base import Answer, Finding, FindingClass, Severity
 from irminsul.checks.code_spans import is_live_doc
 from irminsul.docgraph import DocGraph, DocNode
 from irminsul.fences import FenceTracker
@@ -83,6 +83,12 @@ class DuplicateBlockCheck:
     classes: ClassVar[dict[str, FindingClass]] = {
         CODE_REPEATED_BLOCK: FindingClass.certain,
         CODE_COPIED_BLOCK: FindingClass.hint,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_COPIED_BLOCK: Answer.line(
+            "a block that must read the same in both docs keeps a reasoned ignore comment on its "
+            "line"
+        ),
     }
 
     def run(self, graph: DocGraph) -> list[Finding]:

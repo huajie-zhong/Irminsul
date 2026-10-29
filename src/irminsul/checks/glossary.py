@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
 
-from irminsul.checks.base import Finding, FindingClass, Fix, Severity
+from irminsul.checks.base import Answer, Finding, FindingClass, Fix, Severity
 from irminsul.docgraph import DocGraph, DocNode
 from irminsul.docgraph_index import Link, is_external, resolve_href, slugify
 from irminsul.fences import FenceTracker
@@ -345,6 +345,12 @@ class GlossaryDisciplineCheck:
         CODE_FORBIDDEN_SYNONYM: FindingClass.certain,
         CODE_UNLINKED_TERM: FindingClass.hint,
         CODE_UNUSED_TERM: FindingClass.hint,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_UNLINKED_TERM: Answer.fix("link the term's first use to its glossary entry"),
+        CODE_UNUSED_TERM: Answer.line(
+            "an entry kept for its readers keeps a reasoned ignore comment above its heading"
+        ),
     }
 
     def run(self, graph: DocGraph) -> list[Finding]:

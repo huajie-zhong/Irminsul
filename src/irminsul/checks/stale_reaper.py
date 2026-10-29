@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 from irminsul import clock
-from irminsul.checks.base import CheckFlag, Finding, FindingClass, Severity
+from irminsul.checks.base import Answer, CheckFlag, Finding, FindingClass, Severity
 from irminsul.docgraph import DocGraph
 from irminsul.frontmatter import StatusEnum
 from irminsul.git.mtime import last_commit_time_any_repo
@@ -31,6 +31,11 @@ class StaleReaperCheck:
     }
     classes: ClassVar[dict[str, FindingClass]] = {
         CODE_STALE_DEPRECATED_DOC: FindingClass.time,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_STALE_DEPRECATED_DOC: Answer.fix(
+            "delete the doc, set `status: removed`, or rewrite and recommit it"
+        ),
     }
 
     def run(self, graph: DocGraph) -> list[Finding]:

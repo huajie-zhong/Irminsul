@@ -34,6 +34,45 @@ class FindingClass(StrEnum):
     time = "time"
 
 
+class AnswerKind(StrEnum):
+    """How a correct doc answers a finding of a code, which lasts as long as what it reports.
+
+    `fix`: the doc or config is wrong whenever the finding fires. `line`: an ignore comment
+    on the finding's line waives it as long as the mismatch lasts. `pin`: a re-pin records
+    the content as re-read, until it moves again. `trailer`: an `Irminsul-Reviewed` commit
+    trailer signs off one change.
+    """
+
+    fix = "fix"
+    line = "line"
+    pin = "pin"
+    trailer = "trailer"
+
+
+@dataclass(frozen=True)
+class Answer:
+    """The answer a code declares: its kind, and `how`, the sentence a reader acts on."""
+
+    kind: AnswerKind
+    how: str
+
+    @classmethod
+    def fix(cls, how: str) -> Answer:
+        return cls(AnswerKind.fix, how)
+
+    @classmethod
+    def line(cls, how: str) -> Answer:
+        return cls(AnswerKind.line, how)
+
+    @classmethod
+    def pin(cls, how: str) -> Answer:
+        return cls(AnswerKind.pin, how)
+
+    @classmethod
+    def trailer(cls, how: str) -> Answer:
+        return cls(AnswerKind.trailer, how)
+
+
 _SEVERITY_ORDER = {Severity.error: 0, Severity.warning: 1, Severity.info: 2}
 
 
@@ -94,10 +133,13 @@ class FindingSource(Protocol):
     codes that report a doc as unfinished rather than as wrong about something outside
     it. Only those are demoted to warnings on a draft doc: a half-written doc may be
     half-written, but it may not point at a symbol that does not exist. It may declare
-    `audits_suppression` the same way, the codes that report on a suppression marker, and
-    `flags: ClassVar[frozenset[CheckFlag]]`. Each is optional rather than part of this
-    protocol so the great majority of sources, which declare none, stay silent about it;
-    `pipeline` collects what is declared.
+    `audits_suppression` the same way, the codes that report on a suppression marker,
+    `flags: ClassVar[frozenset[CheckFlag]]`, and `answers: ClassVar[dict[str, Answer]]`, the
+    answer of every hint and time code it explains and of each certain code a trailer
+    answers; a code it leaves out is answered by the fix its explanation gives. Each is
+    optional rather than part of this protocol so the sources that declare none stay silent
+    about it; `pipeline` collects what is declared, and a test holds every hint and time
+    code to an answer.
     """
 
     name: ClassVar[str]
@@ -217,10 +259,10 @@ def finding_records(findings: list[Finding], graph: DocGraph | None) -> list[dic
     Read `effective_class` to predict the exit code — `class` alone cannot, which is
     why both are reported.
 
-    `fixable` and `fix_command` come from `fix_commands` over `graph`. A surface with no
-    graph to ask claims nothing is fixable.
+    `answer` is the kind of answer the code declares. `fixable` and `fix_command` come from
+    `fix_commands` over `graph`. A surface with no graph to ask claims nothing is fixable.
     """
-    from irminsul.checks.pipeline import class_of, effective_class
+    from irminsul.checks.pipeline import answer_of, class_of, effective_class
 
     commands = fix_commands(findings, graph) if graph is not None else [None] * len(findings)
     records: list[dict[str, object]] = []
@@ -232,6 +274,7 @@ def finding_records(findings: list[Finding], graph: DocGraph | None) -> list[dic
             "code": finding.code,
             "class": finding_class.value if finding_class is not None else None,
             "effective_class": enforced.value if enforced is not None else None,
+            "answer": answer_of(finding.code).kind.value,
             "severity": finding.severity.value,
             "message": finding.message,
             "path": finding.path.as_posix() if finding.path else None,

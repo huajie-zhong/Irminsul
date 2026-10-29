@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Final
 
-from irminsul.checks.base import Finding, FindingClass, Severity
+from irminsul.checks.base import Answer, Finding, FindingClass, Severity
 from irminsul.checks.change_range import after_text
 from irminsul.checks.uniqueness import most_specific_claims, resolve_claims
 from irminsul.docgraph import ChangeRange, DocGraph, DocNode, resolve_doc_target
@@ -90,6 +90,21 @@ class CoChangePass:
         CODE_ACKNOWLEDGED: FindingClass.hint,
         CODE_INVALID_ACKNOWLEDGEMENT: FindingClass.hint,
         CODE_UNUSED_ACKNOWLEDGEMENT: FindingClass.hint,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_UNREFLECTED_CHANGE: Answer.trailer(
+            "if you re-read the doc and it is still right, add the `Irminsul-Reviewed` trailer "
+            "its suggestion prints, on a commit made after the last change to the files it lists"
+        ),
+        CODE_ACKNOWLEDGED: Answer.fix(
+            "nothing to do: it shows a reviewer what a trailer acknowledged, and ends when the "
+            "change merges"
+        ),
+        CODE_INVALID_ACKNOWLEDGEMENT: Answer.fix("add a valid trailer to a later commit"),
+        CODE_UNUSED_ACKNOWLEDGEMENT: Answer.fix(
+            "nothing to do if the doc changed in the range; otherwise add a trailer naming the "
+            "right doc to a later commit"
+        ),
     }
 
     def run(self, graph: DocGraph, selected: Collection[str]) -> list[Finding]:

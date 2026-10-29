@@ -27,7 +27,7 @@ from collections.abc import Collection
 from pathlib import Path
 from typing import ClassVar, Final
 
-from irminsul.checks.base import Finding, FindingClass, Severity
+from irminsul.checks.base import Answer, Finding, FindingClass, Severity
 from irminsul.checks.change_range import after_text
 from irminsul.checks.dependency_check import SourceOwnership, imported_paths, resolve_ownership
 from irminsul.docgraph import ChangeRange, DocGraph, DocNode
@@ -54,6 +54,11 @@ class NewDependencyPass:
     }
     classes: ClassVar[dict[str, FindingClass]] = {
         CODE_UNDECLARED_NEW_DEPENDENCY: FindingClass.hint,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_UNDECLARED_NEW_DEPENDENCY: Answer.fix(
+            "add the `depends_on` entry and say why the component now needs it, or drop the import"
+        ),
     }
 
     def run(self, graph: DocGraph, selected: Collection[str]) -> list[Finding]:

@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
-from irminsul.checks.base import Finding, FindingClass, Severity, carries_certain_findings
+from irminsul.checks.base import Answer, Finding, FindingClass, Severity, carries_certain_findings
 from irminsul.checks.code_spans import code_spans, is_guidance, is_live_doc
 from irminsul.checks.file_paths import FileIndex, named_path, path_suffixes
 from irminsul.docgraph import DocGraph
@@ -97,6 +97,18 @@ class CodeReferencesCheck:
         CODE_OPTION_NOT_ON_COMMAND: FindingClass.certain,
         CODE_UNKNOWN_ENV_VAR: FindingClass.hint,
         CODE_UNKNOWN_PATH: FindingClass.hint,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_UNKNOWN_SYMBOL: Answer.line(
+            "a name another language or tool defines keeps a reasoned ignore comment on its line"
+        ),
+        CODE_UNKNOWN_ENV_VAR: Answer.line(
+            "a variable read by CI or another tool keeps a reasoned ignore comment on its line"
+        ),
+        CODE_UNKNOWN_PATH: Answer.line(
+            "an example path, such as a file a command would create, keeps a reasoned "
+            "ignore comment on its line"
+        ),
     }
 
     def run(self, graph: DocGraph) -> list[Finding]:

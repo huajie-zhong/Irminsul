@@ -37,6 +37,7 @@ from typing import TYPE_CHECKING, Final
 from irminsul.checks import REGISTRY
 from irminsul.checks.adoption_record import AdoptionRecordPass
 from irminsul.checks.base import (
+    Answer,
     Check,
     Finding,
     FindingClass,
@@ -99,6 +100,23 @@ def _classes() -> dict[str, FindingClass]:
     for cls in finding_sources().values():
         out.update(cls.classes)
     return out
+
+
+@cache
+def _answers() -> dict[str, Answer]:
+    out: dict[str, Answer] = {}
+    for cls in finding_sources().values():
+        out.update(getattr(cls, "answers", {}))
+    return out
+
+
+_FIX: Final = Answer.fix("")
+
+
+def answer_of(code: str) -> Answer:
+    """The answer a code declares. A test holds every hint and time code to one, so a code
+    that declares none is certain and answered by the fix its explanation gives."""
+    return _answers().get(code, _FIX)
 
 
 @cache

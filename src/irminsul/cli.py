@@ -1241,7 +1241,7 @@ def _first_sentence(text: str) -> str:
 
 
 def _explain_check(check_name: str, cls: type[FindingSource]) -> None:
-    from irminsul.checks.pipeline import class_of
+    from irminsul.checks.pipeline import answer_of, class_of
 
     typer.echo(typer.style(check_name, fg="cyan", bold=True))
     summary = _check_summary(cls)
@@ -1249,7 +1249,8 @@ def _explain_check(check_name: str, cls: type[FindingSource]) -> None:
     typer.echo()
     for known_code in sorted(cls.explanations):
         finding_class = class_of(known_code)
-        label = f" ({finding_class.value})" if finding_class is not None else ""
+        answer = answer_of(known_code).kind.value
+        label = f" ({finding_class.value}, {answer})" if finding_class is not None else ""
         typer.echo(f"  {known_code}{label}")
         typer.echo(f"    {_first_sentence(cls.explanations[known_code])}")
     typer.echo()
@@ -1268,16 +1269,18 @@ def explain_command(
         ),
     ] = None,
 ) -> None:
-    """Explain a finding code: what it means and how to fix it.
+    """Explain a finding code: what it means, its class, and how it is answered.
 
-    A check name lists that check's codes with their classes. With no argument, lists
-    every known code grouped by check.
+    A check name lists that check's codes with their classes and answers. With no
+    argument, lists every known code grouped by check.
     """
     if code is None:
         _list_all_codes()
         return
 
-    from irminsul.checks.pipeline import class_of, finding_sources
+    from irminsul.checks.base import AnswerKind
+    from irminsul.checks.ignore_comments import comment_for
+    from irminsul.checks.pipeline import answer_of, class_of, finding_sources
 
     checks = finding_sources()
     for check_name, cls in sorted(checks.items()):
@@ -1290,6 +1293,11 @@ def explain_command(
         finding_class = class_of(code)
         if finding_class is not None:
             typer.echo(f"class: {finding_class.value} — {_CLASS_BLURB[finding_class]}")
+        answer = answer_of(code)
+        how = answer.how or "the explanation below says what to change"
+        typer.echo(f"answer: {answer.kind.value} — {how}")
+        if answer.kind is AnswerKind.line:
+            typer.echo(f"waive with: {comment_for(code)}")
         typer.echo()
         typer.echo(explanation)
         return

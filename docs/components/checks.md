@@ -101,6 +101,9 @@ The checks, grouped by what they govern:
 
 Whether a finding blocks follows its class, which each check declares for every code it explains ([Finding classes decide what blocks](../decisions/finding-classes-decide-what-blocks.md)); a test runs every check over the fixture corpus and fails if one emits a severity its class does not allow.
 
+How a correct doc turns a finding green is the code's answer, which a check declares in `answers` beside `classes`: `fix`, the doc or config is wrong; `line`, a reasoned ignore comment on the finding's line; `pin`, a re-pin after re-reading; or `trailer`, an `Irminsul-Reviewed` commit trailer that signs off one change. Every hint and time code declares one, and a certain code only when a trailer answers it, so `answer_of` reads a code with none as the fix its explanation gives. `irminsul explain` prints the answer, and the JSON of a finding carries it as `answer`. A test fails on a hint or time code with no answer.
+<!-- anchor: src/irminsul/checks/pipeline.py#answer_of @sha256:2215b944043e -->
+
 A fact about a check that other code acts on is a `CheckFlag` the check declares in `flags`, and `flagged` derives the set from the registry: off unless a project lists it (`opt_in`), answers from commit history (`reads_history`), takes exceptions from the adoption record (`consults_adoption_record`), reaches the network (`uses_network`). No list of check names is kept beside the code that reads one, so renaming a check or adding a sibling cannot leave one stale, and a test reads the source for any module that keeps such a list.
 <!-- anchor: src/irminsul/checks/base.py#CheckFlag.opt_in @sha256:905c9f146ced -->
 <!-- anchor: src/irminsul/checks/base.py#CheckFlag.reads_history @sha256:7d834b6d32e4 -->

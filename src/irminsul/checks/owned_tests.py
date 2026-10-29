@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from irminsul.adoption import recorded_debt
-from irminsul.checks.base import CheckFlag, Finding, FindingClass, Severity
+from irminsul.checks.base import Answer, CheckFlag, Finding, FindingClass, Severity
 from irminsul.config import CONFIG_FILENAME
 from irminsul.declared_tests import classify_test_reference, governed_as_test, is_test_path
 from irminsul.docgraph import DocGraph, DocNode
@@ -100,6 +100,12 @@ class TestOwnershipCheck:
         CODE_OWNED_TEST_MISSING: FindingClass.certain,
         CODE_MISSING_TEST_ROOT: FindingClass.certain,
         CODE_UNGOVERNED_TEST_FILE: FindingClass.hint,
+    }
+    answers: ClassVar[dict[str, Answer]] = {
+        CODE_UNGOVERNED_TEST_FILE: Answer.fix(
+            "name its tree in `paths.test_roots`, give it an `owns_tests:` owner, or rename it "
+            "and claim it with `describes:`"
+        ),
     }
 
     def run(self, graph: DocGraph) -> list[Finding]:
