@@ -33,6 +33,7 @@ from irminsul.errors import UserError
 from irminsul.fences import FenceTracker
 from irminsul.frontmatter_edit import is_frontmatter_delimiter
 from irminsul.git.blame import LineTimes
+from irminsul.git.mtime import git_root_for
 from irminsul.marked_region import MalformedRegion, find_region
 
 REVIEW_VERSION = 1
@@ -306,6 +307,7 @@ def build_review(
     items: list[ReviewItem] = []
     bound_by_path: dict[str, set[str]] = {}
     base_index: dict[str, str | None] = {}
+    uncommitted: dict[str, bool] = {}
     for path, file_line, last_line, sentence in _review_sentences(config, graph, read):
         if changed is not None:
             if not _touches(changed, path, file_line, last_line):
@@ -324,6 +326,10 @@ def build_review(
             if not references:
                 continue
             markers = ["names-code"]
+            if path not in uncommitted:
+                uncommitted[path] = _never_committed(repo_root, config, graph, path, guidance)
+            if uncommitted[path]:
+                markers.append("edited")
         else:
             markers = ["edited"]
             if path not in bound_by_path:
@@ -518,6 +524,16 @@ def _prose_at_ref(
     return _reviewed_text(text, path, guidance, config)
 
 
+def _never_committed(
+    repo_root: Path, config: IrminsulConfig, graph: DocGraph, path: str, guidance: set[str]
+) -> bool:
+    """Whether git holds no commit of this file yet, so it has no "since" and every sentence
+    of it is new. A file outside any repository has no history to be absent from."""
+    if git_root_for(repo_root / path) is None:
+        return False
+    return _prose_at_ref(repo_root, config, graph, "HEAD", path, guidance) is None
+
+
 def _prose_index(text: str) -> str:
     """The sentences of `text`, each reduced by `_comparable`, one to a line.
 
@@ -568,7 +584,11 @@ def marker_meanings(items: list[ReviewItem]) -> dict[str, str]:
 
 
 def review_to_json(items: list[ReviewItem], *, show_all: bool = False) -> str:
-    shown = items if show_all else [item for item in items if item.code_changed_after_doc]
+    shown = (
+        items
+        if show_all
+        else [item for item in items if item.code_changed_after_doc or "edited" in item.markers]
+    )
     return json.dumps(
         {
             "version": REVIEW_VERSION,
@@ -639,8 +659,8 @@ def list_review(
         typer.echo(f"{data['shown']} items this change asks to re-read")
     elif not show_all:
         typer.echo(
-            f"{data['shown']} of {data['total']} sentences naming code name code changed since "
-            "their doc was last committed; pass --all for all of them"
+            f"{data['shown']} of {data['total']} sentences naming code are new or name code "
+            "changed since their doc was last committed; pass --all for all of them"
         )
     for item in items:
         flag = " [code changed after doc]" if item["code_changed_after_doc"] else ""

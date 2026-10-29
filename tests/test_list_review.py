@@ -943,3 +943,27 @@ def test_a_marker_with_no_meaning_cannot_be_shown(tmp_path: Path) -> None:
 
     with pytest.raises(KeyError, match="invented-marker"):
         review_to_json([item], show_all=True)
+
+
+def test_a_doc_no_commit_holds_lists_every_sentence_that_names_code(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _commit_all_in_the_past(root)
+    write(root, "docs/components/fresh.md", _doc("fresh", "`check` exits 1.\n"))
+
+    shown = _items(root, show_all=False)
+    assert [(i["path"], i["sentence"], i["markers"]) for i in shown] == [
+        ("docs/components/fresh.md", "`check` exits 1.", ["names-code", "edited"])
+    ]
+
+    result = runner.invoke(app, ["list", "review", "--path", str(root)])
+    assert "1 of 3 sentences naming code are new or name code changed since" in result.output
+
+
+def test_before_the_first_commit_every_sentence_that_names_code_is_new(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    git_init(root)
+
+    shown = _items(root, "docs/components/pipeline.md", show_all=False)
+
+    assert len(shown) == 2
+    assert all(item["markers"] == ["names-code", "edited"] for item in shown)
