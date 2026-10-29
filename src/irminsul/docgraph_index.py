@@ -2,8 +2,9 @@
 
 `build_graph` builds these once, at its end:
 
-- `inbound_strong` — for each doc id, the set of doc ids whose `depends_on`,
-  `implements`, or implicit `resolved_by` relationship points at it.
+- `inbound_strong` — for each doc id, the set of doc ids whose frontmatter names it through
+  `depends_on`, `implements` or `resolved_by`: an RFC whose `resolved_by` names a decision
+  record is inbound to that record.
 - `inbound_weak` — for each doc id, the set of doc ids whose body contains a
   markdown link resolving to that doc.
 - `headings` — for each doc id, the ordered list of headings in its body.
@@ -80,7 +81,7 @@ def build_inbound_strong(nodes: dict[str, DocNode]) -> dict[str, set[str]]:
         if node.frontmatter.resolved_by is not None:
             target = by_path.get(declared_path(node.frontmatter.resolved_by))
             if target is not None:
-                inbound.setdefault(src_id, set()).add(target.id)
+                inbound.setdefault(target.id, set()).add(src_id)
     return inbound
 
 
@@ -197,11 +198,19 @@ def links_of(tokens: list[Token]) -> list[Link]:
     return out
 
 
-def linked_node(node: DocNode, link: Link, by_path: dict[Path, DocNode]) -> DocNode | None:
-    """The doc a link in `node` points at, or None for an external, same-file or non-doc one."""
+def linked_path(source: str, link: Link, root: str | None = "") -> Path | None:
+    """The path a link in the file at `source` points at, or None for an external or same-file one.
+
+    `source` and `root` are spelled as `resolve_href` takes them.
+    """
     if not link.target or is_external(link.href):
         return None
-    resolved = resolve_href(node.path.as_posix(), link.target)
+    return resolve_href(source, link.target, root)
+
+
+def linked_node(node: DocNode, link: Link, by_path: dict[Path, DocNode]) -> DocNode | None:
+    """The doc a link in `node` points at, or None for an external, same-file or non-doc one."""
+    resolved = linked_path(node.path.as_posix(), link)
     return None if resolved is None else by_path.get(resolved)
 
 

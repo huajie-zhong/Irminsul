@@ -86,9 +86,9 @@ def context_after_edit_json(
 
 
 def refs_json(repo_root: Path, config: IrminsulConfig, target: str) -> str:
-    """The strong and weak inbound references of a doc id or path (`irminsul refs`), as
-    JSON. A target that names no doc raises `RefsError` rather than answering a
-    different question."""
+    """The strong and weak inbound references of a doc id or a doc or guidance file path
+    (`irminsul refs`), as JSON. A target that names none raises `RefsError` rather than
+    answering a different question."""
     graph = build_graph(repo_root, config)
     return doc_refs_report_to_json(build_doc_refs_report(repo_root, graph, target))
 
@@ -255,7 +255,7 @@ def create_server(repo_root: Path) -> MCPServer:
     @server.tool()
     @guarded
     def refs(target: str) -> str:
-        """Call to gauge blast radius before renaming or moving a doc: returns the docs that depend on or link to a doc id or path. A target that names no doc is an error."""
+        """Call to gauge blast radius before renaming or moving a doc: returns the docs and guidance files that depend on or link to a doc id or a doc or guidance file path. A target that names none is an error."""
         return refs_json(root, _config(), target)
 
     @server.tool()

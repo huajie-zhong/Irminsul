@@ -13,9 +13,14 @@ from pathlib import Path
 
 import pytest
 
-from irminsul.refs import RefsError, build_doc_refs_report, doc_refs_report_to_json
+from irminsul.refs import (
+    RefsError,
+    build_doc_refs_report,
+    doc_refs_report_to_json,
+    format_doc_refs_plain,
+)
 
-from .conftest import load_graph, write_config, write_doc
+from .conftest import load_graph, write, write_config, write_doc
 
 FixtureRepo = Callable[[str], Path]
 
@@ -25,18 +30,63 @@ def test_strong_backlinks_come_from_depends_on(fixture_repo: FixtureRepo) -> Non
     report = build_doc_refs_report(repo, load_graph(repo), "0007-depends-on-only")
 
     assert report.target == "0007-depends-on-only"
-    # Strong inbound refs come from `depends_on` plus the resolving ADR
-    # (`resolved_by` is recorded as an inbound strong edge to the RFC).
-    assert [hit.doc_id for hit in report.strong] == ["0001-good-adr", "depends-on-only"]
-    depends_hit = report.strong[1]
+    # The RFC's own `resolved_by` points the other way, so only `depends_on` names it.
+    assert [hit.doc_id for hit in report.strong] == ["depends-on-only"]
+    depends_hit = report.strong[0]
     assert depends_hit.path == "docs/components/depends-on-only.md"
     # Line points at the `- 0007-depends-on-only` entry inside the
     # `depends_on:` frontmatter list, not at the top of the file.
     assert depends_hit.line == 8
-    # The RFC declares its `resolved_by` edge, not the record it names, whose own
-    # frontmatter holds no line for it: line falls back to 1.
-    assert report.strong[0].line == 1
     assert report.weak == []
+
+
+def test_a_record_lists_the_rfcs_that_name_it_through_resolved_by(
+    fixture_repo: FixtureRepo,
+) -> None:
+    repo = fixture_repo("soft-lifecycle")
+    report = build_doc_refs_report(repo, load_graph(repo), "0001-good-adr")
+
+    lines = {hit.doc_id: hit.line for hit in report.strong}
+    assert lines["0001-good"] == 7
+    assert lines["0008-accepted-no-backlink"] == 8
+    assert "0005-implicit-adr" not in lines
+    for hit in report.strong:
+        text = (repo / hit.path).read_text(encoding="utf-8").splitlines()[hit.line - 1]
+        assert text.startswith("resolved_by:"), hit
+
+
+def _guidance_repo(tmp_path: Path) -> Path:
+    write_config(tmp_path, extra='extra_docs = ["README.md"]\n')
+    write_doc(tmp_path, "docs/hub.md", doc_id="hub", body="Back to the [readme](../README.md).")
+    write(tmp_path, "docs/AGENTS.md", "Start at [the hub](hub.md) or the [readme](../README.md).\n")
+    write(tmp_path, "README.md", "# Top\n\n[Self](README.md), [the hub](docs/hub.md).\n")
+    return tmp_path
+
+
+def test_a_link_in_a_guidance_file_is_a_weak_hit_without_a_doc_id(tmp_path: Path) -> None:
+    repo = _guidance_repo(tmp_path)
+    report = build_doc_refs_report(repo, load_graph(repo), "hub")
+
+    assert [(hit.doc_id, hit.path, hit.line) for hit in report.weak] == [
+        (None, "README.md", 3),
+        (None, "docs/AGENTS.md", 1),
+    ]
+    data = json.loads(doc_refs_report_to_json(report))
+    assert data["weak"][0] == {"doc_id": None, "path": "README.md", "line": 3}
+    assert "  docs/AGENTS.md:1" in format_doc_refs_plain(report).splitlines()
+
+
+def test_a_guidance_file_is_a_target_with_every_link_to_it_as_a_weak_hit(tmp_path: Path) -> None:
+    repo = _guidance_repo(tmp_path)
+    for target in ("README.md", "./README.md", str(repo / "README.md")):
+        report = build_doc_refs_report(repo, load_graph(repo), target)
+
+        assert report.target == "README.md"
+        assert report.strong == []
+        assert [(hit.doc_id, hit.path, hit.line) for hit in report.weak] == [
+            (None, "docs/AGENTS.md", 1),
+            ("hub", "docs/hub.md", 10),
+        ]
 
 
 def test_a_strong_hit_through_implements_points_at_its_entry(fixture_repo: FixtureRepo) -> None:

@@ -1,7 +1,9 @@
 """OrphansCheck — docs that nothing links to or claims as a sibling.
 
 Strong (`depends_on`), weak (markdown body links), and structural (folder
-co-location with an INDEX.md) inbound references all count. INDEX.md docs are
+co-location with an INDEX.md) inbound references all count, and so does a doc's own
+`resolved_by` naming a doc: an RFC is placed by the decision record that resolved it even
+when that record does not link back. INDEX.md docs are
 exempt because they're navigation; ADRs are exempt because they're append-only
 and routinely orphaned (linked from PRs and future ADRs, not always from
 existing docs).
@@ -23,7 +25,8 @@ class OrphansCheck:
     default_severity: ClassVar[Severity] = Severity.warning
     explanations: ClassVar[dict[str, str]] = {
         CODE_ORPHAN_DOC: (
-            "No doc links to, or structurally claims, this doc. Add a link from a parent "
+            "No doc links to or names this doc, no INDEX.md sits beside it, and its own "
+            "`resolved_by` names no doc. Add a link from a parent "
             "doc, or put the file in a folder with an INDEX.md. Delete it only when what it "
             "documents is gone; an unreachable doc is usually a missing link, not a "
             "doc nobody needs."
@@ -53,6 +56,9 @@ class OrphansCheck:
             if node.path.parent in indexed_folders:
                 continue
             if inbound:
+                continue
+            resolved_by = node.frontmatter.resolved_by
+            if resolved_by is not None and graph.doc_at(resolved_by) is not None:
                 continue
 
             out.append(

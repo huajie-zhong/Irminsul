@@ -7,7 +7,7 @@ from pathlib import Path
 
 from irminsul.checks.orphans import OrphansCheck
 
-from .conftest import run_check
+from .conftest import run_check, write_config, write_doc
 
 
 def test_orphan_doc_flagged(fixture_repo: Callable[[str], Path]) -> None:
@@ -67,3 +67,29 @@ def test_finding_has_suggestion(fixture_repo: Callable[[str], Path]) -> None:
     stranded = next(f for f in findings if f.doc_id == "stranded")
     assert stranded.suggestion is not None
     assert "INDEX" in stranded.suggestion or "link" in stranded.suggestion.lower()
+
+
+def test_an_rfc_whose_resolved_by_names_a_doc_is_not_an_orphan(tmp_path: Path) -> None:
+    """Nothing links to the RFC and the record does not link back: only its own
+    `resolved_by` places it, and only when it names a doc that exists."""
+    write_config(tmp_path)
+    write_doc(tmp_path, "docs/decisions/record.md", doc_id="record", body="Decides.")
+    write_doc(
+        tmp_path,
+        "docs/rfcs/resolved.md",
+        doc_id="resolved",
+        body="Proposes.",
+        frontmatter_extra=["rfc_state: implemented", "resolved_by: docs/decisions/record.md"],
+    )
+    write_doc(
+        tmp_path,
+        "docs/rfcs/dangling.md",
+        doc_id="dangling",
+        body="Proposes.",
+        frontmatter_extra=["rfc_state: implemented", "resolved_by: docs/decisions/gone.md"],
+    )
+    write_doc(tmp_path, "docs/rfcs/open.md", doc_id="open", body="Proposes.")
+
+    flagged = {f.doc_id for f in run_check(OrphansCheck, tmp_path)}
+
+    assert flagged == {"dangling", "open"}

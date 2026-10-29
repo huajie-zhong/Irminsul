@@ -154,7 +154,8 @@ def test_build_inbound_strong_includes_implements_and_resolved_by() -> None:
     )
 
     inbound = build_inbound_strong({"rfc-1": rfc, "adr-1": adr, "component": component})
-    assert inbound["rfc-1"] == {"adr-1", "component"}
+    assert inbound["rfc-1"] == {"component"}
+    assert inbound["adr-1"] == {"rfc-1"}
 
 
 def test_build_inbound_weak_skips_externals() -> None:

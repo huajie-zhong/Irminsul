@@ -9,6 +9,8 @@ from typer.testing import CliRunner
 
 from irminsul.cli import app
 
+from .conftest import write, write_doc
+
 runner = CliRunner()
 
 
@@ -159,3 +161,19 @@ def test_refs_any_other_unknown_target_points_at_context_topic(tmp_path: Path) -
     assert "irminsul explain" not in result.output
     assert spaced.exit_code == 2
     assert '`irminsul context --topic "markdown links"`' in spaced.output
+
+
+def test_refs_a_guidance_file_target_is_reported_by_its_path(tmp_path: Path) -> None:
+    repo = _make_refs_repo(tmp_path)
+    write(repo, "docs/AGENTS.md", "Start at [the helper](components/helper.md).\n")
+    write_doc(repo, "docs/components/map.md", doc_id="map", body="Read [the map](../AGENTS.md).")
+
+    result = runner.invoke(app, ["refs", "docs/AGENTS.md", "--format", "json", "--path", str(repo)])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["target"] == "docs/AGENTS.md"
+    assert data["strong"] == []
+    assert [(hit["doc_id"], hit["path"]) for hit in data["weak"]] == [
+        ("map", "docs/components/map.md")
+    ]
