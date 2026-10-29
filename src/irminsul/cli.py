@@ -2105,9 +2105,15 @@ def new_component(
                     )
             if rows:
                 surface_groups.append({"kind": kind, "rows": rows})
-        for rel in describes_rel:
-            if rel not in contributing:
-                typer.echo(typer.style(f"note: no derivable surface for: {rel}", fg="yellow"))
+        bare = [rel for rel in describes_rel if rel not in contributing]
+        if bare:
+            typer.echo(
+                typer.style(
+                    f"note: no derivable surface for: {', '.join(bare)} (a surface is the "
+                    "commands, options, routes, exports or environment variables a file declares)",
+                    fg="yellow",
+                )
+            )
 
     spec = NewSpec(
         kind="component",

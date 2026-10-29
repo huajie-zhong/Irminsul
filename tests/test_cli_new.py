@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
 import pytest
+from click import unstyle
 from typer.testing import CliRunner
 
 from irminsul.checks.frontmatter import FrontmatterCheck
@@ -14,7 +16,7 @@ from irminsul.checks.uniqueness import UniquenessCheck
 from irminsul.cli import app
 from irminsul.frontmatter import read_frontmatter
 
-from .conftest import cli_output, load_graph, run_check, write_config
+from .conftest import check_findings, cli_output, load_graph, run_check, write_config
 
 runner = CliRunner()
 
@@ -356,6 +358,89 @@ def test_new_component_from_surface_degrades_for_plain_modules(tmp_path: Path) -
     assert "no derivable surface" in result.output
     body = (repo / "docs" / "components" / "plain.md").read_text(encoding="utf-8")
     assert "## Surface" not in body
+
+
+def test_the_no_surface_note_says_what_a_surface_is_once_for_all_the_files(
+    tmp_path: Path,
+) -> None:
+    repo = _make_repo_with_cli_tool(tmp_path)
+    for name in ("one", "two"):
+        (repo / "src" / f"{name}.py").write_text("def helper() -> int:\n    return 1\n", "utf-8")
+    result = runner.invoke(
+        app,
+        [
+            "new",
+            "component",
+            "Plain",
+            "--describes",
+            "src/one.py",
+            "--describes",
+            "src/two.py",
+            "--describes",
+            "src/tool.py",
+            "--from-surface",
+            "--path",
+            str(repo),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    notes = [line for line in unstyle(result.output).splitlines() if "no derivable" in line]
+    assert len(notes) == 1
+    assert "src/one.py, src/two.py" in notes[0]
+    assert "src/tool.py" not in notes[0]
+    assert (
+        "a surface is the commands, options, routes, exports or environment variables" in notes[0]
+    )
+
+
+def test_a_new_component_says_what_to_write_and_how_to_tie_it_to_code(tmp_path: Path) -> None:
+    repo = _make_repo_with_sources(tmp_path)
+    result = runner.invoke(
+        app,
+        ["new", "component", "Composer", "--describes", "app/composer.py", "--path", str(repo)],
+    )
+    assert result.exit_code == 0, result.output
+
+    doc = repo / "docs" / "components" / "composer.md"
+    [guidance] = re.findall(r"<!-- (Say what the code is for.*?) -->", doc.read_text("utf-8"), re.S)
+    for expected in (
+        "why it works that way",
+        "Class.method",
+        "irminsul anchors --suggest",
+        "claim:",
+    ):
+        assert expected in guidance
+
+
+def test_the_guidance_in_a_new_component_raises_no_finding_of_its_own(tmp_path: Path) -> None:
+    """The guidance names an anchor and a claim in prose, so a check that read the comment as
+    either would report on every scaffolded doc: the findings are those of the doc without it."""
+    repo = _make_repo_with_sources(tmp_path)
+    runner.invoke(
+        app,
+        ["new", "component", "Composer", "--describes", "app/composer.py", "--path", str(repo)],
+    )
+    doc = repo / "docs" / "components" / "composer.md"
+    stable = (
+        doc.read_text(encoding="utf-8")
+        .replace("status: draft", "status: stable")
+        .replace(
+            "# summary: one sentence saying what this doc covers; the agent manifest lists it.",
+            "summary: Composes.",
+        )
+        .replace("<!-- Describe what this component does NOT do. -->", "It composes one thing.")
+    )
+    guidance = re.findall(r"<!-- Say what the code is for.*? -->\n", stable, re.S)
+    assert len(guidance) == 1
+
+    def codes(text: str) -> list[str]:
+        doc.write_text(text, encoding="utf-8")
+        return [
+            f["code"] for f in check_findings(repo) if f["path"] == "docs/components/composer.md"
+        ]
+
+    assert codes(stable) == codes(stable.replace(guidance[0], ""))
 
 
 def test_new_component_from_surface_doc_passes_checks(tmp_path: Path) -> None:

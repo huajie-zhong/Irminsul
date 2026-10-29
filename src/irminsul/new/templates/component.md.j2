@@ -13,6 +13,15 @@ recommended_tests:{% if not tests %} []{% else %}{% for item in tests %}
 {% if split_from %}
 Split from {% for doc in split_from %}{% if not loop.first %}, {% endif %}[{{ doc.title }}]({{ doc.link }}){% endfor %}.
 {% endif %}
+<!-- Say what the code is for, how it works, and why it works that way rather than another.
+     Leave out what the code states itself, such as a default or which function calls which.
+
+     Tie each sentence about code to that code, or it is never re-read when the code changes:
+     - name the code in a code span: `Class.method` binds a method, a path binds a file;
+     - put an anchor marker after the paragraph; `irminsul anchors --suggest` prints each one
+       ready to paste;
+     - or declare a claim in the frontmatter and put `claim:<id>` in a comment after the
+       sentence. -->
 {% if surface %}
 ## Surface
 
