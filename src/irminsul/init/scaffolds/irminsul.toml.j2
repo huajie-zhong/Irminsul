@@ -22,7 +22,7 @@ ref = "origin/main"
 
 [checks]
 enabled = [
-{% for name in default_checks %}    {{ name | tojson }},
+{% for name in enabled_checks %}    {{ name | tojson }},
 {% endfor %}]
 
 [checks.external_links]

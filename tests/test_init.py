@@ -18,7 +18,7 @@ from irminsul.init.command import (
     _MCP_MANUAL_COMMAND,
 )
 
-from .conftest import cli_output, seed_repo
+from .conftest import cli_output, seed_repo, write
 
 runner = CliRunner()
 
@@ -1239,3 +1239,51 @@ def test_the_mcp_warning_does_not_send_you_back_to_the_broken_command(
     assert "irminsul mcp --path ." not in printed
     assert 'python -c "import irminsul, irminsul.mcp_server"' in printed
     assert "pipx install --force irminsul" in printed
+
+
+def test_a_scaffolded_repository_enables_the_check_that_keeps_its_manifest_current(
+    tmp_path: Path,
+) -> None:
+    """`init` writes `docs/AGENTS.md`, whose table only `irminsul fix` rewrites, and `fix`
+    runs the checks `checks.enabled` lists. A doc added later is in the table after `fix`."""
+    target = tmp_path / "demo"
+    target.mkdir()
+    write(target, "src/ledger/store.py", "def put() -> None:\n    pass\n")
+    init = runner.invoke(
+        app, ["init", "--language", "python", "--no-interactive", "--path", str(target)]
+    )
+    assert init.exit_code == 0, init.output
+    new = runner.invoke(
+        app,
+        ["new", "component", "Store", "--describes", "src/ledger/store.py", "--path", str(target)],
+    )
+    assert new.exit_code == 0, cli_output(new)
+    assert "`store`" not in (target / "docs" / "AGENTS.md").read_text(encoding="utf-8")
+
+    fixed = runner.invoke(app, ["fix", "--path", str(target)])
+
+    assert fixed.exit_code == 0, cli_output(fixed)
+    assert "`store`" in (target / "docs" / "AGENTS.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("layout", ["same-repo", "fresh", "siblings"])
+def test_every_layout_enables_agents_manifest(tmp_path: Path, layout: str) -> None:
+    import tomllib
+
+    target = tmp_path / "demo"
+    target.mkdir()
+    args = ["--language", "python", "--no-interactive", "--path", str(target)]
+    if layout == "same-repo":
+        (target / "src").mkdir()
+        argv = ["init", *args]
+    elif layout == "fresh":
+        argv = ["init", "--fresh", *args]
+    else:
+        argv = ["init", "--topology", "siblings", "--code-repo", "../code", *args]
+    assert runner.invoke(app, argv).exit_code == 0
+
+    enabled = tomllib.loads((target / "irminsul.toml").read_text(encoding="utf-8"))["checks"][
+        "enabled"
+    ]
+
+    assert "agents-manifest" in enabled

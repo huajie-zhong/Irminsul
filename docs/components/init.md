@@ -34,6 +34,9 @@ Agent-harness wiring is written after the templates, from module constants rathe
 
 The root `AGENTS.md` is the one template init merges: its section sits between `<!-- irminsul:agents-start -->` and `<!-- irminsul:agents-end -->`, the only part of the file init owns, so init can add it to a file it did not write and `--force` can refresh it alone. A marker inside a code fence is not one, so a file that quotes the pair as an example has no section yet. The section is the one home of the agent loop and posture; this repository's root `AGENTS.md` carries it too, and a test compares the two.
 
+The `checks.enabled` the scaffold writes is every default check plus `agents-manifest` (`_SCAFFOLD_CHECKS` in `src/irminsul/init/command.py`), which is off unless listed. Init writes the `docs/AGENTS.md` table and `irminsul fix` rewrites it only through a check in `checks.enabled`, so a scaffold without that check would answer `fix` with "no automatic fixes available" while the table missed every doc added later. The check stays out of the defaults, so a repository with no `checks.enabled` and no manifest does not start failing.
+<!-- anchor: src/irminsul/init/command.py#_SCAFFOLD_CHECKS @sha256:ff2e37ebed43 -->
+
 The scaffold is born compliant with its own configured checks. Every layer ships a navigation INDEX so sibling docs are never orphans; the components INDEX carries a Scope & Limitations section because that layer sets `require_scope_section`; the INDEX of each not-yet-filled layer is `status: draft`, which `phantom-layer` treats as under construction rather than navigation rot. A fresh same-repo scaffold reports zero errors, and two `foundation-readiness/scaffold-placeholder` warnings on the draft principles and overview until `irminsul seed` fills them. Each prompt there carries `<!-- irminsul:placeholder -->`, so a prompt is found by its marker and never by its wording.
 
 ## Scope & Limitations

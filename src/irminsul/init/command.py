@@ -30,7 +30,7 @@ from urllib.parse import urlsplit
 import typer
 
 from irminsul.atomic import write_atomic
-from irminsul.checks import DEFAULT_CHECKS
+from irminsul.checks import DEFAULT_CHECKS, REGISTRY, AgentsManifestCheck
 from irminsul.config import IrminsulConfig, find_config, load
 from irminsul.errors import UserError
 from irminsul.git.changes import GitChangesError, working_tree_changed_paths
@@ -123,6 +123,14 @@ _CI_WORKSPACE = "workspace"
 _CI_DOCS_PATH = f"{_CI_WORKSPACE}/docs"
 
 _CODE_SIGNAL_DIRS = ("src", "app", "lib")
+
+#: The checks a scaffolded `irminsul.toml` enables: the defaults, and `agents-manifest`, which
+#: is off unless listed but is what `irminsul fix` runs to keep the `docs/AGENTS.md` table
+#: that init writes current. Left out of `DEFAULT_CHECKS` so a repository with no
+#: `checks.enabled` and no manifest does not start failing.
+_SCAFFOLD_CHECKS: Final = tuple(
+    name for name in REGISTRY if name in DEFAULT_CHECKS or name == AgentsManifestCheck.name
+)
 
 SUPPORTED_LANGUAGES = tuple(LANGUAGE_REGISTRY)
 
@@ -590,7 +598,7 @@ def write_scaffold(target_root: Path, answers: InitAnswers, *, force: bool = Fal
         # The generated `irminsul.toml` shows the schema's own defaults and the registry's
         # check list rather than a copy of either, so it cannot drift from them.
         "defaults": IrminsulConfig(),
-        "default_checks": DEFAULT_CHECKS,
+        "enabled_checks": _SCAFFOLD_CHECKS,
         # `seed` renders the principles and overview scaffolds with its answers here.
         "seed": None,
     }

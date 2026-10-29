@@ -23,7 +23,9 @@ from irminsul.frontmatter_edit import split_frontmatter
 FIXTURE_REPOS = Path(__file__).parent / "fixtures" / "repos"
 
 
-def test_scaffolded_config_enables_every_default_check(tmp_path: Path) -> None:
+def test_scaffolded_config_enables_every_default_check_and_the_manifest_check(
+    tmp_path: Path,
+) -> None:
     target = tmp_path / "demo"
     target.mkdir()
     (target / "src").mkdir()
@@ -33,7 +35,9 @@ def test_scaffolded_config_enables_every_default_check(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
 
     checks = tomllib.loads((target / "irminsul.toml").read_text(encoding="utf-8"))["checks"]
-    assert checks["enabled"] == list(DEFAULT_CHECKS)
+    assert checks["enabled"] == [
+        name for name in REGISTRY if name in DEFAULT_CHECKS or name == "agents-manifest"
+    ]
 
 
 def _frontmatter(text: str) -> dict[str, object]:
