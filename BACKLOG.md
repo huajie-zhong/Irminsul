@@ -162,6 +162,24 @@ leaves a project that has not enabled it without the report. Decide whether that
 belongs in `agents-manifest` always or in neither. Found by the marked-region PR on
 2026-10-28.
 
+### `home-paths-are-checked-as-repo-paths`
+
+`code-references/unknown-path` reports `~/.ledger.json` in every doc that gives a
+home-directory default: the rule's "written like a path"
+(`code-is-named-in-code-spans-and-bound-by-anchors`, Decision: "no whitespace, `*` or `://`,
+and a `/` before a last segment with an extension") admits it, and a path under `~` never names
+a repository file. Three docs of the dogfood adoption needed an ignore comment or a rewrite
+(2026-10-29). Add "and does not start with `~`" to that sentence; a Decision edit, so it lands
+once a decision can be edited in place.
+
+### `frontmatter-writer-reorders-keys`
+
+`frontmatter_edit` re-emits keys in canonical order, so the first tool write to a doc authored
+in another order moves keys it did not change: `change finalize` moved `summary:` below
+`describes:` in `docs/components/new-list-regen.md`, and `change transition` did the same in a
+dogfood RFC (2026-10-29). Keep the author's order, or bring every doc into the canonical order
+once so later writes change only what they mean to.
+
 ## Agent workflow
 
 Found by an agent working in this repository, as the root `AGENTS.md` asks.
@@ -190,7 +208,9 @@ without reading. Let evidence name a section or a definition and pin only that p
 accepted RFC `claim-evidence-names-a-part`, resolved into
 `code-is-named-in-code-spans-and-bound-by-anchors`, does it and is not yet implemented. The
 second reset hit it again on 2026-10-29: retargeting one link in `checks.md` re-asked that
-claim, and a help-string edit in the `refs` fix re-asked three claims citing `cli.py`.
+claim, and a help-string edit in the `refs` fix re-asked three claims citing `cli.py`. The
+dogfood fix lanes the same night re-pinned the three `cli.py` claims once per lane and again at
+each rebase, about eight re-reads of three unchanged claims.
 
 ### `after-edit-buries-its-findings`
 
@@ -226,6 +246,43 @@ change to CI and its docs queued 87 items, most of them for such words (PR 11 la
 2026-10-28). A queue that long is skimmed, not read. Bind prose only to names that are
 unambiguous in the repository, and not to a flag that follows another program's name;
 leave plain words to code spans that name them.
+
+A name with two definitions binds to one without saying so: in a component doc about the
+store, `add` bound to the CLI command `add`, not `Ledger.add`, so the queue sent a reader to the
+wrong function for four sentences, and a dotted span resolves by its last segment
+(`UnmatchedPath.recorded_debt` bound to `adoption.recorded_debt`) with no `unbound-name` raised
+(dogfood, 2026-10-29). Show every candidate a name could bind to, or bind none.
+
+### `first-review-after-init-queues-the-scaffold`
+
+The first `list review --changed` after `irminsul init` in a brownfield repository queues 113
+sentences, most of them the managed `AGENTS.md` block and the scaffolded guides, which equal
+their templates; the one wrong sentence in the existing docs sat at the bottom (dogfood
+adoption, 2026-10-29). The `derive-facts` Decision queues "each sentence the change added", so
+the queue keeps them; the plain output could fold text equal to an `init` template into one line
+per file, with JSON unchanged.
+
+### `review-items-carry-no-excerpt`
+
+A review item names the code it binds by `path:line` only, so every item is a file to open: the
+dogfood adoption agent opened `cli.py` to judge the usage guide's "groups by week" (2026-10-29).
+A few lines of the bound definition, under a flag or in JSON, would let a reader judge most items
+in place.
+
+### `stdlib-names-read-as-unbound`
+
+A language's builtins are bound to the language since 2026-10-29, but a standard-library or
+third-party name in a code span, such as `date.fromisoformat` or `monkeypatch.setenv`, is still
+`unbound-name` with "bind it with an anchor", though nothing in the repository can define it
+(dogfood feature lane). Treat a dotted name whose head is importable from the standard library or
+a declared dependency as bound outside the repository.
+
+### `queue-is-unranked`
+
+A feature that adds docs queues every sentence of them: 85 items for the dogfood budget feature,
+about 70 of them the agent's own new sentences, with the claims whose evidence changed under a
+doc nobody edited mixed in (2026-10-29). Group the plain output by marker, the items the change
+did not write first.
 
 ### `init-writes-no-gitattributes`
 

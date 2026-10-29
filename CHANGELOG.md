@@ -1,5 +1,81 @@
 # Changelog
 
+## Unreleased
+
+Gaps that fresh agents hit while adopting Irminsul in a small brownfield project and then
+making a feature, a refactor and an RFC-driven change in it.
+
+**Adopting and scaffolding.**
+- `irminsul init` enables `agents-manifest` in the `irminsul.toml` it writes, in all three
+  layouts. It scaffolds `docs/AGENTS.md`, whose table `irminsul fix` rewrites only through that
+  check, so `fix` used to answer "no automatic fixes available" while the table missed every doc
+  added later. The check stays out of the defaults, so a config that lists no `checks.enabled`
+  and has no manifest does not start failing.
+- `irminsul init --name <name>` names the project instead of the directory, in `irminsul.toml`
+  and every doc that carries it, and answers the prompt for it. An empty `--name` exits 2 before
+  anything is written.
+- `irminsul seed` writes the idea and the first user into the architecture overview after the
+  labels `**Built first:**` and `**First user:**`, with nothing after the answer, so an answer
+  keeps its capital and a trailing period is not doubled.
+- `irminsul new component` writes a guiding comment under the title: what a component doc says,
+  and the three ways to tie a sentence to code, a code span (`Class.method` binds a method), an
+  anchor marker that `irminsul anchors --suggest` prints, or a claim. `--from-surface` names every
+  file with no surface in one note that says what a surface is.
+- `frontmatter/missing-frontmatter` carries a suggestion: add a block on line 1 with the `id` the
+  filename implies, a `title`, a `status` and a `summary`, and, for a file outside every layer
+  folder, move it into its layer after `irminsul refs` shows what links to it.
+
+**Findings and messages.**
+- `check --diff` with a base that does not resolve, such as `origin/main` in a repository with no
+  remote, still exits 2 and now says to pass a ref that exists there, such as the base commit or
+  `HEAD~1`, or to fetch the base (`fetch-depth: 0` in CI).
+- A name the enabled languages define themselves, such as Python's `IndexError` or `len()`, is no
+  longer reported as unbound by `list review` and `anchors --suggest`, and `code-references`
+  reads the same list for a bare `name()` call.
+- `code-references` no longer reads the generated table of `docs/AGENTS.md`, which repeats the
+  summaries of decision records and RFCs that are exempt in their own docs. It judges a code span
+  in a doc's `summary:` at that doc, by that doc's rules.
+- `duplicate-block/repeated-block` reads the WHEN and THEN items under a `#### Scenario:` heading
+  as one block, so scenarios that share an outcome are no longer reported as a repeat to delete; a
+  whole scenario copied still is.
+- A string where a list of mappings belongs, such as a bare path under `required_updates:`, fails
+  with the keys an entry takes (`path`, optional `reason`, optional `kind` of `create`, `update` or
+  `review`), and `change transition <rfc> accepted` prints the same keys beside the empty list it
+  writes.
+- The `unreconciled-scope` blocker of `change verify` and `change finalize` says the change touches
+  components the RFC's `affects` does not declare, to be added if the RFC covers them or moved out
+  of the change. It no longer names a removed code or offers a "reviewed exception" nothing reads.
+- `change finalize`'s `ambiguous-owner` blocker, when no component in `affects` claims a
+  requirement's bindings, names the components that do and lists the declared ones to choose from.
+- The `irminsul new rfc` template asks for the Problem's worked example in plain words, with exact
+  commands, file names and ids under `## Design detail`, so following it no longer draws
+  `rfc-structure/dense-paragraph`.
+- A closed stdout ends the output: `irminsul anchors --help | head -1` exits 1 without a traceback
+  on Windows and on POSIX, and never 0, so a gate cut short cannot pass. An error that names a file
+  is still raised.
+
+**Queries.**
+- `context <path>` for a file the adoption record excepts says, before the edit, that a change
+  editing it must give it an owning doc in the same change, or `check --diff` fails with
+  `diff-integrity/adoption-debt-touched` (`recorded_debt` on the unmatched entry in JSON).
+- `context <path>` for a file that does not exist yet answers the other paths, marks it "(does not
+  exist)", and names the doc whose `describes:` glob would own it, instead of exiting 2 for the
+  whole call. A path outside the repository and every source root is still refused.
+- `context --after-edit` with no `--base-ref` judges the working tree against `HEAD` as before and
+  now says so: `co-change`, `diff-integrity` and `new-dependency` did not run, and `--base-ref
+  <base>` runs them for the branch, or `--base-ref HEAD` for the uncommitted work (JSON `note`).
+- `context --after-edit` leaves the baseline, the adoption record, the manifest and the guidance
+  files out of its unmatched list, since none of them has an owner by design, unless a claim cites
+  one as evidence.
+- `list review --changed` prints what it compared with, `HEAD` or the merge base of `--base-ref`,
+  and without a base, when the branch holds commits the default branch lacks, says that
+  `--base-ref` covers them (JSON `base` and `note`).
+- `list review` no longer splits the marker of a numbered list item, such as `1.`, into a sentence
+  of its own, and without `--changed` it lists every code-naming sentence of a doc no commit holds
+  yet, instead of reporting that none changed since the doc was last committed.
+- `irminsul refs` accepts any Markdown file in the repository as a target, so a brownfield page
+  with no frontmatter can be asked what links to it before it is moved.
+
 ## v0.4.1
 
 The 0.4 release on Irminsul's restarted history, and the one to install. 0.4.0 was published
