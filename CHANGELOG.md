@@ -80,7 +80,8 @@ making a feature, a refactor and an RFC-driven change in it.
 
 The 0.4 release on Irminsul's restarted history, and the one to install. 0.4.0 was published
 from a history that `main` no longer holds, so it is withdrawn: its tag and release page are
-removed and its PyPI files are yanked. 0.4.1 holds everything in 0.4.0 and the changes below.
+removed, and its PyPI files stay, so an install that pins 0.4.0 still works. 0.4.1 holds
+everything in 0.4.0 and the changes below.
 From 0.4.0, the one edit an upgrade can need is a link written for a heading's old slug, which
 `links/unknown-anchor` now reports. The known limitations listed under 0.4.0 still hold.
 
