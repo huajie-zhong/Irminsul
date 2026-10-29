@@ -66,6 +66,19 @@ def test_accept_plan_contains_coupled_edits(repo: Path) -> None:
     assert all(fix.requires_confirm for fix in plan.fixes)
 
 
+def test_accept_note_names_the_keys_of_a_required_update(repo: Path) -> None:
+    """The plan wrote `required_updates: []` beside "(list downstream docs if any)", and a
+    list of path strings then failed to parse."""
+    graph, config = _graph(repo)
+    plan = plan_transition(graph, config, "0004-draft-ready", "accepted", resolved_by=_ADR)
+
+    assert (
+        "required_updates starts empty; list each downstream doc as a mapping with the keys "
+        "path, optional reason, optional kind (create, update or review; update by default)"
+    ) in plan.notes
+    assert "(list downstream docs if any)" not in " ".join(f.description for f in plan.fixes)
+
+
 def test_invalid_transition_blocks(repo: Path) -> None:
     graph, config = _graph(repo)
     plan = plan_transition(graph, config, "0001-accepted-good", "accepted")

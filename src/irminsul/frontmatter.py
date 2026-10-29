@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Final, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic.fields import FieldInfo
 from ruamel.yaml import YAML
 from ruamel.yaml.constructor import ConstructorError, DuplicateKeyError
 from ruamel.yaml.error import MarkedYAMLError, YAMLError
@@ -353,11 +354,34 @@ class ParseFailure:
     data: dict[str, str] | None = None
 
 
+def entry_shape(model: type[BaseModel]) -> str:
+    """The keys a mapping of `model` takes, as one phrase: for `RequiredUpdateEntry`, `path,
+    optional reason, optional kind (create, update or review; update by default)`."""
+    return ", ".join(_entry_key(name, info) for name, info in model.model_fields.items())
+
+
+def _entry_key(name: str, info: FieldInfo) -> str:
+    key = name if info.is_required() else f"optional {name}"
+    annotation = info.annotation
+    if isinstance(annotation, type) and issubclass(annotation, StrEnum):
+        values = [str(member.value) for member in annotation]
+        choices = f"{', '.join(values[:-1])} or {values[-1]}"
+        if isinstance(info.default, StrEnum):
+            choices += f"; {info.default.value} by default"
+        key += f" ({choices})"
+    return key
+
+
 def _format_validation_error(exc: ValidationError) -> str:
     parts: list[str] = []
     for err in exc.errors():
         loc = ".".join(str(x) for x in err["loc"]) or "<root>"
-        parts.append(f"{loc}: {err['msg']}")
+        msg = err["msg"]
+        if err["type"] == "model_type":
+            model = globals().get(str(err.get("ctx", {}).get("class_name")))
+            if isinstance(model, type) and issubclass(model, BaseModel):
+                msg += f"; write it as a mapping with the keys {entry_shape(model)}"
+        parts.append(f"{loc}: {msg}")
     return "; ".join(parts)
 
 

@@ -257,6 +257,27 @@ def test_parse_doc_invalid_frontmatter(tmp_path: Path) -> None:
     assert "title" in result.error
 
 
+def test_a_string_where_an_entry_mapping_belongs_names_the_entry_keys(tmp_path: Path) -> None:
+    """`required_updates` took a list of path strings and said only "Input should be a valid
+    dictionary or instance of RequiredUpdateEntry", with no hint of what the entry holds."""
+    failure = _failed(
+        tmp_path,
+        f"---\n{_REQUIRED}required_updates:\n  - docs/components/cli.md\n---\nBody\n",
+    )
+
+    assert failure.error.startswith("required_updates.0: Input should be a valid dictionary")
+    assert (
+        "write it as a mapping with the keys path, optional reason, "
+        "optional kind (create, update or review; update by default)"
+    ) in failure.error
+
+
+def test_an_error_that_is_not_about_an_entry_gets_no_keys(tmp_path: Path) -> None:
+    failure = _failed(tmp_path, "---\nid: x\n---\nBody\n")
+
+    assert "write it as a mapping" not in failure.error
+
+
 def _parse(tmp_path: Path, text: str) -> ParsedDoc | ParseFailure:
     md = tmp_path / "docs" / "x.md"
     md.parent.mkdir(parents=True, exist_ok=True)

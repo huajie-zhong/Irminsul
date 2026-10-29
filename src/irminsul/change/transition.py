@@ -21,7 +21,9 @@ from irminsul.docgraph import DocGraph, DocNode
 from irminsul.frontmatter import (
     RFC_DECIDED_STATES,
     RFC_STATE_TRANSITIONS,
+    RequiredUpdateEntry,
     RfcStateEnum,
+    entry_shape,
 )
 from irminsul.frontmatter_edit import setter
 
@@ -113,13 +115,10 @@ def plan_transition(
             if resolved_by and resolved_by != fm.resolved_by:
                 fixes.append(_set_fix(node, "resolved_by", resolved_by))
             if fm.required_updates is None:
-                fixes.append(
-                    _set_fix(
-                        node,
-                        "required_updates",
-                        [],
-                        "add required_updates: [] (list downstream docs if any)",
-                    )
+                fixes.append(_set_fix(node, "required_updates", [], "add required_updates: []"))
+                notes.append(
+                    "required_updates starts empty; list each downstream doc as a mapping with "
+                    f"the keys {entry_shape(RequiredUpdateEntry)}"
                 )
         fixes.extend(section_fixes(graph, node, target_state))
 
