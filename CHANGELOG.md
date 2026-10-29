@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## v0.4.1
+
+The 0.4 release on Irminsul's restarted history, and the one to install. 0.4.0 was published
+from a history that `main` no longer holds, so it is withdrawn: its tag and release page are
+removed and its PyPI files are yanked. 0.4.1 holds everything in 0.4.0 and the changes below.
+From 0.4.0, the one edit an upgrade can need is a link written for a heading's old slug, which
+`links/unknown-anchor` now reports. The known limitations listed under 0.4.0 still hold.
+
+### What changed
 
 - `check --diff` no longer compares a change with the accepted RFCs' `affects`:
   `change-binding/touched-but-undeclared` and `change-binding/declared-but-untouched` are
@@ -34,6 +42,13 @@
   owner's section, and an owner's section after `## Design detail` are errors, and an owner's
   paragraph with four or more code spans is a hint. An existing config lists its checks, so it
   runs only once added to `checks.enabled`; `irminsul init` enables it.
+- `irminsul refs` lists everything that names a doc: an RFC whose `resolved_by` names a
+  decision record is listed under that record, at the key's line, and no longer the record
+  under the RFC, and `context`'s `depended_on_by` follows. Links in guidance files, such as the
+  root `AGENTS.md` and `docs/AGENTS.md`, count as weak hits with a `doc_id` of `null`, and a
+  guidance file can itself be the target.
+- A frontmatter value that starts with `!`, which YAML reads as a tag, gets a parse error that
+  says to quote it.
 
 ## v0.4.0
 

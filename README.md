@@ -101,7 +101,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - uses: huajie-zhong/irminsul@v0.4.0
+      - uses: huajie-zhong/irminsul@v0.4.1
         with:
           diff: origin/${{ github.base_ref }}
 ```

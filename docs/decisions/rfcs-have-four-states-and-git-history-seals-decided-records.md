@@ -225,8 +225,8 @@ have recorded something false.
 - The density hint will sometimes fire on a paragraph that needs its names; an ignore comment
   with a reason answers it.
 - No check can tell whether a decision was buried in the agent's part; review still has to.
-- The second reset puts the published `v0.4.0` tag outside `main`'s history, and every clone
-  re-clones.
+- The second reset left the published 0.4.0 outside `main`'s history, so it was withdrawn and
+  0.4.1 released from the new one, and every clone re-clones.
 - A `--diff` run on a branch with an accepted RFC is no longer warned about components that RFC
   does not declare, and nothing now reports an accepted RFC whose components the diff does not
   touch.
