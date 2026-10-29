@@ -23,6 +23,8 @@ It writes only two docs, the foundation principles and the architecture overview
 
 Input arrives from prompts, or from `--principle`, `--idea`, `--belief`, `--first-user`, `--non-goals` and `--direction-risks` with `--no-interactive`, where a missing required field is an error and never invented intent. `--reseed` overwrites an authored doc and `--merge` appends a dated pass instead.
 
+An answer is inserted as typed. The scaffolds place it on a line of its own or after a label's colon, as in `src/irminsul/init/scaffolds/docs/architecture/overview.md.j2`, and write nothing after it, so a proper noun keeps its capital and an answer that ends in a period does not gain a second. A sentence built around an answer would force one of two wrong results: a capital in mid-sentence, or lowercasing words the author spelled on purpose.
+
 The scaffold writes `<!-- irminsul:placeholder -->` beside each prompt, and `placeholder_lines()` in `src/irminsul/init/placeholders.py` reads which lines a marker covers for both `seed` and the `foundation-readiness` [check](checks.md). No list of the prompts' words exists, so rewording a prompt cannot hide it from either ([Derive facts and leave meaning to the reader](../decisions/derive-facts-and-leave-meaning-to-the-reader.md)).
 
 ## Scope & Limitations

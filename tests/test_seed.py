@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -71,6 +72,42 @@ def test_seed_with_flags_writes_the_two_foundation_docs(tmp_path: Path) -> None:
     # The principles and overview docs only: no decision record and no RFC.
     assert result.stdout.count(".md") == 2, result.stdout
     assert not (repo / "docs/rfcs/initial-direction.md").exists()
+
+
+@pytest.mark.parametrize("ending", [".", ""])
+def test_an_answer_stands_as_typed_where_the_overview_inserts_it(
+    tmp_path: Path, ending: str
+) -> None:
+    """The template never writes into a sentence of its own around an answer, so the answer
+    keeps its capital, its proper nouns and its own ending, and a period it ends with is not
+    doubled by one the template adds."""
+    repo = _fresh_repo(tmp_path)
+    idea = f"A tiny ledger CLI for Ada's team{ending}"
+    first_user = f"A developer who tracks spending with Ledgerly{ending}"
+    result = runner.invoke(
+        app,
+        [
+            "seed",
+            "--no-interactive",
+            "--principle",
+            "Money moves are append-only",
+            "--idea",
+            idea,
+            "--belief",
+            "People trust what they can audit",
+            "--first-user",
+            first_user,
+            "--path",
+            str(repo),
+        ],
+    )
+    assert result.exit_code == 0, cli_output(result)
+
+    overview = (repo / "docs/architecture/overview.md").read_text(encoding="utf-8")
+
+    for answer in (idea, first_user):
+        assert re.search(rf"^(?:- \*\*[^*:]+:\*\* )?{re.escape(answer)}$", overview, re.M), overview
+    assert ".." not in overview
 
 
 def test_seed_clears_foundation_readiness_warning(tmp_path: Path) -> None:
