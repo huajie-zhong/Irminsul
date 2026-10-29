@@ -146,6 +146,22 @@ def test_finalize_unreconciled_scope_blocks(repo: Path) -> None:
     assert any(b.code == "unreconciled-scope" for b in plan.blockers)
 
 
+def test_unreconciled_scope_names_the_gap_and_two_ways_out(repo: Path) -> None:
+    """The blocker said "touched-but-undeclared", a retired code, and offered "a reviewed
+    exception" that nothing reads."""
+    (repo / "app" / "billing" / "extra.py").write_text("x = 1\n", encoding="utf-8")
+    graph, config = _graph(repo)
+    plan = plan_finalize(graph, config, repo, _RFC, bindings=_BINDINGS, env={})
+
+    [blocker] = [b for b in plan.blockers if b.code == "unreconciled-scope"]
+    assert "does not declare: billing" in blocker.message
+    assert "touched-but-undeclared" not in blocker.message
+    assert blocker.suggestion is not None
+    assert "add them to `affects`" in blocker.suggestion
+    assert "move that work out" in blocker.suggestion
+    assert "exception" not in blocker.suggestion
+
+
 def test_finalize_apply_end_to_end_and_idempotent(repo: Path) -> None:
     graph, config = _graph(repo)
     plan = plan_finalize(graph, config, repo, _RFC, bindings=_BINDINGS, env={})

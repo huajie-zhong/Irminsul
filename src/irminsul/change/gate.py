@@ -397,9 +397,9 @@ def _scope(rfc: DocNode, footprint: Footprint) -> list[Issue]:
         out.append(
             Issue(
                 CODE_UNRECONCILED_SCOPE,
-                "touched-but-undeclared component(s) must be reconciled before "
-                f"finalization: {', '.join(undeclared)}",
-                "update `affects` or record a reviewed exception in the RFC",
+                "the change touches component(s) this RFC's `affects` does not declare: "
+                f"{', '.join(undeclared)}",
+                "add them to `affects` if the RFC covers them, or move that work out of this change",
                 rfc.path.as_posix(),
             )
         )
