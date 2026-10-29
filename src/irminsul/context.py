@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import posixpath
 import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
@@ -26,6 +27,7 @@ from irminsul.errors import UserError
 from irminsul.frontmatter import RFC_OPEN_STATES, ClaimRelationEnum
 from irminsul.git.changes import working_tree_changed_paths
 from irminsul.ranked_tests import Ranker
+from irminsul.regen.agents_md import manifest_rel_path
 
 if TYPE_CHECKING:
     from irminsul.change.report import ChangeBaseline, ResolvedBase
@@ -663,6 +665,7 @@ def _pending_for_changed(
 
     changed_claims = resolve_claims(graph, changed_paths)
     test_owners = _declared_test_routes(graph, changed_paths)
+    tool_files = _tool_files(graph.config)
 
     for changed_path in changed_paths:
         rel = Path(PurePosixPath(changed_path))
@@ -697,12 +700,15 @@ def _pending_for_changed(
                 group.source_claims.add(ownership.pattern)
             continue
 
+        governed_by = _governing_claims(graph, changed_path)
+        if changed_path in tool_files and not governed_by:
+            continue
         unmatched.append(
             UnmatchedPath(
                 path=changed_path,
                 reason=ownership.reason or "no owning doc found",
                 candidates=[_doc_ref(node) for node in ownership.candidates],
-                governed_by=_governing_claims(graph, changed_path),
+                governed_by=governed_by,
             )
         )
 
@@ -716,6 +722,18 @@ def _pending_for_changed(
     ]
     unmatched.sort(key=lambda item: item.path)
     return pending, unmatched
+
+
+def _tool_files(config: IrminsulConfig | None) -> frozenset[str]:
+    """The files Irminsul writes and judges itself, named by the paths the config sets.
+
+    No doc is meant to own the baseline, the adoption record or the manifest, so editing one
+    is not a gap an agent should answer by finding it an owner.
+    """
+    if config is None:
+        return frozenset()
+    names = (config.paths.baseline, config.paths.adoption, manifest_rel_path(config).as_posix())
+    return frozenset(posixpath.normpath(name.replace("\\", "/")) for name in names)
 
 
 def _declared_test_routes(

@@ -1694,3 +1694,45 @@ def test_every_omitted_rfc_is_named_and_the_named_command_shows_it(tmp_path: Pat
 
     lifecycle = runner.invoke(app, ["list", "lifecycle", "--path", str(repo)])
     assert not any(rfc_id in lifecycle.output for rfc_id in omitted)
+
+
+def _unmatched_after_editing_tool_files(repo: Path, baseline: str, adoption: str) -> list[str]:
+    seed_repo(repo, "initial")
+    write(repo, baseline, '{"version": 1, "findings": []}\n')
+    write(repo, adoption, '{"version": 1, "unowned": []}\n')
+    write(repo, "docs/AGENTS.md", "# Agents\n")
+    write(repo, "src/mylib/new.py", "def new(): pass\n")
+
+    result = runner.invoke(
+        app, ["context", "--after-edit", "--format", "json", "--path", str(repo)]
+    )
+
+    return [item["path"] for item in json.loads(result.output)["unmatched"]]
+
+
+def test_context_after_edit_leaves_the_files_irminsul_writes_out_of_unmatched(
+    tmp_path: Path,
+) -> None:
+    repo = _make_context_repo(tmp_path)
+
+    unmatched = _unmatched_after_editing_tool_files(
+        repo, ".irminsul-baseline.json", ".irminsul-adoption.json"
+    )
+
+    assert unmatched == ["src/mylib/new.py"]
+
+
+def test_the_files_irminsul_writes_are_the_ones_the_config_names(tmp_path: Path) -> None:
+    repo = _make_context_repo(tmp_path)
+    toml = repo / "irminsul.toml"
+    toml.write_text(
+        toml.read_text(encoding="utf-8").replace(
+            'source_roots = ["src"]',
+            'source_roots = ["src"]\nbaseline = "meta/base.json"\nadoption = "meta/adopt.json"',
+        ),
+        encoding="utf-8",
+    )
+
+    unmatched = _unmatched_after_editing_tool_files(repo, "meta/base.json", "meta/adopt.json")
+
+    assert unmatched == ["src/mylib/new.py"]
