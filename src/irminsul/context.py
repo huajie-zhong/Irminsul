@@ -665,7 +665,7 @@ def _pending_for_changed(
 
     changed_claims = resolve_claims(graph, changed_paths)
     test_owners = _declared_test_routes(graph, changed_paths)
-    tool_files = _tool_files(graph.config)
+    unowned_by_design = _tool_files(graph.config) | {file.display for file in graph.guidance_files}
 
     for changed_path in changed_paths:
         rel = Path(PurePosixPath(changed_path))
@@ -701,7 +701,7 @@ def _pending_for_changed(
             continue
 
         governed_by = _governing_claims(graph, changed_path)
-        if changed_path in tool_files and not governed_by:
+        if changed_path in unowned_by_design and not governed_by:
             continue
         unmatched.append(
             UnmatchedPath(

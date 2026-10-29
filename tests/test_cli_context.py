@@ -1736,3 +1736,27 @@ def test_the_files_irminsul_writes_are_the_ones_the_config_names(tmp_path: Path)
     unmatched = _unmatched_after_editing_tool_files(repo, "meta/base.json", "meta/adopt.json")
 
     assert unmatched == ["src/mylib/new.py"]
+
+
+def test_context_after_edit_leaves_guidance_files_out_of_unmatched(tmp_path: Path) -> None:
+    repo = _make_context_repo(tmp_path)
+    toml = repo / "irminsul.toml"
+    toml.write_text(
+        toml.read_text(encoding="utf-8").replace(
+            'source_roots = ["src"]',
+            'source_roots = ["src"]\nextra_docs = ["README.md", "AGENTS.md", "NOTES.md"]',
+        ),
+        encoding="utf-8",
+    )
+    seed_repo(repo, "initial")
+    for guidance in ("AGENTS.md", "README.md", "NOTES.md", "docs/CONTRIBUTING.md"):
+        write(repo, guidance, "# Guidance\n")
+    write(repo, "src/mylib/new.py", "def new(): pass\n")
+
+    result = runner.invoke(
+        app, ["context", "--after-edit", "--format", "json", "--path", str(repo)]
+    )
+
+    assert [item["path"] for item in json.loads(result.output)["unmatched"]] == [
+        "src/mylib/new.py"
+    ]
