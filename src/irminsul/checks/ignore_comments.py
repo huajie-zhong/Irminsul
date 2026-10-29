@@ -4,20 +4,22 @@ A doc silences one check's hint and time findings, or one such finding code, wit
 HTML comment:
 
 - `<!-- irminsul:ignore code-references reason="..." -->` covers its own line, or the next
-  non-blank line when the comment stands alone;
+  non-blank line when the comment stands alone, and every line of a fenced block when that
+  line opens one;
 - `<!-- irminsul:ignore-start code-references/unknown-symbol reason="..." -->` through the matching
-  `irminsul:ignore-end` covers every line between them.
+  `irminsul:ignore-end` covers every line between them, fenced lines included.
 
-Certain findings cannot be silenced this way. `irminsul check` reports comments that name
-only certain findings or nothing known, blocks left open or closed without a start, and
-comments that suppressed nothing.
+A comment written inside a fence is part of the example and is never read. Certain findings
+cannot be silenced this way. `irminsul check` reports comments that name only certain
+findings or nothing known, blocks left open or closed without a start, and comments that
+suppressed nothing.
 """
 
 from __future__ import annotations
 
 import re
 import weakref
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar, Final
@@ -189,19 +191,21 @@ def _time_only(checks: dict[str, type[FindingSource]], name: str) -> bool:
     return bool(suppressible) and all(c is FindingClass.time for c in suppressible)
 
 
-_collect_cache: dict[int, tuple[list[_Comment], list[Finding]]] = {}
+@dataclass(frozen=True)
+class _Scanned:
+    comments: list[_Comment]
+    problems: list[Finding]
+    coverable: dict[Path, frozenset[int]]
 
 
-def _collect(graph: DocGraph) -> tuple[list[_Comment], list[Finding]]:
-    """`_scan_all` for this graph, scanned once and handed out fresh each call.
+_collect_cache: dict[int, _Scanned] = {}
+
+
+def _scanned(graph: DocGraph) -> _Scanned:
+    """`_scan_all` for this graph, scanned once.
 
     A command that runs checks one at a time, such as `irminsul context`, comes here once
     per enabled check, and a scan reads every doc body and every guidance file.
-
-    The callers mutate what they get back: `_Comment.used` is set when a comment
-    suppresses something, and `problems` is appended to. So the cache holds the scan and
-    each call gets its own copies: a comment's `used` flag starts false on every call,
-    and one pass never sees what another suppressed.
     """
     key = id(graph)
     cached = _collect_cache.get(key)
@@ -211,7 +215,26 @@ def _collect(graph: DocGraph) -> tuple[list[_Comment], list[Finding]]:
         # Keyed by identity, so the entry has to die with the graph: `id()` is reused
         # once an object is collected, and a stale entry would answer for a later graph.
         weakref.finalize(graph, _collect_cache.pop, key, None)
-    comments, problems = cached
+    return cached
+
+
+def coverable_lines(graph: DocGraph) -> Mapping[Path, frozenset[int]]:
+    """The lines of each file an ignore comment can cover: the body lines of every doc and
+    every line of each guidance file outside the graph, fenced lines included. A finding of
+    a code that answers on its line has to sit on one of them."""
+    return _scanned(graph).coverable
+
+
+def _collect(graph: DocGraph) -> tuple[list[_Comment], list[Finding]]:
+    """The comments and malformed markers of this graph, handed out fresh each call.
+
+    The callers mutate what they get back: `_Comment.used` is set when a comment
+    suppresses something, and `problems` is appended to. So the cache holds the scan and
+    each call gets its own copies: a comment's `used` flag starts false on every call,
+    and one pass never sees what another suppressed.
+    """
+    cached = _scanned(graph)
+    comments, problems = cached.comments, cached.problems
     fresh = [
         _Comment(
             path=comment.path,
@@ -226,19 +249,25 @@ def _collect(graph: DocGraph) -> tuple[list[_Comment], list[Finding]]:
     return fresh, list(problems)
 
 
-def _scan_all(graph: DocGraph) -> tuple[list[_Comment], list[Finding]]:
+def _scan_all(graph: DocGraph) -> _Scanned:
     """Comments in every doc and in the guidance files outside the graph, such as the README."""
     comments: list[_Comment] = []
     problems: list[Finding] = []
+    coverable: dict[Path, frozenset[int]] = {}
+
+    def scan(path: Path, doc_id: str | None, numbered: list[tuple[int, str]]) -> None:
+        lines: set[int] = set()
+        _scan(path, doc_id, numbered, comments, problems, lines)
+        coverable[path] = frozenset(lines)
+
     for node in graph.nodes.values():
         numbered = [(node.file_line(n), line) for n, line in enumerate(node.body.splitlines(), 1)]
-        _scan(node.path, node.id, numbered, comments, problems)
+        scan(node.path, node.id, numbered)
     for guidance in graph.guidance_files:
         if Path(guidance.display) in graph.by_path or guidance.text is None:
             continue
-        numbered = list(enumerate(guidance.text.splitlines(), 1))
-        _scan(Path(guidance.display), None, numbered, comments, problems)
-    return comments, problems
+        scan(Path(guidance.display), None, list(enumerate(guidance.text.splitlines(), 1)))
+    return _Scanned(comments, problems, coverable)
 
 
 def _scan(
@@ -247,15 +276,34 @@ def _scan(
     numbered: list[tuple[int, str]],
     comments: list[_Comment],
     problems: list[Finding],
+    coverable: set[int],
 ) -> None:
+    """Read the comments of one file into `comments`, and every line a comment could cover
+    into `coverable`.
+
+    A fenced line is covered by the standalone comment whose next non-blank line opens the
+    fence, or by an open block, and never holds a comment of its own: a comment in an
+    example is part of the example.
+    """
     open_blocks: dict[tuple[str, ...], _Comment] = {}
     pending: _Comment | None = None
+    above_fence: _Comment | None = None
     # A toggle on any three backticks would read a four-backtick example that quotes a fenced
     # block as closing early, so an ignore comment in the example would become a live one.
     fence = FenceTracker()
     for file_line, line in numbered:
-        if fence.consume(line):
+        reading = fence.classify(line)
+        if reading != "outside":
+            if reading == "marker" and fence.inside:
+                above_fence, pending = pending, None
+            for comment in (above_fence, *open_blocks.values()):
+                if comment is not None:
+                    comment.lines.add(file_line)
+            coverable.add(file_line)
+            if not fence.inside:
+                above_fence = None
             continue
+        coverable.add(file_line)
         if pending is not None and line.strip():
             pending.lines.add(file_line)
             pending = None

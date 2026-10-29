@@ -6,7 +6,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from .conftest import check_codes, write_config
+from .conftest import check_codes, check_findings, write_config
 
 runner = CliRunner()
 
@@ -149,7 +149,52 @@ def test_backticks_inside_a_tilde_fence_do_not_close_it() -> None:
     ]
     comments: list = []
     problems: list = []
-    _scan(Path("docs/a.md"), "a", list(enumerate(lines, 1)), comments, problems)
+    _scan(Path("docs/a.md"), "a", list(enumerate(lines, 1)), comments, problems, set())
 
     assert comments == []
     assert problems == []
+
+
+# A fenced block whose third line names a variable no source reads.
+_FENCE = "```text\nexport it first\nSTORE_PATH\n```\n"
+_ENV_COMMENT = (
+    '<!-- irminsul:ignore code-references/unknown-env-var reason="the shell sets it" -->\n'
+)
+
+
+def test_a_fenced_variable_is_reported(tmp_path: Path) -> None:
+    assert check_codes(_repo(tmp_path, _FENCE)) == ["code-references/unknown-env-var"]
+
+
+def test_a_comment_above_a_fence_covers_its_lines(tmp_path: Path) -> None:
+    root = _repo(tmp_path, f"{_ENV_COMMENT}\n{_FENCE}")
+    assert check_codes(root) == []
+
+
+def test_a_comment_above_a_fence_covers_that_fence_and_not_the_line_after(
+    tmp_path: Path,
+) -> None:
+    root = _repo(tmp_path, f"{_ENV_COMMENT}{_FENCE}\n{_UNKNOWN_VAR}\n")
+    reported = [(f["code"], f["line"]) for f in check_findings(root)]
+    assert reported == [("code-references/unknown-env-var", 16)]
+
+
+def test_a_block_around_a_fence_covers_its_lines(tmp_path: Path) -> None:
+    root = _repo(
+        tmp_path,
+        '<!-- irminsul:ignore-start code-references/unknown-env-var reason="the shell sets it" -->\n'
+        f"{_FENCE}"
+        "<!-- irminsul:ignore-end code-references/unknown-env-var -->\n",
+    )
+    assert check_codes(root) == []
+
+
+def test_a_comment_inside_a_fence_covers_nothing_and_is_not_reported(tmp_path: Path) -> None:
+    root = _repo(
+        tmp_path,
+        "```md\n"
+        '<!-- irminsul:ignore code-references reason="an example of the syntax" -->\n'
+        "STORE_PATH\n"
+        "```\n",
+    )
+    assert check_codes(root) == ["code-references/unknown-env-var"]

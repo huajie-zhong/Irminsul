@@ -53,6 +53,10 @@ making a feature, a refactor and an RFC-driven change in it.
 - A closed stdout ends the output: `irminsul anchors --help | head -1` exits 1 without a traceback
   on Windows and on POSIX, and never 0, so a gate cut short cannot pass. An error that names a file
   is still raised.
+- An ignore comment standing alone above a fenced block covers every line of the block, and an
+  `ignore-start`/`ignore-end` pair covers the fenced lines between them. A comment above a fence
+  used to cover the first line after the fence instead, so one that relied on that is now
+  reported as unused. A comment inside a fence is still part of the example and is not read.
 
 **Queries.**
 - `context <path>` for a file the adoption record excepts says, before the edit, that a change
