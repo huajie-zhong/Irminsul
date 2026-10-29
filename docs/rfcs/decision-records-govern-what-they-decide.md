@@ -343,7 +343,11 @@ answers are four: fix, line, pin and trailer.
 - **`every-warning-hint-has-an-answer`** (accepted 2026-10-29). It defines the acknowledgement
   step, the trailer grammar and the answer each code declares; this RFC builds on them and
   defines none of them again. Its requirement `acknowledgement-step` reads trailers only, and
-  it depends on this RFC for that. Three of its table rows change here:
+  it depends on this RFC for that. The dependency runs the other way in code: the owner chose on
+  2026-10-29 that its step (its T1, T2 and T7, and T18's trailer for `decision-rewritten`) lands
+  before this RFC, since without it a record whose `governs:` must resolve cannot also serve as
+  the excuse the nine record tests read, and no Decision edit has an answer. Three of its table
+  rows change here:
   - `decision-rewritten`, "a wording correction; a changed decision is superseded", becomes the
     in-place edit with a Changes item, and its class follows decision 4;
   - `accepted-decision-removed`, "fix: deprecate it, then delete it in a later change", becomes
@@ -506,6 +510,23 @@ reset, so it needs no temporary exclusion.
   `docs/components/new-list-regen.md`.
 - The record excuse's sentences in `docs/components/config.md`, `docs/components/baseline.md`
   and the root `AGENTS.md` are the every-hint RFC's.
+
+### Implementation answers
+
+The owner answered on 2026-10-29 what an independent review of the implementation plan found
+the spec leaves open:
+
+- **A bare entry** is a setting when the config schema declares that dotted name, and a path
+  otherwise; an entry holding `/`, `#` or a glob character is always a path.
+- **`governs:` on a doc outside the decisions layer** is reported, not ignored, since a key that
+  does nothing reads as if it works.
+- **The sign-offs `context` lists** for a path are the trailers that name that path or its owning
+  doc, not every trailer of every commit that touched it.
+- **`new adr --split-from`** is repeatable, as `new component`'s is.
+- **`new adr` refuses an entry that resolves to nothing**, so a new record never starts with a
+  certain `unresolved-governs`.
+- **Sign-offs do not follow renames**: a renamed file's earlier trailers are listed under its old
+  path only. A limitation.
 
 ### Not chosen, and out of scope
 
