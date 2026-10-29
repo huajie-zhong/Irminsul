@@ -1548,7 +1548,8 @@ def _unjudged_note() -> str:
     With no base the working tree is compared with `HEAD` by the delta alone. `check --diff HEAD`
     is the same uncommitted work with those passes run, so it is the command to name.
     """
-    names = ", ".join(f"`{name}`" for name in CHANGE_PASSES)
+    *first, last = (f"`{name}`" for name in CHANGE_PASSES)
+    names = f"{', '.join(first)} and {last}"
     return (
         f"no base was given, so the working tree was compared with HEAD and {names}, which "
         "judge a change, did not run; `--base-ref <base>` runs them for the whole branch, "

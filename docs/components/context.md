@@ -33,7 +33,7 @@ claims:
       - src/irminsul/context.py
       - src/irminsul/git/mtime.py
     pinned:
-      src/irminsul/context.py: sha256:25a24aa74203
+      src/irminsul/context.py: sha256:1623bcb557c4
       src/irminsul/git/mtime.py: sha256:c71794836a12
 ---
 
@@ -102,7 +102,7 @@ names `--base-ref <base>` for the whole branch and `--base-ref HEAD` for the unc
 work alone. The verdict itself is the same with or without the note: an edit to a file
 the adoption record excepts passes here and fails under `--base-ref HEAD`.
 <!-- anchor: src/irminsul/context.py#ChangeValidation.note @sha256:fdfc2efcbd75 -->
-<!-- anchor: src/irminsul/checks/pipeline.py#CHANGE_PASSES @sha256:5289621690ed -->
+<!-- anchor: src/irminsul/checks/pipeline.py#CHANGE_PASSES @sha256:14a5db692c54 -->
 
 ## Content excerpts
 

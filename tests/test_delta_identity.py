@@ -185,7 +185,9 @@ def test_an_unrelated_insertion_does_not_introduce_the_old_violation(tmp_path: P
     validation = json.loads(result.output)["validation"]
 
     assert validation["repository"]["state"] == "failed"
-    assert validation["change"] == {
+    change = validation["change"]
+    assert "no base was given" in change.pop("note")
+    assert change == {
         "state": "passed",
         "new_errors": 0,
         "baseline": "HEAD",

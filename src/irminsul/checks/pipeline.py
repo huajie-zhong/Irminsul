@@ -74,8 +74,11 @@ PASSES: Final[dict[str, type[Pass]]] = {
 
 
 #: The passes that judge a change rather than the tree: each reads `graph.change` and reports
-#: nothing for a graph with no range, so a run given no base has not run them.
-CHANGE_PASSES: Final = ("co-change", "diff-integrity", "new-dependency")
+#: nothing for a graph with no range, so a run given no base has not run them. Named through
+#: their classes, so a rename follows.
+CHANGE_PASSES: Final = tuple(
+    cls.name for cls in (CoChangePass, DiffIntegrityPass, NewDependencyPass)
+)
 
 
 @cache
