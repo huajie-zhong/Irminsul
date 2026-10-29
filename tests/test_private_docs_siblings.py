@@ -297,13 +297,30 @@ def test_sibling_source_files_answer_to_their_display_spelling(tmp_path: Path) -
     assert "owner: core" in result.output
 
 
-def test_a_display_spelling_that_names_nothing_still_fails(tmp_path: Path) -> None:
+def test_a_display_spelling_that_names_nothing_is_reported_as_missing(tmp_path: Path) -> None:
     """The mirror: the fallback resolves real files under a configured root, it
-    does not accept any string that happens to look like one."""
+    does not accept any string that happens to look like one. Such a string is a
+    file that does not exist, and no doc's glob owns it."""
     repo_root = _build_siblings(tmp_path)
     result = runner.invoke(app, ["context", "gone.py", "--path", str(repo_root)])
-    assert result.exit_code == 2
-    assert "path does not exist" in result.output
+    assert result.exit_code == 1
+    assert "gone.py: no owning doc found (does not exist)" in result.output
+
+
+def test_a_new_file_under_a_sibling_root_is_owned_by_the_glob_that_covers_it(
+    tmp_path: Path,
+) -> None:
+    """Before a file is created in the code repository, `context ../code/src/extra.py` maps it to
+    the display spelling `extra.py` and names the doc whose `describes:` glob would own it."""
+    repo_root = _build_siblings(tmp_path)
+    doc = repo_root / "docs" / "components" / "core.md"
+    doc.write_text(_DOC.format(claim="'*.py'"), encoding="utf-8")
+
+    result = runner.invoke(app, ["context", "../code/src/extra.py", "--path", str(repo_root)])
+
+    assert result.exit_code == 0, result.output
+    assert "owner: core" in result.output
+    assert "input: extra.py (does not exist)" in result.output
 
 
 def test_mtime_uses_the_sibling_code_repos_own_history(tmp_path: Path) -> None:

@@ -565,6 +565,34 @@ def test_external_display_for_path_refuses_a_colliding_spelling(tmp_path: Path) 
     assert external_display_for_path(docs, roots, code2 / "src" / "pkg" / "core.py") is None
 
 
+def test_external_display_for_path_maps_a_file_not_created_yet_only_when_nothing_collides(
+    tmp_path: Path,
+) -> None:
+    """A file that is not there has nothing to decode to, so its spelling is accepted unless
+    the spelling already names a file; without the flag it is still refused."""
+    from irminsul.checks.globs import external_display_for_path
+
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    code = tmp_path / "code"
+    _make_tree(code, ["src/pkg/core.py"])
+    roots = ["../code/src"]
+    fresh = code / "src" / "pkg" / "fresh.py"
+
+    assert external_display_for_path(docs, roots, fresh) is None
+    assert external_display_for_path(docs, roots, fresh, not_yet_created=True) == "pkg/fresh.py"
+    other = tmp_path / "code2" / "src" / "pkg" / "core.py"
+    assert (
+        external_display_for_path(
+            docs, ["../code/src", "../code2/src"], other, not_yet_created=True
+        )
+        is None
+    )
+    assert (
+        external_display_for_path(docs, roots, tmp_path / "stray.py", not_yet_created=True) is None
+    )
+
+
 def test_is_external_source_location_only_covers_roots_outside_the_repo(tmp_path: Path) -> None:
     """In-repo source is classified by its repo-relative prefix, so the disk
     test exists only for the siblings case where no prefix survives."""

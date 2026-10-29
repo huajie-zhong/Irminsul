@@ -709,6 +709,7 @@ def test_context_after_edit_groups_by_owner_and_reports_unmatched(tmp_path: Path
             "candidates": [],
             "governed_by": [],
             "recorded_debt": None,
+            "missing": False,
         }
     ]
 
@@ -814,6 +815,7 @@ def test_context_after_edit_reports_rename_destination_only(tmp_path: Path) -> N
             "candidates": [],
             "governed_by": [],
             "recorded_debt": None,
+            "missing": False,
         }
     ]
 
@@ -868,13 +870,67 @@ def test_context_takes_several_paths(tmp_path: Path) -> None:
     assert owners == ["core", "helper"]
 
 
-def test_context_missing_path_is_a_usage_error(tmp_path: Path) -> None:
+def test_a_missing_path_no_doc_would_own_is_reported_and_not_refused(tmp_path: Path) -> None:
     repo = _make_context_repo(tmp_path)
 
     result = runner.invoke(app, ["context", "src/mylib/missing.py", "--path", str(repo)])
 
+    assert result.exit_code == 1
+    assert "src/mylib/missing.py: no owning doc found (does not exist)" in result.output
+
+
+def test_a_file_that_does_not_exist_yet_is_answered_with_the_doc_that_would_own_it(
+    tmp_path: Path,
+) -> None:
+    repo = _make_context_repo(tmp_path)
+    core = repo / "docs" / "components" / "core.md"
+    core.write_text(
+        core.read_text(encoding="utf-8").replace(
+            "  - src/mylib/core_extra.py\n", "  - src/mylib/core_extra.py\n  - src/mylib/new/*.py\n"
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "context",
+            "src/mylib/new/fresh.py",
+            "src/mylib/helper.py",
+            "src/mylib/ghost.py",
+            "--format",
+            "json",
+            "--path",
+            str(repo),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    by_owner = {item["owner"]["id"]: item for item in data["results"]}
+    assert sorted(by_owner) == ["core", "helper"]
+    assert by_owner["core"]["input"] == ["src/mylib/new/fresh.py"]
+    assert by_owner["core"]["missing_inputs"] == ["src/mylib/new/fresh.py"]
+    assert by_owner["core"]["source_claims"] == ["src/mylib/new/*.py"]
+    assert by_owner["helper"]["missing_inputs"] == []
+    [ghost] = data["unmatched"]
+    assert (ghost["path"], ghost["missing"]) == ("src/mylib/ghost.py", True)
+
+    plain = runner.invoke(
+        app, ["context", "src/mylib/new/fresh.py", "src/mylib/ghost.py", "--path", str(repo)]
+    )
+    assert "owner: core (docs/components/core.md)" in plain.output
+    assert "input: src/mylib/new/fresh.py (does not exist)" in plain.output
+    assert "src/mylib/ghost.py: no owning doc found (does not exist)" in plain.output
+
+
+def test_a_missing_path_outside_the_repo_is_still_refused(tmp_path: Path) -> None:
+    repo = _make_context_repo(tmp_path)
+
+    result = runner.invoke(app, ["context", "../nowhere.py", "--path", str(repo)])
+
     assert result.exit_code == 2
-    assert "path does not exist" in result.output
+    assert "path is outside the repo" in result.output
 
 
 def test_context_no_topic_matches_returns_empty_json(tmp_path: Path) -> None:
@@ -1759,9 +1815,7 @@ def test_context_after_edit_leaves_guidance_files_out_of_unmatched(tmp_path: Pat
         app, ["context", "--after-edit", "--format", "json", "--path", str(repo)]
     )
 
-    assert [item["path"] for item in json.loads(result.output)["unmatched"]] == [
-        "src/mylib/new.py"
-    ]
+    assert [item["path"] for item in json.loads(result.output)["unmatched"]] == ["src/mylib/new.py"]
 
 
 def _debt_repo(tmp_path: Path) -> Path:
@@ -1778,8 +1832,15 @@ def test_a_recorded_debt_file_says_before_the_edit_what_editing_it_costs(tmp_pat
 
     result = runner.invoke(
         app,
-        ["context", "src/mylib/legacy.py", "src/mylib/fresh.py", "--format", "json"]
-        + ["--path", str(repo)],
+        [
+            "context",
+            "src/mylib/legacy.py",
+            "src/mylib/fresh.py",
+            "--format",
+            "json",
+            "--path",
+            str(repo),
+        ],
     )
 
     fresh, legacy = json.loads(result.output)["unmatched"]

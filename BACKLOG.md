@@ -275,14 +275,6 @@ deleting a whole doc, which removes more prose than any cut, raises no "where do
 live now" prompt. Queue a deleted doc's sentences like any other removal, grouped by doc.
 Found by the PR 12c lane on 2026-10-28.
 
-### `context-new-file-has-no-owner`
-
-`irminsul context <path>` for a file that does not exist yet exits 2 with "path does not
-exist" (`src/irminsul/context.py:782`), although an agent asks exactly then: before
-creating a file. A new file under a glob a doc already `describes:` has an owner the graph
-can name. Answer with the doc it would be owned by, and say the file does not exist. Found
-by the PR 10a lane on 2026-10-28.
-
 ### `context-names-no-owner-for-directories-and-guidance-files`
 
 `irminsul context src/irminsul/change` answers "no owning doc found" and exits 1

@@ -227,6 +227,9 @@ class ContextResult:
     #: Why each test in `tests` is named, for the ones that have a reason; `tests` is in
     #: ranked order, and a test absent here is listed for nothing but being owned.
     test_reasons: dict[str, list[str]] = field(default_factory=dict)
+    #: The inputs that do not exist yet. They are owned by the doc whose `describes:` glob
+    #: would cover them, which is what a path packet is asked for before a file is created.
+    missing_inputs: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -250,6 +253,8 @@ class UnmatchedPath:
     candidates: list[DocRef]
     governed_by: list[GoverningClaim] = field(default_factory=list)
     recorded_debt: str | None = None
+    #: The path is not on disk yet.
+    missing: bool = False
 
 
 @dataclass(frozen=True)
@@ -308,6 +313,8 @@ class _PendingResult:
     node: DocNode
     inputs: tuple[str, ...]
     source_claims: tuple[str, ...]
+    #: The inputs that are not on disk yet, owned by the glob that would cover them.
+    missing: tuple[str, ...] = ()
 
 
 @dataclass
@@ -315,6 +322,7 @@ class _ChangedGroup:
     node: DocNode
     inputs: set[str]
     source_claims: set[str]
+    missing: set[str] = field(default_factory=set)
 
 
 def build_context_report(
@@ -500,6 +508,8 @@ def format_context_plain(report: ContextReport) -> str:
             if item.candidates:
                 ids = ", ".join(doc.id for doc in item.candidates)
                 suffix = f" (candidates: {ids})"
+            if item.missing:
+                suffix += " (does not exist)"
             lines.append(f"  {item.path}: {item.reason}{suffix}")
             for governing in item.governed_by:
                 if (governing.doc.path, governing.claim_id) in reviewed:
@@ -569,12 +579,14 @@ def _pending_for_paths(
             )
             group.inputs.update(item.inputs)
             group.source_claims.update(item.source_claims)
+            group.missing.update(item.missing)
 
     pending = [
         _PendingResult(
             node=group.node,
             inputs=tuple(sorted(group.inputs)),
             source_claims=tuple(sorted(group.source_claims)),
+            missing=tuple(sorted(group.missing)),
         )
         for group in sorted(groups.values(), key=lambda item: item.node.path.as_posix())
     ]
@@ -588,8 +600,9 @@ def _pending_for_path(
     target_path: Path,
 ) -> tuple[list[_PendingResult], list[UnmatchedPath]]:
     source_roots = graph.config.paths.source_roots if graph.config is not None else []
-    rel = _existing_repo_relative(repo_root, target_path, source_roots)
+    rel, exists = _repo_relative(repo_root, target_path, source_roots)
     display = rel.as_posix()
+    missing = () if exists else (display,)
 
     node = graph.by_path.get(rel)
     if node is not None:
@@ -604,7 +617,8 @@ def _pending_for_path(
     routed = _declared_test_routes(graph, [display]).get(display, ())
     if routed:
         return [
-            _PendingResult(node=owner, inputs=(display,), source_claims=()) for owner in routed
+            _PendingResult(node=owner, inputs=(display,), source_claims=(), missing=missing)
+            for owner in routed
         ], []
 
     ownership = _ownership_for_source_path(resolve_claims(graph, [display]).get(display, []))
@@ -614,10 +628,13 @@ def _pending_for_path(
                 node=ownership.node,
                 inputs=(display,),
                 source_claims=(ownership.pattern,) if ownership.pattern else (),
+                missing=missing,
             )
         ], []
 
-    return [], [_unmatched(graph, display, ownership, _governing_claims(graph, display))]
+    return [], [
+        _unmatched(graph, display, ownership, _governing_claims(graph, display), missing=not exists)
+    ]
 
 
 def _unmatched(
@@ -625,6 +642,8 @@ def _unmatched(
     display: str,
     ownership: _Ownership,
     governed_by: list[GoverningClaim],
+    *,
+    missing: bool = False,
 ) -> UnmatchedPath:
     return UnmatchedPath(
         path=display,
@@ -632,6 +651,7 @@ def _unmatched(
         candidates=[_doc_ref(node) for node in ownership.candidates],
         governed_by=governed_by,
         recorded_debt=None if ownership.candidates else _recorded_debt_note(graph, display),
+        missing=missing,
     )
 
 
@@ -792,8 +812,8 @@ def _declared_test_routes(
     }
 
 
-def _existing_repo_relative(repo_root: Path, raw_path: Path, source_roots: list[str]) -> Path:
-    """The display spelling of an existing file, or a `ContextError`.
+def _repo_relative(repo_root: Path, raw_path: Path, source_roots: list[str]) -> tuple[Path, bool]:
+    """The display spelling of a path, whether the file is there, or a `ContextError`.
 
     A path inside the invocation root answers repo-relative. Failing that, the value is
     read as a display spelling — the one `describes:` and `claims[].evidence` speak —
@@ -808,6 +828,10 @@ def _existing_repo_relative(repo_root: Path, raw_path: Path, source_roots: list[
     its display spelling instead of being refused, the encode direction of the
     same round trip. Only a path that neither lies in the repo nor maps to a
     display the tool speaks is refused as outside the repo.
+
+    A path that is not on disk is asked about too, because that is when an agent wants to
+    know which doc a new file would belong to: it answers with the spelling the file would
+    have, under the repo or under an external root, and `False` for existence.
     """
     absolute = raw_path if raw_path.is_absolute() else repo_root / raw_path
     resolved = absolute.resolve()
@@ -817,14 +841,20 @@ def _existing_repo_relative(repo_root: Path, raw_path: Path, source_roots: list[
         except ValueError as exc:
             display_spelling = external_display_for_path(repo_root, source_roots, resolved)
             if display_spelling is not None:
-                return Path(PurePosixPath(display_spelling))
+                return Path(PurePosixPath(display_spelling)), True
             raise ContextError(f"path is outside the repo: {raw_path}") from exc
-        return Path(PurePosixPath(*rel.parts))
+        return Path(PurePosixPath(*rel.parts)), True
 
     display = PurePosixPath(raw_path.as_posix())
     if not raw_path.is_absolute() and resolve_display_path(repo_root, source_roots, str(display)):
-        return Path(display)
-    raise ContextError(f"path does not exist: {raw_path}")
+        return Path(display), True
+    repo_abs = repo_root.resolve()
+    if resolved.is_relative_to(repo_abs):
+        return Path(PurePosixPath(*resolved.relative_to(repo_abs).parts)), False
+    not_yet = external_display_for_path(repo_root, source_roots, resolved, not_yet_created=True)
+    if not_yet is not None:
+        return Path(PurePosixPath(not_yet)), False
+    raise ContextError(f"path is outside the repo: {raw_path}")
 
 
 @dataclass(frozen=True)
@@ -1136,6 +1166,7 @@ def _build_result(
         ),
         records=records,
         test_reasons=ranking.reasons if ranking is not None else {},
+        missing_inputs=list(pending.missing),
     )
 
 
@@ -1600,7 +1631,11 @@ def _has_unowned_source(
     config: IrminsulConfig,
     unmatched: Iterable[UnmatchedPath],
 ) -> bool:
-    return any(is_configured_source_path(repo_root, config, item.path) for item in unmatched)
+    return any(
+        is_configured_source_path(repo_root, config, item.path)
+        for item in unmatched
+        if not item.missing
+    )
 
 
 def _unique_actions(actions: Iterable[NextAction]) -> list[NextAction]:
@@ -1687,6 +1722,7 @@ def _result_to_dict(
         "entrypoint": result.entrypoint,
         "tests": result.tests,
         "test_reasons": result.test_reasons,
+        "missing_inputs": result.missing_inputs,
         "depends_on": [_doc_ref_to_dict(doc) for doc in result.depends_on],
         "depends_on_missing": result.depends_on_missing,
         "depended_on_by": [_doc_ref_to_dict(doc) for doc in result.depended_on_by],
@@ -1776,6 +1812,7 @@ def _unmatched_to_dict(item: UnmatchedPath) -> dict[str, object]:
             for governing in item.governed_by
         ],
         "recorded_debt": item.recorded_debt,
+        "missing": item.missing,
     }
 
 
@@ -1805,7 +1842,7 @@ def _format_result(result: ContextResult, *, include_active_changes: bool = Fals
     lines = [
         f"owner: {result.owner.id} ({result.owner.path})",
         f"  title: {result.owner.title}",
-        f"  input: {_format_list(result.input)}",
+        f"  input: {_format_list(_input_labels(result))}",
         f"  source claims: {_format_list(result.source_claims)}",
         f"  entrypoint: {result.entrypoint or '-'}",
         *_format_tests(result),
@@ -1863,6 +1900,13 @@ def _format_result(result: ContextResult, *, include_active_changes: bool = Fals
         lines.append("  findings: (none)")
     lines.append(f"  hints: {_format_list(result.hints)}")
     return lines
+
+
+def _input_labels(result: ContextResult) -> list[str]:
+    return [
+        f"{path} (does not exist)" if path in result.missing_inputs else path
+        for path in result.input
+    ]
 
 
 def _format_tests(result: ContextResult) -> list[str]:

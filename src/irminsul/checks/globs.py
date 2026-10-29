@@ -204,7 +204,7 @@ def _external_candidates(repo_root: Path, source_roots: list[str], relative: Pat
 
 
 def external_display_for_path(
-    repo_root: Path, source_roots: list[str], resolved: Path
+    repo_root: Path, source_roots: list[str], resolved: Path, *, not_yet_created: bool = False
 ) -> str | None:
     """The display spelling of an on-disk file under an external source root.
 
@@ -217,6 +217,9 @@ def external_display_for_path(
     `app/main.py` (which `GlobsCheck` warns about) make the display mean the
     first root's file, and mapping the second root's file to it would silently
     answer about the wrong one.
+
+    A file that is not there yet has no file to decode to, so with `not_yet_created` a
+    spelling that decodes to nothing is accepted, and one that decodes to any file is not.
     """
     resolved_abs = resolved.resolve()
     repo_abs = repo_root.resolve()
@@ -228,7 +231,10 @@ def external_display_for_path(
             continue
         display = PurePosixPath(*resolved_abs.relative_to(abs_root).parts).as_posix()
         decoded = resolve_display_path(repo_root, source_roots, display)
-        if decoded is not None and decoded.resolve() == resolved_abs:
+        if decoded is None:
+            if not_yet_created:
+                return display
+        elif decoded.resolve() == resolved_abs:
             return display
     return None
 

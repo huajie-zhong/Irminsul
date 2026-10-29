@@ -146,8 +146,8 @@ def test_blank_topic_and_missing_path_are_rejected(fixture_repo: FixtureRepo) ->
         build_context_report(repo, config, topic="   ")
     assert excinfo.value.code == 2
 
-    with pytest.raises(ContextError, match="does not exist") as excinfo:
-        build_context_report(repo, config, target_paths=[repo / "app" / "nope.py"])
+    with pytest.raises(ContextError, match="outside the repo") as excinfo:
+        build_context_report(repo, config, target_paths=[repo.parent / "elsewhere" / "nope.py"])
     assert excinfo.value.code == 2
 
 
@@ -166,6 +166,7 @@ def test_json_report_shape_is_stable(fixture_repo: FixtureRepo) -> None:
         "entrypoint",
         "tests",
         "test_reasons",
+        "missing_inputs",
         "depends_on",
         "depends_on_missing",
         "depended_on_by",
