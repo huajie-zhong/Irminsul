@@ -144,6 +144,8 @@ Checks do not apply fixes; `irminsul fix` remediates. They do not evaluate prose
 
 Two limits are deliberate, because each is a wide net on a finding that does not fail a default run, and narrowing one would report things that are not wrong, which is what teaches an author to reach for an ignore comment. `code-references` treats a name as defined when it appears as a whole identifier anywhere in a source file, so a name surviving only in a comment or a string still resolves. And a doc's freshness is its commit time, so a commit that touches a doc for any reason — a formatting sweep, a mass rename — resets `mtime-drift` and `stale-reaper` for it, and so does an uncommitted edit ([Git helpers](git.md)). Anchors are the precise instrument; the commit clock is the coarse net behind them.
 
+`code-references` judges a code span in a doc's `summary:` at that doc, by that doc's rules: a live doc's summary is read and a decision record's or RFC's is not, as their bodies are not. It skips the generated table in `docs/AGENTS.md`, which repeats every summary and which `irminsul fix` rewrites, so a finding there could only name a sentence that lives, and can only be answered, in another doc.
+
 ## Implemented requirements
 
 - **acknowledge-a-reviewed-co-change-or-evidence-drift#trailer-acknowledges-co-change** — A `co-change` warning on a doc SHALL NOT be reported as a warning when a commit in the diff range carries an `Irminsul-Reviewed: co-change <doc> reason="..."` trailer naming that doc with a non-empty reason, unless a later commit in the range changed one of the files the warning lists, and SHALL be reported as an info finding that quotes the reason. (provenance: code; [RFC](../rfcs/acknowledge-a-reviewed-co-change-or-evidence-drift.md))

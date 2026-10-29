@@ -136,6 +136,22 @@ def replace_generated_section(text: str, section: str) -> str | None:
     return f"{head}\n\n{section.strip()}\n\n{tail}"
 
 
+def without_generated_region(text: str) -> str:
+    """`text` with the generated table blanked and every line number kept; markers that do not
+    make one region blank nothing."""
+    try:
+        region = find_region(text, GENERATED_START, GENERATED_END)
+    except MalformedRegion:
+        return text
+    if region is None:
+        return text
+    lines = text.splitlines()
+    lines[region.start_line : region.end_line + 1] = [""] * (
+        region.end_line - region.start_line + 1
+    )
+    return "\n".join(lines)
+
+
 class RegenError(Exception):
     """A manifest that cannot be refreshed without destroying authored content."""
 

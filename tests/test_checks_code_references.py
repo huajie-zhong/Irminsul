@@ -112,6 +112,61 @@ def test_every_layer_errors_and_other_programs_are_ignored(tmp_path: Path) -> No
     ]
 
 
+_MANIFEST = """\
+# Agent Navigation Manifest
+
+<!-- agents-manifest:generated-start -->
+
+| `old-choice` | [Old](decisions/old-choice.md) | Dropped the `tool publish` step. |
+
+<!-- agents-manifest:generated-end -->
+
+Run `tool bogus` first.
+"""
+
+
+def _summary_doc(doc_id: str, summary: str) -> str:
+    return (
+        f"---\nid: {doc_id}\ntitle: {doc_id}\nstatus: stable\nsummary: {summary}\n---\n\n"
+        f"# {doc_id}\n\nNothing to see.\n"
+    )
+
+
+def test_the_manifests_generated_table_is_not_judged(tmp_path: Path) -> None:
+    """The table repeats every doc's summary, including the decision and RFC summaries that
+    are exempt in their own docs, and `irminsul fix` rewrites it; the sentence a finding
+    there named could only be deleted from the source doc."""
+    root = _repo(tmp_path, "Nothing to see.")
+    write(root, "docs/AGENTS.md", _MANIFEST)
+
+    findings = run_check(CodeReferencesCheck, root)
+
+    assert [(f.path.as_posix(), f.line, (f.data or {})["name"]) for f in findings if f.path] == [
+        ("docs/AGENTS.md", 9, "bogus")
+    ]
+
+
+def test_a_summary_is_judged_at_its_own_doc_by_that_docs_rules(tmp_path: Path) -> None:
+    root = _repo(tmp_path, "Nothing to see.")
+    write(
+        root,
+        "docs/decisions/old-choice.md",
+        _summary_doc("old-choice", "Dropped the `tool publish` step."),
+    )
+    write(
+        root,
+        "docs/guides/walkthrough.md",
+        _summary_doc("walkthrough", "Covers `tool publish`."),
+    )
+    write(root, "docs/AGENTS.md", _MANIFEST.replace("Run `tool bogus` first.", ""))
+
+    findings = run_check(CodeReferencesCheck, root)
+
+    assert [(f.path.as_posix(), f.line, (f.data or {})["name"]) for f in findings if f.path] == [
+        ("docs/guides/walkthrough.md", 5, "publish")
+    ]
+
+
 def test_readme_code_blocks_are_read(tmp_path: Path) -> None:
     root = _repo(tmp_path, "Nothing to see.")
     write(root, "README.md", "```bash\ntool publish --every\n```\n")

@@ -75,6 +75,8 @@ A `--dry-run` lists the edits it would apply, per fix, while a live run groups f
 
 The [`docs/AGENTS.md`](../AGENTS.md) manifest is the one generated file, and `agents-manifest` supplies its fixes: a missing manifest is scaffolded, and a generated section that has drifted from the doc graph is rewritten while the curated Foundations and Protocol sections are kept. A manifest that cannot be read as UTF-8, or whose generated-section markers do not parse, gets no fix — rebuilding either from the template would delete every curated section in it, and the finding says which repair is the reader's. The markers parse when one start marker precedes one end marker outside a code fence, so a manifest with a second pair is refused rather than guessed between. The fix writes derived rows only; it never writes prose or infers intent from code.
 
+A check that judges the manifest's prose reads it through `without_generated_region`, which blanks the table and keeps every line number, because the rows repeat summaries that are judged, and can be answered, only in the docs they come from. Markers that do not parse blank nothing.
+
 ## Scope & Limitations
 
 `list` subcommands are read-only — they report findings but do not modify any docs. `fix` applies deterministic, pre-coded remediations only, and the manifest table it writes is derived from the doc graph rather than from prose or source code.
