@@ -51,7 +51,7 @@ An RFC has two readers, and the owner is the one who decides ([RFCs have four st
 
 - **The weight sets how much the owner reads.** A `small` RFC is a sign-off, such as changing an exit code to match a rule: a Summary that says what changes and what the owner signs off on, and Decisions, read in 5 to 30 seconds. A `large` RFC changes a decision or the foundation, breaks adopters, adds or removes a check or a command, or migrates data or history; it gets all five sections and reads in about two minutes. The author proposes the weight and the owner may change it. Nothing counts words or guesses a weight, so the two minutes are a guideline for the author.
 - **Summary** gives the gain first, then how, then how many decisions need the owner, so a reader with no questions can stop there.
-- **Problem** is one worked example with names and numbers, not a general description.
+- **Problem** is one worked example with named items and numbers, not a general description, told in plain words; the exact commands and names it rests on go under `## Design detail`.
 - **How it works** is the mechanism at a level the owner can question: what is general, where it can grow, and what it leaves out.
 - **Cost and risk** says what the change costs and what could go wrong.
 - **Decisions** lists each choice with its options, the two or three factors that decide it and a recommendation, and later the owner's answer.

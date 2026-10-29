@@ -716,6 +716,22 @@ def _scaffolded_rfc_shape(repo: Path, doc_id: str) -> tuple[str | None, list[str
     return graph.nodes[doc_id].frontmatter.weight, headings
 
 
+def test_the_problem_comment_asks_for_plain_words_and_sends_exact_names_to_design_detail(
+    tmp_path: Path,
+) -> None:
+    """The comment asked for "names and numbers", and an example full of commands then drew
+    `rfc-structure/dense-paragraph` for four or more code spans."""
+    repo = _make_repo(tmp_path)
+    result = runner.invoke(app, ["new", "rfc", "Export rows", "--path", str(repo)])
+    assert result.exit_code == 0, result.output
+
+    text = (repo / "docs" / "rfcs" / "export-rows.md").read_text(encoding="utf-8")
+    problem = " ".join(text.split("## Problem")[1].split("## How it works")[0].split())
+
+    assert "told in plain words" in problem
+    assert "Exact commands, file names and ids go under Design detail" in problem
+
+
 def test_a_new_rfc_is_written_in_two_parts(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
     result = runner.invoke(app, ["new", "rfc", "Export rows", "--path", str(repo)])
