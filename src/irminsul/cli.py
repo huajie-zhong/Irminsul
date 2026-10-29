@@ -173,8 +173,11 @@ def _closed_stdout(error: OSError, *, platform: str | None = None) -> bool:
 
     A pipe closed by `head` or a pager raises `BrokenPipeError` on POSIX but an `OSError`
     with `EINVAL` on Windows, where that code also means a bad argument; only there is it
-    read as a closed pipe.
+    read as a closed pipe. A write to stdout names no file, so an error that names one came
+    from a command's own file work and is never swallowed here.
     """
+    if error.filename is not None:
+        return False
     if error.errno == errno.EPIPE:
         return True
     current_platform = sys.platform if platform is None else platform

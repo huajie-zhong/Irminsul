@@ -81,7 +81,7 @@ The Typer app behind the `irminsul` console script; `irminsul --version` prints 
 
 On Windows both console-script entry points set stdout and stderr to UTF-8 and turn off Click's wildcard expansion, so a quoted glob such as `--describes "src/**"` arrives as written. `main()` does both rather than the import, so using the app as a library or from a test runner leaves the streams alone.
 
-A closed stdout is the end of the output, not a crash: when `head` or a pager closes the pipe, `main()` points stdout at the null device and exits 1 without a traceback. It is never 0, so a gate cut short cannot pass. POSIX raises `BrokenPipeError`; Windows raises an `OSError` whose code also means a bad argument elsewhere, so `main()` reads that code as a closed pipe only on Windows.
+A closed stdout is the end of the output, not a crash: when `head` or a pager closes the pipe, `main()` points stdout at the null device and exits 1 without a traceback. It is never 0, so a gate cut short cannot pass. POSIX raises `BrokenPipeError`; Windows raises an `OSError` whose code also means a bad argument elsewhere, so `main()` reads that code as a closed pipe only on Windows, and only for an error that names no file: one that does came from a command's own file work and is raised as before.
 
 Where a command's reason is not in its `--help`:
 

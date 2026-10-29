@@ -129,6 +129,8 @@ def test_a_closed_stdout_ends_the_output_without_a_traceback() -> None:
         (OSError(errno.EINVAL, "Invalid argument"), "win32", True),
         (OSError(errno.EINVAL, "Invalid argument"), "linux", False),
         (OSError(errno.ENOENT, "No such file"), "win32", False),
+        (OSError(errno.EINVAL, "Invalid argument", "docs/a:b.md"), "win32", False),
+        (BrokenPipeError(errno.EPIPE, "Broken pipe", "fifo"), "linux", False),
     ],
 )
 def test_only_a_closed_pipe_is_read_as_the_end_of_output(
