@@ -337,3 +337,42 @@ def test_a_call_form_span_resolves_to_a_surface_identity(tmp_path: Path) -> None
         assert [(r.kind, r.identity) for r in resolver.resolve(span)] == [
             ("mcp", "context_changed")
         ]
+
+
+_BUILTIN_SENTENCE = (
+    "Sessions raise `IndexError` when empty, and `dict.get()` and `len()` are not ours."
+)
+
+
+def _unbound_names(root: Path) -> list[str]:
+    result = runner.invoke(app, ["anchors", "--suggest", "--format", "json", "--path", str(root)])
+    assert result.exit_code == 0, result.output
+    return [row["name"] for row in json.loads(result.output)["unbound"]]
+
+
+def test_a_name_the_language_defines_is_not_unbound(tmp_path: Path) -> None:
+    root = _repo(tmp_path, f"{_BUILTIN_SENTENCE} See `refreshUserSession()`.")
+
+    assert _unbound_names(root) == ["refreshUserSession"]
+
+
+def test_the_review_queue_does_not_flag_a_language_builtin_as_unbound(tmp_path: Path) -> None:
+    root = _repo(tmp_path, "Nothing yet.")
+    seed_repo(root, "i")
+    doc = root / "docs" / "components" / "auth.md"
+    doc.write_text(doc.read_text(encoding="utf-8") + f"\n{_BUILTIN_SENTENCE}\n", encoding="utf-8")
+
+    result = runner.invoke(
+        app, ["list", "review", "--changed", "--format", "json", "--path", str(root)]
+    )
+
+    [item] = json.loads(result.output)["items"]
+    assert item["unbound"] == []
+    assert "unbound-name" not in item["markers"]
+
+
+def test_the_builtins_are_those_of_the_enabled_languages(tmp_path: Path) -> None:
+    root = _repo(tmp_path, _BUILTIN_SENTENCE)
+    write_config(root, source_roots=["src"], extra='[languages]\nenabled = ["typescript"]\n')
+
+    assert _unbound_names(root) == ["IndexError", "dict.get", "len"]

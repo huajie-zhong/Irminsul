@@ -19,6 +19,7 @@ from irminsul.inventory import SurfaceItem, available_kinds, kind_capabilities
 from irminsul.inventory.base import SourceReader
 from irminsul.inventory.cli_options import command_options
 from irminsul.inventory.programs import program_names
+from irminsul.languages import LANGUAGE_REGISTRY
 
 if TYPE_CHECKING:
     from irminsul.git.reader import GitReader
@@ -45,6 +46,9 @@ class Reference:
 class CodeResolver:
     def __init__(self, tree: SourceTree) -> None:
         repo_root, config = tree.repo_root, tree.config
+        self.builtins: frozenset[str] = frozenset().union(
+            *(LANGUAGE_REGISTRY[name].builtins for name in config.languages.enabled)
+        )
         self._repo_root = repo_root
         files = tree.files
         self._reader: SourceReader = tree

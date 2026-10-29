@@ -50,7 +50,9 @@ be documented without the example becoming a live anchor.
 A code span such as `fetchUserSession()` names code, but which file defines it is a
 judgment ([Code is named in code spans and bound by anchors](../decisions/code-is-named-in-code-spans-and-bound-by-anchors.md)).
 A code name that no surface, symbol index, or repository path resolves, and no anchor in
-the doc binds, is unbound. `irminsul list review --changed` shows a changed sentence's
+the doc binds, is unbound, unless an enabled language defines it itself, as Python does
+`IndexError` (the profile's `builtins`): that name is the language's, not this repository's,
+and is never listed. `irminsul list review --changed` shows a changed sentence's
 unbound names, and `irminsul anchors --suggest` lists every one in live docs, or in one
 doc with `--doc`, with the places an anchor could point and the marker to paste. It
 writes nothing: the agent picks the file. A Python definition inside a function or a

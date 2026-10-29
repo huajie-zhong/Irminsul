@@ -19,7 +19,6 @@ and an unknown path, which a doc may use as an example.
 
 from __future__ import annotations
 
-import builtins
 import posixpath
 import re
 from dataclasses import dataclass
@@ -51,7 +50,6 @@ _NAME_SUGGESTION = (
 _CALL_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\(\)$")
 _ENV_NAME_RE = re.compile(r"^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$")
 _PLACEHOLDER_START = ("-", "<", "[", "{", '"', "'", "$", "|", ">")
-_BUILTINS = frozenset(dir(builtins))
 
 
 class CodeReferencesCheck:
@@ -209,7 +207,7 @@ def _problems(
         named_surface = any(name in items for items in resolver.surfaces.values())
         if (
             not named_surface
-            and name not in _BUILTINS
+            and name not in resolver.builtins
             and resolver.defines_symbol(name) is False
             and not resolver.appears_in_source(name)
         ):

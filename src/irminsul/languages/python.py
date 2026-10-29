@@ -7,12 +7,14 @@ leading whitespace allowed) so prose mentions don't trigger findings.
 
 from __future__ import annotations
 
+import builtins
 import re
 
 from irminsul.languages.base import LanguageProfile
 
 PYTHON_PROFILE = LanguageProfile(
     name="python",
+    builtins=frozenset(dir(builtins)),
     fence_labels=("python", "py"),
     suffixes=(".py",),
     markers=("pyproject.toml", "setup.py", "setup.cfg", "requirements*.txt"),

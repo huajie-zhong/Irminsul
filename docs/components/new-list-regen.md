@@ -16,6 +16,7 @@ depends_on:
   - docgraph
   - file-writing
   - frontmatter
+  - languages
   - user-errors
 owns_tests:
   - tests/test_cli_fix.py
@@ -58,6 +59,8 @@ The semantic half of doc–code consistency, as a queue rather than findings. Ea
 <!-- anchor: src/irminsul/listing/review.py#ReviewItem.code_changed_after_doc @sha256:40f2c7be880b -->
 
 `--changed` and `--base-ref` ask what a change asks a reader to re-read. Every sentence on a changed line whose prose its doc did not already say at the base is an item, whatever it says, because a sentence the reader has not read is the reason to look and a changed line is not: one sentence added to a long paragraph queues that sentence, and a rewrapped paragraph queues none. A deleted sentence is queued, never reported as a finding, because whether the deletion was right is a judgment: the code it described may be gone too. Both sides are read as the queue reads a doc, so a decision record is compared by its `## Decision` alone: a sentence moved into it is `edited`, one moved out of it is `removed-sentence`, and one deleted from its Context is neither. The `governing-claim` entries are the claims [context](context.md) reports for the touched files, so the two surfaces name the same set.
+
+A code name is `unbound-name` only when nothing in the repository resolves it and the enabled languages do not define it themselves: `CodeResolver` holds the union of their [profiles](languages.md)' `builtins`, so `IndexError` in a Python repository is the language's and is not queued, which is why this component depends on `languages`.
 
 Whatever it lists, the command exits 0: it points a reader at what to check and never decides whether a sentence is true.
 

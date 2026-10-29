@@ -12,7 +12,7 @@ owns_tests:
 
 # Language profiles
 
-A `LanguageProfile` is a pure-data record, and `LANGUAGE_REGISTRY` is the only lookup: [config](config.md) validation, `schema-leak`, the [init detector](init.md), `code-references` and the file selection of the [surface](surface.md) extractors and packs all read it. Adding a language is a profile constant registered there and changes no check; `languages/base.py` says what each field is for. Python, TypeScript, Go and Rust are included. What an extractor reads inside the language's files stays the extractor's own code, written once per surface.
+A `LanguageProfile` is a pure-data record, and `LANGUAGE_REGISTRY` is the only lookup: [config](config.md) validation, `schema-leak`, the [init detector](init.md), `code-references` and the file selection of the [surface](surface.md) extractors and packs all read it. Adding a language is a profile constant registered there and changes no check; `languages/base.py` says what each field is for. A profile's `builtins` lists the names its language defines itself, such as Python's `IndexError`, which `code-references` and the review queue's unbound-name test read as the language's rather than as code this repository owes a definition; only the Python profile lists any. Python, TypeScript, Go and Rust are included. What an extractor reads inside the language's files stays the extractor's own code, written once per surface.
 
 ## Scope & Limitations
 

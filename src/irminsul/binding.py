@@ -126,11 +126,16 @@ def bound_names(text: str) -> set[str]:
 
 
 def unbound_names(spans: list[str], resolver: CodeResolver, bound: set[str]) -> list[str]:
-    """The code names among `spans` that nothing resolves and no anchor binds."""
+    """The code names among `spans` that nothing resolves and no anchor binds.
+
+    A name the language itself defines is bound to the language, so it is never unbound.
+    """
     out: list[str] = []
     for span in spans:
         name = code_name(span)
         if name is None or name in bound or name.rsplit(".", 1)[-1] in bound:
+            continue
+        if name.split(".", 1)[0] in resolver.builtins:
             continue
         if resolver.resolve(span):
             continue

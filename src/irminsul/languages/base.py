@@ -45,3 +45,9 @@ class LanguageProfile:
     Empty where the language has no filename convention — Rust keeps unit tests inside
     the module they cover, and no pattern can see that.
     """
+    builtins: frozenset[str] = frozenset()
+    """The names the language itself defines, such as Python's `IndexError` and `len`.
+
+    A doc naming one cites the language, not this repository's code, so no source file is
+    asked to define it. Empty where the profile lists none.
+    """
