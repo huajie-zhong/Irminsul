@@ -138,7 +138,9 @@ def test_an_inherited_error_is_not_charged_to_this_change(tmp_path: Path) -> Non
         "new_errors": 0,
         "baseline": "HEAD",
         "reason": None,
+        "note": data["validation"]["change"]["note"],
     }
+    assert "no base was given" in data["validation"]["change"]["note"]
     assert code == 0
 
 
@@ -355,3 +357,48 @@ def test_after_edit_refuses_an_unreadable_baseline(tmp_path: Path) -> None:
 
     assert code == 2
     assert "could not read baseline" in out
+
+
+# --- with no base, the checks that judge a change did not run -------------------------
+
+
+def _debt_repo(root: Path) -> Path:
+    _repo(root)
+    write(root, "src/legacy.py", "X = 1\n")
+    write(root, ".irminsul-adoption.json", '{"version": 1, "unowned": ["src/legacy.py"]}\n')
+    commit_all(root, "adopt")
+    write(root, "src/legacy.py", "X = 2\n")
+    return root
+
+
+def test_with_no_base_the_verdict_says_which_checks_did_not_run(tmp_path: Path) -> None:
+    """`passed (0 new errors vs HEAD)` is true of what was judged and silent about what was
+    not: `diff-integrity` is the pass that fails an edit to recorded debt, and without a base
+    it never ran. The verdict is unchanged; it now says so and names the command that runs
+    them."""
+    root = _debt_repo(tmp_path)
+
+    code, data = _ctx(root, "--after-edit")
+    change = data["validation"]["change"]
+
+    assert (change["state"], change["new_errors"], change["baseline"]) == ("passed", 0, "HEAD")
+    assert data["validation"]["repository"]["errors"] == 0
+    assert code == 0
+    for name in ("co-change", "diff-integrity", "new-dependency"):
+        assert f"`{name}`" in change["note"]
+    assert "no base was given" in change["note"]
+    assert "--base-ref <base>" in change["note"] and "--base-ref HEAD" in change["note"]
+
+    _, out = _plain(root, "--after-edit")
+    assert "Change validation: passed (0 new errors vs HEAD)\n  note: no base was given" in out
+
+
+def test_the_command_the_note_names_runs_the_checks_it_says_did_not(tmp_path: Path) -> None:
+    root = _debt_repo(tmp_path)
+
+    code, data = _ctx(root, "--after-edit", "--base-ref", "HEAD")
+    change = data["validation"]["change"]
+
+    assert (change["state"], change["new_errors"], change["note"]) == ("failed", 1, None)
+    assert data["validation"]["repository"]["errors"] == 1
+    assert code == 1

@@ -133,7 +133,7 @@ def test_every_pass_reads_the_range_from_the_graph(
 
 
 def test_a_diff_pass_reports_only_for_a_graph_that_carries_a_range(tmp_path: Path) -> None:
-    from irminsul.checks.pipeline import PASSES
+    from irminsul.checks.pipeline import CHANGE_PASSES, PASSES
 
     root = tmp_path / "repo"
     write_config(root, source_roots=["app"], enabled=["frontmatter"])
@@ -149,8 +149,26 @@ def test_a_diff_pass_reports_only_for_a_graph_that_carries_a_range(tmp_path: Pat
     seen = PASSES["co-change"]().run(build_graph(root, config, change=change), [])
     assert [f.code for f in seen] == ["co-change/unreflected-change"]
 
-    for name in ("co-change", "diff-integrity", "new-dependency"):
+    for name in CHANGE_PASSES:
         assert PASSES[name]().run(build_graph(root, config), []) == [], name
+
+
+def test_the_change_passes_are_the_passes_that_read_the_graphs_change() -> None:
+    """`context --after-edit` names `CHANGE_PASSES` as the checks a run with no base did not
+    make, so a pass that reads `graph.change` and is missing from it would go unnamed."""
+    import inspect
+    import sys
+
+    from irminsul.checks.pipeline import CHANGE_PASSES, PASSES
+
+    reads_change = {
+        name
+        for name, cls in PASSES.items()
+        if "graph.change" in inspect.getsource(sys.modules[cls.__module__])
+    }
+
+    assert reads_change, "no pass reads graph.change, so the comparison below proves nothing"
+    assert reads_change == set(CHANGE_PASSES)
 
 
 def test_one_run_audits_the_ignore_comments_of_the_checks_it_ran(tmp_path: Path) -> None:

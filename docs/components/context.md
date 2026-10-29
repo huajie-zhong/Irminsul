@@ -42,8 +42,12 @@ claims:
 `irminsul context` tells an agent what governs a file before and after it edits one: the doc that owns the path, the tests that doc declares and the ones that import the file, the dependencies that doc declares, active RFCs that affect it, the next commands to run, and — after the edit — the findings. It is a runtime lookup over the current [DocGraph](docgraph.md), not a generated artifact, and it is a starting map rather than the documentation itself: its excerpts are bounded, so read the owning doc it names before changing code.
 
 The command takes exactly one input mode, and `irminsul context --help` says what each takes: `<path...>` is the packet to read before editing, `--topic` finds the docs for a concept, and `--after-edit` maps the change made and is the one mode that runs checks. That change is the one `check --diff` judges ([A change is judged from its merge base to the working tree](../decisions/a-change-is-judged-from-its-merge-base-to-the-working-tree.md)). A source file under a configured root outside the repository, such as the sibling code repository of the [private-docs layout](../guides/private-docs.md), is named by the display spelling `describes:` uses, and its filesystem path maps to that spelling. A path that is not on disk yet is answered too, because that is when an agent asks which doc a new file belongs to: `_repo_relative` gives it the spelling it would have, the owner is the doc whose `describes` glob covers it, and `ContextResult.missing_inputs` (or `UnmatchedPath.missing`, where no glob does) says the file does not exist. A path outside the repository and every configured root is refused whether or not it exists.
+<!-- anchor: src/irminsul/context.py#_repo_relative @sha256:5ce500137ae9 -->
+<!-- anchor: src/irminsul/context.py#ContextResult.missing_inputs @sha256:244fe8cd607f -->
+<!-- anchor: src/irminsul/context.py#UnmatchedPath.missing @sha256:7f726f922998 -->
 
 A doc path is its own owner, and a test file reaches every doc that lists it in `owns_tests:` or `recommended_tests:`. A source file is owned by the doc whose `describes` glob matches it most specifically, scored by `claims_for`, the routine the `uniqueness` check reads. When two docs tie, the path has no owner: context lists both as candidates under "ambiguous ownership", and `uniqueness` reports the same tie as an error. A path nothing owns still lists the claims whose `evidence` names it, so an agent editing a file no component owns is told which contract binds the change. When the [adoption record](adoption-record.md) excepts such a path, `UnmatchedPath.recorded_debt` says so before the edit: a change that edits it must give it an owning doc in the same change, or `check --diff` fails with `diff-integrity/adoption-debt-touched`. After an edit, the files Irminsul writes and judges itself, which `_tool_files` names from `paths.baseline`, `paths.adoption` and `manifest_rel_path` (the manifest path [`irminsul fix`](new-list-regen.md) regenerates, read from there so the two cannot name different files), and the guidance files of `DocGraph.guidance_files` (the README, the agent guides and `paths.extra_docs`), are left out of the unmatched list unless a claim cites one, because no doc is meant to own them.
+<!-- anchor: src/irminsul/context.py#UnmatchedPath.recorded_debt @sha256:ba5798ce6f3b -->
 
 ## Which tests a source file gets
 
@@ -90,6 +94,15 @@ from outside the check registry, or one auditing a suppression, is charged to th
 however long it has been there, as it is under `check --delta`. Where no trustworthy
 baseline exists the repository verdict decides instead, which is the safe direction. The
 pull-request gate is independent of this and still fails on the repository's own state.
+
+With no base, the change is the working tree against `HEAD` and the passes that judge a
+change (`CHANGE_PASSES`) have no range to read, so they do not run. A `passed` verdict
+then means no new finding from what did run, and `ChangeValidation.note` says so and
+names `--base-ref <base>` for the whole branch and `--base-ref HEAD` for the uncommitted
+work alone. The verdict itself is the same with or without the note: an edit to a file
+the adoption record excepts passes here and fails under `--base-ref HEAD`.
+<!-- anchor: src/irminsul/context.py#ChangeValidation.note @sha256:fdfc2efcbd75 -->
+<!-- anchor: src/irminsul/checks/pipeline.py#CHANGE_PASSES @sha256:5289621690ed -->
 
 ## Content excerpts
 

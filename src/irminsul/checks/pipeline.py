@@ -73,6 +73,11 @@ PASSES: Final[dict[str, type[Pass]]] = {
 }
 
 
+#: The passes that judge a change rather than the tree: each reads `graph.change` and reports
+#: nothing for a graph with no range, so a run given no base has not run them.
+CHANGE_PASSES: Final = ("co-change", "diff-integrity", "new-dependency")
+
+
 @cache
 def finding_sources() -> dict[str, type[FindingSource]]:
     """Everything that emits findings under a name: the registered checks, the passes, and

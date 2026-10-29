@@ -18,7 +18,7 @@ from irminsul.checks.globs import (
     is_configured_source_path,
     resolve_display_path,
 )
-from irminsul.checks.pipeline import RunResult
+from irminsul.checks.pipeline import CHANGE_PASSES, RunResult
 from irminsul.checks.uniqueness import Claim, most_specific_claims, resolve_claims
 from irminsul.config import IrminsulConfig, in_layer
 from irminsul.declared_tests import governed_as_test, matching_paths
@@ -152,6 +152,9 @@ class ChangeValidation:
     new_errors: int | None = None
     baseline: str | None = None
     reason: str | None = None
+    #: What a `passed` or `failed` verdict leaves out, when it leaves something out: with no
+    #: base the checks that judge a change did not run, so a zero says nothing about them.
+    note: str | None = None
 
 
 @dataclass(frozen=True)
@@ -1448,6 +1451,8 @@ def _validation_lines(validation: EditValidation) -> list[str]:
             f"Change validation: {change.state} "
             f"({change.new_errors} new errors vs {change.baseline})"
         )
+        if change.note:
+            lines.append(f"  note: {change.note}")
     return lines
 
 
@@ -1533,6 +1538,21 @@ def _change_validation(
         state="passed" if new_errors == 0 else "failed",
         new_errors=new_errors,
         baseline=rev,
+        note=_unjudged_note() if graph.change is None else None,
+    )
+
+
+def _unjudged_note() -> str:
+    """Why a verdict reached with no change range says nothing about the passes that judge one.
+
+    With no base the working tree is compared with `HEAD` by the delta alone. `check --diff HEAD`
+    is the same uncommitted work with those passes run, so it is the command to name.
+    """
+    names = ", ".join(f"`{name}`" for name in CHANGE_PASSES)
+    return (
+        f"no base was given, so the working tree was compared with HEAD and {names}, which "
+        "judge a change, did not run; `--base-ref <base>` runs them for the whole branch, "
+        "`--base-ref HEAD` for the uncommitted work alone"
     )
 
 
@@ -1770,6 +1790,7 @@ def _validation_to_dict(validation: EditValidation) -> dict[str, object]:
             "new_errors": change.new_errors,
             "baseline": change.baseline,
             "reason": change.reason,
+            "note": change.note,
         },
     }
     return payload
