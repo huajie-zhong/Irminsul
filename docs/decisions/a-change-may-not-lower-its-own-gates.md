@@ -3,7 +3,7 @@ id: a-change-may-not-lower-its-own-gates
 title: A change may not lower its own gates
 status: stable
 describes: []
-summary: Under --diff every config setting and every gate file is compared with the merge base, a weakening is certain or a hint by what it does, and only a decision record the change adds, naming what it weakens, clears it.
+summary: Under --diff every config setting and every gate file is compared with the merge base, a weakening is certain or a hint by what it does, and only a commit trailer naming what it weakens clears it.
 governs:
   - src/irminsul/checks/diff_integrity.py#run_diff_integrity
   - src/irminsul/checks/diff_integrity.py#_SEALS
@@ -72,23 +72,16 @@ exit status cannot be listed.
   `action.yaml` anywhere, whose text mentions irminsul at the merge base or the head is a gate
   file. Adding, deleting, renaming or editing one is `diff-integrity/gate-file-changed`,
   certain. The text is searched, not parsed, and nothing scores a step.
-- **The excuse is a decision record the change adds.** A stable decision record added in the
-  same change whose `## Decision` names, in a code span, what was weakened clears that
-  subject's findings and no other, hints included: a setting by its dotted name, such as
-  `layers.components.require_tests`; a removed check by its name, such as `links`; a gate file
-  by its path, a deleted one by the path it had. The baseline and claims take the same excuse.
-  Editing an existing record does not count, since a name such as `links` is an ordinary word
-  an old record may contain.
 - **The base decides what is sealed.** The decisions and RFC folders and the baseline path come
   from the merge base's config. A base with neither an `irminsul.toml` nor a baseline is
   adopting and has nothing to weaken. A base config that does not load is
   `diff-integrity/base-config-unreadable`, a hint: the config is not compared, and the sealed
   folders come from the head's config.
-- **A commit trailer replaces the record excuse** (accepted, not yet implemented). A weakened
-  setting, a removed check or a changed gate file is answered by an `Irminsul-Reviewed` trailer
-  naming its subject, a setting by its dotted name with `irminsul.toml` as the path, and an
-  added decision record answers nothing; a finding a trailer accepts prints at info with its
-  reason. This replaces "The excuse is a decision record the change adds" above.
+- **The excuse is a commit trailer.** A weakened setting, a removed check or a changed gate file
+  is answered by an `Irminsul-Reviewed` trailer naming its subject: a setting by its dotted name
+  with `irminsul.toml` as the path, a removed check by its name, a gate file by its path, and a
+  deleted one by the path it had. An added decision record answers nothing. A finding a trailer
+  accepts prints at info with its reason.
 - **Four more settings have a direction** (accepted, not yet implemented):
   `checks.schema_leak.protected_paths` weakens when set or narrowed,
   `checks.external_links.ttl_hours` and `checks.external_links.timeout_seconds` when raised,
@@ -121,13 +114,13 @@ exit status cannot be listed.
 
 ## Consequences
 
-- **The record proves a reason was written, not that anyone agreed.** The same author can
-  weaken a setting and add the record in one commit; what the seal removes is silence. A second
+- **The trailer proves a reason was written, not that anyone agreed.** The same author can
+  weaken a setting and write the trailer in one commit; what the seal removes is silence. A second
   pair of eyes is branch protection on the forge, which no check here can read
   ([enforcement](../foundation/enforcement.md)).
-- A harmless edit to a gate file, such as an `actions/checkout` bump, needs a one-line record.
-- **Known limit:** the excuse is per setting, not per entry, so a record naming
-  `paths.sources.ref` clears a ref change on every declared source.
+- A harmless edit to a gate file, such as an `actions/checkout` bump, needs a one-line trailer.
+- **Known limit:** the excuse is per setting, not per entry, so a trailer naming
+  `paths.sources.ref` accepts a ref change on every declared source.
 - A gate run through a script or a reusable workflow elsewhere is sealed only if the calling
   workflow mentions irminsul. A plain `irminsul check` compares nothing.
 
@@ -140,3 +133,5 @@ exit status cannot be listed.
   dropping a history file is sealed as dropping a guidance file is.
 - 2026-10-29: Accepted [A change to the foundation asks for the owner's sign-off](../rfcs/a-change-to-the-foundation-asks-for-the-owners-sign-off.md):
   a change to a foundation doc's body is a hint under `--diff`, answered by a trailer.
+- 2026-10-30: A decision record no longer excuses a weakened setting, a removed check or a
+  changed gate file: the commit trailer naming its subject does, as the trailer step implements.

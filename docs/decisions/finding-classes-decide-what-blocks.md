@@ -55,6 +55,13 @@ retires:
       - hard profile
       - configured profile
     guidance: Run `irminsul check`, which runs the enabled checks; `--only <check>` runs any registered check, enabled or not.
+  - id: co-change-acknowledgement-codes
+    kind: concept
+    matches:
+      - co-change/acknowledged
+      - co-change/invalid-acknowledgement
+      - co-change/unused-acknowledgement
+    guidance: An accepted finding keeps its own code at info; misuse is `acknowledgement/invalid` or `acknowledgement/unused`.
 ---
 
 # Finding classes decide what blocks
@@ -110,7 +117,7 @@ status that excused every error would make one word of frontmatter the cheapest 
 - **One source policy.** Every check, report and surface reads one inventory: the configured
   roots, the repository's `.gitignore` when `paths.honor_gitignore` is on, explicit includes
   and excludes, and symlinks contained to their root.
-- **Every finding code declares one answer** (accepted, not yet implemented). Beside its class,
+- **Every finding code declares one answer.** Beside its class,
   each code a check explains, info and time codes included, declares `fix`, `line` (an ignore
   comment on its line), `pin` (a re-pin until the content moves) or `trailer` (an
   `Irminsul-Reviewed` commit trailer, the sign-off for one change), and `irminsul explain`
@@ -163,3 +170,4 @@ status that excused every error would make one word of frontmatter the cheapest 
 ## Changes
 
 - 2026-10-29: Accepted [Each finding code has one answer](../rfcs/every-warning-hint-has-an-answer.md).
+- 2026-10-30: The answer bullet is implemented, and the three co-change acknowledgement codes retire to `acknowledgement/*`.

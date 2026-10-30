@@ -3,7 +3,7 @@ id: a-baseline-holds-certain-findings-and-grows-only-by-decision
 title: A baseline holds certain findings and grows only by decision
 status: stable
 describes: []
-summary: The baseline records only certain findings a check reports, is created once, loses entries as they are fixed, gains them only in a change that adds a decision record naming it, and shows what it hides.
+summary: The baseline records only certain findings a check reports, is created once, loses entries as they are fixed, gains them only in a change whose commit trailer names it, and shows what it hides.
 governs:
   - src/irminsul/baseline.py
   - src/irminsul/delta.py
@@ -51,10 +51,10 @@ every later one like it. A strict ratchet fails the other way: an upgrade whose 
   present it lists it, writes nothing and exits 1. No command adds an entry to an existing
   baseline.
 - **Grows only by decision.** Under `--diff`, a baseline holding entries its merge base did not
-  is `diff-integrity/baseline-grew`, certain, unless the change adds a stable decision record
-  whose `## Decision` names the baseline file's path in a code span, or is the adopting change,
-  whose base has neither an `irminsul.toml` nor a baseline. The record says why the findings
-  wait, and the change deletes the file and runs `baseline init` again.
+  is `diff-integrity/baseline-grew`, certain, unless a commit trailer names the baseline file's
+  path, or the change is the adopting change, whose base has neither an `irminsul.toml` nor a
+  baseline. The trailer's reason says why the findings wait, and the change deletes the file and
+  runs `baseline init` again.
 - **What it hides is visible.** A run that applies a baseline prints how many findings it hid
   and how many entries are fixed, and JSON always carries a `baseline` object.
   `--format github` adds a warning annotation and, when `GITHUB_STEP_SUMMARY` is set, lists
@@ -63,8 +63,6 @@ every later one like it. A strict ratchet fails the other way: an upgrade whose 
   entries of enabled checks it left out as fixed. `check --no-baseline` changes one run, writes
   nothing, and is exclusive with `--delta`.
 - **No expiry.** An entry hides its finding until the finding is fixed or its message changes.
-- **A trailer naming the baseline answers its growth** (accepted, not yet implemented), in
-  place of a decision record the change adds; the adopting change stays exempt.
 
 Files with no owning doc at adoption are excepted by the
 [adoption record](../components/adoption-record.md) instead, whose files `uniqueness` skips.
@@ -85,7 +83,7 @@ Files with no owning doc at adoption are excepted by the
 
 - An agent that hits a new certain finding has no command that records it, and a hand edit
   fails `diff-integrity`.
-- An upgrade has a reviewed way through; the record proves a reason was written, not that
+- An upgrade has a reviewed way through; the trailer proves a reason was written, not that
   anyone agreed.
 - `baseline update` cannot be narrowed, so it removes the entries of a check taken out of
   `checks.enabled`.
@@ -94,3 +92,5 @@ Files with no owning doc at adoption are excepted by the
 
 - 2026-10-29: Accepted [Each finding code has one answer](../rfcs/every-warning-hint-has-an-answer.md):
   a trailer naming the baseline answers its growth.
+- 2026-10-30: Growth is answered by a commit trailer naming the baseline file, not by a decision
+  record the change adds, as the trailer step implements.

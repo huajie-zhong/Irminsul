@@ -150,11 +150,11 @@ way to add undocumented code would be to add it, or to narrow a `describes` glob
   a setting that two stable decision records' `governs:` cover is
   `uniqueness/duplicate-governance`, certain, through the same matcher and `!` exclusions as one
   claim per source file.
-- **Three findings gain an answer** (accepted, not yet implemented). `owner-changed` is reported
+- **Two findings gain an answer** (accepted, not yet implemented). `owner-changed` is reported
   only while the old owner's prose still names the moved file, read by the review queue's
-  sentence reader, and a trailer answers it; a trailer naming the adoption record answers
-  `adoption-record-removed`; and `glossary-discipline/unlinked-term` reads the body its fixer
-  links, so every use it reports can be linked.
+  sentence reader, and a trailer answers it; and `glossary-discipline/unlinked-term` reads the
+  body its fixer links, so every use it reports can be linked.
+- A trailer naming the adoption record answers `adoption-record-removed`.
 
 ## Alternatives Considered
 
@@ -197,3 +197,5 @@ way to add undocumented code would be to add it, or to narrow a `describes` glob
   `owner-changed`, a removed adoption record and an unlinked glossary term gain an answer.
 - 2026-10-29: Accepted [A history file is checked for its links](../rfcs/a-history-file-is-checked-for-its-links.md):
   a history file, the changelog by default, is read for its links alone.
+- 2026-10-30: A removed adoption record is answered by a trailer naming it, as the trailer step
+  implements.

@@ -56,20 +56,20 @@ comment can answer them: `co-change/unreflected-change` and `claim-provenance/ev
 - **`co-change` asks for the doc:** under a diff range it warns on each owning doc whose claimed
   source changed or was deleted while the doc did not.
 - **A commit trailer acknowledges a `co-change` warning.**
-  `Irminsul-Reviewed: co-change <doc-id|path> reason="..."`, naming `co-change` or its code, on a
-  commit in the range turns the warning into `co-change/acknowledged`, an info finding quoting the required reason. A trailer
-  covers changes up to its own commit, and uncommitted work is later than every commit, so the
-  warning marks such a file `(uncommitted)`. A trailer that acknowledges nothing is an info
-  finding, because a trailer cannot be removed without rewriting history. The suggestion prints
-  the trailer to paste.
-- **One step accepts trailers** (accepted, not yet implemented). After classes are applied, the
-  shared runner matches each `Irminsul-Reviewed: <code> <path> [<subject>] reason="..."`
-  trailer of the change's commits to a finding by code, path and subject, accepts only a code
-  declared `trailer`, and reports the accepted finding at info under its own code with the
-  reason. A trailer that does not parse, or names a code not declared `trailer`, is
-  `acknowledgement/invalid`, and one that matches nothing `acknowledgement/unused`, both at info;
-  `co-change/acknowledged` and its two misuse codes go. A trailer stops covering a finding once a
-  later commit, or uncommitted work, touches a file the finding is about.
+  `Irminsul-Reviewed: co-change/unreflected-change <doc path> reason="..."`, on a commit in the
+  range, turns the warning into an info finding under its own code, quoting the required reason.
+  A trailer covers changes up to its own commit, and uncommitted work is later than every commit,
+  so the warning marks such a file `(uncommitted)`. A trailer that acknowledges nothing is
+  `acknowledgement/unused`, an info finding, because a trailer cannot be removed without
+  rewriting history. The suggestion prints the trailer to paste.
+- **One step accepts trailers.** After classes are applied, the shared runner matches each
+  `Irminsul-Reviewed: <code> <path> [<subject>] reason="..."` trailer of the change's commits to a
+  finding by code, path and subject, accepts only a code declared `trailer`, and reports the
+  accepted finding at info under its own code with the reason. A trailer that does not parse, or
+  names a code not declared `trailer`, is `acknowledgement/invalid`, and one that matches nothing
+  `acknowledgement/unused`, both at info. The co-change acknowledgement codes retire. A trailer
+  stops covering a finding once a later commit, or uncommitted work, touches a file the finding
+  is about.
 - **A change that only moves pins does not update a doc for `co-change`** (accepted, not yet
   implemented), and `co-change` also reads the code repository's range given as
   `--source-diff`, answered by a trailer on a commit of that range.
@@ -97,14 +97,19 @@ comment can answer them: `co-change/unreflected-change` and `claim-provenance/ev
 ## Consequences
 
 - One run before committing shows what the commit will trigger.
-- A move without `git mv` reads as a deletion plus a new file until staged, an untracked record
-  can clear a seal locally and not in CI, partial staging commits a different change from the
-  one judged, and a sibling repository's dirty work counts under `--source-diff`.
+- A move without `git mv` reads as a deletion plus a new file until staged, partial staging
+  commits a different change from the one judged, and a sibling repository's dirty work counts
+  under `--source-diff`.
 - Widening `source_roots` while deleting an owner is `diff-integrity/adoption-exception-revived`.
 - Acknowledging is easier than editing; acknowledging before re-reading is one of the moves the
   root `AGENTS.md` names as making the tree less true. A pin covers a whole file, so narrowing
   the evidence is the remedy for a busy one.
-- Other hints about a whole doc rather than a line have no acknowledgement.
+- A hint about a whole doc rather than a line has no ignore comment to answer it: a trailer
+  answers `co-change`, and a re-pin answers `evidence-drift`.
+- A trailer's path and subject cannot contain whitespace, so a file with a space in its path
+  cannot be named by a trailer, and its finding is answered by the fix.
+- A trailer for a setting covers every entry under that dotted name: one naming `paths.sources.ref`
+  accepts a ref change on every declared source.
 
 ## Changes
 
@@ -112,3 +117,6 @@ comment can answer them: `co-change/unreflected-change` and `claim-provenance/ev
   one step accepts commit trailers for every code declared to take one.
 - 2026-10-29: Accepted [An edit with no base is judged against HEAD](../rfcs/an-edit-with-no-base-is-judged-against-head.md):
   `context --after-edit` with no base judges uncommitted work against `HEAD`.
+- 2026-10-30: The trailer step is implemented: a finding whose code declares `trailer` is
+  accepted by a trailer naming its path and subject, and the co-change acknowledgement codes
+  retire.

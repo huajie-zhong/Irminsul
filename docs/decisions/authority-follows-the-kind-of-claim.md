@@ -80,21 +80,18 @@ foundation and architecture layers.
   removed claim was a report, nothing is reported.
 - **Moving is not removing.** A declaration is kept while any doc declares it, a claim by its id
   and sentence, so splitting a doc reports nothing.
-- **Authorization is a decision record, separate from the relation.** A stable record the change
-  adds, naming the claim id in a code span in its `## Decision`, excuses a claim's rewording or
-  removal; one naming the doc's path excuses a weakened inventory entry. A removed anchor or
-  inventory entry has no excuse: restore it, declare it elsewhere, or remove its code.
+- **Authorization is a trailer, separate from the relation.** An `Irminsul-Reviewed` trailer naming
+  the claim id excuses a claim's rewording or removal; one naming the doc's path excuses a
+  weakened inventory entry. A removed anchor or inventory entry has no excuse: restore it, declare
+  it elsewhere, or remove its code.
 - **Deleted prose is queued, not blocked:** `list review --changed` lists it as
   `removed-sentence`.
 - **The mechanism is derived, never declared, and protection follows relation, not layer.**
-- **A trailer answers removing or weakening governance** (accepted, not yet implemented). A
-  reworded or removed claim, a changed or removed governing claim and a weakened inventory entry
-  are answered by a trailer naming the claim id or the doc's path, not by a decision record. A
-  removed anchor whose symbol still resolves, named `path#symbol`, and a removed inventory entry
-  whose source still matches, named `source#kind`, gain the same answer. A claim whose relation
-  moves from `review-on-divergence` to `follows-evidence` is `diff-integrity/claim-downgraded`,
-  a hint a trailer answers. This replaces "Authorization is a decision record" and "A removed
-  anchor or inventory entry has no excuse" above.
+- **A trailer answers a removed anchor, a removed inventory entry and a claim downgrade**
+  (accepted, not yet implemented). A removed anchor whose symbol still resolves, named
+  `path#symbol`, and a removed inventory entry whose source still matches, named `source#kind`,
+  gain a trailer as their answer. A claim whose relation moves from `review-on-divergence` to
+  `follows-evidence` is `diff-integrity/claim-downgraded`, a hint a trailer answers.
 
 ## Alternatives Considered
 
@@ -122,8 +119,8 @@ foundation and architecture layers.
 
 ## Consequences
 
-- Removing a feature with the contract that governed it takes a decision record in the same
-  change. Whether its reasoning holds stays a review question.
+- Removing a feature with the contract that governed it takes a trailer naming the claim in the
+  same change. Whether its reasoning holds stays a review question.
 - A semantic claim can gain a mechanical projection, as `import-deps` checks `depends_on`
   against imports; the rest goes to judgment.
 - The removal rules need a diff range; a plain `irminsul check` relies on the ownership floor of
@@ -139,3 +136,6 @@ foundation and architecture layers.
   evidence drift is judged in every layer.
 - 2026-10-29: Accepted [Each finding code has one answer](../rfcs/every-warning-hint-has-an-answer.md):
   a trailer answers removing or weakening governance, and a claim downgrade is reported.
+- 2026-10-30: Authorization for a reworded or removed claim, a changed or removed governing claim
+  and a weakened inventory entry is a commit trailer, not a decision record, as the trailer step
+  implements.
