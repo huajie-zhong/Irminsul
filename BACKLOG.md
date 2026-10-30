@@ -180,6 +180,16 @@ in another order moves keys it did not change: `change finalize` moved `summary:
 dogfood RFC (2026-10-29). Keep the author's order, or bring every doc into the canonical order
 once so later writes change only what they mean to.
 
+### `evidence-drift-misses-component-claims`
+
+`evidence-drift` skips every claim outside the foundation and architecture layers
+(`src/irminsul/checks/claim_provenance.py:113-114`), so a component claim whose evidence file
+changed is never re-asked by a plain `check`. On the trailer-step branch, 11 evidence pins in
+three component docs no longer match their files: six claims in
+`docs/components/adoption-record.md`, `baseline-only-shrinks` in `docs/components/baseline.md`,
+and `transition-applies-human-decisions` in `docs/components/change.md`. No gate reported
+them; a comparison of each pin with its file's current hash did. Found 2026-10-30.
+
 ## Agent workflow
 
 Found by an agent working in this repository, as the root `AGENTS.md` asks.
@@ -429,6 +439,53 @@ answering the same question (one finding per doc, `src/irminsul/checks/new_depen
 The edges are real, but the warning repeats one fact per importer. Report a new shared
 module once, naming its importers, with one fix that writes every `depends_on`. Found by the
 PR 10b lane on 2026-10-28.
+
+### `repin-does-not-name-what-it-moved`
+
+Re-pinning an anchor rewrites the doc's bytes, and a claim whose evidence is that doc is
+left with a stale pin. Re-pinning two anchors in `docs/components/checks.md` printed
+`re-pinned 2 anchor(s), 0 claim evidence pin(s)` (`src/irminsul/cli.py:1651`) and named no
+claim; the next check reported `claim-provenance/evidence-drift` on
+`parent-child-check-available` in `docs/architecture/component-hierarchy.md`, which cites
+`checks.md`. A re-pin should name the claims whose evidence it moved, so the re-read follows
+it. Reproduced 2026-10-30.
+
+### `change-verify-cannot-scope-a-task`
+
+`change verify` gives every task of an RFC the same source evidence. On
+`every-warning-hint-has-an-answer`, a branch that implements part of it, it reports
+`tasks: 27/27 with source evidence, 27/27 with changed tests` (`src/irminsul/change/report.py:673`),
+and each task lists the same ten source files. It also reports `declared component 'change'
+has no implementation evidence`, and the same for `config`, `context` and `frontmatter`, none
+of whose source the branch changed (`src/irminsul/change/report.py:371`). Evidence should be
+scoped to the task's own scenario. Reproduced 2026-10-30.
+
+### `context-after-edit-is-long`
+
+`context --after-edit --base-ref origin/main` printed 901 lines on the trailer-step branch:
+21 owner blocks of about 40 lines each, and 34 lines that mention the glossary
+(`src/irminsul/context.py:337`). Four of the owners are docs the change did not touch:
+`components/INDEX.md`, `adoption-record.md`, `docgraph.md` and `new-list-regen.md`.
+`list review --changed` was the usable view. Reproduced 2026-10-30.
+
+### `diff-lists-trailers-needed`
+
+No command lists the trailers a change still needs. The top-level commands and the `list`
+group (`baseline`, `undocumented`, `lifecycle`, `review`) show none (`src/irminsul/cli.py:2205`).
+On the trailer-step branch the six `decision-rewritten` trailers and the two
+`baseline-only-shrinks` trailers were each found only by a `check --diff` run after the edit
+that needed them. A view of the trailers a change still needs, with the finding each answers,
+would save those runs. Reproduced 2026-10-30.
+
+### `review-flags-removed-sentence-on-edit`
+
+A sentence changed in one phrase is queued twice by `list review --changed`: once as `edited`
+for the new text, and once as `removed-sentence` for the old text (`src/irminsul/listing/review.py:487`).
+The removed item asks "keep the deletion only if the behaviour is gone" (`src/irminsul/listing/review.py:73`),
+but the old text is still in the file except for the phrase that changed, as in
+`docs/decisions/a-change-is-judged-from-its-merge-base-to-the-working-tree.md:61` ("is an
+info finding"). The pair should be read as one edit, asking only about the words it dropped.
+Reproduced 2026-10-30.
 
 ## Release pipeline
 
