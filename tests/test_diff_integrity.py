@@ -1509,9 +1509,13 @@ def test_a_rewritten_and_renamed_decision_is_offered_the_same_two_ways(tmp_path:
     assert _offers_keeping_the_code_or_superseding(suggestion), suggestion
 
 
-def test_explain_decision_rewritten_offers_the_same_two_ways() -> None:
+def test_explain_decision_rewritten_is_answered_by_a_trailer_or_a_superseding_record() -> None:
     result = runner.invoke(app, ["explain", "diff-integrity/decision-rewritten"])
 
     assert result.exit_code == 0, result.output
-    assert "Restore its wording and keep the code it names" in result.output
+    assert (
+        "answer: trailer — a changed decision needs a superseding record; if this only corrects "
+        "the wording, such as a typo, add this trailer"
+    ) in result.output
+    assert "acknowledge with: Irminsul-Reviewed: diff-integrity/decision-rewritten" in result.output
     assert "supersedes this one" in result.output

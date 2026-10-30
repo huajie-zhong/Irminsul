@@ -29,6 +29,7 @@ from .conftest import (
     component_doc,
     config_toml,
     findings_of,
+    git,
     load_graph,
     reviewed,
     seed_repo,
@@ -39,6 +40,9 @@ from .conftest import (
 _DOC = "docs/components/alpha.md"
 _CO_CHANGE = "co-change/unreflected-change"
 _WIDGET = "docs/components/widget.md"
+_REWRITTEN = "diff-integrity/decision-rewritten"
+_RECORD = "docs/decisions/choice.md"
+_REWRITTEN_TO = "docs/decisions/pick-a-lane.md"
 _REWORDED = "diff-integrity/claim-reworded"
 _WEAKENED = "diff-integrity/setting-weakened"
 _LENGTH = "checks.parent_child.length_warning_lines"
@@ -516,3 +520,67 @@ def test_an_uncommitted_config_edit_after_the_trailer_brings_the_error_back(
     [found] = findings_of(tmp_path, _WEAKENED, "--diff", base)
     assert found["severity"] == "error"
     assert "that trailer does not count" in str(found["suggestion"])
+
+
+_TYPO = "Run the chcek on every pull request."
+_TYPO_FIXED = "Run the check on every pull request."
+
+
+def _record(decision: str, *, record_id: str = "choice") -> str:
+    return (
+        f"---\nid: {record_id}\ntitle: Choice\nstatus: stable\nsummary: A test record.\n---\n\n"
+        f"# Choice\n\n## Status\n\nAccepted.\n\n## Decision\n\n{decision}\n\n"
+        "## Consequences\n\nFine.\n"
+    )
+
+
+def _record_repo(root: Path, decision: str) -> str:
+    write_config(root, project_name="ack")
+    write(root, _RECORD, _record(decision))
+    return seed_repo(root, "adopted")
+
+
+def test_a_reviewed_typo_fix_in_a_decision_is_info_under_its_own_code(tmp_path: Path) -> None:
+    base = _record_repo(tmp_path, _TYPO)
+    write(tmp_path, _RECORD, _record(_TYPO_FIXED))
+    commit_all(tmp_path, "fix a typo\n\n" + reviewed(_REWRITTEN, _RECORD, reason="typo"))
+
+    [found] = findings_of(tmp_path, _REWRITTEN, "--diff", base)
+
+    assert found["severity"] == "info"
+    assert found["data"]["reason"] == "typo"
+
+
+def test_the_same_typo_fix_with_no_trailer_is_a_warning(tmp_path: Path) -> None:
+    base = _record_repo(tmp_path, _TYPO)
+    write(tmp_path, _RECORD, _record(_TYPO_FIXED))
+    commit_all(tmp_path, "fix a typo")
+
+    assert [f["severity"] for f in findings_of(tmp_path, _REWRITTEN, "--diff", base)] == ["warning"]
+
+
+def test_a_later_commit_to_the_record_brings_a_reviewed_typo_back_as_a_warning(
+    tmp_path: Path,
+) -> None:
+    base = _record_repo(tmp_path, _TYPO)
+    write(tmp_path, _RECORD, _record(_TYPO_FIXED))
+    commit_all(tmp_path, "fix a typo\n\n" + reviewed(_REWRITTEN, _RECORD, reason="typo"))
+    write(tmp_path, _RECORD, _record(_TYPO_FIXED).replace("Fine.", "Fine enough."))
+    commit_all(tmp_path, "edit the consequences")
+
+    assert [f["severity"] for f in findings_of(tmp_path, _REWRITTEN, "--diff", base)] == ["warning"]
+
+
+def test_a_reviewed_typo_fix_in_a_renamed_record_names_its_new_path(tmp_path: Path) -> None:
+    base = _record_repo(tmp_path, _TYPO)
+    git(tmp_path, "mv", _RECORD, _REWRITTEN_TO)
+    write(tmp_path, _REWRITTEN_TO, _record(_TYPO_FIXED, record_id="pick-a-lane"))
+    commit_all(
+        tmp_path,
+        "rename the record and fix a typo\n\n" + reviewed(_REWRITTEN, _REWRITTEN_TO, reason="typo"),
+    )
+
+    [found] = findings_of(tmp_path, _REWRITTEN, "--diff", base)
+
+    assert found["severity"] == "info"
+    assert found["path"] == _REWRITTEN_TO

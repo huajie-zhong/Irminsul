@@ -226,10 +226,10 @@ class DiffIntegrityPass:
             "in a new ADR that supersedes it."
         ),
         CODE_DECISION_REWRITTEN: (
-            "An accepted decision record's `## Decision` section was rewritten in place. "
-            "Restore its wording and keep the code it names, so the record and the code "
-            "still agree as accepted, or record a changed decision in a new ADR that "
-            "supersedes this one. An accepted record's wording does not change either way."
+            "An accepted decision record's `## Decision` section was rewritten in place. A "
+            "changed decision needs a new record that supersedes this one. A correction that "
+            "changes no decision, such as a typo, needs no new record; a trailer naming this "
+            "record marks it as one."
         ),
         CODE_OWNER_CHANGED: (
             "Source files moved from one doc's `describes` to another's. Remove what the old "
@@ -371,9 +371,9 @@ class DiffIntegrityPass:
         CODE_RULES_NARROWED: FindingClass.hint,
     }
     answers: ClassVar[dict[str, Answer]] = {
-        CODE_DECISION_REWRITTEN: Answer.fix(
-            "restore the decision's wording, or record a changed decision in a new record that "
-            "supersedes this one"
+        CODE_DECISION_REWRITTEN: Answer.trailer(
+            "a changed decision needs a superseding record; if this only corrects the wording, "
+            "such as a typo, add this trailer"
         ),
         CODE_OWNER_CHANGED: Answer.fix(
             "remove what the old owner still says about the moved files, or link the two docs"
@@ -816,6 +816,8 @@ def _sealed_rewrites(
                 path,
                 f"accepted decision section rewritten since {base_ref}",
                 _DECISION_REWRITTEN_SUGGESTION,
+                subject=path,
+                about=(path,),
             )
         )
     return out
@@ -1778,6 +1780,8 @@ def _renamed_record(
                 new_path,
                 f"accepted decision section rewritten since {base_ref}, where it was {old_path}",
                 _DECISION_REWRITTEN_SUGGESTION,
+                subject=new_path,
+                about=(old_path, new_path),
             )
         ]
     return []
