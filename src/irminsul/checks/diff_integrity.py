@@ -383,43 +383,47 @@ class DiffIntegrityPass:
             "merges"
         ),
         CODE_BASELINE_GREW: Answer.trailer(
-            "a reader who has judged why the new findings wait signs it off"
+            "if the new findings have to wait, add this trailer and say why"
         ),
         CODE_ADOPTION_RECORD_REMOVED: Answer.trailer(
-            "a reader who has judged why the record goes signs it off"
+            "if the record should go, add this trailer and say why"
         ),
         CODE_CLAIM_REWORDED: Answer.trailer(
-            "a reader who finds the new wording still right signs it off"
+            "if you re-read the new wording against its evidence and it is right, add this trailer"
         ),
-        CODE_CLAIM_REMOVED: Answer.trailer(
-            "a reader who has confirmed the claim no longer applies signs it off"
-        ),
+        CODE_CLAIM_REMOVED: Answer.trailer("if the claim no longer applies, add this trailer"),
         CODE_GOVERNING_CLAIM_REMOVED: Answer.trailer(
-            "a reader who has judged the contract retired signs it off"
+            "if the contract is retired on purpose, add this trailer and say why"
         ),
         CODE_GOVERNING_CLAIM_CHANGED: Answer.trailer(
-            "a reader who has judged the change of intent sound signs it off"
+            "if the change of intent is deliberate, add this trailer and say why"
         ),
         CODE_INVENTORY_WEAKENED: Answer.trailer(
-            "a reader who has judged the weaker contract sound signs it off"
+            "if the weaker contract is deliberate, add this trailer and say why"
         ),
         CODE_GATE_FILE_CHANGED: Answer.trailer(
-            "a reader who has confirmed the edit does not weaken the gate signs it off"
+            "if the edit does not weaken the gate, add this trailer"
         ),
         CODE_CHECK_DISABLED: Answer.trailer(
-            "a reader who has judged the gate without that check sound signs it off"
+            "if the gate should run without it, add this trailer and say why"
         ),
         CODE_LAYER_RULE_DISABLED: Answer.trailer(
-            "a reader who has judged the weaker rule sound signs it off"
+            "if the weaker rule is deliberate, add this trailer and say why"
         ),
         CODE_SETTING_WEAKENED: Answer.trailer(
-            "a reader who has judged the weaker setting sound signs it off"
+            "if the weaker setting is deliberate, add this trailer and say why"
         ),
-        CODE_SOURCE_EXCLUDED: Answer.trailer("a reader who has confirmed that signs it off"),
-        CODE_EXTRA_DOC_REMOVED: Answer.trailer("a reader who has confirmed that signs it off"),
-        CODE_RULES_NARROWED: Answer.trailer("a reader who has confirmed that signs it off"),
+        CODE_SOURCE_EXCLUDED: Answer.trailer(
+            "if the files no longer read hold no documented code, add this trailer"
+        ),
+        CODE_EXTRA_DOC_REMOVED: Answer.trailer(
+            "if the file holds no guidance that must stay true, add this trailer"
+        ),
+        CODE_RULES_NARROWED: Answer.trailer(
+            "if nothing documented depended on the rule, add this trailer"
+        ),
         CODE_UNREVIEWED_SETTING_CHANGE: Answer.trailer(
-            "a reader who has confirmed that signs it off"
+            "if the change does not weaken the gate, add this trailer"
         ),
     }
 
@@ -1096,7 +1100,7 @@ def _changed_gate_files(
                 Severity.error,
                 named,
                 f"`{named}` mentions irminsul and {how} since {base_ref}",
-                "undo the change",
+                "undo the change if it weakens the gate",
                 subject=named,
                 about=(old_path, path),
             )
@@ -1902,7 +1906,7 @@ _SEALS: Final[dict[str, _Seal]] = {
     "paths.sources": _Seal("removal-by-identity", CODE_SETTING_WEAKENED, identity=("name",)),
     "paths.sources.path": _Seal("any-change", CODE_SETTING_WEAKENED),
     "paths.sources.ref": _Seal("any-change", CODE_SETTING_WEAKENED),
-    # A record names the check it turns off.
+    # A trailer names the check it turns off.
     "checks.enabled": _Seal("narrowed", CODE_CHECK_DISABLED, cites_entry=True),
     "checks.external_links.enabled": _Seal("false", CODE_SETTING_WEAKENED),
     "checks.stale_reaper.deprecated_threshold_days": _Seal("raised", CODE_SETTING_WEAKENED),
@@ -1922,13 +1926,6 @@ _SEALS: Final[dict[str, _Seal]] = {
         for layer in LAYER_NAMES
         for rule in ("require_tests", "require_scope_section")
     },
-}
-
-_CONFIRM: Final = {
-    CODE_SOURCE_EXCLUDED: "confirm the files no longer read hold no documented code",
-    CODE_EXTRA_DOC_REMOVED: "confirm it holds no guidance that must stay true",
-    CODE_RULES_NARROWED: "confirm nothing documented depended on it",
-    CODE_UNREVIEWED_SETTING_CHANGE: "confirm it does not weaken the gate",
 }
 
 
@@ -1962,7 +1959,7 @@ def _config_weakening(old: IrminsulConfig, new: IrminsulConfig, base_ref: str) -
                     CONFIG_FILENAME,
                     f"{change.shown} changed since {base_ref}, and nothing here judges "
                     "whether that weakens the gate",
-                    _CONFIRM[CODE_UNREVIEWED_SETTING_CHANGE],
+                    None,
                     subject=change.name,
                 )
             )
@@ -1976,7 +1973,7 @@ def _config_weakening(old: IrminsulConfig, new: IrminsulConfig, base_ref: str) -
                     Severity.error if certain else Severity.warning,
                     CONFIG_FILENAME,
                     f"{what} since {base_ref}",
-                    _CONFIRM.get(seal.code, "restore it"),
+                    "restore it",
                     subject=cited,
                 )
             )
@@ -2159,7 +2156,7 @@ def _finding(
     severity: Severity,
     path: str,
     message: str,
-    suggestion: str,
+    suggestion: str | None,
     *,
     subject: str | None = None,
     about: tuple[str, ...] = (),
