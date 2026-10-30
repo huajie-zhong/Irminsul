@@ -7,9 +7,11 @@ its code's class has the last word. A certain finding is an error, unless it sit
 draft doc *and* its code is one the check declares in `drafts_exempt` — a code reporting
 that the doc is unfinished rather than that it is wrong about something outside it. A
 hint or time finding is never an error. Given a diff range, time findings are left out,
-because a change cannot have caused them. Last, each code's declared answer: `answer_of`
-says how a correct doc turns a finding green, and the suggestion of a finding whose code
-answers on its line names the ignore comment to write.
+because a change cannot have caused them. Then the acknowledgement step: a trailer of the
+change accepts a finding whose code declares `trailer`. Last, each code's declared answer:
+`answer_of` says how a correct doc turns a finding green, and the suggestion of a finding
+whose code answers on its line names the ignore comment to write, and one whose code
+answers by trailer names the trailer to write.
 
 Two classes, named apart because they answer different questions:
 
@@ -37,6 +39,7 @@ from functools import cache
 from typing import TYPE_CHECKING, Final
 
 from irminsul.checks import REGISTRY
+from irminsul.checks.acknowledgement import AcknowledgementStep, apply_acknowledgements
 from irminsul.checks.adoption_record import AdoptionRecordPass
 from irminsul.checks.base import (
     Answer,
@@ -87,13 +90,15 @@ CHANGE_PASSES: Final = tuple(
 
 @cache
 def finding_sources() -> dict[str, type[FindingSource]]:
-    """Everything that emits findings under a name: the registered checks, the passes, and
-    the ignore-comment filter. The one place that knows all of them, so a new one is
-    explainable, classed, and nameable in an ignore comment without a second list."""
+    """Everything that emits findings under a name: the registered checks, the passes, the
+    ignore-comment filter, and the acknowledgement step. The one place that knows all of them,
+    so a new one is explainable, classed, and nameable in an ignore comment without a second
+    list."""
     return {
         **REGISTRY,
         **PASSES,
         IgnoreCommentFilter.name: IgnoreCommentFilter,
+        AcknowledgementStep.name: AcknowledgementStep,
     }
 
 
@@ -208,35 +213,47 @@ def finish(
     ran: Collection[str] | None = None,
     diff: bool = False,
 ) -> list[Finding]:
-    """Ignore comments, then classes, then answers — the path every finding takes before it
-    is reported.
+    """Ignore comments, then classes, then the acknowledgement step, then answers — the path
+    every finding takes before it is reported.
 
     Ignore comments go first because which findings a comment may silence is decided by
     the class a code declares, never by the severity a check chose, so classifying first
     would change nothing. `ran` names the registered checks whose findings these are and
-    turns on the audit of misused comments; `diff` leaves out time findings. Last, the
-    suggestion of a finding whose code declares `line` names the comment that waives it.
+    turns on the audit of misused comments and trailers; `diff` leaves out time findings. The
+    acknowledgement step follows classes, so the info it gives an accepted finding is the last
+    word, and precedes the answers, which an accepted finding does not need. Last, the
+    suggestion of a finding whose code declares `line` names the comment that waives it, and
+    one whose code declares `trailer` names the trailer that signs it off.
     """
     from irminsul.checks.ignore_comments import apply_ignore_comments
 
     classed = apply_classes(apply_ignore_comments(findings, graph, ran=ran), graph, diff=diff)
-    return _with_answer(classed)
+    return _with_answer(apply_acknowledgements(classed, graph, ran=ran), graph)
 
 
-def _with_answer(findings: list[Finding]) -> list[Finding]:
-    """Each finding with the clause its code's answer adds to its suggestion. Only `line`
-    has one: `fix` and `pin` suggestions already name the act, and a finding that passes
-    through again keeps one clause."""
+def _with_answer(findings: list[Finding], graph: DocGraph) -> list[Finding]:
+    """Each finding with the clause its code's answer adds to its suggestion. `line` names the
+    ignore comment, and `trailer` the trailer and where it goes; `fix` and `pin` suggestions
+    already name the act. A clause is added once, so a finding that passes through again keeps
+    it, and an accepted finding, which is already signed off, gets none."""
+    from irminsul.checks.acknowledgement import accepted, placement, trailer_for
     from irminsul.checks.ignore_comments import comment_for
 
+    change = graph.change
+    uncommitted = change.uncommitted if change is not None else frozenset()
     out: list[Finding] = []
     for finding in findings:
         answer = answer_of(finding.code)
         if answer.kind is AnswerKind.line:
             clause = f"{answer.how}: `{comment_for(finding.code)}`"
-            own = finding.suggestion
-            if own is None or clause not in own:
-                finding = replace(finding, suggestion=f"{own}; {clause}" if own else clause)
+        elif answer.kind is AnswerKind.trailer and not accepted(finding):
+            clause = f"{answer.how}: `{trailer_for(finding)}` {placement(finding, uncommitted)}"
+        else:
+            out.append(finding)
+            continue
+        own = finding.suggestion
+        if own is None or clause not in own:
+            finding = replace(finding, suggestion=f"{own}; {clause}" if own else clause)
         out.append(finding)
     return out
 

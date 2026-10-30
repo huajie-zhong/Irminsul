@@ -100,6 +100,28 @@ def test_explain_of_a_check_labels_each_code_with_its_class_and_answer() -> None
     assert "co-change/unreflected-change (hint, trailer)" in result.output
 
 
+def test_explain_of_a_trailer_code_prints_the_form_that_acknowledges_it() -> None:
+    result = runner.invoke(app, ["explain", "co-change/unreflected-change"])
+
+    assert result.exit_code == 0, result.output
+    assert (
+        "acknowledge with: Irminsul-Reviewed: co-change/unreflected-change <path> [<subject>] "
+        'reason="..."' in result.output
+    )
+    assert "waive with:" not in result.output
+
+
+def test_the_acknowledgement_codes_are_explained_and_the_retired_ones_are_not() -> None:
+    misuse = runner.invoke(app, ["explain", "acknowledgement/invalid"])
+    unused = runner.invoke(app, ["explain", "acknowledgement/unused"])
+    retired = runner.invoke(app, ["explain", "co-change/acknowledged"])
+
+    assert misuse.exit_code == 0, misuse.output
+    assert "answer: fix" in misuse.output
+    assert unused.exit_code == 0, unused.output
+    assert retired.exit_code == 2
+
+
 def test_explain_says_how_to_answer_an_unverifiable_adoption_source() -> None:
     result = runner.invoke(app, ["explain", "adoption-record/source-unverifiable"])
 

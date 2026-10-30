@@ -5,6 +5,7 @@ status: stable
 describes: []
 summary: A change runs from the merge base, read with its own configuration, to the working tree, unless `--committed-only` stops it at HEAD; a reviewed co-change warning is acknowledged by a commit trailer.
 governs:
+  - src/irminsul/checks/acknowledgement.py
   - src/irminsul/checks/change_range.py
   - src/irminsul/checks/co_change.py
   - src/irminsul/git/changes.py

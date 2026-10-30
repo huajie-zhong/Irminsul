@@ -30,7 +30,6 @@ from .test_cli_cochange import _DOC_BODY, _TOML
 from .test_diff_integrity import _ADR, _repo
 
 _UNREFLECTED = "co-change/unreflected-change"
-_ACKNOWLEDGED = "co-change/acknowledged"
 _TRAILER = 'Irminsul-Reviewed: co-change docs/components/alpha.md reason="re-read, still right"'
 
 
@@ -55,6 +54,10 @@ def _feature(tmp_path: Path) -> tuple[Path, str]:
 def _one(findings: list[dict[str, Any]], code: str) -> dict[str, Any]:
     [found] = [f for f in findings if f["code"] == code]
     return found
+
+
+def _severities(findings: list[dict[str, Any]], code: str) -> list[str]:
+    return [f["severity"] for f in findings if f["code"] == code]
 
 
 @pytest.mark.parametrize("staged", [False, True])
@@ -120,24 +123,22 @@ def test_a_commit_carrying_the_trailer_acknowledges_what_the_tree_warned_about(
 
     commit_all(root, f"change alpha\n\n{_TRAILER}", when=_at(2))
 
-    codes = check_codes(root, "--diff", base)
-    assert _ACKNOWLEDGED in codes
-    assert _UNREFLECTED not in codes
+    assert _severities(check_findings(root, "--diff", base), _UNREFLECTED) == ["info"]
 
 
 def test_a_trailer_does_not_cover_a_later_uncommitted_edit(tmp_path: Path) -> None:
     root, base = _feature(tmp_path)
     write(root, "app/alpha.py", "a = 2\n")
     commit_all(root, f"change alpha\n\n{_TRAILER}", when=_at(2))
-    assert _ACKNOWLEDGED in check_codes(root, "--diff", base)
+    assert _severities(check_findings(root, "--diff", base), _UNREFLECTED) == ["info"]
 
     write(root, "app/alpha.py", "a = 3\n")
 
     findings = check_findings(root, "--diff", base)
     found = _one(findings, _UNREFLECTED)
+    assert found["severity"] == "warning"
     assert "that trailer does not count" in found["suggestion"]
     assert "predates the change to app/alpha.py (uncommitted)" in found["suggestion"]
-    assert _ACKNOWLEDGED not in [f["code"] for f in findings]
 
 
 def test_committed_only_leaves_uncommitted_work_out(tmp_path: Path) -> None:
@@ -158,10 +159,9 @@ def test_committed_only_judges_the_commits_not_what_follows_them(tmp_path: Path)
     commit_all(root, f"change alpha\n\n{_TRAILER}", when=_at(2))
     write(root, "app/alpha.py", "a = 3\n")
 
-    codes = check_codes(root, "--diff", base, "--committed-only")
+    findings = check_findings(root, "--diff", base, "--committed-only")
 
-    assert _ACKNOWLEDGED in codes
-    assert _UNREFLECTED not in codes
+    assert _severities(findings, _UNREFLECTED) == ["info"]
 
 
 def test_committed_only_reaches_the_graph(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

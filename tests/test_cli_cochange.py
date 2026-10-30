@@ -235,28 +235,24 @@ def _hint_failing_diff(repo_root: Path, base: str) -> tuple[int, list[dict[str, 
         ],
     )
     findings = json.loads(result.stdout)["findings"]
-    return result.exit_code, [f for f in findings if f["check"] == "co-change"]
+    return result.exit_code, [f for f in findings if f["check"] in ("co-change", "acknowledgement")]
 
 
-@pytest.mark.parametrize(
-    ("check", "doc"),
-    [
-        ("co-change", "docs/components/alpha.md"),
-        ("co-change", "alpha"),
-        ("co-change/unreflected-change", "alpha"),
-    ],
-)
-def test_a_reviewed_trailer_acknowledges_the_warning(tmp_path: Path, check: str, doc: str) -> None:
+@pytest.mark.parametrize("check", ["co-change", "co-change/unreflected-change"])
+def test_a_reviewed_trailer_acknowledges_the_warning(tmp_path: Path, check: str) -> None:
     repo_root, base = _seed_repo(tmp_path)
     (repo_root / "app" / "alpha.py").write_text("a = 2\n", encoding="utf-8")
     commit_all(
         repo_root,
-        f'change source only\n\nIrminsul-Reviewed: {check} {doc} reason="no value is named"',
+        f"change source only\n\nIrminsul-Reviewed: {check} docs/components/alpha.md "
+        'reason="no value is named"',
     )
 
     exit_code, cochange = _hint_failing_diff(repo_root, base)
     assert exit_code == 0
-    assert [(f["code"], f["severity"]) for f in cochange] == [("co-change/acknowledged", "info")]
+    assert [(f["code"], f["severity"]) for f in cochange] == [
+        ("co-change/unreflected-change", "info")
+    ]
     assert '"no value is named"' in cochange[0]["message"]
     assert "app/alpha.py" in cochange[0]["message"]
 
@@ -266,9 +262,9 @@ def test_a_reviewed_trailer_acknowledges_the_warning(tmp_path: Path, check: str,
     [
         ("co-change docs/components/alpha.md", "gives no reason"),
         ('co-change docs/components/alpha.md reason=" "', "gives no reason"),
-        ('co-change reason="still right"', "names no doc"),
-        ('co-change docs/components/gone.md reason="x"', "names no doc with id or path"),
-        ('evidence-drift alpha reason="x"', "acknowledges only co-change"),
+        ('co-change reason="still right"', "names no path"),
+        ('evidence-drift docs/components/alpha.md reason="x"', "no check or finding code"),
+        ('co-change alpha reason="still right"', "write its path, docs/components/alpha.md"),
         ("co-change alpha reason=unquoted", "is not written as"),
     ],
 )
@@ -282,8 +278,8 @@ def test_a_trailer_that_acknowledges_nothing_is_reported(
     exit_code, cochange = _hint_failing_diff(repo_root, base)
     assert exit_code == 1
     codes = sorted(f["code"] for f in cochange)
-    assert codes == ["co-change/invalid-acknowledgement", "co-change/unreflected-change"]
-    invalid = next(f for f in cochange if f["code"] == "co-change/invalid-acknowledgement")
+    assert codes == ["acknowledgement/invalid", "co-change/unreflected-change"]
+    invalid = next(f for f in cochange if f["code"] == "acknowledgement/invalid")
     assert invalid["severity"] == "info"
     assert problem in invalid["message"]
 
@@ -295,15 +291,30 @@ def test_a_trailer_for_a_doc_with_no_warning_is_unused(tmp_path: Path) -> None:
     doc.write_text(_DOC_BODY + "\nNow `a` is 2.\n", encoding="utf-8")
     commit_all(
         repo_root,
-        'change source and doc\n\nIrminsul-Reviewed: co-change alpha reason="still right"',
+        "change source and doc\n\n"
+        'Irminsul-Reviewed: co-change docs/components/alpha.md reason="still right"',
     )
 
     exit_code, cochange = _hint_failing_diff(repo_root, base)
     assert exit_code == 0, "a trailer cannot be removed without rewriting history"
-    assert [(f["code"], f["severity"]) for f in cochange] == [
-        ("co-change/unused-acknowledgement", "info")
-    ]
+    assert [(f["code"], f["severity"]) for f in cochange] == [("acknowledgement/unused", "info")]
     assert cochange[0]["path"] == "docs/components/alpha.md"
+
+
+def test_a_trailer_naming_a_doc_that_is_not_there_is_unused(tmp_path: Path) -> None:
+    repo_root, base = _seed_repo(tmp_path)
+    (repo_root / "app" / "alpha.py").write_text("a = 2\n", encoding="utf-8")
+    commit_all(
+        repo_root,
+        'change source only\n\nIrminsul-Reviewed: co-change docs/components/gone.md reason="x"',
+    )
+
+    exit_code, cochange = _hint_failing_diff(repo_root, base)
+    assert exit_code == 1
+    assert sorted(f["code"] for f in cochange) == [
+        "acknowledgement/unused",
+        "co-change/unreflected-change",
+    ]
 
 
 def test_a_trailer_before_the_base_acknowledges_nothing(tmp_path: Path) -> None:
@@ -313,7 +324,7 @@ def test_a_trailer_before_the_base_acknowledges_nothing(tmp_path: Path) -> None:
         "commit",
         "--allow-empty",
         "-m",
-        'earlier\n\nIrminsul-Reviewed: co-change alpha reason="an older change"',
+        'earlier\n\nIrminsul-Reviewed: co-change docs/components/alpha.md reason="an older change"',
     )
     base = git(repo_root, "rev-parse", "HEAD")
     (repo_root / "app" / "alpha.py").write_text("a = 2\n", encoding="utf-8")
@@ -322,7 +333,10 @@ def test_a_trailer_before_the_base_acknowledges_nothing(tmp_path: Path) -> None:
     exit_code, cochange = _hint_failing_diff(repo_root, base)
     assert exit_code == 1
     assert [f["code"] for f in cochange] == ["co-change/unreflected-change"]
-    assert "Irminsul-Reviewed: co-change docs/components/alpha.md" in cochange[0]["suggestion"]
+    assert (
+        'Irminsul-Reviewed: co-change/unreflected-change docs/components/alpha.md reason="..."'
+        in cochange[0]["suggestion"]
+    )
 
 
 def test_a_trailer_covers_only_the_changes_made_before_it(tmp_path: Path) -> None:
@@ -331,7 +345,8 @@ def test_a_trailer_covers_only_the_changes_made_before_it(tmp_path: Path) -> Non
     (repo_root / "app" / "alpha.py").write_text("a = 2\n", encoding="utf-8")
     commit_all(
         repo_root,
-        'rename a value\n\nIrminsul-Reviewed: co-change alpha reason="no value is named"',
+        "rename a value\n\nIrminsul-Reviewed: co-change docs/components/alpha.md "
+        'reason="no value is named"',
     )
     (repo_root / "app" / "beta.py").write_text("def gone(): ...\n", encoding="utf-8")
     commit_all(repo_root, "change what beta does")
@@ -347,14 +362,17 @@ def test_a_later_change_outside_the_doc_leaves_the_trailer_standing(tmp_path: Pa
     (repo_root / "app" / "alpha.py").write_text("a = 2\n", encoding="utf-8")
     commit_all(
         repo_root,
-        'rename a value\n\nIrminsul-Reviewed: co-change alpha reason="no value is named"',
+        "rename a value\n\nIrminsul-Reviewed: co-change docs/components/alpha.md "
+        'reason="no value is named"',
     )
     (repo_root / "app" / "unclaimed.py").write_text("u = 2\n", encoding="utf-8")
     commit_all(repo_root, "change a file no doc claims")
 
     exit_code, cochange = _hint_failing_diff(repo_root, base)
     assert exit_code == 0
-    assert [f["code"] for f in cochange] == ["co-change/acknowledged"]
+    assert [(f["code"], f["severity"]) for f in cochange] == [
+        ("co-change/unreflected-change", "info")
+    ]
 
 
 def test_what_the_base_gained_is_not_a_later_change(tmp_path: Path) -> None:
@@ -369,7 +387,8 @@ def test_what_the_base_gained_is_not_a_later_change(tmp_path: Path) -> None:
     alpha.write_text("a = 2\n\n\n\nz = 1\n", encoding="utf-8")
     commit_all(
         repo_root,
-        'rename a value\n\nIrminsul-Reviewed: co-change alpha reason="no value is named"',
+        "rename a value\n\nIrminsul-Reviewed: co-change docs/components/alpha.md "
+        'reason="no value is named"',
     )
     git(repo_root, "switch", main)
     alpha.write_text("a = 1\n\n\n\nz = 2\n", encoding="utf-8")
@@ -380,7 +399,9 @@ def test_what_the_base_gained_is_not_a_later_change(tmp_path: Path) -> None:
 
     exit_code, cochange = _hint_failing_diff(repo_root, base)
     assert exit_code == 0
-    assert [f["code"] for f in cochange] == ["co-change/acknowledged"]
+    assert [(f["code"], f["severity"]) for f in cochange] == [
+        ("co-change/unreflected-change", "info")
+    ]
 
 
 _AT = _dt.datetime(2024, 1, 1, tzinfo=_dt.UTC)
@@ -395,7 +416,7 @@ def test_the_suggestion_says_the_trailer_goes_after_the_last_change(tmp_path: Pa
 
     assert [f["code"] for f in cochange] == ["co-change/unreflected-change"]
     assert cochange[0]["suggestion"].endswith(
-        'reason="..."` on a commit made after the last change to those files'
+        'reason="..."` on the commit that carries the last change to app/alpha.py, or a later one'
     )
 
 
@@ -404,7 +425,8 @@ def test_an_overtaken_trailer_is_named_beside_the_same_clause(tmp_path: Path) ->
     (repo_root / "app" / "alpha.py").write_text("a = 2\n", encoding="utf-8")
     commit_all(
         repo_root,
-        'rename a value\n\nIrminsul-Reviewed: co-change alpha reason="no value is named"',
+        "rename a value\n\nIrminsul-Reviewed: co-change docs/components/alpha.md "
+        'reason="no value is named"',
         when=_AT,
     )
     (repo_root / "app" / "beta.py").write_text("def gone(): ...\n", encoding="utf-8")
@@ -413,16 +435,17 @@ def test_an_overtaken_trailer_is_named_beside_the_same_clause(tmp_path: Path) ->
     _, cochange = _hint_failing_diff(repo_root, base)
 
     suggestion = cochange[0]["suggestion"]
-    assert "on a commit made after the last change to those files" in suggestion
+    assert "on the commit that carries the last change to those files, or a later one" in suggestion
     assert "predates the change to app/beta.py: that trailer does not count" in suggestion
 
 
-def test_explain_co_change_says_where_the_trailer_goes() -> None:
+def test_explain_co_change_names_the_trailer_form() -> None:
     result = runner.invoke(app, ["explain", "co-change/unreflected-change"])
 
     assert result.exit_code == 0, result.output
-    assert "on a commit made after the last change to those files" in " ".join(
-        result.output.split()
+    assert (
+        "acknowledge with: Irminsul-Reviewed: co-change/unreflected-change <path> [<subject>] "
+        'reason="..."' in " ".join(result.output.split())
     )
 
 

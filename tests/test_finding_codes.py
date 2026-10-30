@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 
 from irminsul.checks import REGISTRY, Finding
+from irminsul.checks.acknowledgement import Trailer, acknowledge
 from irminsul.checks.base import (
     Answer,
     AnswerKind,
@@ -29,7 +30,7 @@ from irminsul.checks.base import (
     Severity,
     finding_records,
 )
-from irminsul.checks.co_change import Trailer, run_co_change
+from irminsul.checks.co_change import run_co_change
 from irminsul.checks.external_links import _save_cache
 from irminsul.checks.pipeline import _on_draft, answer_of, class_of, finding_sources
 from irminsul.config import ConfigError, find_config, load
@@ -289,15 +290,19 @@ def _co_change_findings(root: Path) -> list[Finding]:
     write_config(root, project_name="codes-co-change", source_roots=["app"])
     graph = load_graph(root)
     changed = frozenset({"app/alpha.py"})
-    reviewed = [
-        Trailer("abc1234", 'co-change alpha reason="still right"', frozenset()),
-        Trailer("abc1234", "co-change alpha", frozenset()),
+    ran = ("co-change",)
+    accepted = [
+        Trailer("abc1234", 'co-change docs/components/alpha.md reason="still right"', frozenset())
     ]
-    unused = [Trailer("abc1234", 'co-change alpha reason="again"', frozenset())]
+    misused = [
+        Trailer("abc1234", 'co-change alpha reason="still right"', frozenset()),
+        Trailer("abc1234", 'co-change docs/components/gone.md reason="again"', frozenset()),
+    ]
     found = [
         *run_co_change(graph, changed),
-        *run_co_change(graph, changed, trailers=reviewed),
-        *run_co_change(graph, frozenset(), trailers=unused),
+        *acknowledge(run_co_change(graph, changed), accepted, graph, ran=ran),
+        *acknowledge(run_co_change(graph, changed), misused, graph, ran=ran),
+        *acknowledge([], misused[1:], graph, ran=ran),
     ]
     _BY_GRAPH.append((graph, found))
     return found
@@ -428,7 +433,7 @@ def test_every_code_declares_its_answer() -> None:
     ]
 
     assert problems == []
-    assert len(walked) >= 40, "too few hint and time codes walked for the silence to mean much"
+    assert len(walked) >= 39, "too few hint and time codes walked for the silence to mean much"
 
 
 def _planted(

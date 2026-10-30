@@ -217,6 +217,13 @@ def component_doc(slug: str, *describes: str) -> str:
     )
 
 
+def reviewed(code: str, path: str, subject: str | None = None, reason: str = "re-read") -> str:
+    """The `Irminsul-Reviewed` trailer line that acknowledges one finding, for a commit message:
+    `commit_all(root, f"msg\\n\\n{reviewed(...)}")`."""
+    subject_part = f" {subject}" if subject is not None else ""
+    return f'Irminsul-Reviewed: {code} {path}{subject_part} reason="{reason}"'
+
+
 def anchor_repo(tmp_path: Path) -> Path:
     """A repository whose one doc anchors a sentence to `src/mod.py#alpha`, unpinned."""
     repo = tmp_path / "anchors"

@@ -97,6 +97,9 @@ class Finding:
     #: The item a sign-off names: a claim id, a setting's dotted name, or the path itself
     #: for a finding about a whole file. A finding of a code declared `trailer` carries one.
     subject: str | None = None
+    #: The files whose later change lapses a trailer that acknowledges this finding. Empty
+    #: means the finding's own path.
+    about: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
