@@ -37,7 +37,7 @@ Whoever reads a doc already has the code, symbol search, git history, and the `i
 
 A claim is a `claims:` frontmatter entry, which any layer's docs may carry; body prose names the claim it rests on with `<!-- claim:<id> -->`. The [frontmatter reference](../components/frontmatter.md) describes the fields, and [Authority follows the kind of claim](../decisions/authority-follows-the-kind-of-claim.md) says what each `relation` means.
 
-Most valuable prose is not a claim. A claim gives a sentence an id and cited evidence; in a pull request, removing it while that evidence survives is a finding, and so is rewording a `governs-evidence` claim without a decision record. That upkeep is worth paying only for:
+Most valuable prose is not a claim. A claim gives a sentence an id and cited evidence; in a pull request, removing it while that evidence survives is a finding, and so is rewording a `governs-evidence` claim without a trailer naming it. That upkeep is worth paying only for:
 
 - **A contract the code could break**, which a person decided to keep — `governs-evidence`.
 - **A model a reader should re-check when its evidence changes** — leave `relation` out, which means `review-on-divergence`.

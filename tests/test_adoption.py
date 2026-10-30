@@ -22,9 +22,11 @@ from .conftest import (
     commit_all,
     component_doc,
     config_toml,
+    findings_of,
     git,
     git_init,
     invoke,
+    reviewed,
     write,
 )
 
@@ -885,33 +887,23 @@ def test_an_empty_record_may_be_deleted(tmp_path: Path) -> None:
     assert _gate(root, base) == (0, [])
 
 
-def test_a_decision_record_may_retire_the_whole_record(tmp_path: Path) -> None:
+def test_a_trailer_may_retire_the_whole_record(tmp_path: Path) -> None:
     """Un-adopting is allowed, and it is the kind of choice that gets written down — the
-    same excuse `check-disabled` takes for switching a check off."""
+    same sign-off `check-disabled` takes for switching a check off."""
     root = _repo(tmp_path)
     base = _adopt(root)
     (root / ".irminsul-adoption.json").unlink()
-    write(
+    commit_all(
         root,
-        "docs/decisions/0001-stop-recording-debt.md",
-        "\n".join(
-            [
-                "---",
-                "id: stop-recording-debt",
-                "title: Stop recording debt",
-                "status: stable",
-                "---",
-                "",
-                "# Stop recording debt",
-                "",
-                "## Decision",
-                "",
-                "We drop `.irminsul-adoption.json` and go back to the covered-directory rule.",
-                "",
-            ]
+        "drop the record, with a reason\n\n"
+        + reviewed(
+            "diff-integrity/adoption-record-removed",
+            ".irminsul-adoption.json",
+            reason="we go back to the covered-directory rule",
         ),
     )
-    commit_all(root, "drop the record, with a reason")
 
     _, errors = _gate(root, base)
     assert "diff-integrity/adoption-record-removed .irminsul-adoption.json" not in errors
+    removed = findings_of(root, "diff-integrity/adoption-record-removed", "--diff", base)
+    assert [f["severity"] for f in removed] == ["info"]

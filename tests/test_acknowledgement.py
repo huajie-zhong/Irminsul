@@ -27,6 +27,8 @@ from .conftest import (
     check_findings,
     commit_all,
     component_doc,
+    config_toml,
+    findings_of,
     load_graph,
     reviewed,
     seed_repo,
@@ -36,6 +38,10 @@ from .conftest import (
 
 _DOC = "docs/components/alpha.md"
 _CO_CHANGE = "co-change/unreflected-change"
+_WIDGET = "docs/components/widget.md"
+_REWORDED = "diff-integrity/claim-reworded"
+_WEAKENED = "diff-integrity/setting-weakened"
+_LENGTH = "checks.parent_child.length_warning_lines"
 
 
 @pytest.fixture
@@ -367,3 +373,146 @@ def test_a_reviewed_trailer_on_one_doc_leaves_another_docs_warning_a_warning(
         "docs/components/alpha.md": (_CO_CHANGE, "info"),
         "docs/components/beta.md": (_CO_CHANGE, "warning"),
     }
+
+
+def _widget(first: str, second: str) -> str:
+    """A stable doc with two claims a change may reword; neither is `governs-evidence`, so a
+    rewording is a hint rather than a contract change."""
+    return (
+        "---\nid: widget\ntitle: Widget\nstatus: stable\nsummary: A test doc.\nclaims:\n"
+        f"  - id: widget-runs\n    state: implemented\n    kind: invariant\n    claim: {first}\n"
+        "    evidence:\n      - src/widget.py\n"
+        f"  - id: widget-stops\n    state: implemented\n    kind: invariant\n    claim: {second}\n"
+        "    evidence:\n      - src/widget.py\n"
+        "---\n\n# Widget\n\nIt runs and stops.\n"
+    )
+
+
+def _widget_repo(root: Path) -> str:
+    write_config(root, project_name="ack")
+    write(root, "src/widget.py", "def run():\n    return 1\n")
+    write(root, _WIDGET, _widget("The widget runs.", "The widget stops."))
+    return seed_repo(root, "adopted")
+
+
+def test_a_reviewed_claim_rewording_is_info_and_the_other_claim_still_warns(
+    tmp_path: Path,
+) -> None:
+    base = _widget_repo(tmp_path)
+    write(tmp_path, _WIDGET, _widget("The widget runs once.", "The widget halts."))
+    commit_all(
+        tmp_path,
+        "reword both claims\n\n"
+        + reviewed(_REWORDED, _WIDGET, "widget-runs", reason="re-read: still runs"),
+    )
+
+    severities = {
+        f["subject"]: f["severity"] for f in findings_of(tmp_path, _REWORDED, "--diff", base)
+    }
+
+    assert severities == {"widget-runs": "info", "widget-stops": "warning"}
+
+
+def test_a_later_commit_to_the_doc_makes_a_reviewed_rewording_a_warning_again(
+    tmp_path: Path,
+) -> None:
+    base = _widget_repo(tmp_path)
+    write(tmp_path, _WIDGET, _widget("The widget runs once.", "The widget halts."))
+    commit_all(
+        tmp_path,
+        "reword both claims\n\n"
+        + reviewed(_REWORDED, _WIDGET, "widget-runs", reason="re-read: still runs"),
+    )
+    accepted = {
+        f["subject"]: f["severity"] for f in findings_of(tmp_path, _REWORDED, "--diff", base)
+    }
+    assert accepted == {"widget-runs": "info", "widget-stops": "warning"}
+
+    write(tmp_path, _WIDGET, _widget("The widget runs once.", "The widget halts.") + "\nMore.\n")
+    commit_all(tmp_path, "add a sentence to the doc")
+
+    severities = {
+        f["subject"]: f["severity"] for f in findings_of(tmp_path, _REWORDED, "--diff", base)
+    }
+    assert severities == {"widget-runs": "warning", "widget-stops": "warning"}
+
+
+def _length_repo(root: Path) -> str:
+    write(root, "irminsul.toml", config_toml(project_name="ack", extra=_length(300)))
+    return seed_repo(root, "adopted")
+
+
+def _length(value: int) -> str:
+    return f"[checks.parent_child]\nlength_warning_lines = {value}\n"
+
+
+def test_a_reviewed_widening_of_a_setting_is_info_quoting_its_reason(tmp_path: Path) -> None:
+    base = _length_repo(tmp_path)
+    write(tmp_path, "irminsul.toml", config_toml(project_name="ack", extra=_length(3000)))
+    commit_all(
+        tmp_path,
+        "raise the length warning\n\n"
+        + reviewed(_WEAKENED, "irminsul.toml", _LENGTH, reason="long files are deliberate"),
+    )
+
+    [found] = findings_of(tmp_path, _WEAKENED, "--diff", base)
+
+    assert found["severity"] == "info"
+    assert found["data"]["reason"] == "long files are deliberate"
+
+
+def test_the_same_widening_with_no_trailer_is_an_error(tmp_path: Path) -> None:
+    base = _length_repo(tmp_path)
+    write(tmp_path, "irminsul.toml", config_toml(project_name="ack", extra=_length(3000)))
+    commit_all(tmp_path, "raise the length warning")
+
+    assert [f["severity"] for f in findings_of(tmp_path, _WEAKENED, "--diff", base)] == ["error"]
+
+
+def test_a_trailer_for_a_fix_code_is_invalid_and_accepts_nothing(tmp_path: Path) -> None:
+    base = _length_repo(tmp_path)
+    write(tmp_path, "irminsul.toml", config_toml(project_name="ack", extra=_length(3000)))
+    commit_all(
+        tmp_path,
+        "raise the length warning\n\n"
+        + reviewed("diff-integrity/adoption-record-grew", ".irminsul-adoption.json"),
+    )
+
+    [invalid] = findings_of(tmp_path, CODE_INVALID, "--diff", base)
+
+    assert invalid["severity"] == "info"
+    assert [f["severity"] for f in findings_of(tmp_path, _WEAKENED, "--diff", base)] == ["error"]
+
+
+def test_a_decision_record_alone_leaves_the_widening_an_error(tmp_path: Path) -> None:
+    base = _length_repo(tmp_path)
+    write(tmp_path, "irminsul.toml", config_toml(project_name="ack", extra=_length(3000)))
+    write(
+        tmp_path,
+        "docs/decisions/long-files.md",
+        "---\nid: long-files\ntitle: Long files\nstatus: stable\nsummary: A test record.\n---\n\n"
+        "# Long files\n\n## Decision\n\nLong files are deliberate: raise "
+        "`checks.parent_child.length_warning_lines`.\n",
+    )
+    commit_all(tmp_path, "raise it, and explain in a record")
+
+    assert [f["severity"] for f in findings_of(tmp_path, _WEAKENED, "--diff", base)] == ["error"]
+
+
+def test_an_uncommitted_config_edit_after_the_trailer_brings_the_error_back(
+    tmp_path: Path,
+) -> None:
+    base = _length_repo(tmp_path)
+    write(tmp_path, "irminsul.toml", config_toml(project_name="ack", extra=_length(3000)))
+    commit_all(
+        tmp_path,
+        "raise the length warning\n\n"
+        + reviewed(_WEAKENED, "irminsul.toml", _LENGTH, reason="long files are deliberate"),
+    )
+    assert [f["severity"] for f in findings_of(tmp_path, _WEAKENED, "--diff", base)] == ["info"]
+
+    write(tmp_path, "irminsul.toml", config_toml(project_name="ack", extra=_length(30000)))
+
+    [found] = findings_of(tmp_path, _WEAKENED, "--diff", base)
+    assert found["severity"] == "error"
+    assert "that trailer does not count" in str(found["suggestion"])

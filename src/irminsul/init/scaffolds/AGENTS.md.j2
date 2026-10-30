@@ -69,7 +69,7 @@ around it. A principle you had to break is worth reporting even when the build i
 These clear a finding while making the tree less true, and none is a repair: deleting a
 claim, anchor or `inventory:` entry; narrowing a `describes:` glob; setting `status:
 draft`; an ignore comment as the first move or one without a real reason; running
-`irminsul baseline init` without a decision record that names the baseline; editing an
+`irminsul baseline init` without an `Irminsul-Reviewed` trailer that names the baseline; editing an
 implemented RFC; re-pinning an anchor or a claim before re-reading it, or a whole doc
 after re-reading one claim (`anchors --re-pin --doc <doc>` with `--claim <id>` or
 `--anchor <path#symbol>` re-pins only what you named), or acknowledging a `co-change`

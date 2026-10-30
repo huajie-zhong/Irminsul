@@ -205,6 +205,12 @@ def check_codes(root: Path, *args: str) -> list[str]:
     return sorted(f["code"] for f in check_findings(root, *args))
 
 
+def findings_of(root: Path, code: str, *args: str) -> list[dict[str, Any]]:
+    """The findings with `code` that `irminsul check --format json <args>` reports. A finding a
+    trailer accepts is still reported, at info, so a test that wants it gone checks severity."""
+    return [f for f in check_findings(root, *args) if f["code"] == code]
+
+
 DECISIONS_INDEX = "---\nid: decisions\ntitle: D\nstatus: stable\n---\n\n# D\n"
 
 

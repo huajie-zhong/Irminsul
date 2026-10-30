@@ -17,9 +17,11 @@ from .conftest import (
     check_findings,
     commit_all,
     config_toml,
+    findings_of,
     git,
     git_init,
     load_graph,
+    reviewed,
     write,
     write_config,
 )
@@ -174,38 +176,40 @@ def _grown_baseline_repo(root: Path) -> str:
     return base
 
 
-def test_a_decision_record_naming_the_baseline_clears_its_growth(tmp_path: Path) -> None:
+def _grew_severities(root: Path, base: str) -> list[str]:
+    return [f["severity"] for f in findings_of(root, _GREW, "--diff", base)]
+
+
+def test_a_trailer_naming_the_baseline_clears_its_growth(tmp_path: Path) -> None:
     base = _grown_baseline_repo(tmp_path)
-    _record(tmp_path, "upgrade-adds-findings", ".irminsul-baseline.json")
-    commit_all(tmp_path, "re-create the baseline, and say why the findings wait")
+    commit_all(
+        tmp_path,
+        "re-create the baseline, and say why the findings wait\n\n"
+        + reviewed(_GREW, ".irminsul-baseline.json", reason="the upgrade's new rules wait"),
+    )
 
-    assert _GREW not in check_codes(tmp_path, "--diff", base)
+    assert _grew_severities(tmp_path, base) == ["info"]
 
 
-def test_a_grown_baseline_without_a_record_is_still_growth(tmp_path: Path) -> None:
+def test_a_grown_baseline_without_a_trailer_is_still_growth(tmp_path: Path) -> None:
     base = _grown_baseline_repo(tmp_path)
     commit_all(tmp_path, "re-create the baseline")
 
-    assert _GREW in check_codes(tmp_path, "--diff", base)
+    assert _grew_severities(tmp_path, base) == ["error"]
 
 
-def test_a_record_naming_another_file_does_not_clear_baseline_growth(tmp_path: Path) -> None:
+def test_a_trailer_naming_another_file_does_not_clear_baseline_growth(tmp_path: Path) -> None:
     base = _grown_baseline_repo(tmp_path)
-    _record(tmp_path, "something-else", "irminsul.toml")
-    commit_all(tmp_path, "re-create the baseline, explain another file")
+    commit_all(
+        tmp_path,
+        "re-create the baseline, explain another file\n\n"
+        + reviewed(_GREW, "irminsul.toml", reason="the wrong file"),
+    )
 
-    assert _GREW in check_codes(tmp_path, "--diff", base)
-
-
-def test_a_draft_record_naming_the_baseline_does_not_clear_its_growth(tmp_path: Path) -> None:
-    base = _grown_baseline_repo(tmp_path)
-    _record(tmp_path, "upgrade-adds-findings", ".irminsul-baseline.json", status="draft")
-    commit_all(tmp_path, "re-create the baseline, with an unaccepted record")
-
-    assert _GREW in check_codes(tmp_path, "--diff", base)
+    assert _grew_severities(tmp_path, base) == ["error"]
 
 
-def test_a_record_naming_the_configured_baseline_path_clears_its_growth(tmp_path: Path) -> None:
+def test_a_trailer_naming_the_configured_baseline_path_clears_its_growth(tmp_path: Path) -> None:
     _repo(tmp_path)
     config = (tmp_path / "irminsul.toml").read_text(encoding="utf-8")
     write(
@@ -214,13 +218,22 @@ def test_a_record_naming_the_configured_baseline_path_clears_its_growth(tmp_path
     _baseline(tmp_path, _DEBT, path="debt.json")
     base = commit_all(tmp_path, "adopted, baseline at debt.json")
     _baseline(tmp_path, _DEBT, _MORE_DEBT, path="debt.json")
-    _record(tmp_path, "wrong-file", ".irminsul-baseline.json")
-    commit_all(tmp_path, "grow it, naming the default path instead")
-    assert _GREW in check_codes(tmp_path, "--diff", base)
+    commit_all(
+        tmp_path,
+        "grow it, naming the default path instead\n\n"
+        + reviewed(_GREW, ".irminsul-baseline.json", reason="the wrong file"),
+    )
+    assert _grew_severities(tmp_path, base) == ["error"]
 
-    _record(tmp_path, "right-file", "debt.json")
-    commit_all(tmp_path, "name the file the baseline really is")
-    assert _GREW not in check_codes(tmp_path, "--diff", base)
+    git(
+        tmp_path,
+        "commit",
+        "--allow-empty",
+        "-qm",
+        "name the file the baseline really is\n\n"
+        + reviewed(_GREW, "debt.json", reason="the baseline's real path"),
+    )
+    assert _grew_severities(tmp_path, base) == ["info"]
 
 
 def test_editing_an_implemented_rfc_is_an_error(tmp_path: Path) -> None:
@@ -597,7 +610,7 @@ def test_removing_a_check_this_version_no_longer_has_is_still_reported(tmp_path:
     assert "diff-integrity/base-config-unreadable" not in codes
 
 
-def test_a_decision_record_naming_the_setting_allows_it(tmp_path: Path) -> None:
+def test_trailers_naming_the_settings_allow_them(tmp_path: Path) -> None:
     base = _config_repo(tmp_path)
     write(
         tmp_path,
@@ -605,14 +618,26 @@ def test_a_decision_record_naming_the_setting_allows_it(tmp_path: Path) -> None:
         _CONFIG
         + '[checks]\nenabled = ["frontmatter"]\n[layers.components]\nrequire_tests = false\n',
     )
-    write(
+    commit_all(
         tmp_path,
-        "docs/decisions/drop-links.md",
-        "---\nid: drop-links\ntitle: Drop links\nstatus: stable\nsummary: A test doc.\n---\n\n# Drop links\n\n"
-        "## Decision\n\nDisable `links` and `layers.components.require_tests` for now.\n",
+        "weaken, and say why\n\n"
+        + reviewed("diff-integrity/check-disabled", "irminsul.toml", "links", reason="not used")
+        + "\n"
+        + reviewed(
+            "diff-integrity/layer-rule-disabled",
+            "irminsul.toml",
+            "layers.components.require_tests",
+            reason="components are not tested here",
+        ),
     )
-    commit_all(tmp_path, "weaken with a record")
-    assert _config_codes(tmp_path, base) == []
+    assert sorted(
+        (f["code"], f["severity"])
+        for f in check_findings(tmp_path, "--diff", base)
+        if f["check"] == "diff-integrity"
+    ) == [
+        ("diff-integrity/check-disabled", "info"),
+        ("diff-integrity/layer-rule-disabled", "info"),
+    ]
 
 
 def test_excluding_source_or_dropping_a_guidance_file_is_a_hint(tmp_path: Path) -> None:
@@ -681,18 +706,6 @@ def test_a_baseline_cannot_hide_diff_integrity_findings(tmp_path: Path) -> None:
     commit_all(tmp_path, "weaken and baseline it")
 
     assert "diff-integrity/check-disabled" in _config_codes(tmp_path, root)
-
-
-def test_editing_an_existing_record_does_not_excuse_a_weakening(tmp_path: Path) -> None:
-    _repo(tmp_path)
-    write(tmp_path, "irminsul.toml", _CONFIG + '[checks]\nenabled = ["frontmatter", "links"]\n')
-    write(tmp_path, "docs/decisions/0001-choice.md", _ADR)
-    base = commit_all(tmp_path, "base")
-    write(tmp_path, "irminsul.toml", _CONFIG + '[checks]\nenabled = ["frontmatter"]\n')
-    write(tmp_path, "docs/decisions/0001-choice.md", _ADR.replace("Fine.", "Keep `links`."))
-    commit_all(tmp_path, "weaken through an old record")
-
-    assert "diff-integrity/check-disabled" in _config_codes(tmp_path, base)
 
 
 def test_adopting_irminsul_is_not_a_weakening(tmp_path: Path) -> None:
@@ -918,51 +931,26 @@ def test_renaming_a_claim_id_is_still_a_removal(tmp_path: Path) -> None:
     assert "diff-integrity/claim-removed" in check_codes(root, "--diff", base)
 
 
-def test_a_record_naming_the_claim_excuses_removing_it(tmp_path: Path) -> None:
+def test_a_trailer_naming_the_claim_accepts_removing_it(tmp_path: Path) -> None:
     root, base = _anchored_repo(tmp_path)
     stripped = (
         _ANCHORED[: _ANCHORED.index("claims:")] + _ANCHORED[_ANCHORED.index("---\n\n# Widget") :]
     )
     write(root, "docs/components/widget.md", stripped)
-    write(
+    commit_all(
         root,
-        "docs/decisions/widget-claim-retired.md",
-        "---\nid: widget-claim-retired\ntitle: Widget claim retired\nstatus: stable\nsummary: A test doc.\n---\n\n"
-        "# Widget claim retired\n\n## Decision\n\nThe claim `widget-runs` is retired.\n",
+        "drop the claim, and say why\n\n"
+        + reviewed(
+            "diff-integrity/claim-removed",
+            "docs/components/widget.md",
+            "widget-runs",
+            reason="the widget no longer runs",
+        ),
     )
-    commit_all(root, "drop the claim with a record")
 
-    assert "diff-integrity/claim-removed" not in check_codes(root, "--diff", base)
-
-
-def test_a_draft_record_naming_the_setting_does_not_allow_it(tmp_path: Path) -> None:
-    """A nine-line draft whose body was just the check name used to unlock it."""
-    base = _config_repo(tmp_path)
-    write(tmp_path, "irminsul.toml", _CONFIG + '[checks]\nenabled = ["frontmatter"]\n')
-    write(
-        tmp_path,
-        "docs/decisions/scratch.md",
-        "---\nid: scratch\ntitle: Scratch\nstatus: draft\nsummary: A test doc.\n---\n\n# Scratch\n\n`links`\n",
-    )
-    commit_all(tmp_path, "weaken with a scratch file")
-
-    assert "diff-integrity/check-disabled" in _config_codes(tmp_path, base)
-
-
-def test_a_record_naming_the_setting_outside_its_decision_does_not_allow_it(
-    tmp_path: Path,
-) -> None:
-    base = _config_repo(tmp_path)
-    write(tmp_path, "irminsul.toml", _CONFIG + '[checks]\nenabled = ["frontmatter"]\n')
-    write(
-        tmp_path,
-        "docs/decisions/aside.md",
-        "---\nid: aside\ntitle: Aside\nstatus: stable\nsummary: A test doc.\n---\n\n# Aside\n\n"
-        "## Context\n\nWe once used `links`.\n\n## Decision\n\nSomething unrelated.\n",
-    )
-    commit_all(tmp_path, "mention the check in passing")
-
-    assert "diff-integrity/check-disabled" in _config_codes(tmp_path, base)
+    assert [
+        f["severity"] for f in findings_of(root, "diff-integrity/claim-removed", "--diff", base)
+    ] == ["info"]
 
 
 def test_repointing_docs_root_is_an_error(tmp_path: Path) -> None:
@@ -1036,22 +1024,28 @@ def test_downgrading_the_relation_is_an_error(tmp_path: Path) -> None:
     assert "diff-integrity/governing-claim-changed" in check_codes(tmp_path, "--diff", base)
 
 
-def test_a_decision_record_authorizes_the_change(tmp_path: Path) -> None:
+def test_a_trailer_naming_the_claim_authorizes_the_change(tmp_path: Path) -> None:
     base = _governing_repo(tmp_path)
     write(
         tmp_path,
         "docs/components/widget.md",
         _GOVERNING.replace("never persists state", "may persist state"),
     )
-    write(
+    commit_all(
         tmp_path,
-        "docs/decisions/allow-widget-state.md",
-        "---\nid: allow-widget-state\ntitle: Allow widget state\nstatus: stable\nsummary: A test doc.\n---\n\n"
-        "# Allow widget state\n\n## Decision\n\nThe claim `widget-stateless` is retired.\n",
+        "authorize the intent change\n\n"
+        + reviewed(
+            "diff-integrity/governing-claim-changed",
+            "docs/components/widget.md",
+            "widget-stateless",
+            reason="widgets may keep state now",
+        ),
     )
-    commit_all(tmp_path, "authorize the intent change")
 
-    assert "diff-integrity/governing-claim-changed" not in check_codes(tmp_path, "--diff", base)
+    assert [
+        f["severity"]
+        for f in findings_of(tmp_path, "diff-integrity/governing-claim-changed", "--diff", base)
+    ] == ["info"]
 
 
 def test_an_untouched_governing_claim_is_silent(tmp_path: Path) -> None:
@@ -1129,22 +1123,27 @@ def test_downgrading_before_deleting_a_governing_claim_is_still_an_error(tmp_pat
     assert "diff-integrity/governing-claim-removed" in check_codes(tmp_path, "--diff", base)
 
 
-def test_a_decision_record_ends_a_governing_claim_with_its_code(tmp_path: Path) -> None:
+def test_a_trailer_naming_the_claim_ends_a_governing_claim_with_its_code(tmp_path: Path) -> None:
     base = _governing_repo(tmp_path)
     write(tmp_path, "docs/components/widget.md", _without_claims(_GOVERNING))
     (tmp_path / "src" / "widget.py").unlink()
-    write(
+    commit_all(
         tmp_path,
-        "docs/decisions/retire-the-widget.md",
-        "---\nid: retire-the-widget\ntitle: Retire the widget\nstatus: stable\nsummary: A test doc.\n---\n\n"
-        "# Retire the widget\n\n## Decision\n\nThe widget is removed, and `widget-stateless` "
-        "ends with it.\n",
+        "retire the widget, and say so\n\n"
+        + reviewed(
+            "diff-integrity/governing-claim-removed",
+            "docs/components/widget.md",
+            "widget-stateless",
+            reason="the widget is removed",
+        ),
     )
-    commit_all(tmp_path, "retire the widget by decision")
 
     codes = check_codes(tmp_path, "--diff", base)
-    assert "diff-integrity/governing-claim-removed" not in codes
     assert "diff-integrity/claim-removed" not in codes
+    assert [
+        f["severity"]
+        for f in findings_of(tmp_path, "diff-integrity/governing-claim-removed", "--diff", base)
+    ] == ["info"]
 
 
 def test_moving_a_governing_claim_to_another_doc_is_not_a_removal(tmp_path: Path) -> None:
@@ -1181,17 +1180,6 @@ def _gated_repo(root: Path, *paths: str) -> str:
     for path in paths or (_DOCS_PR,):
         write(root, path, _gate(_GATE_STEP))
     return commit_all(root, "gated workflow")
-
-
-def _record(root: Path, slug: str, *named: str, status: str = "stable") -> None:
-    spans = " and ".join(f"`{path}`" for path in named)
-    write(
-        root,
-        f"docs/decisions/{slug}.md",
-        f"---\nid: {slug}\ntitle: {slug}\nstatus: {status}\nsummary: A test record.\n---\n\n"
-        f"# {slug}\n\n"
-        f"## Decision\n\nEdit {spans}: the gate asks more of a change, not less.\n",
-    )
 
 
 def _sealed(root: Path, base: str) -> tuple[int, list[dict[str, str]]]:
@@ -1260,28 +1248,37 @@ def test_a_workflow_that_stops_mentioning_irminsul_is_still_sealed(tmp_path: Pat
     assert _sealed_paths(tmp_path, base) == [_DOCS_PR]
 
 
-@pytest.mark.parametrize(("status", "cleared"), [("stable", True), ("draft", False)])
-def test_a_decision_record_naming_the_file_clears_it(
-    tmp_path: Path, status: str, cleared: bool
-) -> None:
+@pytest.mark.parametrize("trailered", [True, False], ids=["trailer", "no-trailer"])
+def test_a_trailer_naming_the_file_clears_it(tmp_path: Path, trailered: bool) -> None:
     base = _gated_repo(tmp_path)
     write(tmp_path, _DOCS_PR, _gate(_GATE_STEP + " --fail-on hint"))
-    _record(tmp_path, "gate-on-hints", _DOCS_PR, status=status)
-    commit_all(tmp_path, "fail on hints, and say why")
+    message = "fail on hints, and say why"
+    if trailered:
+        message += "\n\n" + reviewed(_GATE_FILE, _DOCS_PR, reason="hints are read in review")
+    commit_all(tmp_path, message)
 
     code, sealed = _sealed(tmp_path, base)
 
-    assert (code, sealed == []) == ((0, True) if cleared else (1, False))
+    assert (code, [f["severity"] for f in sealed]) == (
+        (0, ["info"]) if trailered else (1, ["error"])
+    )
 
 
-def test_a_record_clears_only_the_file_it_names(tmp_path: Path) -> None:
+def test_a_trailer_clears_only_the_file_it_names(tmp_path: Path) -> None:
     base = _gated_repo(tmp_path, _DOCS_PR, _NIGHTLY)
     for path in (_DOCS_PR, _NIGHTLY):
         write(tmp_path, path, _gate(_GATE_STEP, "echo done"))
-    _record(tmp_path, "announce-the-gate", _DOCS_PR)
-    commit_all(tmp_path, "edit both gates, explain one")
+    commit_all(
+        tmp_path,
+        "edit both gates, explain one\n\n"
+        + reviewed(_GATE_FILE, _DOCS_PR, reason="the docs gate reads the same"),
+    )
 
-    assert _sealed_paths(tmp_path, base) == [_NIGHTLY]
+    _, sealed = _sealed(tmp_path, base)
+
+    assert sorted((f["path"], f["severity"]) for f in sealed) == sorted(
+        [(_DOCS_PR, "info"), (_NIGHTLY, "error")]
+    )
 
 
 def test_an_adopting_change_is_not_sealed(tmp_path: Path) -> None:

@@ -21,13 +21,13 @@ claims:
     state: implemented
     kind: invariant
     relation: governs-evidence
-    claim: "A baseline records only certain findings, and no command adds an entry to one that exists: creation refuses to overwrite it, and an update may only remove entries. Under `--diff`, a change that gives it more entries fails unless it adds a stable decision record naming the baseline file or is the change that adopts Irminsul."
+    claim: "A baseline records only certain findings, and no command adds an entry to one that exists: creation refuses to overwrite it, and an update may only remove entries. Under `--diff`, a change that gives it more entries fails unless a trailer names the baseline file or the change is the one that adopts Irminsul."
     evidence:
       - src/irminsul/baseline.py
       - src/irminsul/checks/diff_integrity.py
     pinned:
       src/irminsul/baseline.py: sha256:250bd0a339a1
-      src/irminsul/checks/diff_integrity.py: sha256:8a5edf622f76
+      src/irminsul/checks/diff_integrity.py: sha256:ada813b5f257
 ---
 
 # Baseline ratchet
@@ -42,9 +42,9 @@ What may be recorded is `baselinable` in `src/irminsul/baseline.py`: a certain f
 
 ## The ratchet
 
-No command adds an entry to an existing baseline — `baseline init` refuses when one exists and `baseline update` only removes the entries that match nothing — and under `--diff` a change that gives the file more entries fails with `diff-integrity/baseline-grew` unless it adds a stable decision record naming the file or is the change that adopts Irminsul. <!-- claim:baseline-only-shrinks -->
+No command adds an entry to an existing baseline — `baseline init` refuses when one exists and `baseline update` only removes the entries that match nothing — and under `--diff` a change that gives the file more entries fails with `diff-integrity/baseline-grew` unless a trailer names the file or the change is the one that adopts Irminsul. <!-- claim:baseline-only-shrinks -->
 
-The decision record is for an upgrade whose new rules find problems in old docs: its pull request re-creates the baseline and carries the record instead of stalling until every one is fixed ([A baseline holds certain findings and grows only by decision](../decisions/a-baseline-holds-certain-findings-and-grows-only-by-decision.md)). The change that adopts Irminsul is the one exception: its merge base holds neither a config nor a baseline, so there is no ratchet yet and the first baseline is a creation. Without that, the pull request workflow [`init`](init.md) scaffolds would fail the very change that adds it.
+The trailer is for an upgrade whose new rules find problems in old docs: its pull request re-creates the baseline and carries the trailer instead of stalling until every one is fixed ([A baseline holds certain findings and grows only by decision](../decisions/a-baseline-holds-certain-findings-and-grows-only-by-decision.md)). The change that adopts Irminsul is the one exception: its merge base holds neither a config nor a baseline, so there is no ratchet yet and the first baseline is a creation. Without that, the pull request workflow [`init`](init.md) scaffolds would fail the very change that adds it.
 
 What the baseline hides stays visible: each run counts the hidden findings and the fixed entries, `--format github` adds a warning annotation and, when `GITHUB_STEP_SUMMARY` is set, lists every hidden finding in the job summary, `irminsul list baseline` marks each entry `hidden` or `fixed`, and `--no-baseline` shows the full picture.
 

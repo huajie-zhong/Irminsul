@@ -58,7 +58,7 @@ MARKER_MEANINGS: Final[dict[str, str]] = {
     ),
     "governing-claim": (
         "a claim whose evidence this change touched. Under governs-evidence ask whether the "
-        "code still obeys it (the claim wins; changing it takes a decision record); under "
+        "code still obeys it (the claim wins; changing it takes a trailer naming the claim); under "
         "review-on-divergence, which side is now wrong"
     ),
     "evidence": "a file this change touched that the claim cites as its evidence",

@@ -5,7 +5,7 @@ A pass, not a registered graph check: like `co-change`, it needs the diff range,
 with their content at the merge base, which a pull request cannot rewrite, and reports:
 
 - the baseline gained entries, so new findings were recorded instead of fixed, unless a
-  decision record the same diff adds names the baseline file in a code span;
+  trailer names the baseline file;
 - an RFC that was implemented at the base changed, or no longer exists. A change whose
   only difference is a reference pointed at a doc the same diff renamed is not a change;
 - a decision record that was accepted at the base no longer exists;
@@ -13,14 +13,13 @@ with their content at the merge base, which a pull request cannot rewrite, and r
 - a source file's owning doc changed, so the old owner's prose about it may stay behind;
 - the config moved a setting the way that makes a check ask less — a check or a layer rule
   turned off, a threshold widened, the tree moved, the source walk or guidance files
-  narrowed — or changed a setting nothing here judges, unless a decision record the same
-  diff adds names the setting in a code span;
+  narrowed — or changed a setting nothing here judges, unless a trailer names the setting;
 - a workflow or action file that mentions irminsul was added, deleted, renamed or
-  edited, unless a decision record the same diff adds names it in a code span;
+  edited, unless a trailer names it;
 - an anchor, a `claims:` entry, or an `inventory:` entry was deleted while the code it
   named is still there, so a doc stopped asking about code that still exists. The same
   removal is not reported when that code went away in the same change — except for a
-  claim that governed its evidence at the base, which only a decision record ends;
+  claim that governed its evidence at the base, which only a trailer naming the claim ends;
 - a claim was reworded rather than removed — a hint, since nothing separates correcting
   a sentence from emptying it of meaning — unless it is `follows-evidence`, where the
   evidence wins and correcting the report is routine;
@@ -136,10 +135,8 @@ class DiffIntegrityPass:
         CODE_BASELINE_GREW: (
             "The baseline file records findings it did not record at the base of the diff, "
             "so new findings were recorded rather than fixed. Fix them and restore the "
-            "baseline, or shrink it. When they cannot all be fixed in this change, as when an "
-            "upgrade finds new problems in old docs, add a stable decision record in the "
-            "same change whose `## Decision` names the baseline file's path in a code span "
-            "and says why the findings wait."
+            "baseline, or shrink it. An upgrade whose new rules find problems in old docs "
+            "may not be able to fix them all in one change."
         ),
         CODE_ADOPTION_RECORD_GREW: (
             "The adoption record excepts a file it did not except at the base of the diff. "
@@ -193,7 +190,7 @@ class DiffIntegrityPass:
             "The change deletes an adoption record that still holds entries. That hands back "
             "the coarse covered-directory guess the record replaced, and lets the next change "
             "adopt from scratch. Retire the entries with `irminsul adoption update` until the record "
-            "is empty, or add a decision record naming the record's path and why."
+            "is empty."
         ),
         CODE_ADOPTION_DEBT_NOT_HISTORICAL: (
             "The first adoption record names a file that was not in the tree at the base of "
@@ -242,27 +239,22 @@ class DiffIntegrityPass:
         CODE_CHECK_DISABLED: (
             "The change removed a check from `checks.enabled`, or moved `paths.docs_root` so "
             "a different tree is judged, and the gate that judges this change got weaker. "
-            "Restore it, or add a stable decision record in the same change whose "
-            "`## Decision` names the check, or `paths.docs_root`, in a code span and says why."
+            "Restore it."
         ),
         CODE_LAYER_RULE_DISABLED: (
             "The change turned off a layer rule, or moved a layer's folder so its rules judge "
-            "a different one, and the gate that judges this change got weaker. Restore it, or "
-            "add a stable decision record in the same change whose `## Decision` names the "
-            "setting, such as `layers.components.require_tests`, in a code span and says why."
+            "a different one, and the gate that judges this change got weaker. Restore it."
         ),
         CODE_SOURCE_EXCLUDED: (
             "The change made the source walk read fewer files: an added source exclude or "
             "include, a removed source root, test root or language, emptied test patterns, or "
-            "gitignore honoured. Confirm the files no longer read hold no documented code. A "
-            "stable decision record in the same change whose `## Decision` names the setting, "
-            "such as `paths.source_excludes`, in a code span answers it."
+            "gitignore honoured. Whether the files no longer read hold documented code is "
+            "not something a check can tell."
         ),
         CODE_EXTRA_DOC_REMOVED: (
             "The change removed a file from `paths.extra_docs`, so the checks that read "
-            "guidance files no longer read it. Confirm it holds no guidance to keep true. A "
-            "stable decision record in the same change whose `## Decision` names "
-            "`paths.extra_docs` in a code span answers it."
+            "guidance files no longer read it. Whether it held guidance to keep true is not "
+            "something a check can tell."
         ),
         CODE_GATE_FILE_CHANGED: (
             "The change added, deleted, renamed or edited a file under `.github/workflows/`, "
@@ -270,11 +262,10 @@ class DiffIntegrityPass:
             "of the diff or now. The passes that compare a change with its base run only "
             "when CI asks for them, so a change that edits the file asking can switch off "
             "the thing judging it. What the edit means is not read: a comment counts the "
-            "same as a dropped flag. Add a stable decision record in the same change whose "
-            "`## Decision` names the file's path in a code span and says why: a deleted "
-            "file by the path it had, any other by its path now. Not reported when the base "
-            "holds neither irminsul.toml nor a baseline, since a change that adopts "
-            "Irminsul has nothing to weaken."
+            "same as a dropped flag. The finding's subject is the file's path: the path it "
+            "had when deleted, otherwise its path now. Not reported when the base holds "
+            "neither irminsul.toml nor a baseline, since a change that adopts Irminsul has "
+            "nothing to weaken."
         ),
         CODE_ANCHOR_REMOVED: (
             "An `<!-- anchor: ... -->` marker was deleted while the code it pinned is "
@@ -291,8 +282,7 @@ class DiffIntegrityPass:
             "A claim that governed its evidence at the base of the diff was deleted, "
             "renamed, or deleted along with its doc. A contract does not end because the "
             "code it governed was deleted in the same change: that is exactly the change "
-            "it would forbid. Restore the claim, or add a decision record in the same change "
-            "naming it in a code span."
+            "it would forbid. Restore the claim."
         ),
         CODE_CLAIM_REWORDED: (
             "A claim's sentence changed while its id stayed the same, so it is a "
@@ -305,42 +295,35 @@ class DiffIntegrityPass:
             "A claim that governs its evidence was rewritten, or stopped governing it. "
             "Such a claim is a contract: the implementation answers to it, so changing "
             "its words — or its `relation` — is a change of intent, not doc maintenance, "
-            "and it must not ride along with the change it would otherwise forbid. Add a "
-            "decision record in the same change naming the claim in a code span, or "
-            "restore the wording."
+            "and it must not ride along with the change it would otherwise forbid. Restore "
+            "the wording."
         ),
         CODE_INVENTORY_WEAKENED: (
             "An `inventory:` entry kept its kind and source but asks less of the code "
             "than it did at the base of the diff: it stopped requiring the prose to "
             "explain each item, stopped demanding completeness, or added an `omit`. "
             "Each of those silences a live identity without removing the entry, which "
-            "the removal seal watches. Restore the contract, or add a decision record in "
-            "the same change that names the doc in a code span and says why."
+            "the removal seal watches. Restore the contract."
         ),
         CODE_SETTING_WEAKENED: (
             "A setting that decides how much a check asks was weakened: the check was "
             "switched off through its own `enabled` key, a threshold it fires above was "
             "widened, the glossary it reads was repointed, or a declared source was removed "
             "or given another path or ref. None of these touch `checks.enabled`, so the "
-            "check stays listed while asking less. Restore the setting, or add a stable "
-            "decision record in the same change whose `## Decision` names the setting by its "
-            "dotted name, such as `overrides.mtime_drift_days`, in a code span and says why."
+            "check stays listed while asking less. Restore the setting."
         ),
         CODE_RULES_NARROWED: (
             "A configured rule stopped watching something: a `surface.rules` entry's "
             "`(kind, globs)` pair, or a framework pack. Compared by what the rule watched "
             "rather than by list length, since an edited rule and a deleted one shorten the "
-            "list alike. Confirm nothing documented depended on it. A stable decision record "
-            "in the same change whose `## Decision` names the setting, such as "
-            "`frameworks.enabled`, in a code span answers it."
+            "list alike. Whether anything documented depended on it is not something a "
+            "check can tell."
         ),
         CODE_UNREVIEWED_SETTING_CHANGE: (
             "A setting changed and no rule here judges whether that weakens the gate. Every "
             "field of the config schema is compared, so a setting added later is reported "
             "from the day it exists instead of being a free bypass until somebody seals it. "
-            "Nothing is asserted to be wrong: it asks a reader to confirm, and a stable "
-            "decision record in the same change whose `## Decision` names the setting's "
-            "dotted name in a code span answers it."
+            "Nothing is asserted to be wrong: it asks a reader to confirm."
         ),
         CODE_INVENTORY_REMOVED: (
             "An `inventory:` entry was deleted while its source still exists, so a "
@@ -395,29 +378,48 @@ class DiffIntegrityPass:
         CODE_OWNER_CHANGED: Answer.fix(
             "remove what the old owner still says about the moved files, or link the two docs"
         ),
-        CODE_SOURCE_EXCLUDED: Answer.fix(
-            "confirm the files no longer read hold no documented code, then add a stable decision "
-            "record to this change whose `## Decision` names the setting"
-        ),
-        CODE_EXTRA_DOC_REMOVED: Answer.fix(
-            "confirm the file holds no guidance that must stay true, then add a stable decision "
-            "record to this change whose `## Decision` names `paths.extra_docs`"
-        ),
         CODE_BASE_CONFIG_UNREADABLE: Answer.fix(
             "review the config changes by hand; it ends once the change that repairs the config "
             "merges"
         ),
-        CODE_CLAIM_REWORDED: Answer.fix(
-            "re-read the new wording against the claim's evidence; a stable decision record this "
-            "change adds whose `## Decision` names the claim id accepts it"
+        CODE_BASELINE_GREW: Answer.trailer(
+            "a reader who has judged why the new findings wait signs it off"
         ),
-        CODE_UNREVIEWED_SETTING_CHANGE: Answer.fix(
-            "confirm the change does not weaken the gate, then add a stable decision record to "
-            "this change whose `## Decision` names the setting's dotted name"
+        CODE_ADOPTION_RECORD_REMOVED: Answer.trailer(
+            "a reader who has judged why the record goes signs it off"
         ),
-        CODE_RULES_NARROWED: Answer.fix(
-            "confirm nothing documented depended on the rule, then add a stable decision record "
-            "to this change whose `## Decision` names the setting"
+        CODE_CLAIM_REWORDED: Answer.trailer(
+            "a reader who finds the new wording still right signs it off"
+        ),
+        CODE_CLAIM_REMOVED: Answer.trailer(
+            "a reader who has confirmed the claim no longer applies signs it off"
+        ),
+        CODE_GOVERNING_CLAIM_REMOVED: Answer.trailer(
+            "a reader who has judged the contract retired signs it off"
+        ),
+        CODE_GOVERNING_CLAIM_CHANGED: Answer.trailer(
+            "a reader who has judged the change of intent sound signs it off"
+        ),
+        CODE_INVENTORY_WEAKENED: Answer.trailer(
+            "a reader who has judged the weaker contract sound signs it off"
+        ),
+        CODE_GATE_FILE_CHANGED: Answer.trailer(
+            "a reader who has confirmed the edit does not weaken the gate signs it off"
+        ),
+        CODE_CHECK_DISABLED: Answer.trailer(
+            "a reader who has judged the gate without that check sound signs it off"
+        ),
+        CODE_LAYER_RULE_DISABLED: Answer.trailer(
+            "a reader who has judged the weaker rule sound signs it off"
+        ),
+        CODE_SETTING_WEAKENED: Answer.trailer(
+            "a reader who has judged the weaker setting sound signs it off"
+        ),
+        CODE_SOURCE_EXCLUDED: Answer.trailer("a reader who has confirmed that signs it off"),
+        CODE_EXTRA_DOC_REMOVED: Answer.trailer("a reader who has confirmed that signs it off"),
+        CODE_RULES_NARROWED: Answer.trailer("a reader who has confirmed that signs it off"),
+        CODE_UNREVIEWED_SETTING_CHANGE: Answer.trailer(
+            "a reader who has confirmed that signs it off"
         ),
     }
 
@@ -488,17 +490,6 @@ def run_diff_integrity(graph: DocGraph, change: ChangeRange) -> list[Finding]:
         )
     sealing = base_config or config
 
-    added_records = " ".join(
-        reasoning
-        for path in sorted(changed)
-        if path.endswith(".md")
-        and not path.endswith("/INDEX.md")
-        and in_layer(config, path, "decisions")
-        and before(path) is None
-        and (text := after(path)) is not None
-        and (reasoning := _accepted_decision_text(text))
-    )
-
     # A run with no config reads the baseline at the default path, so with no config at
     # the base that is the file the ratchet is measured against. The path this change's
     # own config names could be one that never existed.
@@ -510,7 +501,6 @@ def run_diff_integrity(graph: DocGraph, change: ChangeRange) -> list[Finding]:
             changed,
             base_baseline,
             head_baseline,
-            added_records,
             git,
             repo_root,
             base,
@@ -604,7 +594,6 @@ def run_diff_integrity(graph: DocGraph, change: ChangeRange) -> list[Finding]:
                 in_this_repo=in_this_repo,
                 configured_roots=frozenset((*config.paths.source_roots, *config.paths.test_roots)),
                 renamed_from=renamed_from,
-                excused=f"`{head_adoption}`" in added_records,
                 # Two snapshots, two resolutions. The base's bindings come from the base's
                 # config and the base's record, so a change cannot alter what the base *meant*
                 # by editing either. The checkout is the one input they share, because there is
@@ -669,12 +658,11 @@ def run_diff_integrity(graph: DocGraph, change: ChangeRange) -> list[Finding]:
                 old,
                 surviving,
                 declared,
-                added_records,
                 base_ref,
                 source_displays,
             )
         )
-        out.extend(_rewritten_governing_claims(path, old, surviving, added_records, base_ref))
+        out.extend(_rewritten_governing_claims(path, old, surviving, base_ref))
         if new is None or was_renamed:
             # A renamed sealed record is the `sealed_layers` sweep's business: it finds
             # the record at its new path through the same rename map and says where it
@@ -699,14 +687,10 @@ def run_diff_integrity(graph: DocGraph, change: ChangeRange) -> list[Finding]:
     head_text = after(CONFIG_FILENAME)
     head_config = _parsed(head_text) if head_text is not None else IrminsulConfig()
     if CONFIG_FILENAME in changed and base_config is not None and head_config is not None:
-        out.extend(_config_weakening(base_config, head_config, added_records, base_ref))
+        out.extend(_config_weakening(base_config, head_config, base_ref))
     # A change that adopts Irminsul has no gate to weaken, as with its first baseline.
     if not _adopting(git, repo_root, base, base_baseline):
-        out.extend(
-            _changed_gate_files(
-                changed, renames, renamed_from, before, after, added_records, base_ref
-            )
-        )
+        out.extend(_changed_gate_files(changed, renames, renamed_from, before, after, base_ref))
     return out
 
 
@@ -714,7 +698,6 @@ def _baseline_ratchet(
     changed: frozenset[str],
     base_baseline: str,
     head_baseline: str,
-    added_records: str,
     git: GitReader,
     repo_root: Path,
     base: str,
@@ -722,15 +705,11 @@ def _baseline_ratchet(
     before: Callable[[str], str | None],
     after: Callable[[str], str | None],
 ) -> list[Finding]:
-    """A baseline that gained entries since the base, unless a decision record excuses it."""
+    """A baseline that gained entries since the base, unless the change adopts Irminsul."""
     out: list[Finding] = []
     if base_baseline in changed or head_baseline in changed or base_baseline != head_baseline:
         added = _entries(after(head_baseline)) - _entries(before(base_baseline))
-        if (
-            added
-            and f"`{head_baseline}`" not in added_records
-            and not _adopting(git, repo_root, base, base_baseline)
-        ):
+        if added and not _adopting(git, repo_root, base, base_baseline):
             out.append(
                 _finding(
                     CODE_BASELINE_GREW,
@@ -738,9 +717,9 @@ def _baseline_ratchet(
                     head_baseline,
                     f"baseline gained {len(added)} entr{'y' if len(added) == 1 else 'ies'} "
                     f"since {base_ref}",
-                    "fix the new findings instead of recording them, or add a stable decision "
-                    f"record to this change whose `## Decision` names `{head_baseline}` and "
-                    "says why they wait",
+                    "fix the new findings instead of recording them",
+                    subject=head_baseline,
+                    about=(base_baseline, head_baseline),
                 )
             )
     return out
@@ -867,7 +846,6 @@ def _removed_governance(
     old: str,
     new: str,
     declared: tuple[set[tuple[str, str | None]], set[object], set[object]],
-    excused: str,
     base_ref: str,
     source_displays: list[str],
 ) -> list[Finding]:
@@ -915,11 +893,7 @@ def _removed_governance(
         claim_id = claim.get("id")
         evidence = [str(item) for item in _listed(claim.get("evidence"))]
         if (kept := surviving_by_id.get(claim_id)) is not None:
-            if (
-                kept.get("claim") != claim.get("claim")
-                and claim.get("relation") != _FOLLOWS
-                and f"`{claim_id}`" not in excused
-            ):
+            if kept.get("claim") != claim.get("claim") and claim.get("relation") != _FOLLOWS:
                 out.append(
                     _finding(
                         CODE_CLAIM_REWORDED,
@@ -928,12 +902,11 @@ def _removed_governance(
                         f"claim '{claim_id}' was reworded since {base_ref}",
                         "re-read the new wording against the evidence the claim cites, "
                         "and the prose it governs",
+                        subject=str(claim_id),
                     )
                 )
             continue
         if (claim_id, claim.get("claim")) in kept_claims or not evidence:
-            continue
-        if f"`{claim_id}`" in excused:
             continue
         if claim.get("relation") == _GOVERNS:
             # Read from the base, so downgrading the relation earlier in the same change
@@ -945,7 +918,8 @@ def _removed_governance(
                     Severity.error,
                     path,
                     f"governing claim '{claim_id}' was removed since {base_ref}",
-                    f"restore it, or add a decision record naming `{claim_id}`",
+                    "restore it",
+                    subject=str(claim_id),
                 )
             )
             continue
@@ -962,6 +936,7 @@ def _removed_governance(
                 path,
                 f"claim '{claim_id}' was removed while all of its evidence still exists",
                 "restore the claim, or remove the evidence it cited in the same change",
+                subject=str(claim_id),
             )
         )
 
@@ -977,14 +952,15 @@ def _removed_governance(
         still_here = surviving_entries.get((kind, source))
         if still_here is not None:
             weakening = _inventory_weakening(entry, still_here)
-            if weakening is not None and f"`{path}`" not in excused:
+            if weakening is not None:
                 out.append(
                     _finding(
                         CODE_INVENTORY_WEAKENED,
                         Severity.error,
                         path,
                         f"inventory entry '{kind}' {weakening} since {base_ref}",
-                        "restore the contract, or add a decision record naming this doc",
+                        "restore the contract",
+                        subject=path,
                     )
                 )
             continue
@@ -1077,7 +1053,6 @@ def _changed_gate_files(
     renamed_from: dict[str, str],
     before: Callable[[str], str | None],
     after: Callable[[str], str | None],
-    excused: str,
     base_ref: str,
 ) -> list[Finding]:
     """Every workflow or action file mentioning irminsul that this change touched.
@@ -1107,8 +1082,6 @@ def _changed_gate_files(
         ):
             continue
         named = old_path if new is None else path
-        if f"`{named}`" in excused:
-            continue
         if old is None:
             how = "was added"
         elif new is None:
@@ -1123,17 +1096,12 @@ def _changed_gate_files(
                 Severity.error,
                 named,
                 f"`{named}` mentions irminsul and {how} since {base_ref}",
-                _naming_record(named),
+                "undo the change",
+                subject=named,
+                about=(old_path, path),
             )
         )
     return out
-
-
-def _naming_record(name: str) -> str:
-    return (
-        f"add a stable decision record to this change whose `## Decision` names `{name}` "
-        "and says why"
-    )
 
 
 def _binding_label(binding: Binding) -> str:
@@ -1288,7 +1256,6 @@ def _adoption_seal(
     in_this_repo: frozenset[str],
     configured_roots: frozenset[str],
     renamed_from: dict[str, str],
-    excused: bool,
     base_map: SourceMap,
     head_map: SourceMap,
     base_rules_known: bool,
@@ -1344,7 +1311,7 @@ def _adoption_seal(
                 "supply",
             )
         )
-    if removed and base_paths and not excused:
+    if removed and base_paths:
         out.append(
             _finding(
                 CODE_ADOPTION_RECORD_REMOVED,
@@ -1352,8 +1319,8 @@ def _adoption_seal(
                 head_path,
                 f"the adoption record still named {len(base_paths)} file(s) at {base_ref} and "
                 "this change deletes it",
-                "retire the entries with `irminsul adoption update` until the record is empty, "
-                f"or add a decision record naming `{head_path}` and why it goes",
+                "retire the entries with `irminsul adoption update` until the record is empty",
+                subject=head_path,
             )
         )
         return out
@@ -1696,25 +1663,11 @@ def _adopting(git: GitReader, repo_root: Path, base: str, default_baseline: str)
     )
 
 
-def _accepted_decision_text(text: str) -> str:
-    """The `## Decision` section of an accepted record, or "" when it is neither.
-
-    The excuse for turning a gate off is meant to be a decision someone can review, so
-    the name has to appear in a stable record's actual decision. Matching anywhere in any
-    added file would let a draft whose whole body is the check's name unlock it.
-    """
-    if _frontmatter(text).get("status") != "stable":
-        return ""
-    return _decision(text) or ""
-
-
 _GOVERNS: Final = "governs-evidence"
 _FOLLOWS: Final = "follows-evidence"
 
 
-def _rewritten_governing_claims(
-    path: str, old: str, new: str, excused: str, base_ref: str
-) -> list[Finding]:
+def _rewritten_governing_claims(path: str, old: str, new: str, base_ref: str) -> list[Finding]:
     """Governing claims whose wording or authority changed since the base.
 
     Protection is judged from the claim *at the base*: reading `relation` from the
@@ -1731,8 +1684,6 @@ def _rewritten_governing_claims(
         after = after_by_id.get(claim_id)
         if after is None:
             continue  # removal is `claim-removed`'s business, not this one
-        if f"`{claim_id}`" in excused:
-            continue
         changed_field = next(
             (
                 field
@@ -1752,7 +1703,8 @@ def _rewritten_governing_claims(
                     path,
                     f"governing claim '{claim_id}' had its {changed_field} changed "
                     f"since {base_ref}",
-                    f"restore it, or add a decision record naming `{claim_id}`",
+                    "restore it",
+                    subject=str(claim_id),
                 )
             )
         elif after.get("relation") != _GOVERNS:
@@ -1762,7 +1714,8 @@ def _rewritten_governing_claims(
                     Severity.error,
                     path,
                     f"claim '{claim_id}' stopped governing its evidence since {base_ref}",
-                    f"restore `relation: {_GOVERNS}`, or add a decision record naming `{claim_id}`",
+                    f"restore `relation: {_GOVERNS}`",
+                    subject=str(claim_id),
                 )
             )
     return out
@@ -1922,8 +1875,9 @@ class _Seal:
     nothing, so no change to it is reported and it needs no code.
 
     `identity` also lets each entry kept on both sides have its own fields compared. A
-    decision record cites the setting's dotted name, or with `cites_entry` the entry it lost.
-    `normalize` reads a value the way the setting's users do, so a respelling is no change.
+    finding's subject is the setting's dotted name, or with `cites_entry` the entry it lost,
+    which is what a trailer names to answer it. `normalize` reads a value the way the
+    setting's users do, so a respelling is no change.
     """
 
     weaker: _Weaker
@@ -1989,37 +1943,32 @@ class _Change:
     now: Any
 
 
-def _config_weakening(
-    old: IrminsulConfig, new: IrminsulConfig, added_records: str, base_ref: str
-) -> list[Finding]:
+def _config_weakening(old: IrminsulConfig, new: IrminsulConfig, base_ref: str) -> list[Finding]:
     """Settings this change moved the way that makes a check ask less, and settings no seal
     judges that changed at all.
 
     The schema is walked rather than listed, so a field added to it is compared from the
     day it exists: unsealed, it is a hint until somebody gives it a direction. Each finding
-    names what a stable decision record added in the same change cites in a code span to
-    clear that finding and no other, the excuse the gate-file seal takes.
+    names the setting it is about as its subject, which a trailer names to answer it.
     """
     out: list[Finding] = []
     for change in _changes(old, new):
         seal = _SEALS.get(change.name)
         if seal is None:
-            if f"`{change.name}`" not in added_records:
-                out.append(
-                    _finding(
-                        CODE_UNREVIEWED_SETTING_CHANGE,
-                        Severity.warning,
-                        CONFIG_FILENAME,
-                        f"{change.shown} changed since {base_ref}, and nothing here judges "
-                        "whether that weakens the gate",
-                        _remedy(CODE_UNREVIEWED_SETTING_CHANGE, change.name),
-                    )
+            out.append(
+                _finding(
+                    CODE_UNREVIEWED_SETTING_CHANGE,
+                    Severity.warning,
+                    CONFIG_FILENAME,
+                    f"{change.shown} changed since {base_ref}, and nothing here judges "
+                    "whether that weakens the gate",
+                    _CONFIRM[CODE_UNREVIEWED_SETTING_CHANGE],
+                    subject=change.name,
                 )
+            )
             continue
         for what, entry in _weakenings(seal, change):
             cited = str(entry) if seal.cites_entry else change.name
-            if f"`{cited}`" in added_records:
-                continue
             certain = DiffIntegrityPass.classes[seal.code] is FindingClass.certain
             out.append(
                 _finding(
@@ -2027,7 +1976,8 @@ def _config_weakening(
                     Severity.error if certain else Severity.warning,
                     CONFIG_FILENAME,
                     f"{what} since {base_ref}",
-                    _remedy(seal.code, cited),
+                    _CONFIRM.get(seal.code, "restore it"),
+                    subject=cited,
                 )
             )
     return out
@@ -2108,10 +2058,6 @@ def _by_identity(
 
 def _selector(fields: tuple[str, ...], key: tuple[Any, ...]) -> str:
     return ", ".join(f"{field}={value!r}" for field, value in zip(fields, key, strict=True))
-
-
-def _remedy(code: str, cited: str) -> str:
-    return f"{_CONFIRM.get(code, 'restore it')}, or {_naming_record(cited)}"
 
 
 def _owner_changes(
@@ -2208,7 +2154,16 @@ def _decision_wording(text: str | None) -> str | None:
     return _INLINE_LINK_RE.sub(r"\1", unpinned).replace("`", "")
 
 
-def _finding(code: str, severity: Severity, path: str, message: str, suggestion: str) -> Finding:
+def _finding(
+    code: str,
+    severity: Severity,
+    path: str,
+    message: str,
+    suggestion: str,
+    *,
+    subject: str | None = None,
+    about: tuple[str, ...] = (),
+) -> Finding:
     return Finding(
         check=CHECK_NAME,
         code=code,
@@ -2216,4 +2171,6 @@ def _finding(code: str, severity: Severity, path: str, message: str, suggestion:
         message=message,
         path=Path(path),
         suggestion=suggestion,
+        subject=subject,
+        about=tuple(dict.fromkeys(about)),
     )

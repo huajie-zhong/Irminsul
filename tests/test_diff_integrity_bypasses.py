@@ -18,12 +18,14 @@ from typer.testing import CliRunner
 from irminsul.checks.diff_integrity import _config_weakening
 from irminsul.config import IrminsulConfig, parse_snapshot
 
-from .conftest import check_codes, commit_all, write
+from .conftest import check_codes, commit_all, findings_of, git, reviewed, write
 from .test_diff_integrity import _CONFIG, _repo
 
 runner = CliRunner()
 
 _ENABLED = '[checks]\nenabled = ["frontmatter", "links"]\n'
+_WEAKENED = "diff-integrity/setting-weakened"
+_UNREVIEWED = "diff-integrity/unreviewed-setting-change"
 
 
 def _config_repo(root: Path, extra: str = "") -> str:
@@ -61,17 +63,21 @@ def test_narrowing_a_threshold_is_not(tmp_path: Path) -> None:
     assert "diff-integrity/setting-weakened" not in check_codes(tmp_path, "--diff", base)
 
 
-def test_a_decision_record_accepts_a_widened_threshold(tmp_path: Path) -> None:
+def test_a_trailer_accepts_a_widened_threshold(tmp_path: Path) -> None:
     base = _config_repo(tmp_path)
-    write(
+    write(tmp_path, "irminsul.toml", _CONFIG + _ENABLED + "[overrides]\nmtime_drift_days = 3650\n")
+    commit_all(
         tmp_path,
-        "docs/decisions/slow-repo.md",
-        "---\nid: slow-repo\ntitle: Slow repo\nstatus: stable\n---\n\n"
-        "# Slow repo\n\n## Decision\n\nWiden `overrides.mtime_drift_days`: this tree is archival.\n",
+        "widen the drift threshold\n\n"
+        + reviewed(
+            _WEAKENED,
+            "irminsul.toml",
+            "overrides.mtime_drift_days",
+            reason="this tree is archival",
+        ),
     )
-    _reconfigure(tmp_path, "[overrides]\nmtime_drift_days = 3650\n")
 
-    assert "diff-integrity/setting-weakened" not in check_codes(tmp_path, "--diff", base)
+    assert [f["severity"] for f in findings_of(tmp_path, _WEAKENED, "--diff", base)] == ["info"]
 
 
 _SURFACE_RULE = (
@@ -113,40 +119,35 @@ def test_moving_a_rule_to_the_renamed_table_is_no_change_but_dropping_it_is(
     assert "diff-integrity/rules-narrowed" in check_codes(tmp_path, "--diff", base)
 
 
-def test_a_decision_record_answers_an_unreviewed_setting_change(tmp_path: Path) -> None:
+def test_a_trailer_answers_an_unreviewed_setting_change(tmp_path: Path) -> None:
     """A diff finding is never baselined and the config takes no ignore comment, so before a
-    record could answer this hint it failed every `--fail-on hint` run with no way out."""
+    trailer could answer this hint it failed every `--fail-on hint` run with no way out."""
     base = _config_repo(tmp_path)
     _reconfigure(tmp_path, '[frameworks]\ncommand_names = ["tool"]\n')
-    assert "diff-integrity/unreviewed-setting-change" in check_codes(tmp_path, "--diff", base)
+    assert [f["severity"] for f in findings_of(tmp_path, _UNREVIEWED, "--diff", base)] == [
+        "warning"
+    ]
 
-    write(
+    git(
         tmp_path,
-        "docs/decisions/tool-name.md",
-        "---\nid: tool-name\ntitle: Tool name\nstatus: stable\n---\n\n# Tool name\n\n"
-        "## Decision\n\nThe docs invoke the CLI as `tool`, so `frameworks.command_names` "
-        "names it.\n",
+        "commit",
+        "--allow-empty",
+        "-qm",
+        "answer it\n\n"
+        + reviewed(_UNREVIEWED, "irminsul.toml", "frameworks.command_names", reason="the tool"),
     )
-    commit_all(tmp_path, "answer it")
 
-    assert "diff-integrity/unreviewed-setting-change" not in check_codes(tmp_path, "--diff", base)
+    assert [f["severity"] for f in findings_of(tmp_path, _UNREVIEWED, "--diff", base)] == ["info"]
 
 
 # ------------------------------------------------------------- the seal over the schema
 
 
-def _seal(
-    before: dict[str, Any], after: dict[str, Any], records: str = ""
-) -> list[tuple[str, str]]:
-    """`(code, the name a decision record cites)` for each config finding between two
-    snapshots, given the `## Decision` text of the records the change adds."""
-    found = _config_weakening(parse_snapshot(before), parse_snapshot(after), records, "main")
-    return sorted((f.code.split("/", 1)[1], _cited(f.suggestion or "")) for f in found)
-
-
-def _cited(suggestion: str) -> str:
-    spans = suggestion.split("`")[1::2]
-    return spans[-1] if spans else ""
+def _seal(before: dict[str, Any], after: dict[str, Any]) -> list[tuple[str, str]]:
+    """`(code, subject)` for each config finding between two snapshots: the subject is the
+    name a trailer must give to answer it."""
+    found = _config_weakening(parse_snapshot(before), parse_snapshot(after), "main")
+    return sorted((f.code.split("/", 1)[1], str(f.subject)) for f in found)
 
 
 _SOURCE = {"name": "engine", "path": "../code", "ref": "origin/main"}
@@ -309,29 +310,26 @@ def test_a_setting_no_seal_judges_is_reported_when_it_changes(
     assert _seal(before, after) == [("unreviewed-setting-change", cited)]
 
 
-def test_a_record_clears_the_setting_it_names_and_no_other() -> None:
+def test_each_finding_names_the_setting_it_is_about() -> None:
     after = {
         "overrides": {"mtime_drift_days": 3650},
         "checks": {"stale_reaper": {"deprecated_threshold_days": 999}},
         "frameworks": {"command_names": ["tool"]},
     }
 
-    assert _seal({}, after, "`overrides.mtime_drift_days`") == [
-        ("setting-weakened", "checks.stale_reaper.deprecated_threshold_days"),
-        ("unreviewed-setting-change", "frameworks.command_names"),
-    ]
-    assert _seal({}, after, "`frameworks.command_names`") == [
+    assert _seal({}, after) == [
         ("setting-weakened", "checks.stale_reaper.deprecated_threshold_days"),
         ("setting-weakened", "overrides.mtime_drift_days"),
+        ("unreviewed-setting-change", "frameworks.command_names"),
     ]
 
 
-def test_an_unnamed_setting_change_still_warns() -> None:
-    """Naming a neighbour, or the bare field name, clears nothing: a record cites the dotted
-    name the finding prints."""
+def test_an_unreviewed_setting_change_names_its_dotted_name() -> None:
+    """The subject is the dotted name the finding prints. Matching a trailer to it is tested
+    in `test_acknowledgement`."""
     after = {"checks": {"external_links": {"timeout_seconds": 0.01}}}
 
-    assert _seal({}, after, "`checks.external_links.enabled` `timeout_seconds`") == [
+    assert _seal({}, after) == [
         ("unreviewed-setting-change", "checks.external_links.timeout_seconds")
     ]
 
@@ -411,7 +409,7 @@ def _unreported(model: type[BaseModel]) -> list[str]:
         path, samples = name.split("."), _samples(annotation)
         changes = [(was, now) for was in samples for now in samples if was != now]
         if not any(
-            _config_weakening(_with(base, path, was), _with(base, path, now), "", "main")
+            _config_weakening(_with(base, path, was), _with(base, path, now), "main")
             for was, now in changes
         ):
             missed.append(name)

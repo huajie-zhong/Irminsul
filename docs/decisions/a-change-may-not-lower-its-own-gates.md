@@ -15,7 +15,6 @@ governs:
   - src/irminsul/checks/diff_integrity.py#_by_identity
   - src/irminsul/checks/diff_integrity.py#_parsed
   - src/irminsul/checks/diff_integrity.py#_adopting
-  - src/irminsul/checks/diff_integrity.py#_accepted_decision_text
   - src/irminsul/checks/diff_integrity.py#_changed_gate_files
   - src/irminsul/checks/diff_integrity.py#_is_gate_path
 retires:
@@ -25,7 +24,7 @@ retires:
       - gate-weakened
       - filter-unreadable
       - filter-not-compared
-    guidance: A changed gate file is reported as `diff-integrity/gate-file-changed`; a stable decision record added in the same change clears it by naming the file's path in a code span.
+    guidance: A changed gate file is reported as `diff-integrity/gate-file-changed`; a commit trailer naming the file's path accepts it.
 ---
 
 # A change may not lower its own gates

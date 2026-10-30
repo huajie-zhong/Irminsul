@@ -57,7 +57,7 @@ A new check registers once, in `REGISTRY` in `src/irminsul/checks/__init__.py`, 
 | `surface.rules` | Config-declared surface kinds, each a `kind`, `globs`, `pattern`, `identity`, optional `guard` and optional `mention_pattern`, in the shape of a [framework pack](surface.md)'s rules |
 | `layers.<layer>.path`, `require_tests`, `require_scope_section` | The layer's folder, and the rules every doc in it follows |
 
-Under `--diff`, [`diff-integrity`](checks.md) compares every key with its value at the merge base ([A change may not lower its own gates](../decisions/a-change-may-not-lower-its-own-gates.md)). A decision record answers a finding about a key by naming its dotted name in a code span, spelled as this table spells it with the layer filled in, as in `layers.components.require_tests`, and a field of a list of tables by its name under the list, as in `paths.sources.ref`.
+Under `--diff`, [`diff-integrity`](checks.md) compares every key with its value at the merge base ([A change may not lower its own gates](../decisions/a-change-may-not-lower-its-own-gates.md)). A trailer answers a finding about a key by naming its dotted name as the subject, with `irminsul.toml` as its path, spelled as this table spells it with the layer filled in, as in `layers.components.require_tests`, and a field of a list of tables by its name under the list, as in `paths.sources.ref`.
 
 `paths.baseline` and `paths.adoption` must be committable in-repository file paths, because both files are seals judged against their content at the merge base: one written outside the repository reads as absent at the base on every run, and nothing else reports it.
 
