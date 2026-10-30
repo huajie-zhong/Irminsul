@@ -48,9 +48,7 @@ class CoChangePass:
         CODE_UNREFLECTED_CHANGE: (
             "A source file this doc claims via `describes` changed in the diff, but "
             "the doc itself did not. Update the doc in the same change, or run "
-            "`irminsul context <changed-file>` to see what it claims. A trailer covers the "
-            "changes made up to its own commit, so a later change to those files needs a "
-            "later trailer, and a change not yet committed is later than every commit."
+            "`irminsul context <changed-file>` to see what it claims."
         ),
     }
     classes: ClassVar[dict[str, FindingClass]] = {

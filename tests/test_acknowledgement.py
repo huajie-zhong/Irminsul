@@ -278,13 +278,16 @@ def test_several_trailers_accepting_one_finding_are_all_quoted(graph: DocGraph) 
     assert accepted.data == {"acknowledged_in": "aaa1111, bbb2222", "reason": "one; two"}
 
 
-def test_an_accepted_finding_passing_again_is_not_accepted_twice(graph: DocGraph) -> None:
-    trailer = _trailer(f'co-change {_DOC} reason="x"')
-    once = acknowledge([_finding()], [trailer], graph, ran=("co-change",))
+@pytest.mark.parametrize("spelling", ["./docs/components/alpha.md", "docs\\components\\alpha.md"])
+def test_a_trailer_path_is_normalized_before_it_is_matched(graph: DocGraph, spelling: str) -> None:
+    found = acknowledge(
+        [_finding()],
+        [_trailer(f'{_CO_CHANGE} {spelling} reason="x"')],
+        graph,
+        ran=("co-change",),
+    )
 
-    twice = acknowledge(once, [trailer], graph, ran=("co-change",))
-
-    assert twice == once
+    assert [(f.code, f.severity) for f in found] == [(_CO_CHANGE, Severity.info)]
 
 
 def test_the_suggestion_composes_the_trailer_clause_once(graph: DocGraph) -> None:

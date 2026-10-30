@@ -15,7 +15,7 @@ claims:
       - src/irminsul/checks/pipeline.py
     pinned:
       pyproject.toml: sha256:4ab5d4b249e6
-      src/irminsul/checks/pipeline.py: sha256:7633d76289db
+      src/irminsul/checks/pipeline.py: sha256:3a133bab63c0
   - id: certain-findings-block
     state: enabled
     kind: ci_gate
@@ -28,7 +28,7 @@ claims:
     pinned:
       .github/workflows/ci.yml: sha256:18ef8c6bad1a
       irminsul.toml: sha256:4e83be9b6bc4
-      src/irminsul/checks/pipeline.py: sha256:7633d76289db
+      src/irminsul/checks/pipeline.py: sha256:3a133bab63c0
   - id: hints-advise
     state: implemented
     kind: advisory_checks
@@ -38,8 +38,8 @@ claims:
       - src/irminsul/checks/pipeline.py
       - src/irminsul/cli.py
     pinned:
-      src/irminsul/checks/pipeline.py: sha256:7633d76289db
-      src/irminsul/cli.py: sha256:52388bb96530
+      src/irminsul/checks/pipeline.py: sha256:3a133bab63c0
+      src/irminsul/cli.py: sha256:e4d4e00586b4
   - id: fix-remediation-available
     state: implemented
     kind: auto_fix
@@ -49,7 +49,7 @@ claims:
       - src/irminsul/cli.py
       - src/irminsul/fix.py
     pinned:
-      src/irminsul/cli.py: sha256:21272af53f15
+      src/irminsul/cli.py: sha256:e4d4e00586b4
       src/irminsul/fix.py: sha256:cc4c24a9385c
   - id: source-deletion-reckoning-available
     state: enabled
@@ -61,7 +61,7 @@ claims:
       - src/irminsul/checks/co_change.py
     pinned:
       .github/workflows/ci.yml: sha256:18ef8c6bad1a
-      src/irminsul/checks/co_change.py: sha256:7b19c97c0f48
+      src/irminsul/checks/co_change.py: sha256:411718444fe4
 ---
 
 # Mechanical Enforcement

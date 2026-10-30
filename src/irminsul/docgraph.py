@@ -12,8 +12,10 @@ from __future__ import annotations
 import datetime as _dt
 import os
 import posixpath
+import weakref
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cached_property, wraps
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
@@ -334,6 +336,27 @@ class DocGraph:
             built = _replace(built, record_unreadable=True)
         self._source_map = built
         return built
+
+
+def once_per_graph[T](build: Callable[[DocGraph], T]) -> Callable[[DocGraph], T]:
+    """Memoize `build` for each graph object, for a value that is a function of one graph alone.
+
+    A command that runs checks one at a time asks for the same value once per check, so it is
+    built once. The cache is keyed by `id(graph)`, and `id()` is reused once an object is
+    collected, so the entry is removed when its graph is: a stale one would answer for a
+    later graph.
+    """
+    cache: dict[int, T] = {}
+
+    @wraps(build)
+    def cached(graph: DocGraph) -> T:
+        key = id(graph)
+        if key not in cache:
+            cache[key] = build(graph)
+            weakref.finalize(graph, cache.pop, key, None)
+        return cache[key]
+
+    return cached
 
 
 def guidance_files(repo_root: Path, config: IrminsulConfig) -> list[tuple[str, Path]]:

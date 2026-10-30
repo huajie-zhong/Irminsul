@@ -18,14 +18,13 @@ suppressed nothing.
 from __future__ import annotations
 
 import re
-import weakref
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar, Final
 
 from irminsul.checks.base import Finding, FindingClass, FindingSource, Severity
-from irminsul.docgraph import DocGraph
+from irminsul.docgraph import DocGraph, once_per_graph
 from irminsul.fences import FenceTracker
 
 CHECK_NAME: Final = "ignore-comment"
@@ -203,24 +202,11 @@ class _Scanned:
     coverable: dict[Path, frozenset[int]]
 
 
-_collect_cache: dict[int, _Scanned] = {}
-
-
+@once_per_graph
 def _scanned(graph: DocGraph) -> _Scanned:
-    """`_scan_all` for this graph, scanned once.
-
-    A command that runs checks one at a time, such as `irminsul context`, comes here once
-    per enabled check, and a scan reads every doc body and every guidance file.
-    """
-    key = id(graph)
-    cached = _collect_cache.get(key)
-    if cached is None:
-        cached = _scan_all(graph)
-        _collect_cache[key] = cached
-        # Keyed by identity, so the entry has to die with the graph: `id()` is reused
-        # once an object is collected, and a stale entry would answer for a later graph.
-        weakref.finalize(graph, _collect_cache.pop, key, None)
-    return cached
+    """`_scan_all` for this graph. A scan reads every doc body and every guidance file, and a
+    command that runs checks one at a time, such as `irminsul context`, asks once per check."""
+    return _scan_all(graph)
 
 
 def coverable_lines(graph: DocGraph) -> Mapping[Path, frozenset[int]]:

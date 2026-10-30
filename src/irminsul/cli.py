@@ -1278,7 +1278,7 @@ def explain_command(
         _list_all_codes()
         return
 
-    from irminsul.checks.acknowledgement import trailer_form
+    from irminsul.checks.acknowledgement import LAPSE_RULE, trailer_form
     from irminsul.checks.base import AnswerKind
     from irminsul.checks.ignore_comments import comment_for
     from irminsul.checks.pipeline import answer_of, class_of, finding_sources
@@ -1301,6 +1301,7 @@ def explain_command(
             typer.echo(f"waive with: {comment_for(code)}")
         if answer.kind is AnswerKind.trailer:
             typer.echo(f"acknowledge with: {trailer_form(code)}")
+            typer.echo(LAPSE_RULE)
         typer.echo()
         typer.echo(explanation)
         return

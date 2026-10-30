@@ -6,6 +6,7 @@ import pytest
 from typer.testing import CliRunner
 
 from irminsul.checks import REGISTRY
+from irminsul.checks.acknowledgement import LAPSE_RULE
 from irminsul.cli import app
 
 runner = CliRunner()
@@ -104,10 +105,11 @@ def test_explain_of_a_trailer_code_prints_the_form_that_acknowledges_it() -> Non
     result = runner.invoke(app, ["explain", "co-change/unreflected-change"])
 
     assert result.exit_code == 0, result.output
-    assert (
+    form = (
         "acknowledge with: Irminsul-Reviewed: co-change/unreflected-change <path> [<subject>] "
-        'reason="..."' in result.output
+        'reason="..."'
     )
+    assert f"{form}\n{LAPSE_RULE}\n" in result.output
     assert "waive with:" not in result.output
 
 

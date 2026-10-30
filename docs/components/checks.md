@@ -123,7 +123,7 @@ Five enforcements are passes, in `PASSES` in `checks/pipeline.py` rather than in
 <!-- anchor: src/irminsul/checks/pipeline.py#CHANGE_PASSES @sha256:14a5db692c54 -->
 
 The trailer step is the one place an `Irminsul-Reviewed` commit trailer accepts a finding. It is neither a check nor a pass, and `finish` runs it after classes. `parse` reads a trailer as a code, a path, an optional subject and a reason, and `acknowledge` matches it to a finding by that code, path and subject, and only when the code declares `trailer`. A trailer covers the changes up to its own commit: a later commit of the change, or uncommitted work, that touches a file the finding is about lapses it, and the finding's suggestion says so. An accepted finding stays at info under its own code and quotes the reason. A trailer that does not parse, names a doc by id, or names a code not declared `trailer` is reported as `acknowledgement/invalid`, and one that matches no finding as `acknowledgement/unused`. Both are reported only by a run that names its checks, so a view of one check's items reports neither.
-<!-- anchor: src/irminsul/checks/acknowledgement.py#acknowledge @sha256:9ffc9b166ebc -->
+<!-- anchor: src/irminsul/checks/acknowledgement.py#acknowledge @sha256:3baa956457fc -->
 
 **A check may delegate error reporting only where the calling execution path guarantees that the responsible validation runs.** `uniqueness` and `test-ownership` say nothing about an unreadable adoption record because the `adoption-record` pass reports it, and that holds only while every path runs the pass. So a test replaces every entry in `PASSES` with a sentinel and asserts each entry point fired all of them, and another reads the source so that nothing outside `checks/pipeline.py` calls a check's `run`.
 
@@ -158,7 +158,7 @@ Two limits are deliberate, because each is a wide net on a finding that does not
 
 - **acknowledge-a-reviewed-co-change-or-evidence-drift#trailer-acknowledges-co-change** — A `co-change` warning on a doc SHALL NOT be reported as a warning when a commit in the diff range carries an `Irminsul-Reviewed: co-change <doc> reason="..."` trailer naming that doc with a non-empty reason, unless a later commit in the range changed one of the files the warning lists, and SHALL be reported as an info finding that quotes the reason. (provenance: code; [RFC](../rfcs/acknowledge-a-reviewed-co-change-or-evidence-drift.md))
   <!-- anchor: src/irminsul/checks/co_change.py#run_co_change @sha256:c0a7704f64cd -->
-  <!-- anchor: src/irminsul/checks/acknowledgement.py#acknowledge @sha256:9ffc9b166ebc -->
+  <!-- anchor: src/irminsul/checks/acknowledgement.py#acknowledge @sha256:3baa956457fc -->
 - **acknowledge-a-reviewed-co-change-or-evidence-drift#acknowledgement-needs-reason** — A trailer without a reason, naming no doc, or naming a doc `co-change` does not warn on SHALL acknowledge nothing and SHALL be reported as an info finding. (provenance: code; [RFC](../rfcs/acknowledge-a-reviewed-co-change-or-evidence-drift.md))
   <!-- anchor: src/irminsul/checks/acknowledgement.py#parse @sha256:f8040b658648 -->
 - **acknowledge-a-reviewed-co-change-or-evidence-drift#pin-suppresses-drift** — When a claim records a pin for an evidence file and the file's current normalized hash equals it, `evidence-drift` SHALL NOT report that file; when they differ, the file SHALL be judged by the commit-time comparison, as one without a pin is. (provenance: code; [RFC](../rfcs/acknowledge-a-reviewed-co-change-or-evidence-drift.md))

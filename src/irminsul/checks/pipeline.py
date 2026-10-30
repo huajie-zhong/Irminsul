@@ -39,7 +39,13 @@ from functools import cache
 from typing import TYPE_CHECKING, Final
 
 from irminsul.checks import REGISTRY
-from irminsul.checks.acknowledgement import AcknowledgementStep, apply_acknowledgements
+from irminsul.checks.acknowledgement import (
+    AcknowledgementStep,
+    accepted,
+    apply_acknowledgements,
+    placement,
+    trailer_for,
+)
 from irminsul.checks.adoption_record import AdoptionRecordPass
 from irminsul.checks.base import (
     Answer,
@@ -55,7 +61,7 @@ from irminsul.checks.base import (
 from irminsul.checks.co_change import CoChangePass
 from irminsul.checks.diff_integrity import DiffIntegrityPass
 from irminsul.checks.history_depth import HistoryDepthPass
-from irminsul.checks.ignore_comments import IgnoreCommentFilter
+from irminsul.checks.ignore_comments import IgnoreCommentFilter, apply_ignore_comments, comment_for
 from irminsul.checks.new_dependency import NewDependencyPass
 from irminsul.config import IrminsulConfig
 from irminsul.docgraph import DocGraph
@@ -225,8 +231,6 @@ def finish(
     suggestion of a finding whose code declares `line` names the comment that waives it, and
     one whose code declares `trailer` names the trailer that signs it off.
     """
-    from irminsul.checks.ignore_comments import apply_ignore_comments
-
     classed = apply_classes(apply_ignore_comments(findings, graph, ran=ran), graph, diff=diff)
     return _with_answer(apply_acknowledgements(classed, graph, ran=ran), graph)
 
@@ -236,9 +240,6 @@ def _with_answer(findings: list[Finding], graph: DocGraph) -> list[Finding]:
     ignore comment, and `trailer` the trailer and where it goes; `fix` and `pin` suggestions
     already name the act. A clause is added once, so a finding that passes through again keeps
     it, and an accepted finding, which is already signed off, gets none."""
-    from irminsul.checks.acknowledgement import accepted, placement, trailer_for
-    from irminsul.checks.ignore_comments import comment_for
-
     change = graph.change
     uncommitted = change.uncommitted if change is not None else frozenset()
     out: list[Finding] = []

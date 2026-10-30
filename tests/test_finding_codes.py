@@ -302,7 +302,6 @@ def _co_change_findings(root: Path) -> list[Finding]:
         *run_co_change(graph, changed),
         *acknowledge(run_co_change(graph, changed), accepted, graph, ran=ran),
         *acknowledge(run_co_change(graph, changed), misused, graph, ran=ran),
-        *acknowledge([], misused[1:], graph, ran=ran),
     ]
     _BY_GRAPH.append((graph, found))
     return found

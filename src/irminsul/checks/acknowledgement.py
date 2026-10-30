@@ -10,14 +10,13 @@ to its own commit, so a later change to a file the finding is about lapses it.
 from __future__ import annotations
 
 import re
-import weakref
 from collections.abc import Collection
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Final
 
 from irminsul.checks.base import Answer, AnswerKind, Finding, FindingClass, Severity
-from irminsul.docgraph import ChangeRange, DocGraph, _spelled_from_root
+from irminsul.docgraph import ChangeRange, DocGraph, _spelled_from_root, once_per_graph
 
 if TYPE_CHECKING:
     from irminsul.git.reader import GitReader
@@ -28,6 +27,11 @@ CODE_UNUSED: Final = "acknowledgement/unused"
 TRAILER_KEY: Final = "Irminsul-Reviewed"
 ACKNOWLEDGED_IN: Final = "acknowledged_in"
 REASON: Final = "reason"
+LAPSE_RULE: Final = (
+    "A trailer covers the changes made up to its own commit, so a later change to the files "
+    "the finding is about needs a later trailer, and a change not yet committed is later than "
+    "every commit."
+)
 
 _TRAILER_RE = re.compile(
     r"(?P<code>\S+)"
@@ -36,10 +40,6 @@ _TRAILER_RE = re.compile(
     r'(?:\s+reason="(?P<reason>[^"]*)")?\s*'
 )
 
-_FIX_THE_TRAILER: Final = (
-    "add a valid trailer to a later commit: "
-    '`Irminsul-Reviewed: <code> <path> [<subject>] reason="..."`'
-)
 _UNUSED_SUGGESTION: Final = (
     "nothing to do if the finding it named no longer arises; if it names the wrong path or "
     "subject, add a trailer naming the right one to a later commit"
@@ -160,7 +160,7 @@ def acknowledge(
     for finding in findings:
         hits = [index for index, read in enumerate(named) if _matches(finding, read)]
         used.update(hits)
-        if hits and not accepted(finding):
+        if hits:
             finding = _judge(finding, [named[index] for index in hits], graph)
         out.append(finding)
     if ran is not None:
@@ -173,7 +173,7 @@ def acknowledge(
 
 
 def accepted(finding: Finding) -> bool:
-    """Whether an earlier pass accepted `finding`, so it must not be accepted again."""
+    """Whether the acknowledgement step accepted `finding`, so it is already signed off."""
     return finding.data is not None and ACKNOWLEDGED_IN in finding.data
 
 
@@ -210,30 +210,24 @@ def trailer_form(code: str) -> str:
     return f'{TRAILER_KEY}: {code} <path> [<subject>] reason="..."'
 
 
+_FIX_THE_TRAILER: Final = f"add a valid trailer to a later commit: `{trailer_form('<code>')}`"
+
+
 def apply_acknowledgements(
     findings: list[Finding], graph: DocGraph, *, ran: Collection[str] | None
 ) -> list[Finding]:
     """`findings` with the change's trailers applied. A graph with no change has none."""
-    change, repo_root = graph.change, graph.repo_root
-    if change is None or repo_root is None:
-        return findings
-    return acknowledge(findings, _trailers(graph, repo_root, change), graph, ran=ran)
+    return acknowledge(findings, _trailers(graph), graph, ran=ran)
 
 
-_trailers_read: dict[int, list[Trailer]] = {}
-
-
-def _trailers(graph: DocGraph, repo_root: Path, change: ChangeRange) -> list[Trailer]:
+@once_per_graph
+def _trailers(graph: DocGraph) -> list[Trailer]:
     """The change's trailers, read once per graph: a command that runs checks one at a time
     comes here once per check."""
-    key = id(graph)
-    cached = _trailers_read.get(key)
-    if cached is None:
-        cached = reviewed_trailers(graph.git, repo_root, change)
-        _trailers_read[key] = cached
-        # Keyed by identity, so the entry has to die with the graph, as `ignore_comments` does.
-        weakref.finalize(graph, _trailers_read.pop, key, None)
-    return cached
+    change, repo_root = graph.change, graph.repo_root
+    if change is None or repo_root is None:
+        return []
+    return reviewed_trailers(graph.git, repo_root, change)
 
 
 def reviewed_trailers(git: GitReader, repo_root: Path, change: ChangeRange) -> list[Trailer]:
@@ -340,9 +334,7 @@ def _judge(finding: Finding, hits: list[_Named], graph: DocGraph) -> Finding:
         for hit in hits
     )
     own = finding.suggestion
-    if own is None:
-        return replace(finding, suggestion=note)
-    return replace(finding, suggestion=own if note in own else f"{own} ({note})")
+    return replace(finding, suggestion=note if own is None else f"{own} ({note})")
 
 
 def _invalid(trailer: Trailer, problem: _Problem) -> Finding:
