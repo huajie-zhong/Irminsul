@@ -29,8 +29,8 @@ claims:
       - src/irminsul/checks/owned_tests.py
     pinned:
       src/irminsul/adoption.py: sha256:172d868df4d6
-      src/irminsul/checks/uniqueness.py: sha256:a650805acc40
-      src/irminsul/checks/owned_tests.py: sha256:343c7c090f6d
+      src/irminsul/checks/uniqueness.py: sha256:e22fea2887c0
+      src/irminsul/checks/owned_tests.py: sha256:0643881c0a53
   - id: adoption-record-only-shrinks
     state: implemented
     kind: invariant
@@ -41,7 +41,7 @@ claims:
       - src/irminsul/checks/diff_integrity.py
     pinned:
       src/irminsul/adoption.py: sha256:172d868df4d6
-      src/irminsul/checks/diff_integrity.py: sha256:8a5edf622f76
+      src/irminsul/checks/diff_integrity.py: sha256:1a0eaa0d8260
   - id: adoption-exception-does-not-return
     state: implemented
     kind: invariant
@@ -50,7 +50,7 @@ claims:
     evidence:
       - src/irminsul/checks/diff_integrity.py
     pinned:
-      src/irminsul/checks/diff_integrity.py: sha256:8a5edf622f76
+      src/irminsul/checks/diff_integrity.py: sha256:1a0eaa0d8260
   - id: cross-repo-debt-is-pinned
     state: implemented
     kind: invariant
@@ -62,7 +62,7 @@ claims:
       - src/irminsul/checks/adoption_record.py
     pinned:
       src/irminsul/adoption.py: sha256:172d868df4d6
-      src/irminsul/checks/uniqueness.py: sha256:a650805acc40
+      src/irminsul/checks/uniqueness.py: sha256:e22fea2887c0
       src/irminsul/checks/adoption_record.py: sha256:210962a2c53c
   - id: adopting-obligations-are-complete
     state: implemented
@@ -72,7 +72,7 @@ claims:
     evidence:
       - src/irminsul/checks/diff_integrity.py
     pinned:
-      src/irminsul/checks/diff_integrity.py: sha256:8a5edf622f76
+      src/irminsul/checks/diff_integrity.py: sha256:1a0eaa0d8260
   - id: record-validity-is-asked-on-every-path
     state: implemented
     kind: invariant
@@ -83,9 +83,9 @@ claims:
       - src/irminsul/context.py
       - src/irminsul/mcp_server.py
     pinned:
-      src/irminsul/checks/pipeline.py: sha256:cd853662d0c4
+      src/irminsul/checks/pipeline.py: sha256:3a133bab63c0
       src/irminsul/context.py: sha256:1623bcb557c4
-      src/irminsul/mcp_server.py: sha256:d5097f13b089
+      src/irminsul/mcp_server.py: sha256:337dc4606c24
 ---
 
 # Adoption record

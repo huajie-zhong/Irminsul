@@ -27,7 +27,7 @@ claims:
       - src/irminsul/checks/diff_integrity.py
     pinned:
       src/irminsul/baseline.py: sha256:250bd0a339a1
-      src/irminsul/checks/diff_integrity.py: sha256:ada813b5f257
+      src/irminsul/checks/diff_integrity.py: sha256:1a0eaa0d8260
 ---
 
 # Baseline ratchet
