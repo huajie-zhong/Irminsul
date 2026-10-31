@@ -15,12 +15,12 @@ claims:
       - src/irminsul/checks/pipeline.py
     pinned:
       pyproject.toml: sha256:4ab5d4b249e6
-      src/irminsul/checks/pipeline.py: sha256:3a133bab63c0
+      src/irminsul/checks/pipeline.py: sha256:b54acfc1df14
   - id: certain-findings-block
     state: enabled
     kind: ci_gate
     relation: follows-evidence
-    claim: This repository runs its enabled Irminsul checks in CI and fails on any certain finding except a draft doc's own unfinished-doc codes.
+    claim: This repository runs its enabled Irminsul checks in CI and fails on any certain finding except a draft doc's own unfinished-doc codes and one a commit trailer accepts.
     evidence:
       - .github/workflows/ci.yml
       - irminsul.toml
@@ -28,7 +28,7 @@ claims:
     pinned:
       .github/workflows/ci.yml: sha256:18ef8c6bad1a
       irminsul.toml: sha256:4e83be9b6bc4
-      src/irminsul/checks/pipeline.py: sha256:3a133bab63c0
+      src/irminsul/checks/pipeline.py: sha256:b54acfc1df14
   - id: hints-advise
     state: implemented
     kind: advisory_checks
@@ -38,8 +38,8 @@ claims:
       - src/irminsul/checks/pipeline.py
       - src/irminsul/cli.py
     pinned:
-      src/irminsul/checks/pipeline.py: sha256:3a133bab63c0
-      src/irminsul/cli.py: sha256:e4d4e00586b4
+      src/irminsul/checks/pipeline.py: sha256:b54acfc1df14
+      src/irminsul/cli.py: sha256:a1886e5a1784
   - id: fix-remediation-available
     state: implemented
     kind: auto_fix
@@ -49,7 +49,7 @@ claims:
       - src/irminsul/cli.py
       - src/irminsul/fix.py
     pinned:
-      src/irminsul/cli.py: sha256:e4d4e00586b4
+      src/irminsul/cli.py: sha256:a1886e5a1784
       src/irminsul/fix.py: sha256:cc4c24a9385c
   - id: source-deletion-reckoning-available
     state: enabled
@@ -72,11 +72,11 @@ The point of the whole system is that you do not have to remember every rule. Th
 
 Every check is deterministic, and every finding it reports has one of three [finding classes](../GLOSSARY.md#finding-class): <!-- claim:checks-are-deterministic -->
 
-- **Certain** findings prove the tree breaks a rule, such as a link to a file that does not exist, and fail CI. <!-- claim:certain-findings-block -->
+- **Certain** findings prove the tree breaks a rule, such as a link to a file that does not exist, and fail CI unless a commit trailer of the change accepts them. <!-- claim:certain-findings-block -->
 - **Hint** findings need judgment, such as a doc older than the code it claims, and fail a run only when the invocation opts in with `--fail-on`. <!-- claim:hints-advise -->
 - **Time** findings come from elapsed time or the outside world, and a run given a diff range leaves them out, so a pull request is never blamed for one. <!-- claim:hints-advise -->
 
-Every finding is computed; what separates the classes is whether the computation proves a rule broken. A certain finding does, so it blocks. A hint shows only that something may be wrong, and the judgment belongs to the agent or reviewer reading it, because build correctness never depends on model judgment ([Principles](principles.md#goals)). [Finding classes decide what blocks](../decisions/finding-classes-decide-what-blocks.md) records the classes, and `irminsul explain <code>` prints the class of any code. <!-- claim:checks-are-deterministic -->
+Every finding is computed; what separates the classes is whether the computation proves a rule broken. A certain finding does, so it blocks until a trailer of the change accepts it. A hint shows only that something may be wrong, and the judgment belongs to the agent or reviewer reading it, because build correctness never depends on model judgment ([Principles](principles.md#goals)). [Finding classes decide what blocks](../decisions/finding-classes-decide-what-blocks.md) records the classes, and `irminsul explain <code>` prints the class of any code. <!-- claim:checks-are-deterministic -->
 
 ## Where the Gate Holds
 

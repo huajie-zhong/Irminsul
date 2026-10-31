@@ -185,10 +185,12 @@ once so later writes change only what they mean to.
 `evidence-drift` skips every claim outside the foundation and architecture layers
 (`src/irminsul/checks/claim_provenance.py:113-114`), so a component claim whose evidence file
 changed is never re-asked by a plain `check`. On the trailer-step branch, 11 evidence pins in
-three component docs no longer match their files: six claims in
-`docs/components/adoption-record.md`, `baseline-only-shrinks` in `docs/components/baseline.md`,
-and `transition-applies-human-decisions` in `docs/components/change.md`. No gate reported
-them; a comparison of each pin with its file's current hash did. Found 2026-10-30.
+three component docs no longer matched their files, in `docs/components/adoption-record.md`,
+`docs/components/baseline.md` and `docs/components/change.md`. No gate reported them; a
+comparison of each pin with its file's current hash did. The branch has since re-pinned them
+after re-reading each claim, except two: both pins of `transition-applies-human-decisions` in
+`docs/components/change.md`, which still do not match `src/irminsul/change/transition.py` and
+`src/irminsul/change/finalize.py`. Found 2026-10-30.
 
 ## Agent workflow
 

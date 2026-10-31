@@ -41,7 +41,7 @@ claims:
       - src/irminsul/checks/diff_integrity.py
     pinned:
       src/irminsul/adoption.py: sha256:172d868df4d6
-      src/irminsul/checks/diff_integrity.py: sha256:1a0eaa0d8260
+      src/irminsul/checks/diff_integrity.py: sha256:190f2511cbbb
   - id: adoption-exception-does-not-return
     state: implemented
     kind: invariant
@@ -50,7 +50,7 @@ claims:
     evidence:
       - src/irminsul/checks/diff_integrity.py
     pinned:
-      src/irminsul/checks/diff_integrity.py: sha256:1a0eaa0d8260
+      src/irminsul/checks/diff_integrity.py: sha256:190f2511cbbb
   - id: cross-repo-debt-is-pinned
     state: implemented
     kind: invariant
@@ -72,18 +72,18 @@ claims:
     evidence:
       - src/irminsul/checks/diff_integrity.py
     pinned:
-      src/irminsul/checks/diff_integrity.py: sha256:1a0eaa0d8260
+      src/irminsul/checks/diff_integrity.py: sha256:190f2511cbbb
   - id: record-validity-is-asked-on-every-path
     state: implemented
     kind: invariant
     relation: governs-evidence
-    claim: Every execution path that returns findings runs the pass that validates the adoption record, so a check may delegate reporting an unreadable or unverifiable record only because the calling path guarantees the reporter runs.
+    claim: Every execution path that reaches a verdict runs the pass that validates the adoption record, so a check may delegate reporting an unreadable or unverifiable record only because the calling path guarantees the reporter runs.
     evidence:
       - src/irminsul/checks/pipeline.py
       - src/irminsul/context.py
       - src/irminsul/mcp_server.py
     pinned:
-      src/irminsul/checks/pipeline.py: sha256:3a133bab63c0
+      src/irminsul/checks/pipeline.py: sha256:b54acfc1df14
       src/irminsul/context.py: sha256:1623bcb557c4
       src/irminsul/mcp_server.py: sha256:337dc4606c24
 ---
@@ -173,7 +173,7 @@ added to the adopting path belongs in it in the same change.
    asked only when every configured root is present.
 
 Afterwards the record may not gain an entry, its pins may not move, and it may not be
-deleted while it holds entries. Two things are re-asked on every run, because they are about
+deleted while it holds entries, unless a trailer names it. Two things are re-asked on every run, because they are about
 the record as it stands: each entry existed in its source at the pinned revision, and the
 source an entry states is the one the configured roots resolve it to.
 

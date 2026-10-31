@@ -2,10 +2,12 @@
 
 A pass, not a registered graph check: like `co-change`, it needs the diff range, which
 `--diff <base>` or `context --after-edit` with a base puts on the graph. It compares files
-with their content at the merge base, which a pull request cannot rewrite, and reports:
+with their content at the merge base, which a pull request cannot rewrite, and always
+reports what it finds. Each finding names a subject, and the acknowledgement step accepts
+it when a trailer of the change names that subject, so the lists below say what the pass
+reports, not what a trailer can answer.
 
-- the baseline gained entries, so new findings were recorded instead of fixed, unless a
-  trailer names the baseline file;
+- the baseline gained entries, so new findings were recorded instead of fixed;
 - an RFC that was implemented at the base changed, or no longer exists. A change whose
   only difference is a reference pointed at a doc the same diff renamed is not a change;
 - a decision record that was accepted at the base no longer exists;
@@ -13,9 +15,8 @@ with their content at the merge base, which a pull request cannot rewrite, and r
 - a source file's owning doc changed, so the old owner's prose about it may stay behind;
 - the config moved a setting the way that makes a check ask less — a check or a layer rule
   turned off, a threshold widened, the tree moved, the source walk or guidance files
-  narrowed — or changed a setting nothing here judges, unless a trailer names the setting;
-- a workflow or action file that mentions irminsul was added, deleted, renamed or
-  edited, unless a trailer names it;
+  narrowed — or changed a setting nothing here judges;
+- a workflow or action file that mentions irminsul was added, deleted, renamed or edited;
 - an anchor, a `claims:` entry, or an `inventory:` entry was deleted while the code it
   named is still there, so a doc stopped asking about code that still exists. The same
   removal is not reported when that code went away in the same change — except for a

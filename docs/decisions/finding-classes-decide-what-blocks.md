@@ -3,7 +3,7 @@ id: finding-classes-decide-what-blocks
 title: Finding classes decide what blocks
 status: stable
 describes: []
-summary: Every check is deterministic and every finding code is certain, hint or time; certain findings block unless a draft excuses one as unfinished, hints are investigated, and time findings stay off a diff.
+summary: Every check is deterministic and every finding code is certain, hint or time; certain findings block unless a draft excuses one as unfinished or a trailer of the change accepts it, hints are investigated, and time findings stay off a diff.
 governs:
   - src/irminsul/checks/base.py
   - src/irminsul/checks/pipeline.py#class_of
@@ -89,7 +89,7 @@ status that excused every error would make one word of frontmatter the cheapest 
   `classes` beside its explanation. A test requires one for every explained code, and
   `irminsul explain <code>` prints it; this record keeps no table, which would drift.
   - **Certain:** the tree provably breaks a rule. An error, which fails every run unless a
-    baseline or `--delta` filters it out.
+    baseline or `--delta` filters it out, or a trailer of the change accepts it.
   - **Hint:** deciding needs judgment. A warning, which fails a run only under
     `--fail-on hint`, or an info, which never does. It is answered by fixing the doc, a
     reasoned ignore comment, or an acknowledgement
@@ -100,7 +100,7 @@ status that excused every error would make one word of frontmatter the cheapest 
 - **A draft excuses an unfinished doc, not a wrong one.** A check declares `drafts_exempt`, the
   certain codes that report a doc as unfinished, such as a missing `summary:`. On a `draft`
   doc those are warnings that enforce as hints, so `--fail-on hint` still fails on them. Every
-  other certain code is an error whatever the status.
+  other certain code is an error whatever the status, until a trailer of the change accepts it.
 - **One enabled list.** `checks.enabled` names the checks to run; a config with `checks.hard`
   or `checks.soft_deterministic` fails to load and names `checks.enabled`. `--only` runs any
   registered check.
@@ -171,3 +171,4 @@ status that excused every error would make one word of frontmatter the cheapest 
 
 - 2026-10-29: Accepted [Each finding code has one answer](../rfcs/every-warning-hint-has-an-answer.md).
 - 2026-10-30: The answer bullet is implemented, and the three co-change acknowledgement codes retire to `acknowledgement/*`.
+- 2026-10-30: A trailer of the change accepts a certain finding whose code declares `trailer`, which then reports at info, so a certain code is no longer always an error. The Certain and draft bullets say so.

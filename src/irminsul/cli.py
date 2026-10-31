@@ -1208,12 +1208,12 @@ def _check_summary(cls: type[FindingSource]) -> str:
 
 
 _CLASS_BLURB: dict[FindingClass, str] = {
-    # A baseline, `--delta` and a draft doc's own `drafts_exempt` codes each demote a
-    # certain finding, so the blurb cannot say it fails every run.
+    # A baseline, `--delta`, a trailer and a draft doc's own `drafts_exempt` codes each take a
+    # certain finding out of the error, so the blurb cannot say it fails every run.
     FindingClass.certain: (
         "the tree provably breaks a rule; an error unless a baseline or --delta "
-        "filters it out, or it reports a draft doc as unfinished — in which case it "
-        "enforces as a hint"
+        "filters it out, a trailer of the change accepts it, or it reports a draft doc as "
+        "unfinished — in which case it enforces as a hint"
     ),
     # No flag reaches a code reported at info severity, so a run cannot be made to fail
     # on one.

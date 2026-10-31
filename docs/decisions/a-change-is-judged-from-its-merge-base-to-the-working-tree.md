@@ -110,6 +110,8 @@ comment can answer them: `co-change/unreflected-change` and `claim-provenance/ev
   cannot be named by a trailer, and its finding is answered by the fix.
 - A trailer for a setting covers every entry under that dotted name: one naming `paths.sources.ref`
   accepts a ref change on every declared source.
+- A hand edit inside a merge commit does not lapse a trailer, because merges do not count, so a
+  reviewer reads the merge itself.
 
 ## Changes
 

@@ -37,7 +37,8 @@ forbidden_synonyms: ["severity class", "Severity class"]
 case_sensitive: true
 
 How sure a finding is, which decides whether it blocks. A **certain** finding proves
-the tree breaks a rule and is an error; a **hint** needs judgment and never errors; a
+the tree breaks a rule and is an error, unless a trailer of the change accepts it; a
+**hint** needs judgment and never errors; a
 **time** finding comes from elapsed time or the outside world and is left out of a run
 given a diff range.
 

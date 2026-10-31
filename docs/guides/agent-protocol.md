@@ -40,10 +40,10 @@ correct doc turns it green, and `irminsul explain <code>` prints both:
   is required and says why the doc is right.
 - **pin** — re-read the prose or the claim against its code, then run the
   `irminsul anchors --re-pin` command the finding prints, which moves only that pin.
-- **trailer** — re-read the doc, then add the `Irminsul-Reviewed` commit trailer the
-  suggestion prints, on the commit that carries the last change to the files it lists or
-  a later one; an earlier commit's trailer does not count. The reason says why the doc did
-  not need to change.
+- **trailer** — do what the finding's answer asks (`irminsul explain <code>` names it), then
+  add the `Irminsul-Reviewed` commit trailer the suggestion prints, on the commit that carries
+  the last change to the files it is about or a later one; an earlier commit's trailer does
+  not count. The reason says why the finding is acceptable.
 
 Then, in order:
 

@@ -20,13 +20,14 @@ Two classes, named apart because they answer different questions:
   allowed at all — a comment names a code, and cannot depend on the status of whichever
   doc it lands in.
 - `effective_class(finding)` is what **this occurrence** enforces as, and the exit code
-  follows it. The draft exemption is the only thing that separates the two: it demotes a
-  certain finding to a warning, and a warning enforces as a hint.
+  follows it. Two things separate the two: the draft exemption demotes a certain finding to
+  a warning, which enforces as a hint, and a trailer of the change accepts it at info, which
+  enforces as nothing.
 
 So a demoted finding reports `class: certain` and `effective_class: hint`, is not
 silenceable by a comment, and fails under `--fail-on hint` but not under
-the default run. `severity` is the same fact in the older vocabulary: error exactly when
-the effective class is certain.
+the default run. An accepted one reports `effective_class: null`. `severity` is the same
+fact in the older vocabulary: error exactly when the effective class is certain.
 """
 
 from __future__ import annotations
@@ -163,10 +164,11 @@ def class_of(code: str) -> FindingClass | None:
 def effective_class(finding: Finding) -> FindingClass | None:
     """The class *this occurrence* enforces as, which the run's exit code follows.
 
-    It differs from the declared class in exactly one situation: the draft exemption
-    demoted a certain finding to a warning, and a warning enforces as a hint
-    everywhere else, so it enforces as one here too. `None` means no flag fails on it
-    — an info finding, or a code no check declares.
+    It differs from the declared class in two situations. The draft exemption demotes a
+    certain finding to a warning, and a warning enforces as a hint everywhere else, so it
+    enforces as one here too. A trailer of the change accepts a certain finding at info,
+    which enforces as nothing. `None` means no flag fails on it — an info finding, or a code
+    no check declares.
 
     An *error* whose code no check declares still enforces as certain. A test holds every
     explained code to a class, so this is latent, but the direction matters: a code left out

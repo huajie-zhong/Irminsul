@@ -25,8 +25,9 @@ class FindingClass(StrEnum):
     """How sure a finding is, which decides whether it blocks.
 
     `certain` findings prove the tree breaks a rule and are errors, unless they report a
-    draft doc as unfinished. `hint` findings need judgment and never error. `time` findings come from elapsed time or the
-    outside world, never error, and are left out of a run given a diff range.
+    draft doc as unfinished or a trailer of the change accepts them. `hint` findings need
+    judgment and never error. `time` findings come from elapsed time or the outside world,
+    never error, and are left out of a run given a diff range.
     """
 
     certain = "certain"
@@ -261,7 +262,8 @@ def finding_records(findings: list[Finding], graph: DocGraph | None) -> list[dic
     """The JSON shape of a finding, shared by every findings-emitting surface.
 
     `class` is what the code declares and `effective_class` what this occurrence
-    enforces as; they differ only where the draft exemption demoted a certain finding.
+    enforces as; they differ where the draft exemption demoted a certain finding, or a
+    trailer of the change accepted one.
     Read `effective_class` to predict the exit code — `class` alone cannot, which is
     why both are reported.
 

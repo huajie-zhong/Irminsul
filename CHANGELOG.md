@@ -77,8 +77,8 @@ making a feature, a refactor and an RFC-driven change in it.
   change: `Irminsul-Reviewed: <code> <path> [<subject>] reason="..."`. The path is the file the
   finding is about, and the subject, when the finding names one, is the item it is about: a
   setting's dotted name, a claim id, or a record's path. The reason is required. The finding stays
-  in the report at info under its own code and quotes the reason. A later commit that touches the
-  file, or uncommitted work on it, lapses the trailer, and the suggestion says so.
+  in the report at info under its own code and quotes the reason. A later commit that touches a file the
+  finding is about, or uncommitted work on one, lapses the trailer, and the suggestion says so.
   `irminsul explain <code>` prints the form to write.
 - These codes are answered by a trailer: `diff-integrity/baseline-grew`,
   `adoption-record-removed`, `claim-reworded`, `claim-removed`, `governing-claim-removed`,
@@ -88,10 +88,11 @@ making a feature, a refactor and an RFC-driven change in it.
   `co-change/unreflected-change`.
 - A decision record no longer excuses anything. A weakened setting, a removed check, a changed
   gate file, a grown baseline, or a removed or reworded claim needs a trailer naming it, and an
-  added decision record answers none of them. A changed decision still needs a superseding record;
-  a trailer on `decision-rewritten` covers only a correction of the wording, such as a typo.
+  added decision record answers none of them. A changed decision still needs a superseding record,
+  unless an accepted RFC already made it; a trailer on `decision-rewritten` covers a correction of
+  the wording, such as a typo, or a change that carries out the accepted RFC.
 - A trailer that cannot acknowledge a finding is reported at info as `acknowledgement/invalid`: one
-  that does not parse, names no path or no reason, names a doc by its id, or names a code not
+  that does not parse, names no path or no reason, or names a code not
   declared `trailer`. One that matches no finding in the change is `acknowledgement/unused`. A
   trailer's path and subject cannot contain a space, so a file with a space in its path is
   answered by the fix.
@@ -128,9 +129,11 @@ making a feature, a refactor and an RFC-driven change in it.
 - An upgrade PR that bumps the Action's version in a workflow needs a `gate-file-changed` trailer
   for that path: `Irminsul-Reviewed: diff-integrity/gate-file-changed <workflow path> reason="..."`.
 - Id-form trailers stop working: a trailer names a doc by its path, so `co-change alpha` is now
-  `acknowledgement/invalid`, and `co-change docs/components/alpha.md` still acknowledges it.
+  `acknowledgement/unused`, and `co-change docs/components/alpha.md` still acknowledges it.
 - The three co-change trailer codes are gone from JSON; see the retirement above.
-- An adopter's managed `AGENTS.md` block keeps the old text until `irminsul init` is re-run.
+- An adopter's managed `AGENTS.md` block keeps its old text, so an adopter changes one sentence in
+  it by hand: `without a decision record that names the baseline` becomes
+  ``without an `Irminsul-Reviewed` trailer that names the baseline``.
 
 ## v0.4.1
 
