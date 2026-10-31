@@ -100,7 +100,10 @@ every severity, listed once for the whole report and not under each owner. When 
 could not be compared, every finding of the run is listed instead, and `validation.change`
 says why, so a list that looks clean is never one nothing measured. Under those findings
 the plain output lists the trailer each open one can take, under the heading `irminsul check`
-uses, and the JSON gives each finding that trailer as `trailer`.
+uses, and the JSON gives each finding that trailer as `trailer`. The comparison counts a
+finding by its fingerprint, so when a doc has the same finding twice and the count grew, the
+first one in report order is taken as the old one. The finding named can then sit on the
+line that did not change, and the verdict is still right: one more of them was introduced.
 
 With no base, the change is the working tree against `HEAD` and the passes that judge a
 change (`CHANGE_PASSES`) have no range to read, so they do not run. A `passed` verdict

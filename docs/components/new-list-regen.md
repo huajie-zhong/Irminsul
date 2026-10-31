@@ -70,7 +70,7 @@ Whatever it lists, the command exits 0: it points a reader at what to check and 
 
 Applies deterministic remediations for the findings of the checks in `checks.enabled`, or of the registered checks `--only` names, enabled or not — the same selection as `irminsul check`. A check opts in by exposing a `fixes(findings, graph)` method that returns `Fix` objects, and each fix only ever remediates a finding the check actually emits ([Finding classes decide what blocks](../decisions/finding-classes-decide-what-blocks.md)).
 
-A `--dry-run` lists the edits it would apply, per fix, while a live run groups fixes by path and lists the files it actually wrote, because a group whose combined result equals the original is skipped; the dry-run list cannot stand in for what changed. Fixes that modify or remove existing content or load-bearing metadata are tagged `requires_confirm` and are held back, listed but not written, unless `--confirm` is passed; only purely additive inverse pointers apply by default.
+A `--dry-run` lists the edits it would apply, per fix, while a live run groups fixes by path and lists the files it actually wrote, because a group whose combined result equals the original is skipped; the dry-run list cannot stand in for what changed. Fixes that modify or remove existing content or load-bearing metadata are tagged `requires_confirm` and are held back, not written, unless `--confirm` is passed; only purely additive inverse pointers apply by default. A plain run says how many fixes it held and that `--dry-run --confirm` lists them.
 <!-- anchor: src/irminsul/checks/base.py#Fix.requires_confirm @sha256:6e42d13129d7 -->
 
 ### The agent manifest
@@ -82,6 +82,8 @@ A check that judges the manifest's prose reads it through `without_generated_reg
 ## Scope & Limitations
 
 `list` subcommands are read-only — they report findings but do not modify any docs. `fix` applies deterministic, pre-coded remediations only, and the manifest table it writes is derived from the doc graph rather than from prose or source code.
+
+`list review --changed` pairs an edited sentence with the one it replaced by position, not by similarity: within a run the change rewrote, the first new sentence pairs with the first old sentence the file no longer has. An insertion before a rewrite can therefore pair a new sentence with an old one it did not replace, so its `was` names that one. This is accepted, because a threshold would guess where order does not, and the queue shows both texts, so the reader sees the mismatch. A sentence both moved and reworded in one edit has no run to pair in, so it is queued as `edited` and as `removed-sentence`.
 
 ## Implemented requirements
 

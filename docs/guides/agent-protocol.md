@@ -45,7 +45,8 @@ correct doc turns it green, and `irminsul explain <code>` prints both:
   the last change to the files it is about or a later one; an earlier commit's trailer does
   not count. The reason says why the finding is acceptable. `irminsul check` and
   `irminsul context --after-edit` list the trailers their open findings can take, under one
-  heading just before the summary; a finding a trailer already accepted is not listed.
+  heading: `check` prints it just before its summary, and `--after-edit` just before
+  `Next actions:`. A finding a trailer already accepted is not listed.
 
 Then, in order:
 

@@ -249,7 +249,7 @@ def create_server(repo_root: Path) -> MCPServer:
     @server.tool()
     @guarded
     def context_after_edit(base_ref: str | None = None, committed_only: bool = False) -> str:
-        """Call after editing: maps the change to its owning docs, runs the enabled checks, and reports what the repository fails on and the findings this change caused, once for the whole report. Each owner carries only its doc and the changed files it owns; its title, tests, dependencies, requirements and hints are not in this packet, and `context_for_path` gives them. If the change could not be compared with a base, every finding of the run is listed instead and `validation.change.reason` says why. `base_ref` is the branch point to measure against, such as origin/main (IRMINSUL_BASE_REF or GITHUB_BASE_REF when not given): the change then runs from its merge base to the working tree, so committed and uncommitted work both count and the passes `check --diff` adds run too. Without a base the working tree is compared with HEAD, which says nothing about work already committed, and those passes do not run. `committed_only` leaves staged, unstaged and untracked work out; with no base the change is empty, so nothing is judged as one."""
+        """Call after editing: maps the change to its owning docs, runs the enabled checks, and reports the findings this change caused, once for the whole report, and how many repository errors remain, which `irminsul check` lists. Each owner carries only its id, its path and the changed files it owns; its title, tests, dependencies, requirements and hints are not in this packet, and `context_for_path` gives them. If the change could not be compared with a base, every finding of the run is listed instead and `validation.change.reason` says why. `base_ref` is the branch point to measure against, such as origin/main (IRMINSUL_BASE_REF or GITHUB_BASE_REF when not given): the change then runs from its merge base to the working tree, so committed and uncommitted work both count and the passes `check --diff` adds run too. Without a base the working tree is compared with HEAD, which says nothing about work already committed, and those passes do not run. `committed_only` leaves staged, unstaged and untracked work out; with no base the change is empty, so nothing is judged as one."""
         return context_after_edit_json(root, _config(), base_ref, committed_only)
 
     @server.tool()
@@ -285,7 +285,7 @@ def create_server(repo_root: Path) -> MCPServer:
     @server.tool()
     @guarded
     def change_status(change: str) -> str:
-        """Call to orient on one RFC: lifecycle state, declared scope, task evidence, blockers, and valid next transitions. `change` is the RFC's doc id or repo-relative path. Lifecycle writes stay confirmed CLI actions (`irminsul change transition/finalize`)."""
+        """Call to orient on one RFC: lifecycle state, declared scope, tasks by id and text, blockers, and valid next transitions. `change` is the RFC's doc id or repo-relative path. Lifecycle writes stay confirmed CLI actions (`irminsul change transition/finalize`)."""
         return change_status_json(root, _config(), change)
 
     @server.tool()

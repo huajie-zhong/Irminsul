@@ -156,7 +156,7 @@ Two limits are deliberate, because each is a wide net on a finding that does not
 
 ## Implemented requirements
 
-- **acknowledge-a-reviewed-co-change-or-evidence-drift#trailer-acknowledges-co-change** — A `co-change` warning on a doc SHALL NOT be reported as a warning when a commit in the diff range carries an `Irminsul-Reviewed: co-change <doc> reason="..."` trailer naming that doc with a reason that is neither empty nor the printed `...` placeholder, unless a later commit in the range changed one of the files the warning lists, and SHALL be reported as an info finding that quotes the reason. (provenance: code; [RFC](../rfcs/acknowledge-a-reviewed-co-change-or-evidence-drift.md))
+- **acknowledge-a-reviewed-co-change-or-evidence-drift#trailer-acknowledges-co-change** — A `co-change` warning on a doc SHALL NOT be reported as a warning when a commit in the diff range carries an `Irminsul-Reviewed: co-change <doc> reason="..."` trailer naming that doc with a non-empty reason, unless a later commit in the range changed one of the files the warning lists, and SHALL be reported as an info finding that quotes the reason. (provenance: code; [RFC](../rfcs/acknowledge-a-reviewed-co-change-or-evidence-drift.md))
   <!-- anchor: src/irminsul/checks/co_change.py#run_co_change @sha256:c0a7704f64cd -->
   <!-- anchor: src/irminsul/checks/acknowledgement.py#acknowledge @sha256:9ef4dde1ac66 -->
 - **acknowledge-a-reviewed-co-change-or-evidence-drift#acknowledgement-needs-reason** — A trailer without a reason, naming no doc, or naming a doc `co-change` does not warn on SHALL acknowledge nothing and SHALL be reported as an info finding. (provenance: code; [RFC](../rfcs/acknowledge-a-reviewed-co-change-or-evidence-drift.md))

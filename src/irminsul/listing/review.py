@@ -72,8 +72,9 @@ MARKER_MEANINGS: Final[dict[str, str]] = {
         "doc; delete it or rewrite it"
     ),
     "removed-sentence": (
-        "a sentence this change deleted outright. Keep the deletion only if the behaviour is "
-        "gone or the sentence only repeats a surface query, with no reason or gotcha of its own"
+        "a sentence the change deleted outright. Keep it only if the behaviour is "
+        "gone or the sentence only repeats a surface query, one file or another doc, with no "
+        "reason or gotcha of its own"
     ),
 }
 

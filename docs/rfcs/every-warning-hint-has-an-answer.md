@@ -477,9 +477,10 @@ an item with no id is still `requirement-grammar/task-missing-id`.
   `src/irminsul/change/gate.py`, as the other rules `gate` shares with a check are, and `gate`
   judges it without raising it, as it does `update-missing-implements`. A finalization or a
   `change status` blocked by the finding that asks for it would leave no way to clear it.
-- **Progress.** `TaskItem` and `TaskSummary` in `src/irminsul/change/report.py` carry the done
-  state, and `_task_summary` prints "4 of 7 tasks done" before the evidence counts. The count
-  comes from the RFC alone, so it shows even when no diff baseline resolves.
+- **Progress.** `TaskItem` and `TaskSummary` in `src/irminsul/change/report.py` are to carry the
+  done state, and `change status` is to print "4 of 7 tasks done" where it now prints the
+  declared count. The count comes from the RFC alone, so it shows even when no diff baseline
+  resolves.
 - **The reminder.** For each accepted RFC with an open task whose `affects` names a component
   in the change's own footprint, from `touched_components` as `change verify` computes it,
   `list review --changed` and `context --after-edit` print the RFC and its open tasks, worded
@@ -1361,7 +1362,7 @@ task's done state and the count.
 
 #### Scenario: No diff baseline
 - **WHEN** the same RFC is read where no diff baseline resolves
-- **THEN** it still reports "4 of 7 tasks done", and the evidence counts are unknown
+- **THEN** it still reports "4 of 7 tasks done", and the evidence is reported as unknown, not as zero: `evidence_measured` is false
 
 #### Scenario: JSON
 - **WHEN** `change status --format json` runs on the same RFC
@@ -1433,7 +1434,7 @@ raise `rfc-follow-through/all-tasks-done`.
 - `T22` Make `co-change` read `ChangeRange.source_changed` and the trailers of the source repository's range under `--source-diff`, and reword the private-docs guide's scope note that sends a reader to `mtime-drift` for the cross-repository signal. (req: co-change-source-range)
 - `T23` Read a leading `[ ]`, `[x]` or `[X]` on a task item into a field of `Task` that is empty without a box, and leave the id, text and reference reading as it is. (req: task-checkboxes-parse)
 - `T24` Report `rfc-follow-through/all-tasks-done` from `RfcFollowThroughCheck` as one predicate in `gate.py`, judged but not raised when finalizing, certain and with no trailer. (req: all-tasks-done-finalizes)
-- `T25` Carry the done state in `TaskItem` and `TaskSummary`, and print "N of M tasks done" in `change status` and its JSON. (req: status-shows-task-progress)
+- `T25` Carry the done state in `TaskItem` and `TaskSummary`, which holds only the total today, and print "N of M tasks done" in `change status` and its JSON. (req: status-shows-task-progress)
 - `T26` List an accepted RFC's open tasks in `list review --changed` and `context --after-edit` when the change's footprint holds a component it declares, without making it a finding. (req: review-queue-names-rfc-work)
 - `T27` Count a task with no box as open, report an RFC with no box as not tracked, and keep it out of the finding. (req: old-style-tasks-stay-valid)
 - `T28` Show the box in the `new rfc` scaffold, write the tick flow into step 4 of the agent protocol, and qualify the sentence in the change doc that says a task carries no status. (req: all-tasks-done-finalizes)

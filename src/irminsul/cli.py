@@ -1027,8 +1027,9 @@ def context_command(
         typer.Option(
             "--after-edit",
             help=(
-                "Map the change to its owners and run the checks: what the repository "
-                "fails on, and what this change introduced. With a base, the change runs "
+                "Map the change to its owners and run the checks: the findings this change "
+                "caused, and how many repository errors remain for `irminsul check` to list. "
+                "With a base, the change runs "
                 "from its merge base with HEAD to the working tree, and the passes "
                 "`check --diff` adds run too."
             ),

@@ -268,8 +268,9 @@ def finding_records(findings: list[Finding], graph: DocGraph | None) -> list[dic
     why both are reported.
 
     `answer` is the kind of answer the code declares, and `subject` the item a sign-off
-    names. `trailer` is the commit trailer that would accept the finding, when one still can. `fixable` and `fix_command` come from `fix_commands` over `graph`. A surface with
-    no graph to ask claims nothing is fixable.
+    names. `trailer` is the commit trailer that would accept the finding, when one still can.
+    `fixable` and `fix_command` come from `fix_commands` over `graph`. A surface with no graph
+    to ask claims nothing is fixable.
     """
     from irminsul.checks.acknowledgement import trailer_for, trailer_open
     from irminsul.checks.pipeline import answer_of, class_of, effective_class

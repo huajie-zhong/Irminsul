@@ -50,7 +50,7 @@ The loop: orient, locate the owning docs, edit code and docs in the same commit,
 | Command | What it does |
 |---------|--------------|
 | `irminsul orient` | First call in a session: one-shot repo orientation — what this repo is, the layer map, how much of the source a doc owns, where to start |
-| `irminsul context <path...>` / `--after-edit` | Before an edit: owners, tests, active RFCs, bounded authored excerpts, and next actions, with no checks run. After it: the same for the changed files, plus findings and what the change introduced |
+| `irminsul context <path...>` / `--after-edit` | Before an edit: owners, tests, active RFCs, bounded authored excerpts, and next actions, with no checks run. After it: the owner of each changed file, the findings the change caused, with the fix command where one exists, and whether the change introduced errors |
 | `irminsul context --topic <q>` | The docs that cover a topic, before you know which file to open |
 | `irminsul refs <doc-id>` | The docs that depend on or link to a doc |
 | `irminsul surface {cli,cli-options,http,exports,env-vars,mcp}` | Derive a code surface from source on demand — never written to disk, so it cannot drift |

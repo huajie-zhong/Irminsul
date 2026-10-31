@@ -100,6 +100,17 @@ making a feature, a refactor and an RFC-driven change in it.
   and `co-change/unused-acknowledgement` are gone from `explain` and from JSON. An accepted
   `co-change` warning keeps its own code, `co-change/unreflected-change`, at info; a misused
   trailer is `acknowledgement/invalid` or `acknowledgement/unused`.
+- `irminsul check` and `irminsul context --after-edit` list, under one heading, the trailer each
+  open finding can take and the commit it goes on. The JSON records carry the same text as
+  `trailer`, which is null once a trailer has accepted the finding or the code takes none.
+- A trailer whose reason is still the printed `...` placeholder is `acknowledgement/invalid` and
+  accepts nothing, so a trailer pasted unedited leaves its finding standing. An
+  `acknowledgement/unused` trailer whose path and subject carry a finding with another
+  trailer-answerable code names that code and asks for a trailer naming it, if the finding is
+  acceptable, instead of saying nothing is left to do.
+- `irminsul fix` no longer lists each held fix in plain output. It prints one line that counts
+  them and names `--dry-run --confirm`, which lists them. The `change` commands never hold a fix,
+  so `change transition` and `change finalize` print no held list.
 
 **Queries.**
 - `context <path>` for a file the adoption record excepts says, before the edit, that a change
@@ -122,6 +133,23 @@ making a feature, a refactor and an RFC-driven change in it.
   yet, instead of reporting that none changed since the doc was last committed.
 - `irminsul refs` accepts any Markdown file in the repository as a target, so a brownfield page
   with no frontmatter can be asked what links to it before it is moved.
+- `context --after-edit` JSON is reshaped. Each result has `input`, `owner` (only its `id` and
+  `path`), and `content` only under `--include`, so owner content no longer comes back by
+  default. `missing_inputs` appears only when non-empty, and `hints` is gone. The findings the
+  change caused are one top-level `findings` list for the whole report, with a `fix_command` on
+  each one that `irminsul fix` remediates; the plain output prints that command as a `fix:` line
+  under it.
+- `list review --changed` shows an edited sentence's old wording as `was`. A deletion is a sentence
+  whose words the file no longer has, so merging two sentences into one is not reported as the
+  removal of the second. The old and new sentences pair in order within a rewritten run, so an
+  insertion before a rewrite can pair a new sentence with an old one it did not replace; both
+  texts are shown. A sentence that is both moved and reworded in one edit is queued as an `edited`
+  item and as a `removed-sentence`.
+- The JSON of `change status` and `change verify` reports the RFC's changed source and tests once,
+  not per task. Each task has `id`, `text`, `req` and `component`; the changed files are in
+  `evidence`, and one `semantic_review` clue says what to check. `evidence_measured` is a top-level
+  boolean. The per-task `source_evidence`, `changed_tests` and `review_clue` fields and the
+  summary's `with_source_evidence` and `with_changed_tests` counts are gone.
 
 **Upgrading.**
 - A claim that cites a doc as evidence is now judged on that doc's words, with its pins left out,
@@ -136,6 +164,8 @@ making a feature, a refactor and an RFC-driven change in it.
 - Id-form trailers stop working: a trailer names a doc by its path, so `co-change alpha` is now
   `acknowledgement/unused`, and `co-change docs/components/alpha.md` still acknowledges it.
 - The three co-change trailer codes are gone from JSON; see the retirement above.
+- The change report and the context report are version 2 in their JSON (`version`). A consumer
+  that read version 1 should check the shapes listed above before it relies on a field.
 - An adopter's managed `AGENTS.md` block keeps its old text, so an adopter changes one sentence in
   it by hand: `without a decision record that names the baseline` becomes
   ``without an `Irminsul-Reviewed` trailer that names the baseline``.

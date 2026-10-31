@@ -190,7 +190,9 @@ three component docs no longer matched their files, in `docs/components/adoption
 comparison of each pin with its file's current hash did. The branch has since re-pinned them
 after re-reading each claim, except two: both pins of `transition-applies-human-decisions` in
 `docs/components/change.md`, which still do not match `src/irminsul/change/transition.py` and
-`src/irminsul/change/finalize.py`. Found 2026-10-30.
+`src/irminsul/change/finalize.py`. A claim with no pin on a cited doc still reports after a
+re-pin commit of that doc, because the commit-time comparison remains: the re-pin commit is
+later than the doc's edit, and only a commit of the claim's own doc clears it. Found 2026-10-30.
 
 ## Agent workflow
 
@@ -329,8 +331,7 @@ a `git mv`, an unchanged sentence sharing a line with a reworded one is queued t
 `irminsul list review --base-ref` queues one `removed-sentence` item per deleted sentence
 (`_removed_sentences`, `src/irminsul/listing/review.py:458`). A deliberate cut queues every
 sentence of it: four items for a four-sentence paragraph, about 25 for one paragraph and
-213 for the trim of `checks.md` in the PR 12 lanes. A sentence reworded rather than cut
-shows twice, as `edited` and as `removed-sentence`. The reader has no way to say where a
+213 for the trim of `checks.md` in the PR 12 lanes. The reader has no way to say where a
 cut sentence now lives, so the same cut is re-read at every run. Group removed sentences by
 paragraph, pair a reworded sentence with its replacement, and let a reader name the home
 once. Found by the PR 12a, 12c and 12d lanes on 2026-10-28.
