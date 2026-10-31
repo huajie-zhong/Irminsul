@@ -55,7 +55,7 @@ from ruamel.yaml import YAML
 
 from irminsul import source_map
 from irminsul.adoption import AdoptionRecord, parse_record
-from irminsul.anchors import ANCHOR_RE
+from irminsul.anchors import without_pins
 from irminsul.checks.base import Answer, Finding, FindingClass, Severity
 from irminsul.checks.change_range import after_paths, after_text
 from irminsul.config import (
@@ -2156,10 +2156,7 @@ def _decision_wording(text: str | None) -> str | None:
     decision = _decision(text) if text is not None else None
     if decision is None:
         return None
-    unpinned = ANCHOR_RE.sub(
-        lambda match: f"anchor {match['path']}#{match['symbol'] or ''}", decision
-    )
-    return _INLINE_LINK_RE.sub(r"\1", unpinned).replace("`", "")
+    return _INLINE_LINK_RE.sub(r"\1", without_pins(decision)).replace("`", "")
 
 
 def _finding(

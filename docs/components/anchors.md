@@ -67,7 +67,9 @@ true." Nothing rewrites a pin silently, because that would rubber-stamp the very
 staleness the anchor exists to catch. The same command pins each evidence file of every
 claim in the doc under the claim's `pinned`, with the hash a file-level anchor would
 take, so `claim-provenance/evidence-drift` does not re-ask a re-read claim over a
-formatting-only commit; a pin only ever removes drift.
+formatting-only commit; a pin only ever removes drift. A doc cited as evidence is hashed with
+its own pins left out (`file_pin`, through `without_pins`), so re-pinning an anchor in that
+doc does not re-ask the claims citing it, while a change to its words still does.
 
 The acknowledgement is per document, so `--re-pin` requires `--doc <id|path>`: nobody
 re-reads a whole repository at once, and `--all` is for the rare case that is really what

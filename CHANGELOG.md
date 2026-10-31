@@ -124,6 +124,11 @@ making a feature, a refactor and an RFC-driven change in it.
   with no frontmatter can be asked what links to it before it is moved.
 
 **Upgrading.**
+- A claim that cites a doc as evidence is now judged on that doc's words, with its pins left out,
+  so re-pinning an anchor in the doc no longer re-asks the claim. Once after upgrading, a claim
+  that cites a doc holding a pin can report `claim-provenance/evidence-drift`, because the doc's
+  hash changed; re-read the claim and re-pin it with `irminsul anchors --re-pin --doc <doc>
+  --claim <id>`.
 - An upgrade PR that re-creates the baseline needs
   `Irminsul-Reviewed: diff-integrity/baseline-grew <baseline path> reason="..."`.
 - An upgrade PR that bumps the Action's version in a workflow needs a `gate-file-changed` trailer

@@ -442,16 +442,6 @@ The edges are real, but the warning repeats one fact per importer. Report a new 
 module once, naming its importers, with one fix that writes every `depends_on`. Found by the
 PR 10b lane on 2026-10-28.
 
-### `repin-does-not-name-what-it-moved`
-
-Re-pinning an anchor rewrites the doc's bytes, and a claim whose evidence is that doc is
-left with a stale pin. Re-pinning two anchors in `docs/components/checks.md` printed
-`re-pinned 2 anchor(s), 0 claim evidence pin(s)` (`src/irminsul/cli.py:1651`) and named no
-claim; the next check reported `claim-provenance/evidence-drift` on
-`parent-child-check-available` in `docs/architecture/component-hierarchy.md`, which cites
-`checks.md`. A re-pin should name the claims whose evidence it moved, so the re-read follows
-it. Reproduced 2026-10-30.
-
 ### `change-verify-cannot-scope-a-task`
 
 `change verify` gives every task of an RFC the same source evidence. On

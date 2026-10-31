@@ -447,6 +447,79 @@ def test_a_pinned_claim_drifts_when_its_evidence_changes(tmp_path: Path) -> None
     )
 
 
+_CITED_DOC = "docs/components/checks.md"
+
+
+def _doc_evidence_repo(tmp_path: Path) -> Path:
+    """A claim citing `_CITED_DOC`, pinned to it. The cited doc holds an anchor pin, which a
+    re-pin rewrites, and is committed before the claim's doc."""
+    write_config(tmp_path, source_roots=["src"])
+    git_init(tmp_path)
+    commit_all(tmp_path, "config", when=_at(0), paths=["irminsul.toml"])
+    commit_file(tmp_path, "action.yml", "name: docs\n", "workflow", when=_at(0))
+    write_doc(
+        tmp_path,
+        _CITED_DOC,
+        doc_id="checks",
+        body="Checks run. <!-- anchor: action.yml @sha256:aaaaaaaaaaaa -->",
+    )
+    commit_all(tmp_path, "checks doc", when=_at(0), paths=[_CITED_DOC])
+    write_doc(
+        tmp_path,
+        _DOC,
+        doc_id="enforcement",
+        body="CI blocks invalid docs. <!-- claim:enabled-claim -->",
+        frontmatter_extra=[
+            "claims:",
+            "  - id: enabled-claim",
+            "    state: enabled",
+            "    kind: ci_gate",
+            "    claim: The checks doc describes the run.",
+            "    evidence:",
+            "      - action.yml",
+            f"      - {_CITED_DOC}",
+            "    pinned:",
+            f"      {_CITED_DOC}: {file_pin(tmp_path / _CITED_DOC)}",
+        ],
+    )
+    commit_all(tmp_path, "doc claim", when=_at(1), paths=[_DOC])
+    return tmp_path
+
+
+def test_re_pinning_an_anchor_in_cited_doc_is_not_drift(tmp_path: Path) -> None:
+    root = _doc_evidence_repo(tmp_path)
+    assert _drift(root) == []
+
+    cited = (root / _CITED_DOC).read_text(encoding="utf-8")
+    commit_file(
+        root,
+        _CITED_DOC,
+        cited.replace("aaaaaaaaaaaa", "bbbbbbbbbbbb"),
+        "re-pin the anchor",
+        when=_at(2),
+    )
+
+    assert _drift(root) == []
+
+
+def test_a_prose_edit_to_cited_doc_is_drift_even_when_pinned(tmp_path: Path) -> None:
+    root = _doc_evidence_repo(tmp_path)
+
+    cited = (root / _CITED_DOC).read_text(encoding="utf-8")
+    commit_file(
+        root,
+        _CITED_DOC,
+        cited.replace("Checks run.", "Checks run twice."),
+        "reword the checks doc",
+        when=_at(2),
+    )
+
+    assert _drift(root) == [
+        "claim 'enabled-claim' cites evidence changed after the doc and since it was pinned: "
+        f"'{_CITED_DOC}'"
+    ]
+
+
 def test_updating_the_doc_clears_a_stale_pin_as_it_would_without_one(tmp_path: Path) -> None:
     """A pin only ever removes drift, so the protocol's usual fix still works."""
     root = _claim_repo(tmp_path, "name: docs\non: [push]\n", pinned=True)
