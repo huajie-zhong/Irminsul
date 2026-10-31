@@ -11,8 +11,10 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from io import StringIO
+from typing import Any
 
 from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 
 _DELIMITER_RE = re.compile(r"-{3,}\s*")
 _INDENTED_SEQUENCE_RE = re.compile(r"^( *)[^\s#-][^\n]*:[ \t]*\n\1 {2}- ", re.MULTILINE)
@@ -136,35 +138,62 @@ def remove_inventory_item(text: str, kind: str, item: str) -> str:
     return text
 
 
+def _rewrite_claims(text: str, edit: Callable[[dict[str, Any]], bool]) -> str:
+    """`text` with `edit` applied to each claim mapping of its frontmatter, which returns
+    whether it changed the claim. The delimiters and body come back as they were, and so
+    does the whole text when no claim changed or the frontmatter names no claims."""
+    raw_yaml, _ = split_frontmatter(text)
+    yaml = round_trip_yaml(raw_yaml)
+    data = yaml.load(raw_yaml) or {}
+    claims = data.get("claims") if isinstance(data, dict) else None
+    if not isinstance(claims, list):
+        return text
+    changed = [edit(claim) for claim in claims if isinstance(claim, dict)]
+    if not any(changed):
+        return text
+    buf = StringIO()
+    yaml.dump(data, buf)
+    opening = text.splitlines(keepends=True)[0]
+    return opening + buf.getvalue() + text[len(opening) + len(raw_yaml) :]
+
+
 def set_claim_pins(text: str, pins: dict[str, dict[str, str]]) -> str:
     """Set the `pinned` map of each claim `pins` names by id; an empty map removes it.
 
     Idempotent: when every named claim already holds its map, the input comes back
     unchanged. Keys are not reordered, so a re-pin changes only the pin lines.
     """
-    raw_yaml, body = split_frontmatter(text)
-    yaml = round_trip_yaml(raw_yaml)
-    data = yaml.load(raw_yaml) or {}
-    claims = data.get("claims")
-    if not isinstance(claims, list):
-        return text
-    changed = False
-    for claim in claims:
-        if not isinstance(claim, dict) or claim.get("id") not in pins:
-            continue
+
+    def apply(claim: dict[str, Any]) -> bool:
+        if claim.get("id") not in pins:
+            return False
         wanted = pins[claim["id"]]
         if dict(claim.get("pinned") or {}) == wanted:
-            continue
-        changed = True
+            return False
         if wanted:
             claim["pinned"] = wanted
         else:
             claim.pop("pinned", None)
-    if not changed:
+        return True
+
+    return _rewrite_claims(text, apply)
+
+
+def strip_claim_pins(text: str) -> str:
+    """`text` with the `pinned` map of every claim removed, which is how a doc's words are
+    compared without its pins. Text with no frontmatter, or whose YAML does not parse,
+    comes back unchanged, since a body fragment has none to strip."""
+
+    def drop(claim: dict[str, Any]) -> bool:
+        if "pinned" not in claim:
+            return False
+        del claim["pinned"]
+        return True
+
+    try:
+        return _rewrite_claims(text, drop)
+    except (ValueError, YAMLError):
         return text
-    buf = StringIO()
-    yaml.dump(data, buf)
-    return f"---\n{buf.getvalue()}---\n{body}"
 
 
 def setter(key: str, value: object) -> Callable[[str], str]:

@@ -33,7 +33,7 @@ from typing import TYPE_CHECKING
 
 from irminsul.fences import FenceTracker
 from irminsul.frontmatter import Claim
-from irminsul.frontmatter_edit import set_claim_pins, split_frontmatter
+from irminsul.frontmatter_edit import set_claim_pins, strip_claim_pins
 
 if TYPE_CHECKING:
     from irminsul.inventory.base import SourceReader
@@ -42,7 +42,6 @@ ANCHOR_RE = re.compile(
     r"<!--\s*anchor:\s*(?P<path>[^\s#@]+)(?:#(?P<symbol>[^\s@]+))?"
     r"(?:\s+@(?P<algo>[a-z0-9]+):(?P<hash>[0-9a-f]+))?\s*-->"
 )
-_CLAIM_PIN_RE = re.compile(r"^( *)pinned:[^\n]*\n(?:\1 +[^\n]*\n)*", re.MULTILINE)
 _CODE_SPAN_RE = re.compile(r"(`+)(.+?)\1")
 _BLOCK_LINE_LIMIT = 200
 _HASH_LEN = 12
@@ -222,6 +221,8 @@ def resolve(repo_root: Path, anchor: Anchor, reader: SourceReader | None = None)
         return Resolution("unreadable")
 
     if target.suffix != ".py":
+        if target.suffix == ".md" and anchor.symbol is None:
+            text = without_pins(text)
         return _resolve_text(text, anchor.symbol)
     module = reader.module(target)
     if module is None:
@@ -240,17 +241,11 @@ def without_pins(text: str) -> str:
     """`text` with its pins left out, the one reading that compares a doc's words.
 
     An anchor marker reads as `anchor <target>`, without its `@algo:hash`, and each claim's
-    `pinned` block leaves the frontmatter. A re-pin writes only pins, so it changes nothing
+    `pinned` map leaves the frontmatter. A re-pin writes only pins, so it changes nothing
     this reading compares.
     """
     unpinned = ANCHOR_RE.sub(lambda match: f"anchor {match['path']}#{match['symbol'] or ''}", text)
-    try:
-        raw_yaml, _ = split_frontmatter(unpinned)
-    except ValueError:
-        return unpinned
-    opening = unpinned.splitlines(keepends=True)[0]
-    rest = unpinned[len(opening) + len(raw_yaml) :]
-    return opening + _CLAIM_PIN_RE.sub("", raw_yaml) + rest
+    return strip_claim_pins(unpinned)
 
 
 def file_pin(target: Path, reader: SourceReader | None = None) -> str | None:
@@ -258,16 +253,10 @@ def file_pin(target: Path, reader: SourceReader | None = None) -> str | None:
     None when it is not a readable file.
 
     A claim pins its evidence with this, so a formatting-only commit to the evidence does
-    not re-ask a claim someone already re-read. A doc is hashed without its pins, so a
-    re-pin of the doc, which rewrites only pins, does not re-ask the claims that cite it.
+    not re-ask a claim someone already re-read. A doc is hashed without its pins, as
+    `resolve` hashes any doc a file-level anchor names, so a re-pin of the doc, which
+    rewrites only pins, does not re-ask the claims that cite it.
     """
-    if target.suffix == ".md":
-        from irminsul.inventory.base import SourceReader
-
-        text = (reader or SourceReader()).text(target)
-        if text is None:
-            return None
-        return f"{_ALGO}:{_hash(_normalize_whitespace(without_pins(text)))}"
     anchor = Anchor(line=0, raw="", path=target.name, symbol=None, pinned=None)
     resolution = resolve(target.parent, anchor, reader)
     return f"{_ALGO}:{resolution.current}" if resolution.status == "ok" else None

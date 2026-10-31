@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from irminsul.anchors import Anchor, parse_anchors, repin_text, resolve
+from irminsul.anchors import Anchor, file_pin, parse_anchors, repin_text, resolve
 from irminsul.checks.base import Severity
 from irminsul.checks.claim_anchor import ClaimAnchorCheck
 
@@ -106,6 +106,81 @@ def test_file_level_anchor_is_ast_normalized(tmp_path: Path) -> None:
     a = resolve(_repo(tmp_path / "a", "x", SRC), file_anchor)
     b = resolve(_repo(tmp_path / "b", "x", reformatted), file_anchor)
     assert a.current == b.current is not None
+
+
+CITED_DOC = """\
+---
+id: cited
+title: Cited
+status: stable
+summary: A cited doc.
+claims:
+  - id: holds
+    state: implemented
+    kind: invariant
+    claim: The thing holds.
+    evidence:
+      - src/mod.py
+    pinned:
+      src/mod.py: sha256:0123456789ab
+---
+
+# Cited
+
+See <!-- anchor: src/mod.py#alpha @sha256:0123456789ab --> for it.
+"""
+
+
+def test_a_re_pin_in_a_cited_doc_does_not_move_its_hash(tmp_path: Path) -> None:
+    doc = tmp_path / "cited.md"
+    doc.write_text(CITED_DOC, encoding="utf-8")
+    before = file_pin(doc)
+    doc.write_text(
+        CITED_DOC.replace("src/mod.py: sha256:0123456789ab\n", "src/mod.py: sha256:ffffffffffff\n"),
+        encoding="utf-8",
+    )
+
+    assert before == "sha256:baae072ee90c"
+    assert file_pin(doc) == before
+
+
+def test_a_file_level_anchor_on_a_doc_follows_its_words_not_its_pins(tmp_path: Path) -> None:
+    doc = "docs/components/cited.md"
+    repo = tmp_path / "r"
+    (repo / "docs" / "components").mkdir(parents=True)
+    (repo / doc).write_text(CITED_DOC, encoding="utf-8")
+    anchor = Anchor(line=0, raw="", path=doc, symbol=None, pinned=None)
+    before = resolve(repo, anchor).current
+
+    (repo / doc).write_text(
+        CITED_DOC.replace("sha256:0123456789ab", "sha256:ffffffffffff"), encoding="utf-8"
+    )
+    assert resolve(repo, anchor).current == before
+
+    (repo / doc).write_text(
+        CITED_DOC.replace("The thing holds.", "The thing breaks."), encoding="utf-8"
+    )
+    assert resolve(repo, anchor).current != before
+
+
+def test_a_pinned_line_in_a_summary_block_moves_the_hash_when_edited(tmp_path: Path) -> None:
+    doc = tmp_path / "summary.md"
+    text = CITED_DOC.replace(
+        "summary: A cited doc.", "summary: |\n  A cited doc.\n  pinned: this line is prose"
+    )
+    doc.write_text(text, encoding="utf-8")
+    before = file_pin(doc)
+
+    doc.write_text(text.replace("this line is prose", "this line is not"), encoding="utf-8")
+
+    assert file_pin(doc) != before
+
+
+def test_a_doc_whose_frontmatter_does_not_parse_still_has_a_hash(tmp_path: Path) -> None:
+    doc = tmp_path / "broken.md"
+    doc.write_text("---\nid: x\nclaims: [unclosed\n---\n\nBody.\n", encoding="utf-8")
+
+    assert file_pin(doc) is not None
 
 
 def test_unreadable_target_warns(tmp_path: Path) -> None:

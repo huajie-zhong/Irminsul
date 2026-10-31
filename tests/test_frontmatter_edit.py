@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import pytest
+
 from irminsul.frontmatter_edit import (
     add_to_list,
     remove_inventory_item,
     set_value,
+    strip_claim_pins,
 )
 
 DOC = """\
@@ -18,6 +21,54 @@ status: draft
 # Foo
 
 Body stays untouched.
+"""
+
+PINNED = """\
+---
+id: foo
+title: Foo
+status: stable
+claims:
+  - id: first
+    state: implemented
+    kind: invariant
+    claim: The first holds.
+    evidence:
+      - src/a.py
+    pinned:
+      src/a.py: sha256:aaaa
+  - id: second
+    state: implemented
+    kind: invariant
+    claim: The second holds.
+    evidence:
+      - src/b.py
+    pinned:
+      src/b.py: sha256:bbbb
+---
+
+# Foo
+
+Body stays untouched.
+"""
+
+PINNED_FIRST = """\
+---
+id: foo
+title: Foo
+status: stable
+claims:
+  - pinned:
+      src/a.py: sha256:aaaa
+    id: first
+    state: implemented
+    kind: invariant
+    claim: The first holds.
+    evidence:
+      - src/a.py
+---
+
+Body.
 """
 
 
@@ -163,3 +214,49 @@ def test_a_doc_with_flush_lists_keeps_them_flush() -> None:
     flush = "---\nid: foo\ntitle: Foo\nstatus: stable\ndescribes:\n- src/a.py\n---\n\n# Foo\n"
     out = add_to_list(flush, "describes", "src/b.py")
     assert out == flush.replace("- src/a.py\n", "- src/a.py\n- src/b.py\n")
+
+
+def test_strip_claim_pins_removes_each_claims_pinned_map_and_keeps_the_rest() -> None:
+    stripped = strip_claim_pins(PINNED)
+
+    assert "pinned" not in stripped
+    assert "src/a.py: sha256:aaaa" not in stripped
+    assert "claim: The second holds." in stripped
+    assert stripped.endswith("---\n\n# Foo\n\nBody stays untouched.\n")
+
+
+def test_strip_claim_pins_removes_a_pinned_key_that_opens_a_claim() -> None:
+    assert "pinned" not in strip_claim_pins(PINNED_FIRST)
+    assert "id: first" in strip_claim_pins(PINNED_FIRST)
+
+
+def test_a_re_pin_leaves_the_stripped_frontmatter_unchanged() -> None:
+    repinned = PINNED_FIRST.replace("sha256:aaaa", "sha256:cccc")
+
+    assert strip_claim_pins(repinned) == strip_claim_pins(PINNED_FIRST)
+
+
+def test_a_pinned_line_inside_a_block_scalar_is_prose_not_a_pin() -> None:
+    doc = PINNED.replace(
+        "claim: The first holds.",
+        "claim: |\n      The first holds.\n      pinned: this line is prose",
+    )
+
+    stripped = strip_claim_pins(doc)
+
+    assert "pinned: this line is prose" in stripped
+    assert "src/a.py: sha256:aaaa" not in stripped
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "",
+        "Just a fragment, `pinned: yes`.\n",
+        "---\nid: foo\nclaims: [unclosed\n---\nBody.\n",
+        "---\n- not\n- a mapping\n---\nBody.\n",
+        "---\nid: foo\nclaims:\n  - id: a\n  - [\n---\nBody.\n",
+    ],
+)
+def test_strip_claim_pins_returns_text_it_cannot_read_unchanged(text: str) -> None:
+    assert strip_claim_pins(text) == text
