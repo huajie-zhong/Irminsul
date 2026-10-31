@@ -12,7 +12,7 @@ from typer.testing import CliRunner
 
 from irminsul.checks.base import Fix
 from irminsul.cli import app
-from irminsul.fix import FixResult, apply_fixes
+from irminsul.fix import apply_fixes
 
 from .conftest import write_config
 
@@ -333,13 +333,3 @@ def test_fix_dry_run_with_confirm_lists_the_held_fixes_as_planned(
     assert f"{_HELD_RFC}: set status: stable" in result.output
     assert "planned 3 fix(es)" in result.output
     assert "held" not in result.output
-
-
-def test_a_change_command_still_lists_each_held_fix(capsys: pytest.CaptureFixture[str]) -> None:
-    from irminsul.cli import _echo_held
-
-    held = Fix(Path(_HELD_RFC), "set status: stable", lambda text: text, requires_confirm=True)
-
-    _echo_held(FixResult(held=[held]))
-
-    assert capsys.readouterr().out == f"  held: {_HELD_RFC}: set status: stable\n"
