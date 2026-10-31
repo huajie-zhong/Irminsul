@@ -12,6 +12,7 @@ affects:
   - context
   - docgraph
   - frontmatter
+  - git
   - init
   - new-list-regen
 resolved_by: docs/decisions/finding-classes-decide-what-blocks.md
