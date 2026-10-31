@@ -42,8 +42,8 @@ _TRAILER_RE = re.compile(
 )
 
 _UNUSED_SUGGESTION: Final = (
-    "nothing to do if the finding it named no longer arises; if it names the wrong path or "
-    "subject, add a trailer naming the right one to a later commit"
+    "nothing to do unless it names the wrong path or subject; then add a trailer naming the "
+    "right one to a later commit"
 )
 
 
@@ -102,9 +102,9 @@ class AcknowledgementStep:
         ),
         CODE_UNUSED: (
             f"An `{TRAILER_KEY}` commit trailer that matches no finding in this change, so it "
-            "acknowledges nothing. Nothing is left to do when the finding it named no longer "
-            "arises. A trailer naming the wrong path or subject is answered by one naming the "
-            "right one on a later commit. It is info for the same reason as the invalid one."
+            "does nothing. Nothing is left to do unless it names the wrong path or subject; "
+            "then a trailer naming the right one on a later commit answers it. It is info for "
+            "the same reason as the invalid one."
         ),
     }
     classes: ClassVar[dict[str, FindingClass]] = {
@@ -334,7 +334,7 @@ def _unused(named: _Named) -> Finding:
         severity=Severity.info,
         message=(
             f"the {TRAILER_KEY} trailer in {named.trailer.commit} matches no finding in this "
-            f"change: {named.trailer.value}"
+            f"change, so it does nothing: {named.trailer.value}"
         ),
         path=Path(named.path),
         suggestion=_UNUSED_SUGGESTION,

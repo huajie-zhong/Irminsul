@@ -288,6 +288,21 @@ def test_a_trailer_matching_nothing_is_unused_only_when_the_run_says_so(graph: D
     assert unused.severity is Severity.info
 
 
+def test_an_unused_trailer_says_it_does_nothing_and_names_the_fix(graph: DocGraph) -> None:
+    trailer = _trailer('co-change docs/components/gone.md reason="x"')
+
+    [unused] = acknowledge([], [trailer], graph, ran=("co-change",))
+
+    assert unused.message == (
+        "the Irminsul-Reviewed trailer in abc1234 matches no finding in this change, so it does "
+        'nothing: co-change docs/components/gone.md reason="x"'
+    )
+    assert unused.suggestion == (
+        "nothing to do unless it names the wrong path or subject; then add a trailer naming the "
+        "right one to a later commit"
+    )
+
+
 def test_misuse_is_reported_only_when_the_run_says_so(graph: DocGraph) -> None:
     assert acknowledge([], [_trailer('evidence-drift alpha reason="x"')], graph, ran=None) == []
 
