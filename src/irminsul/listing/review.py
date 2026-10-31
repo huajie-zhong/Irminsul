@@ -285,6 +285,7 @@ def build_review(
     bound_by_path: dict[str, set[str]] = {}
     uncommitted: dict[str, bool] = {}
     revisions: dict[str, _Revision] = {}
+    queued: dict[str, set[int]] = {}
     for path, rows in _review_sentences(config, graph, read).items():
         if changed is not None and path not in changed:
             continue
@@ -331,11 +332,13 @@ def build_review(
                     graph.git, repo_root / path, references, lines
                 )
             items.append(item)
+            if revision is not None:
+                queued.setdefault(path, set()).add(position)
     if changed is not None:
         items.extend(_stale_summaries(graph, changed, read))
         items.extend(_governing_claims_over_changed_code(graph, changed, read))
         items.extend(_moved_file_sentences(graph, changed, base_ref, read))
-        items.extend(_removed_sentences(revisions))
+        items.extend(_removed_sentences(revisions, queued))
     return sorted(
         items,
         key=lambda i: (not i.code_changed_after_doc, not i.references, i.path, i.line),
@@ -454,27 +457,28 @@ class _Revision:
 
     `known` holds the base's sentences, so a sentence already there is not new. `replaced`
     pairs each new sentence that took the place of an old one: {position now: position at
-    the base}. `surviving` holds every sentence now, so a deleted sentence whose text the
-    file still has, elsewhere, is not deleted.
+    the base}. `now` holds every sentence now, one to a line, so a deleted sentence whose
+    words the file still has inside a merged sentence is not deleted.
     """
 
     before: list[tuple[int, int, str]]
     known: frozenset[str]
     replaced: dict[int, int]
-    surviving: frozenset[str]
+    now: str
 
     def replaced_text(self, position: int) -> str | None:
         old = self.replaced.get(position)
         return None if old is None else self.before[old][2]
 
-    def deleted(self) -> list[tuple[int, str]]:
-        """(line, sentence) of each base sentence that no new sentence replaced and no line
-        still carries."""
-        taken = set(self.replaced.values())
+    def deleted(self, queued: set[int]) -> list[tuple[int, str]]:
+        """(line, sentence) of each base sentence that no queued edit replaced and no line
+        still carries. Only a replacement the queue showed takes a base sentence: an edit it
+        did not queue was never read, so the sentence it stood for is still to be read."""
+        taken = {self.replaced[position] for position in queued if position in self.replaced}
         return [
             (line, sentence)
             for index, (line, _, sentence) in enumerate(self.before)
-            if index not in taken and _comparable(sentence) not in self.surviving
+            if index not in taken and _comparable(sentence) not in self.now
         ]
 
 
@@ -491,25 +495,30 @@ def _revision(
 
     `SequenceMatcher` lines the two lists up without a similarity threshold, so a sentence
     that only moved is an unchanged run in both places and pairs with nothing. Within a
-    `replace` run the first new sentence pairs with the first old one, and so on; what is
-    left over is an addition or a deletion. A new sentence that the base already had
-    elsewhere replaces nothing, because it is not new text.
+    `replace` run the old sentences the file no longer has pair, in order, with the new
+    sentences the base did not have; what is left over is an addition or a deletion. Both
+    sides are filtered before pairing, so a sentence the file still has is never named as
+    replaced. An insertion before a rewrite can still shift the pairing: order is the only
+    thing that pairs them.
     """
     base = _prose_at_ref(repo_root, config, graph, base_ref, path, guidance)
     before = [] if base is None else _text_sentences(base)
     old = [_comparable(sentence) for _, _, sentence in before]
     new = [_comparable(sentence) for _, _, sentence in rows]
     known = frozenset(old)
+    current = frozenset(new)
     replaced: dict[int, int] = {}
     for tag, i1, i2, j1, j2 in SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
         if tag == "replace":
-            for position, index in zip(range(j1, j2), range(i1, i2), strict=False):
-                if new[position] not in known:
-                    replaced[position] = index
-    return _Revision(before, known, replaced, frozenset(new))
+            gone = [index for index in range(i1, i2) if old[index] not in current]
+            fresh = [position for position in range(j1, j2) if new[position] not in known]
+            replaced.update(zip(fresh, gone, strict=False))
+    return _Revision(before, known, replaced, "\n".join(new))
 
 
-def _removed_sentences(revisions: dict[str, _Revision]) -> list[ReviewItem]:
+def _removed_sentences(
+    revisions: dict[str, _Revision], queued: dict[str, set[int]]
+) -> list[ReviewItem]:
     """Sentences the change deleted, which no surviving line can carry.
 
     Every other item here is built from a line that still exists, so deleting a sentence
@@ -524,7 +533,7 @@ def _removed_sentences(revisions: dict[str, _Revision]) -> list[ReviewItem]:
             continue
         out.extend(
             ReviewItem(path=path, line=line, sentence=sentence, markers=["removed-sentence"])
-            for line, sentence in revision.deleted()
+            for line, sentence in revision.deleted(queued.get(path, set()))
         )
     return out
 

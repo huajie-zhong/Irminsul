@@ -717,6 +717,120 @@ def test_a_sentence_deleted_outright_is_removed_and_not_an_edit(tmp_path: Path) 
     assert _edits(items) == []
 
 
+def test_deleting_the_first_line_of_a_wrapped_sentence_queues_its_removal(tmp_path: Path) -> None:
+    """The line left behind is not on a changed line, so it is not queued and cannot take
+    the sentence it came from as replaced: the removal is still queued."""
+    items = _review_pipeline_edit(
+        _repo(tmp_path),
+        "Keep this.\n\nThe gate runs on every push\nand fails on any error.\n",
+        "Keep this.\n\nand fails on any error.\n",
+    )
+    assert _removed(items) == ["The gate runs on every push and fails on any error."]
+    assert _edits(items) == []
+
+
+def test_a_sentence_moved_and_reworded_in_the_same_edit_is_not_said_to_replace_the_moved_one(
+    tmp_path: Path,
+) -> None:
+    items = _review_pipeline_edit(
+        _repo(tmp_path),
+        "Aaa one.\n\nBbb two.\n\nCcc three.\n\nDdd four.\n",
+        "Aaa one.\n\nBrand new sentence.\n\nCcc three.\n\nDdd four.\n\nBbb two.\n",
+    )
+    assert _edits(items) == [("Brand new sentence.", None)]
+    assert _removed(items) == []
+
+
+def test_a_new_sentence_takes_the_place_of_the_sentence_it_replaced_not_a_kept_one(
+    tmp_path: Path,
+) -> None:
+    """`Aaa` faces `Ccc` and `Ddd` in one replace run. The base already had `Ccc`, so it is
+    not new and cannot be what `Ddd` replaced: `Ddd` takes `Aaa`'s place."""
+    items = _review_pipeline_edit(
+        _repo(tmp_path),
+        "Aaa one.\n\nBbb two.\n\nCcc three.\n",
+        "Ccc three.\n\nDdd four.\n\nBbb two.\n",
+    )
+    assert _edits(items) == [("Ddd four.", "Aaa one.")]
+    assert _removed(items) == []
+
+
+def test_a_sentence_split_in_two_is_two_edits_and_the_first_shows_what_it_replaced(
+    tmp_path: Path,
+) -> None:
+    items = _review_pipeline_edit(
+        _repo(tmp_path),
+        "Keep. The gate runs on push and fails on errors. Tail.\n",
+        "Keep. The gate runs on push. It fails on errors. Tail.\n",
+    )
+    assert _edits(items) == [
+        ("The gate runs on push.", "The gate runs on push and fails on errors."),
+        ("It fails on errors.", None),
+    ]
+    assert _removed(items) == []
+
+
+def test_a_sentence_moved_and_reworded_is_an_edit_and_a_removal(tmp_path: Path) -> None:
+    """Moving a sentence past an unchanged one and rewording it leaves no run to pair it in,
+    so the new wording is queued without a `was` and the old one as removed. An accepted limit:
+    the threshold-free pairing never guesses across an unchanged sentence."""
+    items = _review_pipeline_edit(
+        _repo(tmp_path),
+        "Aaa one.\n\nBbb two.\n",
+        "Bbb two.\n\nAaa one, edited.\n",
+    )
+    assert _edits(items) == [("Aaa one, edited.", None)]
+    assert _removed(items) == ["Aaa one."]
+
+
+def test_an_insertion_before_a_rewrite_shifts_the_pairing_and_both_texts_are_shown(
+    tmp_path: Path,
+) -> None:
+    """Accepted limit: the threshold-free pairing takes the first new sentence of a run with
+    the first old one, so the insertion is paired with `Alpha` and the rewrite with `Beta`.
+    Each new sentence is queued with the text it was paired with, so the reader sees both."""
+    items = _review_pipeline_edit(
+        _repo(tmp_path),
+        "Keep head.\n\nAlpha runs first.\n\nBeta runs second.\n\nKeep tail.\n",
+        "Keep head.\n\nA wholly unrelated sentence is inserted.\n\n"
+        "Alpha runs first of all.\n\nBeta runs second of all.\n\nKeep tail.\n",
+    )
+    assert _edits(items) == [
+        ("A wholly unrelated sentence is inserted.", "Alpha runs first."),
+        ("Alpha runs first of all.", "Beta runs second."),
+        ("Beta runs second of all.", None),
+    ]
+    assert _removed(items) == []
+
+
+def test_a_merged_line_does_not_report_the_second_half_as_removed(tmp_path: Path) -> None:
+    """Two sentences made one: the first is the edit, and the second's words are still in
+    the sentence that now holds them, so only the first is queued."""
+    items = _review_pipeline_edit(
+        _repo(tmp_path),
+        "First half without a stop\n\nsecond half of it.\n",
+        "First half without a stop\nsecond half of it.\n",
+    )
+    assert _edits(items) == [
+        ("First half without a stop second half of it.", "First half without a stop"),
+    ]
+    assert _removed(items) == []
+
+
+def test_a_shortened_sentence_is_queued_as_an_edit(tmp_path: Path) -> None:
+    """The words of the old sentence still appear in the file, yet the new sentence is not
+    the old one, so it is queued: only a deletion reads the words as still there."""
+    items = _review_pipeline_edit(
+        _repo(tmp_path),
+        "Keep. The gate fails on errors and warnings. Tail.\n",
+        "Keep. The gate fails on errors. Tail.\n",
+    )
+    assert _edits(items) == [
+        ("The gate fails on errors.", "The gate fails on errors and warnings."),
+    ]
+    assert _removed(items) == []
+
+
 def test_every_sentence_of_a_new_doc_is_edited_even_when_another_doc_says_it(
     tmp_path: Path,
 ) -> None:
