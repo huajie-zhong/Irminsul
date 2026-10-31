@@ -268,9 +268,10 @@ def finding_records(findings: list[Finding], graph: DocGraph | None) -> list[dic
     why both are reported.
 
     `answer` is the kind of answer the code declares, and `subject` the item a sign-off
-    names. `fixable` and `fix_command` come from `fix_commands` over `graph`. A surface with
+    names. `trailer` is the commit trailer that would accept the finding, when one still can. `fixable` and `fix_command` come from `fix_commands` over `graph`. A surface with
     no graph to ask claims nothing is fixable.
     """
+    from irminsul.checks.acknowledgement import trailer_for, trailer_open
     from irminsul.checks.pipeline import answer_of, class_of, effective_class
 
     commands = fix_commands(findings, graph) if graph is not None else [None] * len(findings)
@@ -284,6 +285,7 @@ def finding_records(findings: list[Finding], graph: DocGraph | None) -> list[dic
             "class": finding_class.value if finding_class is not None else None,
             "effective_class": enforced.value if enforced is not None else None,
             "answer": answer_of(finding.code).kind.value,
+            "trailer": trailer_for(finding) if trailer_open(finding) else None,
             "subject": finding.subject,
             "severity": finding.severity.value,
             "message": finding.message,

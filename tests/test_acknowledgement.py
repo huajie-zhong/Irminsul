@@ -34,6 +34,7 @@ from .conftest import (
     config_toml,
     findings_of,
     git,
+    invoke,
     load_graph,
     reviewed,
     seed_repo,
@@ -1015,3 +1016,80 @@ def test_a_printed_trailer_pasted_unedited_accepts_nothing(
         finding["severity"] for finding in raised
     ]
     assert findings_of(tmp_path, CODE_INVALID, "--diff", base)
+
+
+_TRAILER_HEADING = (
+    "1 finding(s) can be answered by a trailer, if you have judged them acceptable; each goes "
+    "on the commit that carries the last change to its files, or a later one:"
+)
+_CLAIM_TRAILER = (
+    "Irminsul-Reviewed: diff-integrity/governing-claim-changed docs/components/widget.md governs "
+    'reason="..."'
+)
+
+
+def test_check_lists_the_trailer_an_open_finding_can_take_before_the_summary(
+    tmp_path: Path,
+) -> None:
+    base = _changed({_WIDGET: _GOVERNED.replace("The widget runs.", "The widget halts.")})(tmp_path)
+
+    _, output = invoke(tmp_path, "check", "--diff", base)
+
+    lines = output.splitlines()
+    [heading] = [index for index, line in enumerate(lines) if line == _TRAILER_HEADING]
+    assert lines[heading + 1] == f"  {_CLAIM_TRAILER}"
+    assert re.fullmatch(r"\d+ errors?, \d+ warnings?.*", lines[-1]), lines[-1]
+
+
+def test_check_lists_no_trailers_when_no_open_finding_takes_one(tmp_path: Path) -> None:
+    base = _seeded(tmp_path)
+
+    _, output = invoke(tmp_path, "check", "--diff", base)
+
+    assert _TRAILER_HEADING not in output
+
+
+def test_an_accepted_finding_is_not_listed_for_a_trailer(tmp_path: Path) -> None:
+    base = _changed({_WIDGET: _GOVERNED.replace("The widget runs.", "The widget halts.")})(tmp_path)
+    git(
+        tmp_path,
+        "commit",
+        "--allow-empty",
+        "-qm",
+        "re-read the claim\n\n"
+        + reviewed("diff-integrity/governing-claim-changed", _WIDGET, "governs"),
+    )
+
+    _, output = invoke(tmp_path, "check", "--diff", base)
+
+    assert _TRAILER_HEADING not in output
+
+
+def test_the_github_format_does_not_list_the_trailers(tmp_path: Path) -> None:
+    base = _changed({_WIDGET: _GOVERNED.replace("The widget runs.", "The widget halts.")})(tmp_path)
+
+    _, output = invoke(tmp_path, "check", "--diff", base, "--format", "github")
+
+    assert _TRAILER_HEADING not in output
+
+
+def test_check_json_gives_each_finding_its_trailer_or_none(tmp_path: Path) -> None:
+    base = _changed({_WIDGET: _GOVERNED.replace("The widget runs.", "The widget halts.")})(tmp_path)
+
+    records = check_findings(tmp_path, "--diff", base)
+
+    assert all("trailer" in record for record in records)
+    [claim] = [r for r in records if r["code"] == "diff-integrity/governing-claim-changed"]
+    assert claim["trailer"] == _CLAIM_TRAILER
+    assert [r["trailer"] for r in records if r is not claim] == [None] * (len(records) - 1)
+
+
+def test_context_after_edit_lists_the_trailers_before_its_next_actions(tmp_path: Path) -> None:
+    base = _changed({_WIDGET: _GOVERNED.replace("The widget runs.", "The widget halts.")})(tmp_path)
+
+    _, output = invoke(tmp_path, "context", "--after-edit", "--base-ref", base)
+
+    lines = output.splitlines()
+    assert _TRAILER_HEADING in lines
+    assert f"  {_CLAIM_TRAILER}" in lines
+    assert lines.index(_TRAILER_HEADING) < lines.index("Next actions:")

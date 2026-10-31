@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Literal
 
 from irminsul.adoption import recorded_debt
 from irminsul.checks import Finding, finding_records
+from irminsul.checks.acknowledgement import trailer_block
 from irminsul.checks.change_range import range_of
 from irminsul.checks.globs import (
     external_display_for_path,
@@ -555,6 +556,8 @@ def format_context_plain(report: ContextReport) -> str:
         if report.validation is not None:
             lines.extend(_validation_lines(report.validation))
         lines.extend(_findings_lines(report))
+        if report.findings is not None:
+            lines.extend(trailer_block(report.findings))
         lines.append("Next actions:")
         if report.next_actions:
             for action in report.next_actions:

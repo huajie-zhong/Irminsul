@@ -442,15 +442,6 @@ The edges are real, but the warning repeats one fact per importer. Report a new 
 module once, naming its importers, with one fix that writes every `depends_on`. Found by the
 PR 10b lane on 2026-10-28.
 
-### `diff-lists-trailers-needed`
-
-No command lists the trailers a change still needs. The top-level commands and the `list`
-group (`baseline`, `undocumented`, `lifecycle`, `review`) show none (`src/irminsul/cli.py:2205`).
-On the trailer-step branch the six `decision-rewritten` trailers and the two
-`baseline-only-shrinks` trailers were each found only by a `check --diff` run after the edit
-that needed them. A view of the trailers a change still needs, with the finding each answers,
-would save those runs. Reproduced 2026-10-30.
-
 ## Release pipeline
 
 v0.3.0 was tagged and published on 2026-09-25: PyPI carries the wheel and sdist with

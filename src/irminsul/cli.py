@@ -35,6 +35,7 @@ from irminsul.checks import (
     sort_findings,
     summarize,
 )
+from irminsul.checks.acknowledgement import trailer_block
 from irminsul.checks.render import escape_github_data, findings_json, github_annotation
 from irminsul.config import IrminsulConfig, find_config, load
 from irminsul.docgraph import ChangeRange, DocGraph, build_graph
@@ -849,6 +850,8 @@ def check(
             _print_finding(finding)
         _print_run_notes(baseline_status, delta_status)
         _print_adoption_note(graph)
+        for line in trailer_block(findings):
+            typer.echo(line)
         _print_summary(counts)
 
     raise typer.Exit(code=1 if fail else 0)

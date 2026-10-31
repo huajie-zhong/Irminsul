@@ -98,7 +98,9 @@ pull-request gate is independent of this and still fails on the repository's own
 The findings an edit reports are the ones this change caused: the comparison above, over
 every severity, listed once for the whole report and not under each owner. When the change
 could not be compared, every finding of the run is listed instead, and `validation.change`
-says why, so a list that looks clean is never one nothing measured.
+says why, so a list that looks clean is never one nothing measured. Under those findings
+the plain output lists the trailer each open one can take, under the heading `irminsul check`
+uses, and the JSON gives each finding that trailer as `trailer`.
 
 With no base, the change is the working tree against `HEAD` and the passes that judge a
 change (`CHANGE_PASSES`) have no range to read, so they do not run. A `passed` verdict

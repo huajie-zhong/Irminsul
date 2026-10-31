@@ -43,7 +43,9 @@ correct doc turns it green, and `irminsul explain <code>` prints both:
 - **trailer** — do what the finding's answer asks (`irminsul explain <code>` names it), then
   add the `Irminsul-Reviewed` commit trailer the suggestion prints, on the commit that carries
   the last change to the files it is about or a later one; an earlier commit's trailer does
-  not count. The reason says why the finding is acceptable.
+  not count. The reason says why the finding is acceptable. `irminsul check` and
+  `irminsul context --after-edit` list the trailers their open findings can take, under one
+  heading just before the summary; a finding a trailer already accepted is not listed.
 
 Then, in order:
 

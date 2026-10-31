@@ -10,7 +10,7 @@ to its own commit, so a later change to a file the finding is about lapses it.
 from __future__ import annotations
 
 import re
-from collections.abc import Collection
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Final
@@ -208,6 +208,27 @@ def trailer_for(finding: Finding) -> str:
 def trailer_form(code: str) -> str:
     """The shape of a trailer that acknowledges `code`, for `irminsul explain`."""
     return f'{TRAILER_KEY}: {code} <path> [<subject>] reason="{REASON_PLACEHOLDER}"'
+
+
+def trailer_open(finding: Finding) -> bool:
+    """Whether a trailer can still take `finding`: its code declares `trailer`, and no trailer
+    of the change has accepted it yet."""
+    from irminsul.checks.pipeline import answer_of
+
+    return answer_of(finding.code).kind is AnswerKind.trailer and not accepted(finding)
+
+
+def trailer_block(findings: Iterable[Finding]) -> list[str]:
+    """The trailers the open findings can take, under one heading, or nothing when none can."""
+    open_findings = [finding for finding in findings if trailer_open(finding)]
+    if not open_findings:
+        return []
+    return [
+        f"{len(open_findings)} finding(s) can be answered by a trailer, if you have judged them "
+        "acceptable; each goes on the commit that carries the last change to its files, or a "
+        "later one:",
+        *(f"  {trailer_for(finding)}" for finding in open_findings),
+    ]
 
 
 _FIX_THE_TRAILER: Final = f"add a valid trailer to a later commit: `{trailer_form('<code>')}`"
