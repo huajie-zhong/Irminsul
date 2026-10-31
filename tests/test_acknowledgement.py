@@ -3,8 +3,11 @@ declared `trailer`, by code, path and subject, and reports misuse as info."""
 
 from __future__ import annotations
 
+import re
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -22,6 +25,7 @@ from irminsul.checks.acknowledgement import (
 from irminsul.checks.base import AnswerKind, Finding, Severity
 from irminsul.checks.pipeline import answer_of
 from irminsul.docgraph import DocGraph
+from irminsul.git import changes
 
 from .conftest import (
     check_findings,
@@ -33,6 +37,7 @@ from .conftest import (
     load_graph,
     reviewed,
     seed_repo,
+    severities_of,
     write,
     write_config,
 )
@@ -160,18 +165,18 @@ def test_an_unknown_code_is_invalid(graph: DocGraph) -> None:
     assert "no check or finding code" in _only(found, CODE_INVALID).message
 
 
-def test_a_code_declared_fix_is_invalid_and_its_answer_is_named(graph: DocGraph) -> None:
-    code = "claim-anchor/unreadable"
+def test_a_code_declared_fix_is_invalid_and_explain_is_named(graph: DocGraph) -> None:
+    code = "claim-anchor/missing-file"
     assert answer_of(code).kind is AnswerKind.fix
 
     found = acknowledge([], [_trailer(f'{code} {_DOC} reason="x"')], graph, ran=("claim-anchor",))
 
     [invalid] = found
     assert invalid.code == CODE_INVALID
-    assert answer_of(code).how in (invalid.suggestion or "")
+    assert f"`irminsul explain {code}` says how" in (invalid.suggestion or "")
 
 
-def test_a_doc_id_is_invalid_and_the_path_is_named(graph: DocGraph) -> None:
+def test_a_doc_id_names_no_finding_and_is_unused(graph: DocGraph) -> None:
     found = acknowledge(
         [_finding()],
         [_trailer('co-change alpha reason="still right"')],
@@ -179,9 +184,38 @@ def test_a_doc_id_is_invalid_and_the_path_is_named(graph: DocGraph) -> None:
         ran=("co-change",),
     )
 
-    invalid = _only(found, CODE_INVALID)
-    assert f"write its path, {_DOC}" in invalid.message
+    assert CODE_INVALID not in [f.code for f in found]
+    assert _only(found, CODE_UNUSED).severity is Severity.info
     assert _only(found, _CO_CHANGE).severity is Severity.warning
+
+
+def test_a_trailer_naming_a_baseline_whose_path_is_also_a_doc_id_accepts_it(
+    tmp_path: Path,
+) -> None:
+    write_config(tmp_path, project_name="ack", source_roots=["app"], extra='baseline = "thebase"\n')
+    write(
+        tmp_path,
+        "docs/components/thebase.md",
+        "---\nid: thebase\ntitle: Base\nstatus: stable\nsummary: A test doc.\ndescribes: []\n"
+        "---\n\n# Base\n\nIt holds the baseline.\n",
+    )
+    grew = _finding(
+        code="diff-integrity/baseline-grew",
+        path="thebase",
+        subject="thebase",
+        about=("thebase",),
+        suggestion="fix the new findings instead of recording them",
+    )
+
+    [accepted] = acknowledge(
+        [grew],
+        [_trailer('diff-integrity/baseline-grew thebase reason="the upgrade waits"')],
+        load_graph(tmp_path),
+        ran=("diff-integrity",),
+    )
+
+    assert accepted.code == "diff-integrity/baseline-grew"
+    assert accepted.severity is Severity.info
 
 
 def test_a_subject_defaults_to_the_path(graph: DocGraph) -> None:
@@ -300,14 +334,13 @@ def test_a_trailer_path_is_normalized_before_it_is_matched(graph: DocGraph, spel
     assert [(f.code, f.severity) for f in found] == [(_CO_CHANGE, Severity.info)]
 
 
-def test_the_suggestion_composes_the_trailer_clause_once(graph: DocGraph) -> None:
+def test_the_suggestion_composes_the_trailer_clause(graph: DocGraph) -> None:
     finding = _finding()
 
-    once = pipeline.finish([finding], graph)
-    twice = pipeline.finish(once, graph)
+    [out] = pipeline.finish([finding], graph)
 
-    assert twice[0].suggestion == once[0].suggestion
-    assert (once[0].suggestion or "").endswith(
+    assert out.suggestion == (
+        "update the doc; if you re-read the doc and it is still right, add this trailer: "
         f"`{trailer_for(finding)}` on the commit that carries the last change to app/alpha.py, "
         "or a later one"
     )
@@ -334,7 +367,7 @@ def test_placement_names_an_uncommitted_file_or_the_last_change() -> None:
     )
     assert (
         placement(_finding(about=("app/alpha.py", "app/beta.py")), frozenset())
-        == "on the commit that carries the last change to those files, or a later one"
+        == "on the commit that carries the last change to app/alpha.py, app/beta.py, or a later one"
     )
 
 
@@ -470,7 +503,7 @@ def test_the_same_widening_with_no_trailer_is_an_error(tmp_path: Path) -> None:
     write(tmp_path, "irminsul.toml", config_toml(project_name="ack", extra=_length(3000)))
     commit_all(tmp_path, "raise the length warning")
 
-    assert [f["severity"] for f in findings_of(tmp_path, _WEAKENED, "--diff", base)] == ["error"]
+    assert severities_of(tmp_path, _WEAKENED, "--diff", base) == ["error"]
 
 
 def test_a_trailer_for_a_fix_code_is_invalid_and_accepts_nothing(tmp_path: Path) -> None:
@@ -485,7 +518,7 @@ def test_a_trailer_for_a_fix_code_is_invalid_and_accepts_nothing(tmp_path: Path)
     [invalid] = findings_of(tmp_path, CODE_INVALID, "--diff", base)
 
     assert invalid["severity"] == "info"
-    assert [f["severity"] for f in findings_of(tmp_path, _WEAKENED, "--diff", base)] == ["error"]
+    assert severities_of(tmp_path, _WEAKENED, "--diff", base) == ["error"]
 
 
 def test_a_decision_record_alone_leaves_the_widening_an_error(tmp_path: Path) -> None:
@@ -500,7 +533,7 @@ def test_a_decision_record_alone_leaves_the_widening_an_error(tmp_path: Path) ->
     )
     commit_all(tmp_path, "raise it, and explain in a record")
 
-    assert [f["severity"] for f in findings_of(tmp_path, _WEAKENED, "--diff", base)] == ["error"]
+    assert severities_of(tmp_path, _WEAKENED, "--diff", base) == ["error"]
 
 
 def test_an_uncommitted_config_edit_after_the_trailer_brings_the_error_back(
@@ -513,7 +546,7 @@ def test_an_uncommitted_config_edit_after_the_trailer_brings_the_error_back(
         "raise the length warning\n\n"
         + reviewed(_WEAKENED, "irminsul.toml", _LENGTH, reason="long files are deliberate"),
     )
-    assert [f["severity"] for f in findings_of(tmp_path, _WEAKENED, "--diff", base)] == ["info"]
+    assert severities_of(tmp_path, _WEAKENED, "--diff", base) == ["info"]
 
     write(tmp_path, "irminsul.toml", config_toml(project_name="ack", extra=_length(30000)))
 
@@ -556,7 +589,7 @@ def test_the_same_typo_fix_with_no_trailer_is_a_warning(tmp_path: Path) -> None:
     write(tmp_path, _RECORD, _record(_TYPO_FIXED))
     commit_all(tmp_path, "fix a typo")
 
-    assert [f["severity"] for f in findings_of(tmp_path, _REWRITTEN, "--diff", base)] == ["warning"]
+    assert severities_of(tmp_path, _REWRITTEN, "--diff", base) == ["warning"]
 
 
 def test_a_later_commit_to_the_record_brings_a_reviewed_typo_back_as_a_warning(
@@ -568,7 +601,7 @@ def test_a_later_commit_to_the_record_brings_a_reviewed_typo_back_as_a_warning(
     write(tmp_path, _RECORD, _record(_TYPO_FIXED).replace("Fine.", "Fine enough."))
     commit_all(tmp_path, "edit the consequences")
 
-    assert [f["severity"] for f in findings_of(tmp_path, _REWRITTEN, "--diff", base)] == ["warning"]
+    assert severities_of(tmp_path, _REWRITTEN, "--diff", base) == ["warning"]
 
 
 def test_a_reviewed_typo_fix_in_a_renamed_record_names_its_new_path(tmp_path: Path) -> None:
@@ -584,3 +617,304 @@ def test_a_reviewed_typo_fix_in_a_renamed_record_names_its_new_path(tmp_path: Pa
 
     assert found["severity"] == "info"
     assert found["path"] == _REWRITTEN_TO
+
+
+def test_a_later_delete_of_a_renamed_records_old_path_lapses_its_trailer(tmp_path: Path) -> None:
+    """A copy with the typo fixed and then a delete of the original reads at the base as one
+    rename. The trailer on the copy names the new path, and the delete changes the old one,
+    which the finding is about too."""
+    base = _record_repo(tmp_path, _TYPO)
+    write(tmp_path, _REWRITTEN_TO, _record(_TYPO_FIXED, record_id="pick-a-lane"))
+    commit_all(
+        tmp_path,
+        "copy the record and fix a typo\n\n" + reviewed(_REWRITTEN, _REWRITTEN_TO, reason="typo"),
+    )
+    git(tmp_path, "rm", "-q", _RECORD)
+    commit_all(tmp_path, "remove the original record")
+
+    assert severities_of(tmp_path, _REWRITTEN, "--diff", base) == ["warning"]
+
+
+def test_a_trailer_whose_later_changes_git_cannot_read_acknowledges_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_config(tmp_path, project_name="ack", source_roots=["app"])
+    write(tmp_path, "app/alpha.py", "a = 1\n")
+    write(tmp_path, _DOC, component_doc("alpha", "app/alpha.py"))
+    base = seed_repo(tmp_path, "seed")
+    write(tmp_path, "app/alpha.py", "a = 2\n")
+    commit_all(tmp_path, f"change the source\n\n{reviewed(_CO_CHANGE, _DOC)}")
+    monkeypatch.setattr(changes, "files_changed_after", lambda *args: None)
+
+    assert severities_of(tmp_path, _CO_CHANGE, "--diff", base) == ["warning"]
+
+
+_GOVERNS_CLAIM = (
+    "  - id: governs\n    state: implemented\n    kind: invariant\n"
+    "    relation: governs-evidence\n    claim: The widget runs.\n"
+    "    evidence:\n      - src/widget.py\n"
+)
+_NOTES_CLAIM = (
+    "  - id: notes\n    state: implemented\n    kind: invariant\n"
+    "    claim: The widget keeps notes.\n    evidence:\n      - src/widget.py\n"
+)
+_GOVERNED = (
+    "---\nid: widget\ntitle: Widget\nstatus: stable\nsummary: A test doc.\n"
+    "describes: [src/widget.py]\nclaims:\n"
+    + _GOVERNS_CLAIM
+    + _NOTES_CLAIM
+    + "inventory:\n  - kind: cli-options\n    source: src/widget.py\n    complete: true\n"
+    "---\n\n# Widget\n\nIt runs.\n"
+)
+_WORKFLOW_PATH = ".github/workflows/docs-pr.yml"
+_RENAMED_WORKFLOW = ".github/workflows/docs-renamed.yml"
+_WORKFLOW = (
+    "name: docs\n\non: pull_request\n\njobs:\n  check:\n    runs-on: ubuntu-latest\n"
+    "    steps:\n      - run: irminsul check --diff origin/main\n"
+)
+_BASELINE_PATH = ".irminsul-baseline.json"
+_BASELINE_EMPTY = '{"version":1,"findings":[]}'
+_BASELINE_GROWN = (
+    '{"version":1,"findings":[{"check":"links","path":"a.md","message":"m","code":"links/x"}]}'
+)
+_ADOPTION_PATH = ".irminsul-adoption.json"
+_ADOPTION = '{"version":1,"unowned":["src/old.py"],"sources":[],"bindings":{}}'
+_THEBASE_DOC = (
+    "---\nid: thebase\ntitle: Base\nstatus: stable\nsummary: A test doc.\ndescribes: []\n"
+    "---\n\n# Base\n\nIt holds the baseline.\n"
+)
+
+Arrange = Callable[[Path], str]
+
+
+def _seeded(root: Path, *, extra: str = "", files: dict[str, str] | None = None) -> str:
+    write_config(root, project_name="ack", source_roots=["src"], extra=extra)
+    write(root, "src/widget.py", "def run():\n    return 1\n")
+    write(root, _WIDGET, _GOVERNED)
+    write(root, _RECORD, _record(_TYPO))
+    write(root, _WORKFLOW_PATH, _WORKFLOW)
+    for path, text in (files or {}).items():
+        write(root, path, text)
+    return seed_repo(root, "adopted")
+
+
+def _changed(
+    changes: dict[str, str | None],
+    *,
+    extra: str = "",
+    files: dict[str, str] | None = None,
+    moves: dict[str, str] | None = None,
+) -> Arrange:
+    """A repository whose base is the commit before one change: `moves` are `git mv`s, and
+    `changes` writes each file, or deletes it when its text is None, and commits the lot."""
+
+    def arrange(root: Path) -> str:
+        base = _seeded(root, extra=extra, files=files)
+        for old, new in (moves or {}).items():
+            git(root, "mv", old, new)
+        for path, text in changes.items():
+            if text is None:
+                (root / path).unlink()
+            else:
+                write(root, path, text)
+        commit_all(root, "the change")
+        return base
+
+    return arrange
+
+
+_PRINTED = re.compile(r"`(Irminsul-Reviewed: [^`]*)`")
+
+
+def _printed_trailer(finding: dict[str, Any]) -> str | None:
+    found = _PRINTED.search(finding.get("suggestion") or "")
+    return found.group(1) if found else None
+
+
+_ROUNDTRIP: list[Any] = [
+    pytest.param(
+        "diff-integrity/baseline-grew",
+        _changed({_BASELINE_PATH: _BASELINE_GROWN}, files={_BASELINE_PATH: _BASELINE_EMPTY}),
+        id="baseline-grew",
+    ),
+    pytest.param(
+        "diff-integrity/adoption-record-removed",
+        _changed({_ADOPTION_PATH: None}, files={_ADOPTION_PATH: _ADOPTION}),
+        id="adoption-record-removed",
+    ),
+    pytest.param(
+        "diff-integrity/claim-reworded",
+        _changed({_WIDGET: _GOVERNED.replace("keeps notes.", "keeps every note.")}),
+        id="claim-reworded",
+    ),
+    pytest.param(
+        "diff-integrity/claim-removed",
+        _changed({_WIDGET: _GOVERNED.replace(_NOTES_CLAIM, "")}),
+        id="claim-removed",
+    ),
+    pytest.param(
+        "diff-integrity/governing-claim-removed",
+        _changed({_WIDGET: _GOVERNED.replace(_GOVERNS_CLAIM, "")}),
+        id="governing-claim-removed",
+    ),
+    pytest.param(
+        "diff-integrity/governing-claim-changed",
+        _changed({_WIDGET: _GOVERNED.replace("The widget runs.", "The widget halts.")}),
+        id="governing-claim-changed",
+    ),
+    pytest.param(
+        "diff-integrity/inventory-weakened",
+        _changed({_WIDGET: _GOVERNED.replace("    complete: true\n", "")}),
+        id="inventory-weakened",
+    ),
+    pytest.param(
+        "diff-integrity/gate-file-changed",
+        _changed({_WORKFLOW_PATH: _WORKFLOW + "# c\n"}),
+        id="gate-file-changed",
+    ),
+    pytest.param(
+        "diff-integrity/check-disabled",
+        _changed(
+            {
+                "irminsul.toml": config_toml(
+                    project_name="ack",
+                    source_roots=["src"],
+                    extra='[checks]\nenabled = ["frontmatter"]\n',
+                )
+            },
+            extra='[checks]\nenabled = ["frontmatter", "links"]\n',
+        ),
+        id="check-disabled",
+    ),
+    pytest.param(
+        "diff-integrity/layer-rule-disabled",
+        _changed(
+            {
+                "irminsul.toml": config_toml(
+                    project_name="ack",
+                    source_roots=["src"],
+                    extra="[layers.components]\nrequire_tests = false\n",
+                )
+            },
+            extra="[layers.components]\nrequire_tests = true\n",
+        ),
+        id="layer-rule-disabled",
+    ),
+    pytest.param(
+        "diff-integrity/setting-weakened",
+        _changed(
+            {
+                "irminsul.toml": config_toml(
+                    project_name="ack",
+                    source_roots=["src"],
+                    extra="[checks.parent_child]\nlength_warning_lines = 3000\n",
+                )
+            },
+            extra="[checks.parent_child]\nlength_warning_lines = 300\n",
+        ),
+        id="setting-weakened",
+    ),
+    pytest.param(
+        "diff-integrity/source-excluded",
+        _changed(
+            {
+                "irminsul.toml": config_toml(
+                    project_name="ack",
+                    source_roots=["src"],
+                    extra='source_excludes = ["src/a/**", "src/b/**"]\n',
+                )
+            }
+        ),
+        id="source-excluded",
+    ),
+    pytest.param(
+        "diff-integrity/extra-doc-removed",
+        _changed(
+            {"irminsul.toml": config_toml(project_name="ack", source_roots=["src"])},
+            extra='extra_docs = ["NOTES.md"]\n',
+            files={"NOTES.md": "Notes.\n"},
+        ),
+        id="extra-doc-removed",
+    ),
+    pytest.param(
+        "diff-integrity/rules-narrowed",
+        _changed(
+            {"irminsul.toml": config_toml(project_name="ack", source_roots=["src"])},
+            extra='[[surface.rules]]\nkind = "k"\nglobs = ["src/**"]\npattern = "x"\nidentity = "i"\n',
+        ),
+        id="rules-narrowed",
+    ),
+    pytest.param(
+        "diff-integrity/unreviewed-setting-change",
+        _changed(
+            {
+                "irminsul.toml": config_toml(
+                    project_name="ack",
+                    source_roots=["src"],
+                    extra='[frameworks]\ncommand_names = ["tool"]\n',
+                )
+            }
+        ),
+        id="unreviewed-setting-change",
+    ),
+    pytest.param(
+        "diff-integrity/decision-rewritten",
+        _changed({_RECORD: _record(_TYPO_FIXED)}),
+        id="decision-rewritten",
+    ),
+    pytest.param(
+        "co-change/unreflected-change",
+        _changed({"src/widget.py": "def run():\n    return 2\n"}),
+        id="co-change",
+    ),
+    pytest.param(
+        "diff-integrity/gate-file-changed",
+        _changed({}, moves={_WORKFLOW_PATH: _RENAMED_WORKFLOW}),
+        id="gate-file-renamed",
+    ),
+    pytest.param(
+        "diff-integrity/gate-file-changed",
+        _changed({_WORKFLOW_PATH: None}),
+        id="gate-file-deleted",
+    ),
+    pytest.param(
+        "diff-integrity/baseline-grew",
+        _changed(
+            {"thebase": _BASELINE_GROWN},
+            extra='baseline = "thebase"\n',
+            files={"thebase": _BASELINE_EMPTY, "docs/components/thebase.md": _THEBASE_DOC},
+        ),
+        id="configured-baseline-path-is-a-doc-id",
+    ),
+    pytest.param(
+        "diff-integrity/decision-rewritten",
+        _changed(
+            {_REWRITTEN_TO: _record(_TYPO_FIXED, record_id="pick-a-lane")},
+            moves={_RECORD: _REWRITTEN_TO},
+        ),
+        id="decision-renamed",
+    ),
+]
+
+
+@pytest.mark.parametrize(("code", "arrange"), _ROUNDTRIP)
+def test_the_trailer_a_finding_prints_accepts_that_finding(
+    tmp_path: Path, code: str, arrange: Arrange
+) -> None:
+    """The printed trailer, with a reason, on a later commit accepts the finding at info."""
+    base = arrange(tmp_path)
+    raised = findings_of(tmp_path, code, "--diff", base)
+    printed = [_printed_trailer(finding) for finding in raised]
+
+    assert raised and all(finding["severity"] != "info" for finding in raised)
+    assert None not in printed
+    git(
+        tmp_path,
+        "commit",
+        "--allow-empty",
+        "-qm",
+        "acknowledge what the findings print\n\n"
+        + "\n".join(line.replace('reason="..."', 'reason="re-read"') for line in printed if line),
+    )
+
+    assert severities_of(tmp_path, code, "--diff", base) == ["info"] * len(raised)

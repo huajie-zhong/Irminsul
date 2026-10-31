@@ -238,8 +238,7 @@ def finish(
 def _with_answer(findings: list[Finding], graph: DocGraph) -> list[Finding]:
     """Each finding with the clause its code's answer adds to its suggestion. `line` names the
     ignore comment, and `trailer` the trailer and where it goes; `fix` and `pin` suggestions
-    already name the act. A clause is added once, so a finding that passes through again keeps
-    it, and an accepted finding, which is already signed off, gets none."""
+    already name the act. An accepted finding, which is already signed off, gets none."""
     change = graph.change
     uncommitted = change.uncommitted if change is not None else frozenset()
     out: list[Finding] = []
@@ -253,9 +252,7 @@ def _with_answer(findings: list[Finding], graph: DocGraph) -> list[Finding]:
             out.append(finding)
             continue
         own = finding.suggestion
-        if own is None or clause not in own:
-            finding = replace(finding, suggestion=f"{own}; {clause}" if own else clause)
-        out.append(finding)
+        out.append(replace(finding, suggestion=f"{own}; {clause}" if own else clause))
     return out
 
 

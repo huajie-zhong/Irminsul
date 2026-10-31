@@ -231,20 +231,6 @@ def test_the_guard_records_what_the_cli_reports(
     ]
 
 
-def test_a_line_finding_finished_twice_names_its_comment_once(tmp_path: Path) -> None:
-    from dataclasses import replace
-
-    from irminsul.checks import pipeline
-
-    graph = load_graph(_repo(tmp_path))
-    once = pipeline.finish([replace(_copied_block(10), suggestion="link it")], graph)
-    twice = pipeline.finish(once, graph)
-
-    assert twice[0].suggestion == once[0].suggestion
-    assert (once[0].suggestion or "").startswith("link it; a block that must read the same")
-    assert (once[0].suggestion or "").count("irminsul:ignore duplicate-block/copied-block") == 1
-
-
 def test_the_guard_records_a_trailer_code_without_a_subject(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

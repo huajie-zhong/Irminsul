@@ -22,6 +22,7 @@ from .conftest import (
     git,
     git_init,
     invoke,
+    severities_of,
     write,
     write_config,
 )
@@ -54,10 +55,6 @@ def _feature(tmp_path: Path) -> tuple[Path, str]:
 def _one(findings: list[dict[str, Any]], code: str) -> dict[str, Any]:
     [found] = [f for f in findings if f["code"] == code]
     return found
-
-
-def _severities(findings: list[dict[str, Any]], code: str) -> list[str]:
-    return [f["severity"] for f in findings if f["code"] == code]
 
 
 @pytest.mark.parametrize("staged", [False, True])
@@ -123,14 +120,14 @@ def test_a_commit_carrying_the_trailer_acknowledges_what_the_tree_warned_about(
 
     commit_all(root, f"change alpha\n\n{_TRAILER}", when=_at(2))
 
-    assert _severities(check_findings(root, "--diff", base), _UNREFLECTED) == ["info"]
+    assert severities_of(root, _UNREFLECTED, "--diff", base) == ["info"]
 
 
 def test_a_trailer_does_not_cover_a_later_uncommitted_edit(tmp_path: Path) -> None:
     root, base = _feature(tmp_path)
     write(root, "app/alpha.py", "a = 2\n")
     commit_all(root, f"change alpha\n\n{_TRAILER}", when=_at(2))
-    assert _severities(check_findings(root, "--diff", base), _UNREFLECTED) == ["info"]
+    assert severities_of(root, _UNREFLECTED, "--diff", base) == ["info"]
 
     write(root, "app/alpha.py", "a = 3\n")
 
@@ -159,9 +156,7 @@ def test_committed_only_judges_the_commits_not_what_follows_them(tmp_path: Path)
     commit_all(root, f"change alpha\n\n{_TRAILER}", when=_at(2))
     write(root, "app/alpha.py", "a = 3\n")
 
-    findings = check_findings(root, "--diff", base, "--committed-only")
-
-    assert _severities(findings, _UNREFLECTED) == ["info"]
+    assert severities_of(root, _UNREFLECTED, "--diff", base, "--committed-only") == ["info"]
 
 
 def test_committed_only_reaches_the_graph(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

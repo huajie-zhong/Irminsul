@@ -18,7 +18,7 @@ from typer.testing import CliRunner
 from irminsul.checks.diff_integrity import _config_weakening
 from irminsul.config import IrminsulConfig, parse_snapshot
 
-from .conftest import check_codes, commit_all, findings_of, git, reviewed, write
+from .conftest import check_codes, commit_all, git, reviewed, severities_of, write
 from .test_diff_integrity import _CONFIG, _repo
 
 runner = CliRunner()
@@ -77,7 +77,7 @@ def test_a_trailer_accepts_a_widened_threshold(tmp_path: Path) -> None:
         ),
     )
 
-    assert [f["severity"] for f in findings_of(tmp_path, _WEAKENED, "--diff", base)] == ["info"]
+    assert severities_of(tmp_path, _WEAKENED, "--diff", base) == ["info"]
 
 
 _SURFACE_RULE = (
@@ -124,9 +124,7 @@ def test_a_trailer_answers_an_unreviewed_setting_change(tmp_path: Path) -> None:
     trailer could answer this hint it failed every `--fail-on hint` run with no way out."""
     base = _config_repo(tmp_path)
     _reconfigure(tmp_path, '[frameworks]\ncommand_names = ["tool"]\n')
-    assert [f["severity"] for f in findings_of(tmp_path, _UNREVIEWED, "--diff", base)] == [
-        "warning"
-    ]
+    assert severities_of(tmp_path, _UNREVIEWED, "--diff", base) == ["warning"]
 
     git(
         tmp_path,
@@ -137,7 +135,7 @@ def test_a_trailer_answers_an_unreviewed_setting_change(tmp_path: Path) -> None:
         + reviewed(_UNREVIEWED, "irminsul.toml", "frameworks.command_names", reason="the tool"),
     )
 
-    assert [f["severity"] for f in findings_of(tmp_path, _UNREVIEWED, "--diff", base)] == ["info"]
+    assert severities_of(tmp_path, _UNREVIEWED, "--diff", base) == ["info"]
 
 
 # ------------------------------------------------------------- the seal over the schema

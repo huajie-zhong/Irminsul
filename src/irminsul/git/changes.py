@@ -256,7 +256,8 @@ def files_changed_after(
 
     Only commits `head` adds to `base`, other than merges, count. A pull request's checkout
     is a merge commit, and what the base branch gained since the branch was cut is not a
-    later change of this one.
+    later change of this one. Renames are off, so a move counts as the old path's deletion
+    and the new path's addition, and the old path is among the files that changed.
     """
     prefix = _git_worktree_prefix(git, repo_root)
     result = _run_git(
@@ -266,6 +267,7 @@ def files_changed_after(
         "core.quotePath=false",
         "log",
         "--no-merges",
+        "--no-renames",
         "--format=",
         "--name-only",
         head,

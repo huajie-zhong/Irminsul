@@ -211,6 +211,12 @@ def findings_of(root: Path, code: str, *args: str) -> list[dict[str, Any]]:
     return [f for f in check_findings(root, *args) if f["code"] == code]
 
 
+def severities_of(root: Path, code: str, *args: str) -> list[str]:
+    """The severity of each finding with `code` that `irminsul check --format json <args>`
+    reports, in the order the run gives them."""
+    return [f["severity"] for f in findings_of(root, code, *args)]
+
+
 DECISIONS_INDEX = "---\nid: decisions\ntitle: D\nstatus: stable\n---\n\n# D\n"
 
 

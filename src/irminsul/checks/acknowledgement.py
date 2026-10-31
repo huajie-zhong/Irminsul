@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Final
 
 from irminsul.checks.base import Answer, AnswerKind, Finding, FindingClass, Severity
-from irminsul.docgraph import ChangeRange, DocGraph, _spelled_from_root, once_per_graph
+from irminsul.docgraph import ChangeRange, DocGraph, _spelled_from_root
 
 if TYPE_CHECKING:
     from irminsul.git.reader import GitReader
@@ -27,10 +27,11 @@ CODE_UNUSED: Final = "acknowledgement/unused"
 TRAILER_KEY: Final = "Irminsul-Reviewed"
 ACKNOWLEDGED_IN: Final = "acknowledged_in"
 REASON: Final = "reason"
-LAPSE_RULE: Final = (
+TRAILER_RULE: Final = (
     "A trailer covers the changes made up to its own commit, so a later change to the files "
     "the finding is about needs a later trailer, and a change not yet committed is later than "
-    "every commit."
+    "every commit. A finding's suggestion prints its exact trailer; the subject is left out "
+    "only where it would repeat the path."
 )
 
 _TRAILER_RE = re.compile(
@@ -80,7 +81,6 @@ class _Named:
 class _Problem:
     problem: str
     suggestion: str
-    path: str | None = None
 
 
 class AcknowledgementStep:
@@ -96,9 +96,9 @@ class AcknowledgementStep:
     explanations: ClassVar[dict[str, str]] = {
         CODE_INVALID: (
             f"An `{TRAILER_KEY}` commit trailer that cannot acknowledge a finding: it does not "
-            "parse, names no path or gives no reason, names a doc by id, or names a code that "
-            "is not declared `trailer`. It is info, because a commit trailer "
-            "cannot be removed without rewriting history; a later commit carries a valid one."
+            "parse, names no path or gives no reason, or names a code that is not declared "
+            "`trailer`. It is info, because a commit trailer cannot be removed without rewriting "
+            "history; a later commit carries a valid one."
         ),
         CODE_UNUSED: (
             f"An `{TRAILER_KEY}` commit trailer that matches no finding in this change, so it "
@@ -164,11 +164,7 @@ def acknowledge(
             finding = _judge(finding, [named[index] for index in hits], graph)
         out.append(finding)
     if ran is not None:
-        out.extend(
-            _unused(read)
-            for index, read in enumerate(named)
-            if index not in used and _source_ran(read.code, ran)
-        )
+        out.extend(_unused(read) for index, read in enumerate(named) if index not in used)
     return out + problems
 
 
@@ -194,8 +190,7 @@ def placement(finding: Finding, uncommitted: frozenset[str]) -> str:
     pending = [path for path in about if path in uncommitted]
     if pending:
         return f"in the message of the commit that carries {', '.join(pending)}"
-    named = about[0] if len(about) == 1 else "those files"
-    return f"on the commit that carries the last change to {named}, or a later one"
+    return f"on the commit that carries the last change to {', '.join(about)}, or a later one"
 
 
 def trailer_for(finding: Finding) -> str:
@@ -216,18 +211,12 @@ _FIX_THE_TRAILER: Final = f"add a valid trailer to a later commit: `{trailer_for
 def apply_acknowledgements(
     findings: list[Finding], graph: DocGraph, *, ran: Collection[str] | None
 ) -> list[Finding]:
-    """`findings` with the change's trailers applied. A graph with no change has none."""
-    return acknowledge(findings, _trailers(graph), graph, ran=ran)
-
-
-@once_per_graph
-def _trailers(graph: DocGraph) -> list[Trailer]:
-    """The change's trailers, read once per graph: a command that runs checks one at a time
-    comes here once per check."""
-    change, repo_root = graph.change, graph.repo_root
-    if change is None or repo_root is None:
-        return []
-    return reviewed_trailers(graph.git, repo_root, change)
+    """`findings` with the change's trailers applied. A graph with no change has none, so its
+    findings come back unchanged."""
+    if graph.change is None or graph.repo_root is None:
+        return findings
+    trailers = reviewed_trailers(graph.git, graph.repo_root, graph.change)
+    return acknowledge(findings, trailers, graph, ran=ran)
 
 
 def reviewed_trailers(git: GitReader, repo_root: Path, change: ChangeRange) -> list[Trailer]:
@@ -260,15 +249,6 @@ def _read(trailer: Trailer, graph: DocGraph) -> _Named | _Problem:
     code = _code_named(parsed.code)
     if isinstance(code, _Problem):
         return code
-    node = graph.nodes.get(parsed.path)
-    if node is not None:
-        path = node.path.as_posix()
-        return _Problem(
-            f"names the doc by id {parsed.path}, which a trailer does not accept; write its "
-            f"path, {path}",
-            f"write `{path}` as the path",
-            path=path,
-        )
     path = _spelled_from_root(graph.repo_root, parsed.path)
     return _Named(trailer, code, path, parsed.subject or path, parsed.reason)
 
@@ -294,7 +274,7 @@ def _code_named(name: str) -> str | _Problem:
     if answer.kind is not AnswerKind.trailer:
         return _Problem(
             f"names {name}, which is answered by {answer.kind.value}, not by a trailer",
-            f"`{name}` is answered by {answer.kind.value}: {answer.how}",
+            f"`{name}` is answered by {answer.kind.value}; `irminsul explain {name}` says how",
         )
     return name
 
@@ -343,7 +323,6 @@ def _invalid(trailer: Trailer, problem: _Problem) -> Finding:
         code=CODE_INVALID,
         severity=Severity.info,
         message=f"the {TRAILER_KEY} trailer in {trailer.commit} {problem.problem}: {trailer.value}",
-        path=Path(problem.path) if problem.path is not None else None,
         suggestion=problem.suggestion,
     )
 
@@ -360,10 +339,3 @@ def _unused(named: _Named) -> Finding:
         path=Path(named.path),
         suggestion=_UNUSED_SUGGESTION,
     )
-
-
-def _source_ran(code: str, ran: Collection[str]) -> bool:
-    from irminsul.checks.pipeline import PASSES
-
-    source = code.split("/", 1)[0]
-    return source in ran or source in PASSES

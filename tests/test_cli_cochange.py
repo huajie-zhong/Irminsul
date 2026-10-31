@@ -264,7 +264,6 @@ def test_a_reviewed_trailer_acknowledges_the_warning(tmp_path: Path, check: str)
         ('co-change docs/components/alpha.md reason=" "', "gives no reason"),
         ('co-change reason="still right"', "names no path"),
         ('evidence-drift docs/components/alpha.md reason="x"', "no check or finding code"),
-        ('co-change alpha reason="still right"', "write its path, docs/components/alpha.md"),
         ("co-change alpha reason=unquoted", "is not written as"),
     ],
 )
@@ -282,6 +281,19 @@ def test_a_trailer_that_acknowledges_nothing_is_reported(
     invalid = next(f for f in cochange if f["code"] == "acknowledgement/invalid")
     assert invalid["severity"] == "info"
     assert problem in invalid["message"]
+
+
+def test_a_trailer_naming_a_doc_id_matches_nothing(tmp_path: Path) -> None:
+    repo_root, base = _seed_repo(tmp_path)
+    (repo_root / "app" / "alpha.py").write_text("a = 2\n", encoding="utf-8")
+    commit_all(repo_root, 'change source only\n\nIrminsul-Reviewed: co-change alpha reason="x"')
+
+    exit_code, cochange = _hint_failing_diff(repo_root, base)
+    assert exit_code == 1
+    assert sorted(f["code"] for f in cochange) == [
+        "acknowledgement/unused",
+        "co-change/unreflected-change",
+    ]
 
 
 def test_a_trailer_for_a_doc_with_no_warning_is_unused(tmp_path: Path) -> None:
@@ -435,7 +447,10 @@ def test_an_overtaken_trailer_is_named_beside_the_same_clause(tmp_path: Path) ->
     _, cochange = _hint_failing_diff(repo_root, base)
 
     suggestion = cochange[0]["suggestion"]
-    assert "on the commit that carries the last change to those files, or a later one" in suggestion
+    assert (
+        "on the commit that carries the last change to app/alpha.py, app/beta.py, or a later one"
+        in suggestion
+    )
     assert "predates the change to app/beta.py: that trailer does not count" in suggestion
 
 

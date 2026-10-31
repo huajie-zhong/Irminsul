@@ -907,3 +907,28 @@ def test_a_trailer_may_retire_the_whole_record(tmp_path: Path) -> None:
     assert "diff-integrity/adoption-record-removed .irminsul-adoption.json" not in errors
     removed = findings_of(root, "diff-integrity/adoption-record-removed", "--diff", base)
     assert [f["severity"] for f in removed] == ["info"]
+
+
+def test_a_trailer_naming_a_moved_record_lapses_when_the_old_file_is_deleted(
+    tmp_path: Path,
+) -> None:
+    """The record moves to the path the config now names, and the trailer names that path.
+    Deleting the old file later changes the path the removal is about, so the trailer lapses."""
+    root = _repo(tmp_path)
+    base = _adopt(root)
+    write(root, "irminsul.toml", _CONFIG.replace("[paths]\n", '[paths]\nadoption = "moved.json"\n'))
+    commit_all(
+        root,
+        "move the record's configured path\n\n"
+        + reviewed(
+            "diff-integrity/adoption-record-removed",
+            "moved.json",
+            reason="not deleted yet",
+        ),
+    )
+    (root / ".irminsul-adoption.json").unlink()
+    commit_all(root, "now delete the record")
+
+    removed = findings_of(root, "diff-integrity/adoption-record-removed", "--diff", base)
+
+    assert [f["severity"] for f in removed] == ["error"]

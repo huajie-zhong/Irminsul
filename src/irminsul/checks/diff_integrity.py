@@ -22,7 +22,8 @@ with their content at the merge base, which a pull request cannot rewrite, and r
   claim that governed its evidence at the base, which only a trailer naming the claim ends;
 - a claim was reworded rather than removed — a hint, since nothing separates correcting
   a sentence from emptying it of meaning — unless it is `follows-evidence`, where the
-  evidence wins and correcting the report is routine;
+  evidence wins and correcting the report is routine, or `governs-evidence`, where
+  `governing-claim-changed` reports the rewording instead;
 - a `governs-evidence` claim had its wording, evidence, state, kind or relation changed,
   each of which stops it governing what it governed at the base;
 - an `inventory:` entry kept its kind and source but asks less than it did — it dropped
@@ -99,9 +100,7 @@ CODE_IMPLEMENTED_RFC_REMOVED: Final = "diff-integrity/implemented-rfc-removed"
 CODE_ACCEPTED_DECISION_REMOVED: Final = "diff-integrity/accepted-decision-removed"
 CODE_DECISION_REWRITTEN: Final = "diff-integrity/decision-rewritten"
 _DECISION_REWRITTEN_SUGGESTION: Final = (
-    "restore the record and keep the code it names, so the two still agree as accepted, "
-    "or record the changed decision in a new ADR that supersedes it; the accepted "
-    "record's wording does not change either way"
+    "restore the record and keep the code it names, so the two still agree as accepted"
 )
 CODE_OWNER_CHANGED: Final = "diff-integrity/owner-changed"
 CODE_CHECK_DISABLED: Final = "diff-integrity/check-disabled"
@@ -227,9 +226,10 @@ class DiffIntegrityPass:
         ),
         CODE_DECISION_REWRITTEN: (
             "An accepted decision record's `## Decision` section was rewritten in place. A "
-            "changed decision needs a new record that supersedes this one. A correction that "
-            "changes no decision, such as a typo, needs no new record; a trailer naming this "
-            "record marks it as one."
+            "changed decision needs a new record that supersedes this one, unless an accepted "
+            "RFC already made the change. A correction that changes no decision, such as a "
+            "typo, or a change that carries out an accepted RFC, needs no new record; a trailer "
+            "naming this record says which of the two it is."
         ),
         CODE_OWNER_CHANGED: (
             "Source files moved from one doc's `describes` to another's. Remove what the old "
@@ -289,7 +289,8 @@ class DiffIntegrityPass:
             "rewording rather than a removal. Nothing can tell a correction from a "
             "claim quietly emptied of meaning, so re-read it against the evidence it "
             "cites. A `follows-evidence` claim is exempt: the evidence wins there, and "
-            "correcting the report is routine."
+            "correcting the report is routine. A `governs-evidence` claim is exempt too, and "
+            "`governing-claim-changed` reports its rewording instead."
         ),
         CODE_GOVERNING_CLAIM_CHANGED: (
             "A claim that governs its evidence was rewritten, or stopped governing it. "
@@ -372,8 +373,8 @@ class DiffIntegrityPass:
     }
     answers: ClassVar[dict[str, Answer]] = {
         CODE_DECISION_REWRITTEN: Answer.trailer(
-            "a changed decision needs a superseding record; if this only corrects the wording, "
-            "such as a typo, add this trailer"
+            "a changed decision needs a superseding record, unless an accepted RFC already made "
+            "it; if this only corrects the wording or carries out that RFC, add this trailer"
         ),
         CODE_OWNER_CHANGED: Answer.fix(
             "remove what the old owner still says about the moved files, or link the two docs"
@@ -405,7 +406,7 @@ class DiffIntegrityPass:
             "if the edit does not weaken the gate, add this trailer"
         ),
         CODE_CHECK_DISABLED: Answer.trailer(
-            "if the gate should run without it, add this trailer and say why"
+            "if the weaker gate is deliberate, add this trailer and say why"
         ),
         CODE_LAYER_RULE_DISABLED: Answer.trailer(
             "if the weaker rule is deliberate, add this trailer and say why"
@@ -585,6 +586,7 @@ def run_diff_integrity(graph: DocGraph, change: ChangeRange) -> list[Finding]:
                 head_parsed,
                 head_adoption,
                 base_ref,
+                base_path=base_adoption,
                 removed=base_record is not None and head_record is None,
                 adopting=exists_at_ref(git, repo_root, base, base_adoption) is False,
                 owned=_owned_now(graph),
@@ -817,7 +819,6 @@ def _sealed_rewrites(
                 f"accepted decision section rewritten since {base_ref}",
                 _DECISION_REWRITTEN_SUGGESTION,
                 subject=path,
-                about=(path,),
             )
         )
     return out
@@ -899,7 +900,10 @@ def _removed_governance(
         claim_id = claim.get("id")
         evidence = [str(item) for item in _listed(claim.get("evidence"))]
         if (kept := surviving_by_id.get(claim_id)) is not None:
-            if kept.get("claim") != claim.get("claim") and claim.get("relation") != _FOLLOWS:
+            if kept.get("claim") != claim.get("claim") and claim.get("relation") not in (
+                _FOLLOWS,
+                _GOVERNS,
+            ):
                 out.append(
                     _finding(
                         CODE_CLAIM_REWORDED,
@@ -1253,6 +1257,7 @@ def _adoption_seal(
     head_path: str,
     base_ref: str,
     *,
+    base_path: str,
     removed: bool,
     adopting: bool,
     owned: frozenset[str],
@@ -1327,6 +1332,7 @@ def _adoption_seal(
                 "this change deletes it",
                 "retire the entries with `irminsul adoption update` until the record is empty",
                 subject=head_path,
+                about=(base_path, head_path),
             )
         )
         return out

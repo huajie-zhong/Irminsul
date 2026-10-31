@@ -22,6 +22,7 @@ from .conftest import (
     git_init,
     load_graph,
     reviewed,
+    severities_of,
     write,
     write_config,
 )
@@ -176,10 +177,6 @@ def _grown_baseline_repo(root: Path) -> str:
     return base
 
 
-def _grew_severities(root: Path, base: str) -> list[str]:
-    return [f["severity"] for f in findings_of(root, _GREW, "--diff", base)]
-
-
 def test_a_trailer_naming_the_baseline_clears_its_growth(tmp_path: Path) -> None:
     base = _grown_baseline_repo(tmp_path)
     commit_all(
@@ -188,14 +185,14 @@ def test_a_trailer_naming_the_baseline_clears_its_growth(tmp_path: Path) -> None
         + reviewed(_GREW, ".irminsul-baseline.json", reason="the upgrade's new rules wait"),
     )
 
-    assert _grew_severities(tmp_path, base) == ["info"]
+    assert severities_of(tmp_path, _GREW, "--diff", base) == ["info"]
 
 
 def test_a_grown_baseline_without_a_trailer_is_still_growth(tmp_path: Path) -> None:
     base = _grown_baseline_repo(tmp_path)
     commit_all(tmp_path, "re-create the baseline")
 
-    assert _grew_severities(tmp_path, base) == ["error"]
+    assert severities_of(tmp_path, _GREW, "--diff", base) == ["error"]
 
 
 def test_a_trailer_naming_another_file_does_not_clear_baseline_growth(tmp_path: Path) -> None:
@@ -206,7 +203,7 @@ def test_a_trailer_naming_another_file_does_not_clear_baseline_growth(tmp_path: 
         + reviewed(_GREW, "irminsul.toml", reason="the wrong file"),
     )
 
-    assert _grew_severities(tmp_path, base) == ["error"]
+    assert severities_of(tmp_path, _GREW, "--diff", base) == ["error"]
 
 
 def test_a_trailer_naming_the_configured_baseline_path_clears_its_growth(tmp_path: Path) -> None:
@@ -223,7 +220,7 @@ def test_a_trailer_naming_the_configured_baseline_path_clears_its_growth(tmp_pat
         "grow it, naming the default path instead\n\n"
         + reviewed(_GREW, ".irminsul-baseline.json", reason="the wrong file"),
     )
-    assert _grew_severities(tmp_path, base) == ["error"]
+    assert severities_of(tmp_path, _GREW, "--diff", base) == ["error"]
 
     git(
         tmp_path,
@@ -233,7 +230,49 @@ def test_a_trailer_naming_the_configured_baseline_path_clears_its_growth(tmp_pat
         "name the file the baseline really is\n\n"
         + reviewed(_GREW, "debt.json", reason="the baseline's real path"),
     )
-    assert _grew_severities(tmp_path, base) == ["info"]
+    assert severities_of(tmp_path, _GREW, "--diff", base) == ["info"]
+
+
+def _moved_baseline(root: Path) -> str:
+    _repo(root)
+    config = (root / "irminsul.toml").read_text(encoding="utf-8")
+    write(root, "irminsul.toml", config.replace("[paths]\n", '[paths]\nbaseline = "debt.json"\n'))
+    _baseline(root, _DEBT, path="debt.json")
+    return commit_all(root, "adopted, baseline at debt.json")
+
+
+def _move_and_grow(root: Path) -> None:
+    config = (root / "irminsul.toml").read_text(encoding="utf-8")
+    write(root, "irminsul.toml", config.replace('baseline = "debt.json"', 'baseline = "new.json"'))
+    _baseline(root, _DEBT, _MORE_DEBT, path="new.json")
+
+
+def test_a_trailer_naming_a_moved_baseline_accepts_its_growth(tmp_path: Path) -> None:
+    base = _moved_baseline(tmp_path)
+    _move_and_grow(tmp_path)
+    commit_all(
+        tmp_path,
+        "move the baseline, and grow it\n\n"
+        + reviewed(_GREW, "new.json", reason="the new file waits"),
+    )
+
+    assert severities_of(tmp_path, _GREW, "--diff", base) == ["info"]
+
+
+def test_a_later_change_to_the_old_baseline_path_lapses_a_trailer_naming_the_new_one(
+    tmp_path: Path,
+) -> None:
+    base = _moved_baseline(tmp_path)
+    _move_and_grow(tmp_path)
+    commit_all(
+        tmp_path,
+        "move the baseline, and grow it\n\n"
+        + reviewed(_GREW, "new.json", reason="the new file waits"),
+    )
+    _baseline(tmp_path, _MORE_DEBT, path="debt.json")
+    commit_all(tmp_path, "rewrite the old baseline")
+
+    assert severities_of(tmp_path, _GREW, "--diff", base) == ["error"]
 
 
 def test_editing_an_implemented_rfc_is_an_error(tmp_path: Path) -> None:
@@ -902,6 +941,25 @@ def test_neutering_a_claim_in_place_is_reported(tmp_path: Path) -> None:
     assert "diff-integrity/claim-removed" not in codes
 
 
+def test_rewording_a_governing_claim_raises_one_finding(tmp_path: Path) -> None:
+    root, _ = _anchored_repo(tmp_path)
+    governing = _ANCHORED.replace(
+        "    kind: invariant\n", "    kind: invariant\n    relation: governs-evidence\n"
+    )
+    write(root, "docs/components/widget.md", governing)
+    base = commit_all(root, "make the claim govern")
+    write(
+        root,
+        "docs/components/widget.md",
+        governing.replace("The widget runs.", "The widget exists."),
+    )
+    commit_all(root, "empty the governing claim")
+
+    codes = check_codes(root, "--diff", base)
+    assert "diff-integrity/governing-claim-changed" in codes
+    assert "diff-integrity/claim-reworded" not in codes
+
+
 def test_repointing_a_governing_claims_evidence_is_a_change_of_intent(tmp_path: Path) -> None:
     """The words of a contract are not the whole contract: aiming it at a file that
     trivially satisfies it leaves the sentence intact and governs nothing."""
@@ -948,9 +1006,7 @@ def test_a_trailer_naming_the_claim_accepts_removing_it(tmp_path: Path) -> None:
         ),
     )
 
-    assert [
-        f["severity"] for f in findings_of(root, "diff-integrity/claim-removed", "--diff", base)
-    ] == ["info"]
+    assert severities_of(root, "diff-integrity/claim-removed", "--diff", base) == ["info"]
 
 
 def test_repointing_docs_root_is_an_error(tmp_path: Path) -> None:
@@ -1281,6 +1337,63 @@ def test_a_trailer_clears_only_the_file_it_names(tmp_path: Path) -> None:
     )
 
 
+_MOVED = ".github/workflows/docs-moved.yml"
+_UNRELATED_GATE = (
+    "name: other\n\non: push\n\njobs:\n  build:\n    runs-on: windows-latest\n    steps:\n"
+    + "".join(f"      - run: echo step {n}\n" for n in range(1, 6))
+)
+
+
+def test_a_later_move_of_a_rewritten_gate_file_lapses_its_trailer(tmp_path: Path) -> None:
+    """The trailer on the rewrite covers the file at its old path, so moving that file later
+    lapses it. Unless renames are off, `git log` shows the move as a rename to the new path
+    alone, and the old path would read as untouched."""
+    base = _gated_repo(tmp_path)
+    write(tmp_path, _DOCS_PR, _UNRELATED_GATE)
+    commit_all(
+        tmp_path,
+        "rewrite the gate\n\n" + reviewed(_GATE_FILE, _DOCS_PR, reason="the gate reads the same"),
+    )
+    git(tmp_path, "mv", _DOCS_PR, "attic.txt")
+    commit_all(tmp_path, "park the workflow")
+
+    _, sealed = _sealed(tmp_path, base)
+
+    assert [(f["path"], f["severity"]) for f in sealed] == [(_DOCS_PR, "error")]
+
+
+def test_a_trailer_naming_a_renamed_gate_file_accepts_its_rename(tmp_path: Path) -> None:
+    base = _gated_repo(tmp_path)
+    git(tmp_path, "mv", _DOCS_PR, _MOVED)
+    commit_all(
+        tmp_path,
+        "move the gate\n\n" + reviewed(_GATE_FILE, _MOVED, reason="the same gate, a new name"),
+    )
+
+    _, sealed = _sealed(tmp_path, base)
+
+    assert [(f["path"], f["severity"]) for f in sealed] == [(_MOVED, "info")]
+
+
+def test_a_later_delete_of_a_gate_files_original_lapses_the_trailer_on_its_copy(
+    tmp_path: Path,
+) -> None:
+    """A copy and then a delete of the original reads at the base as one rename, whose finding
+    the trailer on the copy signs off. The delete is a later change to the original's path."""
+    base = _gated_repo(tmp_path)
+    write(tmp_path, _MOVED, _gate(_GATE_STEP))
+    commit_all(
+        tmp_path,
+        "copy the gate\n\n" + reviewed(_GATE_FILE, _MOVED, reason="the copy reads the same"),
+    )
+    git(tmp_path, "rm", "-q", _DOCS_PR)
+    commit_all(tmp_path, "remove the original")
+
+    _, sealed = _sealed(tmp_path, base)
+
+    assert [(f["path"], f["severity"]) for f in sealed] == [(_MOVED, "error")]
+
+
 def test_an_adopting_change_is_not_sealed(tmp_path: Path) -> None:
     """A base with no config has no gate to weaken, as with the first baseline."""
     git_init(tmp_path)
@@ -1469,12 +1582,12 @@ def _suggestion(root: Path, base: str, code: str) -> str:
     return findings[0]["suggestion"]
 
 
-def _offers_keeping_the_code_or_superseding(suggestion: str) -> bool:
+def _offers_both_routes(suggestion: str) -> bool:
     return (
         "keep the code it names" in suggestion
         and "still agree as accepted" in suggestion
-        and "new ADR that supersedes it" in suggestion
-        and "wording does not change either way" in suggestion
+        and "superseding record, unless an accepted RFC already made it" in suggestion
+        and "carries out that RFC, add this trailer" in suggestion
     )
 
 
@@ -1489,7 +1602,7 @@ def test_a_rewritten_decision_is_offered_keeping_the_code_as_well_as_superseding
 
     suggestion = _suggestion(root, base, "diff-integrity/decision-rewritten")
 
-    assert _offers_keeping_the_code_or_superseding(suggestion), suggestion
+    assert _offers_both_routes(suggestion), suggestion
 
 
 def test_a_rewritten_and_renamed_decision_is_offered_the_same_two_ways(tmp_path: Path) -> None:
@@ -1506,7 +1619,7 @@ def test_a_rewritten_and_renamed_decision_is_offered_the_same_two_ways(tmp_path:
 
     suggestion = _suggestion(root, base, "diff-integrity/decision-rewritten")
 
-    assert _offers_keeping_the_code_or_superseding(suggestion), suggestion
+    assert _offers_both_routes(suggestion), suggestion
 
 
 def test_explain_decision_rewritten_is_answered_by_a_trailer_or_a_superseding_record() -> None:
@@ -1514,8 +1627,9 @@ def test_explain_decision_rewritten_is_answered_by_a_trailer_or_a_superseding_re
 
     assert result.exit_code == 0, result.output
     assert (
-        "answer: trailer — a changed decision needs a superseding record; if this only corrects "
-        "the wording, such as a typo, add this trailer"
+        "answer: trailer — a changed decision needs a superseding record, unless an accepted "
+        "RFC already made it; if this only corrects the wording or carries out that RFC, add "
+        "this trailer"
     ) in result.output
     assert "acknowledge with: Irminsul-Reviewed: diff-integrity/decision-rewritten" in result.output
     assert "supersedes this one" in result.output
