@@ -592,7 +592,8 @@ def test_a_stray_bracket_does_not_make_the_sentences_after_it_read_as_deleted(
         stray + link + REWRITTEN + "\n",
         stray + link + "A sentence the edit rewrote.\n",
     )
-    assert _removed(items) == [REWRITTEN]
+    assert _edits(items) == [("A sentence the edit rewrote.", REWRITTEN)]
+    assert _removed(items) == []
 
 
 @pytest.mark.parametrize("shape", sorted(STRAY_BRACKET_SHAPES))
@@ -623,21 +624,17 @@ def test_deleting_an_anchored_sentence_is_still_queued(tmp_path: Path) -> None:
     sentence = "`find_config()` exits 1 when no config exists."
     marker = " <!-- anchor: src/cli.py#find_config @sha256:" + "a" * 12 + " -->"
     items = _review_pipeline_edit(
-        _repo(tmp_path), sentence + marker + "\n", "Nothing is claimed.\n"
+        _repo(tmp_path), "Kept sentence.\n\n" + sentence + marker + "\n", "Kept sentence.\n"
     )
     assert _removed(items) == [sentence + marker]
 
 
 def test_rewriting_a_comment_quoted_in_a_code_span_is_still_queued(tmp_path: Path) -> None:
     """A comment shown as an example is prose, unlike the marker that trails a sentence."""
-    items = _review_pipeline_edit(
-        _repo(tmp_path),
-        "A comment such as `<!-- irminsul:ignore reality -->` covers its line.\n",
-        "A comment such as `<!-- irminsul:ignore liar -->` covers its line.\n",
-    )
-    assert _removed(items) == [
-        "A comment such as `<!-- irminsul:ignore reality -->` covers its line."
-    ]
+    old = "A comment such as `<!-- irminsul:ignore reality -->` covers its line."
+    new = "A comment such as `<!-- irminsul:ignore liar -->` covers its line."
+    items = _review_pipeline_edit(_repo(tmp_path), old + "\n", new + "\n")
+    assert _edits(items) == [(new, old)]
 
 
 def test_retargeting_a_link_does_not_delete_the_sentence_around_it(tmp_path: Path) -> None:
@@ -674,11 +671,50 @@ def test_reflowing_a_paragraph_queues_nothing(tmp_path: Path) -> None:
     assert items == []
 
 
-def test_a_sentence_rewritten_in_place_is_edited_and_removed(tmp_path: Path) -> None:
+FIND = "`find_config()` exits 1 when no config exists."
+EMITS = "`check --format json` emits a JSON array."
+PLAIN = "This sentence names no code at all."
+FLAGS = "`check --strict` fails on warnings."
+
+
+def _edits(items: list[dict]) -> list[tuple[str, str | None]]:
+    return [(i["sentence"], i["was"]) for i in items if "edited" in i["markers"]]
+
+
+def test_a_sentence_rewritten_in_place_is_one_edit_that_shows_what_it_replaced(
+    tmp_path: Path,
+) -> None:
     rewritten = PARAGRAPH.replace("exits 1", "exits 2")
     items = _review_pipeline_edit(_repo(tmp_path), PARAGRAPH + "\n", rewritten + "\n")
-    assert _edited(items) == ["`find_config()` exits 2 when no config exists."]
-    assert _removed(items) == ["`find_config()` exits 1 when no config exists."]
+    assert _edits(items) == [
+        ("`find_config()` exits 2 when no config exists.", FIND),
+    ]
+    assert _removed(items) == []
+
+
+def test_two_sentences_replaced_by_one_are_one_edit_and_one_removal(tmp_path: Path) -> None:
+    items = _review_pipeline_edit(
+        _repo(tmp_path),
+        PARAGRAPH + "\n",
+        f"{FIND} {FLAGS}\n",
+    )
+    assert _edits(items) == [(FLAGS, EMITS)]
+    assert _removed(items) == [PLAIN]
+
+
+def test_a_sentence_moved_elsewhere_in_the_file_is_not_queued(tmp_path: Path) -> None:
+    items = _review_pipeline_edit(
+        _repo(tmp_path),
+        f"{FIND} {EMITS}\n\nThe table below lists the flags.\n",
+        f"{FIND}\n\nThe table below lists the flags. {EMITS}\n",
+    )
+    assert items == []
+
+
+def test_a_sentence_deleted_outright_is_removed_and_not_an_edit(tmp_path: Path) -> None:
+    items = _review_pipeline_edit(_repo(tmp_path), PARAGRAPH + "\n", f"{FIND} {EMITS}\n")
+    assert _removed(items) == [PLAIN]
+    assert _edits(items) == []
 
 
 def test_every_sentence_of_a_new_doc_is_edited_even_when_another_doc_says_it(
@@ -872,6 +908,15 @@ def test_plain_review_explains_each_marker_it_shows_once(tmp_path: Path) -> None
     assert [line.split()[0] for line in legend] == ["edited", "removed-sentence"]
     assert MARKER_MEANINGS["edited"] in legend[0]
     assert MARKER_MEANINGS["removed-sentence"] in legend[1]
+
+
+def test_plain_review_shows_the_sentence_an_edit_replaced(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _rewrite_one_sentence_and_delete_another(root)
+
+    output = _review_changed_plain(root)
+
+    assert "`find_config()` exits 2 when no config exists.\n  was: " + FIND in output
 
 
 def test_json_review_carries_the_meaning_of_each_marker_it_shows(tmp_path: Path) -> None:

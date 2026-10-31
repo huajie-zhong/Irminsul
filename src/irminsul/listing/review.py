@@ -13,6 +13,7 @@ import json
 import re
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
@@ -49,8 +50,8 @@ MARKER_MEANINGS: Final[dict[str, str]] = {
         "code that changed after the doc's last commit"
     ),
     "edited": (
-        "a sentence this change added or reworded, whatever it says; re-read it against the "
-        "code it names, and correct the doc if it is wrong"
+        "a sentence this change added or reworded, whatever it says; `was` gives the sentence "
+        "it replaced. Re-read it against the code it names, and correct the doc if it is wrong"
     ),
     "unbound-name": (
         f"a code name nothing resolves and no anchor binds; {UNBOUND_ADVICE}, reword the "
@@ -71,9 +72,8 @@ MARKER_MEANINGS: Final[dict[str, str]] = {
         "doc; delete it or rewrite it"
     ),
     "removed-sentence": (
-        "a sentence this change deleted. Keep the deletion only if the behaviour is gone or "
-        "the sentence repeated a surface query, one file or another doc, with no reason or "
-        "gotcha of its own"
+        "a sentence this change deleted outright. Keep the deletion only if the behaviour is "
+        "gone or the sentence only repeats a surface query, with no reason or gotcha of its own"
     ),
 }
 
@@ -102,6 +102,8 @@ class ReviewItem:
     references: list[Reference] = field(default_factory=list)
     code_changed_after_doc: bool = False
     unbound: list[str] = field(default_factory=list)
+    was: str | None = None
+    """The sentence an edit replaced, so a reader sees both texts."""
 
 
 def shipped_draft_evidence(
@@ -189,9 +191,9 @@ def _text_sentences(text_body: str) -> list[tuple[int, int, str]]:
 
 def _review_sentences(
     config: IrminsulConfig, graph: DocGraph, read: Callable[[str], str | None]
-) -> list[tuple[str, int, int, str]]:
-    """(repo-relative path, first file line, last file line, sentence) for every sentence
-    the queue reads, from the text `read` returns for each file.
+) -> dict[str, list[tuple[int, int, str]]]:
+    """Each file the queue reads, with its sentences as (first line, last line, sentence),
+    from the text `read` returns for it.
 
     That is all prose in live docs, the `## Decision` section of each decision record,
     and the guidance files, the glossary's definitions among them.
@@ -203,15 +205,12 @@ def _review_sentences(
         if is_live_doc(node, config) or in_layer(config, node.path, "decisions")
     ]
     paths.extend(file.display for file in graph.guidance_files)
-    out: list[tuple[str, int, int, str]] = []
+    out: dict[str, list[tuple[int, int, str]]] = {}
     for path in paths:
         text = read(path)
         if text is None:
             continue
-        out.extend(
-            (path, line, end, sentence)
-            for line, end, sentence in _text_sentences(_reviewed_text(text, path, guidance, config))
-        )
+        out[path] = _text_sentences(_reviewed_text(text, path, guidance, config))
     return out
 
 
@@ -223,17 +222,6 @@ def _guidance_prose(display: str, text: str, config: IrminsulConfig) -> str:
 
         text = without_generated_region(text)
     return "\n".join("" if _GLOSSARY_META_RE.match(line) else line for line in text.splitlines())
-
-
-def _reviewed_path(path: str, graph: DocGraph, config: IrminsulConfig, guidance: set[str]) -> bool:
-    """Whether the queue reads this file's sentences: a guidance file, a live doc, or a
-    decision record."""
-    if path in guidance:
-        return True
-    node = graph.by_path.get(Path(path))
-    return node is not None and (
-        is_live_doc(node, config) or in_layer(config, node.path, "decisions")
-    )
 
 
 def _decision_prose(body: str) -> str:
@@ -274,11 +262,12 @@ def build_review(
     With `changed`, every sentence on a changed line that its doc did not already say at
     `base_ref` is kept as `edited`, with every sentence the change deleted, each claim whose
     evidence it touched, the sentences an old owner still has about a file it moved, and a
-    summary its body edit left behind. A doc the change added has no base, so all its
-    sentences are `edited`. An edited sentence naming code that nothing resolves and no
-    anchor in its doc binds lists those names as `unbound`, so the writer binds them. Without
-    `changed`, every sentence that names code is kept as `names-code`, and marked when that
-    code changed after the doc.
+    summary its body edit left behind. A sentence that replaced one in place is one edit,
+    which carries the sentence it replaced as `was`, so the deletion is not queued twice.
+    A doc the change added has no base, so all its sentences are `edited`. An edited
+    sentence naming code that nothing resolves and no anchor in its doc binds lists those
+    names as `unbound`, so the writer binds them. Without `changed`, every sentence that
+    names code is kept as `names-code`, and marked when that code changed after the doc.
 
     The prose is read from the working tree, or from `HEAD` under `committed_only`.
     """
@@ -294,57 +283,59 @@ def build_review(
     guidance = {guidance.display for guidance in graph.guidance_files}
     items: list[ReviewItem] = []
     bound_by_path: dict[str, set[str]] = {}
-    base_index: dict[str, str | None] = {}
     uncommitted: dict[str, bool] = {}
-    for path, file_line, last_line, sentence in _review_sentences(config, graph, read):
+    revisions: dict[str, _Revision] = {}
+    for path, rows in _review_sentences(config, graph, read).items():
+        if changed is not None and path not in changed:
+            continue
+        revision: _Revision | None = None
         if changed is not None:
-            if not _touches(changed, path, file_line, last_line):
-                continue
-            if path not in base_index:
-                base = _prose_at_ref(repo_root, config, graph, base_ref, path, guidance)
-                base_index[path] = None if base is None else _prose_index(base)
-            index = base_index[path]
-            if index is not None and _comparable(sentence) in index:
-                continue
-        spans = [m.group(2) for m in _SPAN_RE.finditer(sentence)]
-        references = [ref for span in spans for ref in resolver.resolve(span)]
-        references.extend(resolver.resolve_prose(_SPAN_RE.sub(" ", sentence)))
-        unbound: list[str] = []
-        if changed is None:
-            if not references:
-                continue
-            markers = ["names-code"]
-            if path not in uncommitted:
-                uncommitted[path] = _never_committed(repo_root, config, graph, path, guidance)
-            if uncommitted[path]:
-                markers.append("edited")
-        else:
-            markers = ["edited"]
-            if path not in bound_by_path:
-                bound_by_path[path] = bound_names(read(path) or "")
-            unbound = unbound_names(spans, resolver, bound_by_path[path])
-            if unbound:
-                markers.append("unbound-name")
-        item = ReviewItem(
-            path=path,
-            line=file_line,
-            sentence=sentence,
-            markers=markers,
-            references=references,
-            unbound=unbound,
-        )
-        if references:
-            item.code_changed_after_doc = resolver.changed_after(
-                graph.git, repo_root / path, references, lines
+            revision = revisions[path] = _revision(
+                repo_root, config, graph, base_ref, path, guidance, rows
             )
-        items.append(item)
+        for position, (file_line, last_line, sentence) in enumerate(rows):
+            if changed is not None and not _touches(changed, path, file_line, last_line):
+                continue
+            if revision is not None and _comparable(sentence) in revision.known:
+                continue
+            spans = [m.group(2) for m in _SPAN_RE.finditer(sentence)]
+            references = [ref for span in spans for ref in resolver.resolve(span)]
+            references.extend(resolver.resolve_prose(_SPAN_RE.sub(" ", sentence)))
+            unbound: list[str] = []
+            if revision is None:
+                if not references:
+                    continue
+                markers = ["names-code"]
+                if path not in uncommitted:
+                    uncommitted[path] = _never_committed(repo_root, config, graph, path, guidance)
+                if uncommitted[path]:
+                    markers.append("edited")
+            else:
+                markers = ["edited"]
+                if path not in bound_by_path:
+                    bound_by_path[path] = bound_names(read(path) or "")
+                unbound = unbound_names(spans, resolver, bound_by_path[path])
+                if unbound:
+                    markers.append("unbound-name")
+            item = ReviewItem(
+                path=path,
+                line=file_line,
+                sentence=sentence,
+                markers=markers,
+                references=references,
+                unbound=unbound,
+                was=None if revision is None else revision.replaced_text(position),
+            )
+            if references:
+                item.code_changed_after_doc = resolver.changed_after(
+                    graph.git, repo_root / path, references, lines
+                )
+            items.append(item)
     if changed is not None:
         items.extend(_stale_summaries(graph, changed, read))
         items.extend(_governing_claims_over_changed_code(graph, changed, read))
         items.extend(_moved_file_sentences(graph, changed, base_ref, read))
-        items.extend(
-            _removed_sentences(repo_root, config, graph, changed, base_ref, guidance, read)
-        )
+        items.extend(_removed_sentences(revisions))
     return sorted(
         items,
         key=lambda i: (not i.code_changed_after_doc, not i.references, i.path, i.line),
@@ -457,15 +448,68 @@ def _moved_file_sentences(
     return out
 
 
-def _removed_sentences(
+@dataclass(frozen=True)
+class _Revision:
+    """How one file's sentences read at the base and now.
+
+    `known` holds the base's sentences, so a sentence already there is not new. `replaced`
+    pairs each new sentence that took the place of an old one: {position now: position at
+    the base}. `surviving` holds every sentence now, so a deleted sentence whose text the
+    file still has, elsewhere, is not deleted.
+    """
+
+    before: list[tuple[int, int, str]]
+    known: frozenset[str]
+    replaced: dict[int, int]
+    surviving: frozenset[str]
+
+    def replaced_text(self, position: int) -> str | None:
+        old = self.replaced.get(position)
+        return None if old is None else self.before[old][2]
+
+    def deleted(self) -> list[tuple[int, str]]:
+        """(line, sentence) of each base sentence that no new sentence replaced and no line
+        still carries."""
+        taken = set(self.replaced.values())
+        return [
+            (line, sentence)
+            for index, (line, _, sentence) in enumerate(self.before)
+            if index not in taken and _comparable(sentence) not in self.surviving
+        ]
+
+
+def _revision(
     repo_root: Path,
     config: IrminsulConfig,
     graph: DocGraph,
-    changed: ChangedLines,
     base_ref: str,
+    path: str,
     guidance: set[str],
-    read: Callable[[str], str | None],
-) -> list[ReviewItem]:
+    rows: list[tuple[int, int, str]],
+) -> _Revision:
+    """Pair the sentences a file had at `base_ref` with those it has now, in order.
+
+    `SequenceMatcher` lines the two lists up without a similarity threshold, so a sentence
+    that only moved is an unchanged run in both places and pairs with nothing. Within a
+    `replace` run the first new sentence pairs with the first old one, and so on; what is
+    left over is an addition or a deletion. A new sentence that the base already had
+    elsewhere replaces nothing, because it is not new text.
+    """
+    base = _prose_at_ref(repo_root, config, graph, base_ref, path, guidance)
+    before = [] if base is None else _text_sentences(base)
+    old = [_comparable(sentence) for _, _, sentence in before]
+    new = [_comparable(sentence) for _, _, sentence in rows]
+    known = frozenset(old)
+    replaced: dict[int, int] = {}
+    for tag, i1, i2, j1, j2 in SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
+        if tag == "replace":
+            for position, index in zip(range(j1, j2), range(i1, i2), strict=False):
+                if new[position] not in known:
+                    replaced[position] = index
+    return _Revision(before, known, replaced, frozenset(new))
+
+
+def _removed_sentences(revisions: dict[str, _Revision]) -> list[ReviewItem]:
     """Sentences the change deleted, which no surviving line can carry.
 
     Every other item here is built from a line that still exists, so deleting a sentence
@@ -475,20 +519,13 @@ def _removed_sentences(
     finding. A doc deleted whole is not in `changed`, so its sentences are not queued.
     """
     out: list[ReviewItem] = []
-    for path in sorted(changed):
-        if not path.endswith(".md") or not _reviewed_path(path, graph, config, guidance):
+    for path, revision in sorted(revisions.items()):
+        if not path.endswith(".md"):
             continue
-        before = _prose_at_ref(repo_root, config, graph, base_ref, path, guidance)
-        if before is None:
-            continue
-        after = read(path) or ""
-        surviving = _prose_index(_reviewed_text(after, path, guidance, config))
-        for line, _, sentence in _text_sentences(before):
-            if _comparable(sentence) in surviving:
-                continue
-            out.append(
-                ReviewItem(path=path, line=line, sentence=sentence, markers=["removed-sentence"])
-            )
+        out.extend(
+            ReviewItem(path=path, line=line, sentence=sentence, markers=["removed-sentence"])
+            for line, sentence in revision.deleted()
+        )
     return out
 
 
@@ -520,15 +557,6 @@ def _never_committed(
     if git_root_for(repo_root / path) is None:
         return False
     return _prose_at_ref(repo_root, config, graph, "HEAD", path, guidance) is None
-
-
-def _prose_index(text: str) -> str:
-    """The sentences of `text`, each reduced by `_comparable`, one to a line.
-
-    `_comparable(sentence) in index` asks whether the prose of a sentence is in `text`, which
-    is how both a deleted sentence and an edited one are told from one that only moved.
-    """
-    return "\n".join(_comparable(sentence) for _, _, sentence in _text_sentences(text))
 
 
 def _comparable(text: str) -> str:
@@ -689,6 +717,8 @@ def list_review(
         flag = " [code changed after doc]" if item["code_changed_after_doc"] else ""
         typer.echo(f"{item['path']}:{item['line']} ({', '.join(item['markers'])}){flag}")
         typer.echo(f"  {item['sentence']}")
+        if item["was"] is not None:
+            typer.echo(f"  was: {item['was']}")
         for ref in item["references"]:
             if ref["line"] and ref["line_end"] and ref["line_end"] != ref["line"]:
                 where = f"{ref['defined_at']}:{ref['line']}-{ref['line_end']}"

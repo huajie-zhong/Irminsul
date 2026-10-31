@@ -469,16 +469,6 @@ On the trailer-step branch the six `decision-rewritten` trailers and the two
 that needed them. A view of the trailers a change still needs, with the finding each answers,
 would save those runs. Reproduced 2026-10-30.
 
-### `review-flags-removed-sentence-on-edit`
-
-A sentence changed in one phrase is queued twice by `list review --changed`: once as `edited`
-for the new text, and once as `removed-sentence` for the old text (`src/irminsul/listing/review.py:487`).
-The removed item asks "keep the deletion only if the behaviour is gone" (`src/irminsul/listing/review.py:73`),
-but the old text is still in the file except for the phrase that changed, as in
-`docs/decisions/a-change-is-judged-from-its-merge-base-to-the-working-tree.md:61` ("is an
-info finding"). The pair should be read as one edit, asking only about the words it dropped.
-Reproduced 2026-10-30.
-
 ## Release pipeline
 
 v0.3.0 was tagged and published on 2026-09-25: PyPI carries the wheel and sdist with
