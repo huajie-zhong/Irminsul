@@ -108,8 +108,8 @@ class AcknowledgementStep:
             "does nothing. Nothing is left to do unless it names the wrong path or subject; "
             "then a trailer naming the right one on a later commit answers it. When a finding "
             "on the same path and subject carries another code that declares `trailer`, the "
-            "message names that code, since the trailer named the wrong one. It is info for the "
-            "same reason as the invalid one."
+            "message names that code, and a trailer naming that code on a later commit answers "
+            "that finding, if it is acceptable. It is info for the same reason as the invalid one."
         ),
     }
     classes: ClassVar[dict[str, FindingClass]] = {
@@ -305,13 +305,17 @@ def _code_named(name: str) -> str | _Problem:
     return name
 
 
-def _matches(finding: Finding, named: _Named) -> bool:
+def _same_target(finding: Finding, named: _Named) -> bool:
+    """Whether `finding` is on the path and subject the trailer names, whatever its code."""
     return (
-        finding.code == named.code
-        and finding.path is not None
+        finding.path is not None
         and finding.path.as_posix() == named.path
         and finding.subject == named.subject
     )
+
+
+def _matches(finding: Finding, named: _Named) -> bool:
+    return finding.code == named.code and _same_target(finding, named)
 
 
 def _judge(finding: Finding, hits: list[_Named], graph: DocGraph) -> Finding:
@@ -354,11 +358,12 @@ def _invalid(trailer: Trailer, problem: _Problem) -> Finding:
 
 
 def _unused(named: _Named, findings: list[Finding]) -> Finding:
+    codes = _codes_on(named, findings)
     message = (
         f"the {TRAILER_KEY} trailer in {named.trailer.commit} matches no finding in this "
         f"change, so it does nothing: {named.trailer.value}"
     )
-    for code in _codes_on(named, findings):
+    for code in codes:
         message += (
             f"; the finding on `{named.path}` `{named.subject}` is `{code}`, not `{named.code}`"
         )
@@ -368,8 +373,19 @@ def _unused(named: _Named, findings: list[Finding]) -> Finding:
         severity=Severity.info,
         message=message,
         path=Path(named.path),
-        suggestion=_UNUSED_SUGGESTION,
+        suggestion=_unused_suggestion(codes),
     )
+
+
+def _unused_suggestion(codes: list[str]) -> str:
+    """What to do with an unused trailer. A finding on the same target that a trailer can
+    still take is open, so "nothing to do" would be false: the trailer named the wrong code."""
+    if not codes:
+        return _UNUSED_SUGGESTION
+    named = ", ".join(f"`{code}`" for code in codes)
+    if len(codes) == 1:
+        return f"add a trailer naming {named} to a later commit, if the finding is acceptable"
+    return f"add a trailer naming each of {named} to a later commit, if the findings are acceptable"
 
 
 def _codes_on(named: _Named, findings: list[Finding]) -> list[str]:
@@ -382,9 +398,7 @@ def _codes_on(named: _Named, findings: list[Finding]) -> list[str]:
             finding.code
             for finding in findings
             if finding.code != named.code
-            and finding.path is not None
-            and finding.path.as_posix() == named.path
-            and finding.subject == named.subject
+            and _same_target(finding, named)
             and answer_of(finding.code).kind is AnswerKind.trailer
         }
     )

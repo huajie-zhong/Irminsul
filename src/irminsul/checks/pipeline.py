@@ -42,10 +42,10 @@ from typing import TYPE_CHECKING, Final
 from irminsul.checks import REGISTRY
 from irminsul.checks.acknowledgement import (
     AcknowledgementStep,
-    accepted,
     apply_acknowledgements,
     placement,
     trailer_for,
+    trailer_open,
 )
 from irminsul.checks.adoption_record import AdoptionRecordPass
 from irminsul.checks.base import (
@@ -248,7 +248,7 @@ def _with_answer(findings: list[Finding], graph: DocGraph) -> list[Finding]:
         answer = answer_of(finding.code)
         if answer.kind is AnswerKind.line:
             clause = f"{answer.how}: `{comment_for(finding.code)}`"
-        elif answer.kind is AnswerKind.trailer and not accepted(finding):
+        elif trailer_open(finding):
             clause = f"{answer.how}: `{trailer_for(finding)}` {placement(finding, uncommitted)}"
         else:
             out.append(finding)

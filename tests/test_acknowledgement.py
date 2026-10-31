@@ -44,6 +44,10 @@ from .conftest import (
 )
 
 _DOC = "docs/components/alpha.md"
+_NOTHING_TO_DO = (
+    "nothing to do unless it names the wrong path or subject; then add a trailer naming the "
+    "right one to a later commit"
+)
 _CO_CHANGE = "co-change/unreflected-change"
 _WIDGET = "docs/components/widget.md"
 _REWRITTEN = "diff-integrity/decision-rewritten"
@@ -298,10 +302,7 @@ def test_an_unused_trailer_says_it_does_nothing_and_names_the_fix(graph: DocGrap
         "the Irminsul-Reviewed trailer in abc1234 matches no finding in this change, so it does "
         'nothing: co-change docs/components/gone.md reason="x"'
     )
-    assert unused.suggestion == (
-        "nothing to do unless it names the wrong path or subject; then add a trailer naming the "
-        "right one to a later commit"
-    )
+    assert unused.suggestion == _NOTHING_TO_DO
 
 
 def test_an_unused_trailer_names_the_other_code_its_path_and_subject_carry(graph: DocGraph) -> None:
@@ -319,6 +320,35 @@ def test_an_unused_trailer_names_the_other_code_its_path_and_subject_carry(graph
         "; the finding on `docs/components/widget.md` `governs` is "
         "`diff-integrity/governing-claim-changed`, not `diff-integrity/claim-reworded`"
     )
+    assert unused.suggestion == (
+        "add a trailer naming `diff-integrity/governing-claim-changed` to a later commit, if the "
+        "finding is acceptable"
+    )
+
+
+def test_an_unused_trailer_asks_for_each_other_code_its_target_carries(graph: DocGraph) -> None:
+    findings = [
+        _finding(
+            code="diff-integrity/governing-claim-changed",
+            path="docs/components/widget.md",
+            subject="governs",
+            about=("src/widget.py",),
+        ),
+        _finding(
+            code="diff-integrity/claim-reworded",
+            path="docs/components/widget.md",
+            subject="governs",
+            about=("src/widget.py",),
+        ),
+    ]
+    trailer = _trailer('diff-integrity/claim-removed docs/components/widget.md governs reason="x"')
+
+    unused = _only(acknowledge(findings, [trailer], graph, ran=("diff-integrity",)), CODE_UNUSED)
+
+    assert unused.suggestion == (
+        "add a trailer naming each of `diff-integrity/claim-reworded`, "
+        "`diff-integrity/governing-claim-changed` to a later commit, if the findings are acceptable"
+    )
 
 
 def test_an_unused_trailer_names_no_other_code_that_a_fix_answers(graph: DocGraph) -> None:
@@ -328,6 +358,7 @@ def test_an_unused_trailer_names_no_other_code_that_a_fix_answers(graph: DocGrap
     unused = _only(acknowledge([finding], [trailer], graph, ran=("co-change",)), CODE_UNUSED)
 
     assert "the finding on" not in unused.message
+    assert unused.suggestion == _NOTHING_TO_DO
 
 
 def test_an_unused_trailer_on_a_path_with_no_finding_names_no_other_code(graph: DocGraph) -> None:
