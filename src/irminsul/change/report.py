@@ -23,7 +23,6 @@ from irminsul.change.gate import NEXT_STATE, Gate, Issue, declared_docs, gate, s
 from irminsul.checks import Severity, sort_findings
 from irminsul.config import IrminsulConfig
 from irminsul.docgraph import DocGraph, DocNode, build_graph, is_rfc, resolve_doc_target
-from irminsul.docgraph_index import Task as TaskType
 from irminsul.docgraph_index import TasksSection, global_requirement_id
 from irminsul.errors import UserError
 from irminsul.frontmatter import (
@@ -115,23 +114,16 @@ class TaskItem:
     text: str
     req: str | None
     component: str | None
-    source_evidence: tuple[str, ...] | None
-    """None when nothing was measured, never an empty tuple that reads as a measured zero."""
-    changed_tests: tuple[str, ...] | None
-    review_clue: str | None
 
 
 @dataclass(frozen=True)
 class TaskSummary:
     total: int
-    with_source_evidence: int | None
-    with_changed_tests: int | None
 
 
 @dataclass(frozen=True)
 class TasksReport:
     items: tuple[TaskItem, ...]
-    evidence_measured: bool
     summary: TaskSummary
 
 
@@ -341,11 +333,7 @@ def build_change_report(
                 )
 
     tasks_section = graph.tasks.get(node.id)
-    tasks = (
-        _task_evidence(node, tasks_section, affects, footprint, clues)
-        if tasks_section is not None
-        else None
-    )
+    tasks = _tasks(node, tasks_section, footprint, clues) if tasks_section is not None else None
 
     declared_untouched: tuple[str, ...] = ()
     touched_undeclared: tuple[str, ...] = ()
@@ -472,87 +460,31 @@ def _partition_configured_findings(
     return tuple(scoped), tuple(DebtCount(check, n) for check, n in sorted(debt.items()))
 
 
-def _task_evidence(
+def _tasks(
     node: DocNode,
     tasks_section: TasksSection,
-    affects: tuple[str, ...] | None,
     footprint: Footprint | None,
     clues: list[ReviewClue],
 ) -> TasksReport:
-    """Per-task mechanical evidence: evidence labels, never
-    completion labels. Several tasks may share one requirement and therefore
-    the same changed files — semantics stay with the reviewer.
-
-    With no diff baseline nothing was measured, so evidence and counts are
-    `None` (unknown), never an empty list that reads as a measured zero.
-    """
+    """The RFC's tasks by id and text. Evidence is the RFC's, not the task's: a task may
+    name no file, so every changed file of the RFC is its evidence, and one clue asks the
+    reviewer to match them, rather than one clue per task that repeats the same files."""
     tasks = tasks_section.tasks
-    declared = tuple(affects or ())
-    items: list[TaskItem] = []
-    tasks_with_source = 0
-    tasks_with_test = 0
-
-    for task in tasks:
-        related = (task.component_ref,) if task.component_ref else declared
-        source_evidence: tuple[str, ...] | None = None
-        changed_tests: tuple[str, ...] | None = None
-        review_clue: str | None = None
-
-        if footprint is not None:
-            source_evidence = tuple(
-                sorted({f for c in related for f in footprint.touched.get(c, ())})
-            )
-            changed_tests = tuple(
-                sorted({f for c in related for f in footprint.changed_tests.get(c, ())})
-            )
-            tasks_with_source += bool(source_evidence)
-            tasks_with_test += bool(changed_tests)
-
-            if not source_evidence:
-                review_clue = f"no changed source is associated with {_task_scope(task)}"
-            elif not changed_tests:
-                review_clue = "inspect implementation and add or identify scenario coverage"
-            else:
-                review_clue = "confirm the changed tests assert this task's scenario, and run them"
-            clues.append(
-                ReviewClue(
-                    question=f"task '{task.task_id}': {review_clue}",
-                    evidence=(*source_evidence, *changed_tests) or (node.path.as_posix(),),
-                )
-            )
-
-        items.append(
-            TaskItem(
-                id=task.task_id,
-                text=task.text,
-                req=task.req_ref,
-                component=task.component_ref,
-                source_evidence=source_evidence,
-                changed_tests=changed_tests,
-                review_clue=review_clue,
+    if footprint is not None and tasks:
+        clues.append(
+            ReviewClue(
+                question="confirm the changed tests assert each task's scenario, and run them",
+                evidence=(node.path.as_posix(),),
             )
         )
-
-    measured = footprint is not None
     return TasksReport(
-        items=tuple(items),
-        evidence_measured=measured,
-        summary=TaskSummary(
-            total=len(tasks),
-            with_source_evidence=tasks_with_source if measured else None,
-            with_changed_tests=tasks_with_test if measured else None,
+        items=tuple(
+            TaskItem(
+                id=task.task_id, text=task.text, req=task.req_ref, component=task.component_ref
+            )
+            for task in tasks
         ),
-    )
-
-
-def _task_scope(task: TaskType) -> str:
-    if task.component_ref:
-        return "this task's component"
-    if task.req_ref:
-        return "this task's requirement"
-    return (
-        "any declared affected component (this task references neither a "
-        "requirement nor a component)"
+        summary=TaskSummary(total=len(tasks)),
     )
 
 
@@ -575,6 +507,7 @@ def change_report_to_json(report: ChangeReport) -> str:
             for b in report.blockers
         ],
         "evidence": [asdict(e) for e in report.evidence],
+        "evidence_measured": report.footprint is not None,
         "semantic_review": [asdict(c) for c in report.semantic_review],
         "mechanically_ready_for": report.mechanically_ready_for,
         "repository_debt": [asdict(d) for d in report.repository_debt],
@@ -603,7 +536,7 @@ def format_change_status_plain(report: ChangeReport) -> str:
         lines.extend(f"    [{b.code}] {b.message}" for b in report.blockers)
     lines.append(f"  mechanically ready for: {report.mechanically_ready_for}")
     if report.tasks is not None:
-        lines.append(f"  tasks: {_task_summary(report.tasks)}")
+        lines.append(f"  tasks: {report.tasks.summary.total} declared")
     if report.evidence:
         lines.append(f"  evidence: {len(report.evidence)} item(s); run `change verify` for detail")
     if report.scoped_findings:
@@ -625,7 +558,6 @@ def format_change_verify_plain(report: ChangeReport) -> str:
         f"  baseline: {_baseline_line(report.baseline)}",
     ]
     lines.extend(_requirements_lines(report.requirements))
-    lines.extend(_tasks_lines(report.tasks))
     if report.blockers:
         lines.append("  blockers:")
         for b in report.blockers:
@@ -639,8 +571,11 @@ def format_change_verify_plain(report: ChangeReport) -> str:
         for e in report.evidence:
             component = f" ({e.component})" if e.component else ""
             lines.append(f"    {e.kind}: {e.path}{component}")
+    elif report.footprint is None:
+        lines.append("  evidence: unknown (no diff baseline)")
     else:
         lines.append("  evidence: (none)")
+    lines.extend(_tasks_lines(report.tasks))
     if report.declared_untouched:
         lines.append(f"  declared but untouched: {', '.join(report.declared_untouched)}")
     if report.touched_undeclared:
@@ -665,25 +600,10 @@ def format_change_verify_plain(report: ChangeReport) -> str:
     return "\n".join(lines)
 
 
-def _task_summary(tasks: TasksReport) -> str:
-    total = tasks.summary.total
-    if not tasks.evidence_measured:
-        return f"{total} declared; evidence unknown (no diff baseline)"
-    return (
-        f"{tasks.summary.with_source_evidence}/{total} with source evidence, "
-        f"{tasks.summary.with_changed_tests}/{total} with changed tests"
-    )
-
-
-def _evidence_line(label: str, paths: tuple[str, ...] | None) -> str:
-    value = "unknown (no diff baseline)" if paths is None else ", ".join(paths) or "none"
-    return f"      {label} {value}"
-
-
 def _tasks_lines(tasks: TasksReport | None) -> list[str]:
     if tasks is None:
         return []
-    lines = [f"  tasks: {_task_summary(tasks)}"]
+    lines = [f"  tasks: {tasks.summary.total} declared"]
     for item in tasks.items:
         ref = ""
         if item.req:
@@ -691,10 +611,6 @@ def _tasks_lines(tasks: TasksReport | None) -> list[str]:
         elif item.component:
             ref = f" (component: {item.component})"
         lines.append(f"    {item.id} {item.text}{ref}")
-        lines.append(_evidence_line("source evidence:", item.source_evidence))
-        lines.append(_evidence_line("changed tests:  ", item.changed_tests))
-        if item.review_clue:
-            lines.append(f"      review clue:     {item.review_clue}")
     return lines
 
 

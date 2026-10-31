@@ -114,7 +114,8 @@ def test_change_verify_plain_shows_tasks(repo: Path) -> None:
     )
     assert result.exit_code == 0, result.output
     assert "T1 Wire the identity-provider client. (req: sso-login)" in result.output
-    assert "source evidence:" in result.output
+    assert "tasks: 3 declared" in result.output
+    assert "source evidence" not in result.output
 
 
 def test_change_finalize_plan_only(repo: Path) -> None:
@@ -179,7 +180,7 @@ def test_change_finalize_presents_semantic_review(repo: Path) -> None:
     )
     assert result.exit_code == 0, result.output
     assert "semantic review" in result.output
-    assert "task 'T1'" in result.output
+    assert "confirm the changed tests assert each task's scenario, and run them" in result.output
 
 
 def test_change_finalize_blocked_exits_one(repo: Path) -> None:

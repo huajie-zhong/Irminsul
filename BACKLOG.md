@@ -442,16 +442,6 @@ The edges are real, but the warning repeats one fact per importer. Report a new 
 module once, naming its importers, with one fix that writes every `depends_on`. Found by the
 PR 10b lane on 2026-10-28.
 
-### `change-verify-cannot-scope-a-task`
-
-`change verify` gives every task of an RFC the same source evidence. On
-`every-warning-hint-has-an-answer`, a branch that implements part of it, it reports
-`tasks: 27/27 with source evidence, 27/27 with changed tests` (`src/irminsul/change/report.py:673`),
-and each task lists the same ten source files. It also reports `declared component 'change'
-has no implementation evidence`, and the same for `config`, `context` and `frontmatter`, none
-of whose source the branch changed (`src/irminsul/change/report.py:371`). Evidence should be
-scoped to the task's own scenario. Reproduced 2026-10-30.
-
 ### `context-after-edit-is-long`
 
 `context --after-edit --base-ref origin/main` printed 901 lines on the trailer-step branch:

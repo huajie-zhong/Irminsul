@@ -308,42 +308,80 @@ def test_report_task_evidence(repo: Path) -> None:
     report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
     tasks = report.tasks
     assert tasks is not None
-    assert [item.id for item in tasks.items] == ["T1", "T2", "T3"]
-    t1 = tasks.items[0]
-    assert t1.req == "sso-login"
-    assert t1.source_evidence is not None and "app/auth/sso.py" in t1.source_evidence
-    assert t1.changed_tests is not None and "tests/test_auth.py" in t1.changed_tests
-    assert tasks.evidence_measured is True
-    assert tasks.summary == TaskSummary(total=3, with_source_evidence=3, with_changed_tests=3)
+    assert [(item.id, item.req) for item in tasks.items] == [
+        ("T1", "sso-login"),
+        ("T2", "sso-login"),
+        ("T3", None),
+    ]
+    assert tasks.summary == TaskSummary(total=3)
 
 
-def test_report_task_without_evidence_gets_clue(repo: Path) -> None:
+def test_the_changed_files_are_named_once_for_the_rfc_not_per_task(repo: Path) -> None:
+    seed_repo(repo, "init")
+    (repo / "app" / "auth" / "sso.py").write_text("x = 1\n", encoding="utf-8")
+    (repo / "tests" / "test_auth.py").write_text(
+        "def test_login() -> None:\n    assert 1\n", encoding="utf-8"
+    )
+
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+    verify = format_change_verify_plain(report)
+
+    assert verify.count("app/auth/sso.py") == 1
+    assert verify.count("tests/test_auth.py") == 1
+    assert "source evidence" not in verify
+    assert "with changed tests" not in verify
+    assert verify.index("changed-source: app/auth/sso.py") < verify.index("  tasks: 3 declared")
+    assert "    T1 Wire the identity-provider client. (req: sso-login)" in verify
+
+
+def test_one_rfc_clue_asks_about_the_tests_not_one_per_task(repo: Path) -> None:
+    seed_repo(repo, "init")
+    (repo / "app" / "auth" / "sso.py").write_text("x = 1\n", encoding="utf-8")
+    (repo / "tests" / "test_auth.py").write_text(
+        "def test_login() -> None:\n    assert 1\n", encoding="utf-8"
+    )
+
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+
+    questions = [clue.question for clue in report.semantic_review]
+    assert (
+        questions.count("confirm the changed tests assert each task's scenario, and run them") == 1
+    )
+    assert not any(question.startswith("task '") for question in questions)
+
+
+def test_a_declared_component_with_no_changed_source_is_still_a_clue(repo: Path) -> None:
+    seed_repo(repo, "init")
+
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+
+    assert any(
+        "declared component 'auth' has no implementation evidence" in clue.question
+        for clue in report.semantic_review
+    )
+
+
+def test_no_task_gets_a_clue_of_its_own_when_nothing_changed(repo: Path) -> None:
     seed_repo(repo, "init")
     report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
-    tasks = report.tasks
-    assert tasks is not None
-    assert tasks.evidence_measured is True
-    assert tasks.summary.with_source_evidence == 0
-    assert all(item.review_clue for item in tasks.items)
-    assert any("task 'T1'" in clue.question for clue in report.semantic_review)
+
+    assert not any(clue.question.startswith("task '") for clue in report.semantic_review)
+    assert report.tasks is not None
+    assert report.tasks.summary == TaskSummary(total=3)
 
 
-def test_report_task_evidence_unknown_without_baseline(repo: Path) -> None:
+def test_report_tasks_are_listed_without_a_baseline(repo: Path) -> None:
     report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
     assert report.baseline.changed_paths is None
 
-    tasks = report.tasks
-    assert tasks is not None
-    assert tasks.evidence_measured is False
-    assert tasks.summary == TaskSummary(total=3, with_source_evidence=None, with_changed_tests=None)
-    assert all(item.source_evidence is None for item in tasks.items)
-    assert all(item.changed_tests is None for item in tasks.items)
-    assert all(item.review_clue is None for item in tasks.items)
-    assert not any(clue.question.startswith("task '") for clue in report.semantic_review)
+    assert report.tasks is not None
+    assert report.tasks.summary == TaskSummary(total=3)
+    assert not any("confirm the changed tests" in clue.question for clue in report.semantic_review)
 
     data = json.loads(change_report_to_json(report))
-    assert data["tasks"]["summary"]["with_source_evidence"] is None
-    assert data["tasks"]["items"][0]["source_evidence"] is None
+    assert data["evidence_measured"] is False
+    assert data["tasks"]["summary"] == {"total": 3}
+    assert set(data["tasks"]["items"][0]) == {"id", "text", "req", "component"}
 
 
 def test_plain_output_never_shows_measured_zeros_without_baseline(repo: Path) -> None:
@@ -351,31 +389,10 @@ def test_plain_output_never_shows_measured_zeros_without_baseline(repo: Path) ->
     status = format_change_status_plain(report)
     verify = format_change_verify_plain(report)
 
-    assert "tasks: 3 declared; evidence unknown (no diff baseline)" in status
+    assert "  tasks: 3 declared" in status
     assert "0/3" not in status
-    assert "source evidence: unknown (no diff baseline)" in verify
-    assert "changed tests:   unknown (no diff baseline)" in verify
-    assert "source evidence: none" not in verify
-
-
-def test_report_unreferenced_task_clue_names_declared_components(repo: Path) -> None:
-    seed_repo(repo, "init")
-    path = repo / "docs" / "rfcs" / "0001-accepted-good.md"
-    text = path.read_text(encoding="utf-8")
-    path.write_text(
-        text.replace(
-            "- `T3` Refresh the auth component doc. (component: auth)",
-            "- `T3` Refresh the auth component doc.",
-        ),
-        encoding="utf-8",
-    )
-
-    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
-    assert report.tasks is not None
-    clue = report.tasks.items[2].review_clue
-    assert clue is not None
-    assert "declared affected component" in clue
-    assert "requirement" not in clue.split("(")[0]
+    assert "  evidence: unknown (no diff baseline)" in verify
+    assert "evidence: (none)" not in verify
 
 
 def test_report_json_round_trips(repo: Path) -> None:
