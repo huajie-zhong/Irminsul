@@ -41,7 +41,7 @@ other language the symbol resolves by name as a whole token, and the hash covers
 block that starts at the line defining it, with whitespace normalized. A marker written
 inside a code span or a fenced block is an example and is not read, so this syntax can
 be documented without the example becoming a live anchor.
-<!-- anchor: src/irminsul/anchors.py#resolve @sha256:9cd41cafd826 -->
+<!-- anchor: src/irminsul/anchors.py#resolve @sha256:c3f4df66e0c1 -->
 <!-- anchor: src/irminsul/anchors.py#_find_symbol @sha256:95c45a01a21c -->
 <!-- anchor: src/irminsul/anchors.py#_canonical @sha256:1c9d471d4bfc -->
 
