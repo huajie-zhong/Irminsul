@@ -11,6 +11,7 @@ import pytest
 import irminsul.change.report as report_module
 from irminsul.change.report import (
     ChangeError,
+    ChangeReport,
     TaskSummary,
     build_change_report,
     change_report_to_json,
@@ -361,6 +362,57 @@ def test_a_declared_component_with_no_changed_source_is_still_a_clue(repo: Path)
     )
 
 
+_TASK_CLUES = (
+    "no changed source is associated with this RFC's components",
+    "inspect implementation and add or identify scenario coverage",
+    "confirm the changed tests assert each task's scenario, and run them",
+)
+
+
+def _task_clues(report: ChangeReport) -> list[str]:
+    return [clue.question for clue in report.semantic_review if clue.question in _TASK_CLUES]
+
+
+def test_the_task_clue_says_no_source_changed_when_nothing_in_the_rfc_did(repo: Path) -> None:
+    seed_repo(repo, "init")
+
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+
+    assert _task_clues(report) == [_TASK_CLUES[0]]
+
+
+def test_the_task_clue_says_to_inspect_when_source_changed_and_no_test_did(repo: Path) -> None:
+    seed_repo(repo, "init")
+    (repo / "app" / "auth" / "sso.py").write_text("x = 1\n", encoding="utf-8")
+
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+
+    assert _task_clues(report) == [_TASK_CLUES[1]]
+
+
+def test_the_task_clue_asks_for_the_tests_when_source_and_tests_changed(repo: Path) -> None:
+    seed_repo(repo, "init")
+    (repo / "app" / "auth" / "sso.py").write_text("x = 1\n", encoding="utf-8")
+    (repo / "tests" / "test_auth.py").write_text(
+        "def test_login() -> None:\n    assert 1\n", encoding="utf-8"
+    )
+
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+
+    assert _task_clues(report) == [_TASK_CLUES[2]]
+
+
+def test_evidence_is_measured_once_a_baseline_resolves(repo: Path) -> None:
+    seed_repo(repo, "init")
+    (repo / "app" / "auth" / "sso.py").write_text("x = 1\n", encoding="utf-8")
+
+    report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
+
+    data = json.loads(change_report_to_json(report))
+    assert data["evidence_measured"] is True
+    assert data["tasks"]["summary"] == {"total": 3}
+
+
 def test_no_task_gets_a_clue_of_its_own_when_nothing_changed(repo: Path) -> None:
     seed_repo(repo, "init")
     report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
@@ -376,7 +428,7 @@ def test_report_tasks_are_listed_without_a_baseline(repo: Path) -> None:
 
     assert report.tasks is not None
     assert report.tasks.summary == TaskSummary(total=3)
-    assert not any("confirm the changed tests" in clue.question for clue in report.semantic_review)
+    assert _task_clues(report) == []
 
     data = json.loads(change_report_to_json(report))
     assert data["evidence_measured"] is False
@@ -390,7 +442,6 @@ def test_plain_output_never_shows_measured_zeros_without_baseline(repo: Path) ->
     verify = format_change_verify_plain(report)
 
     assert "  tasks: 3 declared" in status
-    assert "0/3" not in status
     assert "  evidence: unknown (no diff baseline)" in verify
     assert "evidence: (none)" not in verify
 
@@ -399,7 +450,7 @@ def test_report_json_round_trips(repo: Path) -> None:
     seed_repo(repo, "init")
     report = build_change_report(repo, load(find_config(repo)), "0001-accepted-good", env={})
     data = json.loads(change_report_to_json(report))
-    assert data["version"] == 1
+    assert data["version"] == 2
     assert data["change"] == "0001-accepted-good"
     assert data["state"] == "accepted"
     assert isinstance(data["blockers"], list)

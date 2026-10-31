@@ -38,7 +38,7 @@ from irminsul.git.changes import (
 )
 from irminsul.git.reader import GitReader
 
-REPORT_VERSION = 1
+REPORT_VERSION = 2
 
 # Environment variables consulted for a CI-provided diff base, in order.
 _CI_BASE_ENV_VARS = ("IRMINSUL_BASE_REF", "GITHUB_BASE_REF")
@@ -471,12 +471,7 @@ def _tasks(
     reviewer to match them, rather than one clue per task that repeats the same files."""
     tasks = tasks_section.tasks
     if footprint is not None and tasks:
-        clues.append(
-            ReviewClue(
-                question="confirm the changed tests assert each task's scenario, and run them",
-                evidence=(node.path.as_posix(),),
-            )
-        )
+        clues.append(ReviewClue(question=_task_clue(footprint), evidence=(node.path.as_posix(),)))
     return TasksReport(
         items=tuple(
             TaskItem(
@@ -598,6 +593,16 @@ def format_change_verify_plain(report: ChangeReport) -> str:
         lines.append("  next:")
         lines.extend(f"    {action}" for action in report.next_actions)
     return "\n".join(lines)
+
+
+def _task_clue(footprint: Footprint) -> str:
+    """The one clue for the RFC's tasks, by how far the change got: no changed source, changed
+    source with no changed test, or both."""
+    if not footprint.touched:
+        return "no changed source is associated with this RFC's components"
+    if not footprint.changed_tests:
+        return "inspect implementation and add or identify scenario coverage"
+    return "confirm the changed tests assert each task's scenario, and run them"
 
 
 def _tasks_lines(tasks: TasksReport | None) -> list[str]:

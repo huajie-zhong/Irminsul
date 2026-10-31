@@ -180,7 +180,10 @@ def test_change_finalize_presents_semantic_review(repo: Path) -> None:
     )
     assert result.exit_code == 0, result.output
     assert "semantic review" in result.output
-    assert "confirm the changed tests assert each task's scenario, and run them" in result.output
+    assert "no changed source is associated with this RFC's components" in result.output
+    assert (
+        "confirm the changed tests assert each task's scenario, and run them" not in result.output
+    )
 
 
 def test_change_finalize_blocked_exits_one(repo: Path) -> None:
