@@ -303,6 +303,41 @@ def test_an_unused_trailer_says_it_does_nothing_and_names_the_fix(graph: DocGrap
     )
 
 
+def test_an_unused_trailer_names_the_other_code_its_path_and_subject_carry(graph: DocGraph) -> None:
+    finding = _finding(
+        code="diff-integrity/governing-claim-changed",
+        path="docs/components/widget.md",
+        subject="governs",
+        about=("src/widget.py",),
+    )
+    trailer = _trailer('diff-integrity/claim-reworded docs/components/widget.md governs reason="x"')
+
+    unused = _only(acknowledge([finding], [trailer], graph, ran=("diff-integrity",)), CODE_UNUSED)
+
+    assert unused.message.endswith(
+        "; the finding on `docs/components/widget.md` `governs` is "
+        "`diff-integrity/governing-claim-changed`, not `diff-integrity/claim-reworded`"
+    )
+
+
+def test_an_unused_trailer_names_no_other_code_that_a_fix_answers(graph: DocGraph) -> None:
+    finding = _finding(code="glossary-discipline/unlinked-term", path=_DOC, subject=_DOC)
+    trailer = _trailer(f'co-change {_DOC} {_DOC} reason="x"')
+
+    unused = _only(acknowledge([finding], [trailer], graph, ran=("co-change",)), CODE_UNUSED)
+
+    assert "the finding on" not in unused.message
+
+
+def test_an_unused_trailer_on_a_path_with_no_finding_names_no_other_code(graph: DocGraph) -> None:
+    finding = _finding(code="diff-integrity/governing-claim-changed", subject="governs")
+    trailer = _trailer('diff-integrity/claim-reworded docs/components/gone.md governs reason="x"')
+
+    unused = _only(acknowledge([finding], [trailer], graph, ran=("diff-integrity",)), CODE_UNUSED)
+
+    assert "the finding on" not in unused.message
+
+
 def test_misuse_is_reported_only_when_the_run_says_so(graph: DocGraph) -> None:
     assert acknowledge([], [_trailer('evidence-drift alpha reason="x"')], graph, ran=None) == []
 
@@ -933,3 +968,21 @@ def test_the_trailer_a_finding_prints_accepts_that_finding(
     )
 
     assert severities_of(tmp_path, code, "--diff", base) == ["info"] * len(raised)
+
+
+def test_an_unused_trailer_names_the_code_the_claims_finding_carries(tmp_path: Path) -> None:
+    base = _changed({_WIDGET: _GOVERNED.replace("The widget runs.", "The widget halts.")})(tmp_path)
+    git(
+        tmp_path,
+        "commit",
+        "--allow-empty",
+        "-qm",
+        "re-read the claim\n\n" + reviewed("diff-integrity/claim-reworded", _WIDGET, "governs"),
+    )
+
+    [unused] = findings_of(tmp_path, CODE_UNUSED, "--diff", base)
+
+    assert (
+        "the finding on `docs/components/widget.md` `governs` is "
+        "`diff-integrity/governing-claim-changed`, not `diff-integrity/claim-reworded`"
+    ) in unused["message"]

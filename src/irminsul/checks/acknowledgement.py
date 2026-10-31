@@ -103,8 +103,10 @@ class AcknowledgementStep:
         CODE_UNUSED: (
             f"An `{TRAILER_KEY}` commit trailer that matches no finding in this change, so it "
             "does nothing. Nothing is left to do unless it names the wrong path or subject; "
-            "then a trailer naming the right one on a later commit answers it. It is info for "
-            "the same reason as the invalid one."
+            "then a trailer naming the right one on a later commit answers it. When a finding "
+            "on the same path and subject carries another code that declares `trailer`, the "
+            "message names that code, since the trailer named the wrong one. It is info for the "
+            "same reason as the invalid one."
         ),
     }
     classes: ClassVar[dict[str, FindingClass]] = {
@@ -164,7 +166,7 @@ def acknowledge(
             finding = _judge(finding, [named[index] for index in hits], graph)
         out.append(finding)
     if ran is not None:
-        out.extend(_unused(read) for index, read in enumerate(named) if index not in used)
+        out.extend(_unused(read, findings) for index, read in enumerate(named) if index not in used)
     return out + problems
 
 
@@ -327,15 +329,38 @@ def _invalid(trailer: Trailer, problem: _Problem) -> Finding:
     )
 
 
-def _unused(named: _Named) -> Finding:
+def _unused(named: _Named, findings: list[Finding]) -> Finding:
+    message = (
+        f"the {TRAILER_KEY} trailer in {named.trailer.commit} matches no finding in this "
+        f"change, so it does nothing: {named.trailer.value}"
+    )
+    for code in _codes_on(named, findings):
+        message += (
+            f"; the finding on `{named.path}` `{named.subject}` is `{code}`, not `{named.code}`"
+        )
     return Finding(
         check=CHECK_NAME,
         code=CODE_UNUSED,
         severity=Severity.info,
-        message=(
-            f"the {TRAILER_KEY} trailer in {named.trailer.commit} matches no finding in this "
-            f"change, so it does nothing: {named.trailer.value}"
-        ),
+        message=message,
         path=Path(named.path),
         suggestion=_UNUSED_SUGGESTION,
+    )
+
+
+def _codes_on(named: _Named, findings: list[Finding]) -> list[str]:
+    """The other codes that findings on the trailer's path and subject carry, where a trailer
+    answers the code: the trailer named the wrong one."""
+    from irminsul.checks.pipeline import answer_of
+
+    return sorted(
+        {
+            finding.code
+            for finding in findings
+            if finding.code != named.code
+            and finding.path is not None
+            and finding.path.as_posix() == named.path
+            and finding.subject == named.subject
+            and answer_of(finding.code).kind is AnswerKind.trailer
+        }
     )
