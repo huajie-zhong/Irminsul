@@ -349,8 +349,8 @@ def test_check_json_fixable_true_matches_fix_dry_run_plan(
             "irminsul fix --only supersession --confirm",
         )
 
-    # `irminsul fix --dry-run` really does plan these fixes.
-    result = runner.invoke(app, ["fix", "--dry-run", "--path", str(repo)])
+    # `irminsul fix --dry-run --confirm` really does plan these fixes.
+    result = runner.invoke(app, ["fix", "--dry-run", "--confirm", "--path", str(repo)])
     assert result.exit_code == 0, result.output
     assert "planned" in result.output
     assert "status: deprecated" in result.output
