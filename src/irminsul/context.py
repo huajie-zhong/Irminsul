@@ -428,7 +428,7 @@ def build_context_report(
         else []
     )
     return ContextReport(
-        version=1,
+        version=2,
         mode=mode,
         results=results,
         unmatched=unmatched,
@@ -1718,9 +1718,10 @@ def _result_to_dict(result: ContextResult, *, mode: ContextMode) -> dict[str, ob
     if mode == "after-edit":
         payload: dict[str, object] = {
             "input": result.input,
-            "owner": _doc_ref_to_dict(result.owner),
-            "missing_inputs": result.missing_inputs,
+            "owner": {"id": result.owner.id, "path": result.owner.path},
         }
+        if result.missing_inputs:
+            payload["missing_inputs"] = result.missing_inputs
         if result.content is not None:
             payload["content"] = _content_to_dict(result.content)
         return payload
@@ -1908,7 +1909,7 @@ def _format_changed_owner(result: ContextResult) -> list[str]:
 
 def _findings_lines(report: ContextReport) -> list[str]:
     """The findings of the edit, once for the whole report, under the verdict they belong to."""
-    if report.findings is None or report.validation is None:
+    if report.findings is None or report.records is None or report.validation is None:
         return []
     change = report.validation.change
     if change.state == "not_run":
@@ -1921,7 +1922,7 @@ def _findings_lines(report: ContextReport) -> list[str]:
             f"Findings this change caused (compared with {change.baseline}): {len(report.findings)}"
         )
     lines = [header]
-    for finding in report.findings:
+    for finding, record in zip(report.findings, report.records, strict=True):
         location = finding.path.as_posix() if finding.path else "<repo>"
         if finding.line is not None:
             location = f"{location}:{finding.line}"
@@ -1930,6 +1931,8 @@ def _findings_lines(report: ContextReport) -> list[str]:
         lines.append(f"  {finding.severity.value}  [{finding.code}] {location}: {finding.message}")
         if finding.suggestion:
             lines.append(f"    suggestion: {finding.suggestion}")
+        if "fix_command" in record:
+            lines.append(f"    fix: {record['fix_command']}")
     return lines
 
 

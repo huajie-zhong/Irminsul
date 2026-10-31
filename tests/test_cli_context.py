@@ -284,7 +284,7 @@ def test_context_source_path_json_returns_owner_tests_and_dependencies(tmp_path:
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert set(data) == {"version", "mode", "results", "unmatched", "claim_reviews", "next_actions"}
-    assert data["version"] == 1
+    assert data["version"] == 2
     assert data["mode"] == "path"
     assert data["unmatched"] == []
     [context] = data["results"]
@@ -323,6 +323,75 @@ def test_context_after_edit_offers_the_fix_for_a_fixable_finding(
         if finding["code"] == "glossary-discipline/unlinked-term" and "fix_command" in finding
     }
     assert fixes == {"irminsul fix --only glossary-discipline --confirm"}
+
+
+_UNLINKED_TERM = "glossary-discipline/unlinked-term"
+_UNLINKED_FIX = "irminsul fix --only glossary-discipline --confirm"
+
+
+def _composer_gains_an_unlinked_term(repo: Path) -> str:
+    """Commit the glossary fixture clean, then give composer a term no link names: the
+    finding is caused by this edit, so a compared run reports it. Returns the base commit."""
+    base = seed_repo(repo, "initial")
+    composer = repo / "docs" / "components" / "composer.md"
+    composer.write_text(
+        composer.read_text(encoding="utf-8") + "\nA Planner keeps the order.\n", encoding="utf-8"
+    )
+    return base
+
+
+def test_a_caused_finding_in_a_compared_run_carries_its_fix_command(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("soft-glossary")
+    base = _composer_gains_an_unlinked_term(repo)
+
+    data = _after_edit(repo, "--base-ref", base)
+
+    caused = [
+        finding
+        for finding in data["findings"]
+        if finding["code"] == _UNLINKED_TERM and finding["path"] == "docs/components/composer.md"
+    ]
+    assert caused, data["findings"]
+    assert {finding["fix_command"] for finding in caused} == {_UNLINKED_FIX}
+
+
+def test_plain_after_edit_gives_the_fix_under_each_caused_finding(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("soft-glossary")
+    base = _composer_gains_an_unlinked_term(repo)
+
+    code, output = invoke(repo, "context", "--after-edit", "--base-ref", base)
+
+    assert code == 0, output
+    lines = output.splitlines()
+    finding = next(
+        index
+        for index, line in enumerate(lines)
+        if f"[{_UNLINKED_TERM}] docs/components/composer.md" in line
+    )
+    assert f"    fix: {_UNLINKED_FIX}" in lines[finding : finding + 3]
+
+
+def test_an_error_the_change_inherited_is_left_to_irminsul_check(tmp_path: Path) -> None:
+    repo = _make_context_repo(tmp_path)
+    helper = repo / "docs" / "components" / "helper.md"
+    helper.write_text(
+        helper.read_text(encoding="utf-8") + "\nSee [gone](no-such-page.md).\n", encoding="utf-8"
+    )
+    base = seed_repo(repo, "initial")
+    git(repo, "checkout", "-q", "-b", "feature")
+    write(repo, "src/mylib/core.py", "def run(): return 1\n")
+
+    data = _after_edit(repo, "--base-ref", base)
+
+    assert data["validation"]["repository"]["state"] == "failed"
+    assert data["validation"]["change"]["state"] == "passed"
+    assert "links/broken-link" not in _finding_codes(data)
+    [check] = [action for action in data["next_actions"] if action["command"] == "irminsul check"]
+    assert check["reason"] == "The repository has errors to resolve; they are not this change's."
 
 
 def test_context_after_edit_carries_no_hints(tmp_path: Path) -> None:
@@ -1898,7 +1967,8 @@ def test_after_edit_names_each_owner_and_its_changed_files_only(tmp_path: Path) 
     detail = [line for line in output.splitlines() if line.strip().startswith(_OWNER_DETAIL_LABELS)]
     assert detail == []
     data = _after_edit(repo, "--base-ref", base)
-    assert set(_core(data)) == {"owner", "input", "missing_inputs"}
+    assert set(_core(data)) == {"owner", "input"}
+    assert set(_core(data)["owner"]) == {"id", "path"}
     assert "hints" not in data
 
 

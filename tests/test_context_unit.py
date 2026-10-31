@@ -156,7 +156,7 @@ def test_json_report_shape_is_stable(fixture_repo: FixtureRepo) -> None:
     report = build_context_report(repo, _config(repo), target_paths=[repo / "app" / "composer.py"])
 
     data = json.loads(context_report_to_json(report))
-    assert data["version"] == 1
+    assert data["version"] == 2
     assert data["mode"] == "path"
     assert set(data) == {"version", "mode", "results", "unmatched", "claim_reviews", "next_actions"}
     assert set(data["results"][0]) == {
