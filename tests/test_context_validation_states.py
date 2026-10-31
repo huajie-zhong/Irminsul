@@ -292,7 +292,7 @@ def test_after_edit_audits_ignore_comments_as_check_does(tmp_path: Path) -> None
 
     code, data = _ctx(root, "--after-edit")
 
-    codes = {finding["code"] for result in data["results"] for finding in result["findings"]}
+    codes = {finding["code"] for finding in data["findings"]}
     assert "ignore-comment/unused" in codes
     assert data["validation"]["repository"]["state"] == "failed"
     assert code == 1
@@ -313,10 +313,7 @@ def test_after_edit_findings_carry_the_shared_record_shape(tmp_path: Path) -> No
     _, data = _ctx(root, "--after-edit")
 
     record = next(
-        finding
-        for result in data["results"]
-        for finding in result["findings"]
-        if finding["code"] == "frontmatter/missing-summary"
+        finding for finding in data["findings"] if finding["code"] == "frontmatter/missing-summary"
     )
     assert record["class"] == "certain"
     assert record["effective_class"] == "hint"

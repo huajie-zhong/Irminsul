@@ -442,14 +442,6 @@ The edges are real, but the warning repeats one fact per importer. Report a new 
 module once, naming its importers, with one fix that writes every `depends_on`. Found by the
 PR 10b lane on 2026-10-28.
 
-### `context-after-edit-is-long`
-
-`context --after-edit --base-ref origin/main` printed 901 lines on the trailer-step branch:
-21 owner blocks of about 40 lines each, and 34 lines that mention the glossary
-(`src/irminsul/context.py:337`). Four of the owners are docs the change did not touch:
-`components/INDEX.md`, `adoption-record.md`, `docgraph.md` and `new-list-regen.md`.
-`list review --changed` was the usable view. Reproduced 2026-10-30.
-
 ### `diff-lists-trailers-needed`
 
 No command lists the trailers a change still needs. The top-level commands and the `list`

@@ -203,11 +203,10 @@ class ContextContent:
 class ContextResult:
     """One owning doc and what an agent needs from it for the paths in hand.
 
-    A field that does not apply to the mode is absent from the JSON, never `[]`:
-    `findings` and `hints` appear only after an edit, the one mode that runs the checks,
-    because an empty list would read as a clean result nobody looked for. `active_changes`
-    appears outside topic mode, and `content` when excerpts were asked for, which a topic
-    lookup does only under `--include`.
+    An after-edit result names only the owner and the changed inputs it owns: the findings
+    the change caused are on the report, once. A path packet carries the rest, and a field
+    that does not apply to the mode is absent from the JSON, never `[]`. `content` appears
+    when excerpts were asked for, which a topic lookup and an edit do only under `--include`.
     """
 
     input: list[str]
@@ -218,15 +217,8 @@ class ContextResult:
     depends_on: list[DocRef]
     depends_on_missing: list[str]
     depended_on_by: list[DocRef]
-    #: `None` outside `after-edit`, which alone runs the checks; it is never reported as an
-    #: empty list, because having not looked is not having found nothing.
-    findings: list[Finding] | None
-    hints: list[str]
     active_changes: ActiveChanges = field(default_factory=lambda: ActiveChanges(shown=[]))
     content: ContextContent | None = None
-    #: `findings` as `check --format json` reports them, each with its `irminsul fix`
-    #: command when one remediates it; `None` exactly when `findings` is.
-    records: list[dict[str, object]] | None = None
     #: Why each test in `tests` is named, for the ones that have a reason; `tests` is in
     #: ranked order, and a test absent here is listed for nothing but being owned.
     test_reasons: dict[str, list[str]] = field(default_factory=dict)
@@ -288,9 +280,11 @@ class ContextReport:
     `claim_reviews` lists the claims whose evidence the paths in hand cite, so a topic
     lookup, which has no paths, has none. `validation` is set only after an edit: a mode
     that ran no checks leaves it out of the JSON rather than reporting an empty verdict.
-    `next_actions` are command-and-reason pairs derived from the report's own state; a
-    topic report carries `suggestion` in their place, null when a doc matched and otherwise
-    the sentence the plain output prints after `(none)`.
+    `findings` is the same edit's findings, once for the whole report: those the change
+    caused, or every finding of the run when the change was not compared, which
+    `validation.change` says. `next_actions` are command-and-reason pairs derived from the
+    report's own state; a topic report carries `suggestion` in their place, null when a doc
+    matched and otherwise the sentence the plain output prints after `(none)`.
     """
 
     version: int
@@ -301,6 +295,10 @@ class ContextReport:
     next_actions: list[NextAction] = field(default_factory=list)
     claim_reviews: list[ClaimReview] = field(default_factory=list)
     suggestion: str | None = None
+    findings: list[Finding] | None = None
+    #: `findings` as `check --format json` reports them, each with its `irminsul fix`
+    #: command when one remediates it; `None` exactly when `findings` is.
+    records: list[dict[str, object]] | None = None
 
 
 @dataclass(frozen=True)
@@ -361,10 +359,10 @@ def build_context_report(
         "path" if paths is not None else "topic" if topic is not None else "after-edit"
     )
     if content_categories is None:
-        categories = () if mode == "topic" else DEFAULT_PACKET_CONTENT
+        categories = DEFAULT_PACKET_CONTENT if mode == "path" else ()
     else:
         categories = _normalize_content_categories(content_categories)
-    include_content = mode != "topic" or content_categories is not None
+    include_content = mode == "path" or content_categories is not None
 
     base = _resolve_base(repo_root, base_ref, committed_only) if after_edit else None
     graph = build_graph(
@@ -399,24 +397,23 @@ def build_context_report(
         reviewed_by_doc.setdefault(review.doc.path, set()).add(review.claim_id)
 
     run = _run_checks(graph) if mode == "after-edit" else None
-    ranker = Ranker(graph) if mode != "topic" else None
+    ranker = Ranker(graph) if mode == "path" else None
     results = [
         _build_result(
             graph,
             item,
-            run.findings if run is not None else None,
             ranker=ranker,
-            include_active_changes=mode != "topic",
+            include_active_changes=mode == "path",
             content_categories=categories if include_content else None,
             reviewed_claims=frozenset(reviewed_by_doc.get(item.node.path.as_posix(), ())),
         )
         for item in pending
     ]
-    validation = (
-        _edit_validation(graph, run, base.baseline)
-        if run is not None and base is not None
-        else None
-    )
+    validation: EditValidation | None = None
+    findings: list[Finding] | None = None
+    if run is not None and base is not None:
+        validation, caused = _edit_validation(graph, run, base.baseline)
+        findings = run.findings if caused is None else caused
     next_actions = (
         _next_actions(
             mode,
@@ -438,6 +435,8 @@ def build_context_report(
         next_actions=next_actions,
         claim_reviews=claim_reviews,
         suggestion=_TOPIC_MISS_SUGGESTION if mode == "topic" and not results else None,
+        findings=findings,
+        records=None if findings is None else finding_records(findings, graph),
     )
 
 
@@ -496,10 +495,14 @@ def format_context_plain(report: ContextReport) -> str:
     if not report.results and not report.unmatched and report.mode == "topic":
         return f"(none)\n{report.suggestion}" if report.suggestion else "(none)"
 
-    for result in report.results:
-        if lines:
-            lines.append("")
-        lines.extend(_format_result(result, include_active_changes=report.mode != "topic"))
+    if report.mode == "after-edit":
+        for result in report.results:
+            lines.extend(_format_changed_owner(result))
+    else:
+        for result in report.results:
+            if lines:
+                lines.append("")
+            lines.extend(_format_result(result, include_active_changes=report.mode == "path"))
 
     reviewed = {(review.doc.path, review.claim_id) for review in report.claim_reviews}
     if report.unmatched:
@@ -551,6 +554,7 @@ def format_context_plain(report: ContextReport) -> str:
             lines.append("")
         if report.validation is not None:
             lines.extend(_validation_lines(report.validation))
+        lines.extend(_findings_lines(report))
         lines.append("Next actions:")
         if report.next_actions:
             for action in report.next_actions:
@@ -1116,7 +1120,6 @@ def _run_checks(graph: DocGraph) -> RunResult:
 def _build_result(
     graph: DocGraph,
     pending: _PendingResult,
-    all_findings: list[Finding] | None,
     *,
     ranker: Ranker | None = None,
     include_active_changes: bool = False,
@@ -1126,10 +1129,6 @@ def _build_result(
     node = pending.node
     source_claims = list(pending.source_claims) or list(node.frontmatter.describes)
     ranking = ranker.rank(node, pending.inputs) if ranker is not None else None
-    relevant_findings = (
-        _relevant_findings(all_findings, node, pending.inputs) if all_findings is not None else None
-    )
-    records = finding_records(relevant_findings, graph) if relevant_findings is not None else None
     all_changes = (
         _active_changes(graph, node)
         if include_active_changes
@@ -1157,8 +1156,6 @@ def _build_result(
             for doc_id in sorted(graph.inbound_strong.get(node.id, set()))
             if doc_id in graph.nodes
         ],
-        findings=relevant_findings,
-        hints=[] if records is None else _hints(records),
         active_changes=_bound_active_changes(all_changes)
         if include_active_changes
         else ActiveChanges(shown=[]),
@@ -1167,7 +1164,6 @@ def _build_result(
             if content_categories is not None
             else None
         ),
-        records=records,
         test_reasons=ranking.reasons if ranking is not None else {},
         missing_inputs=list(pending.missing),
     )
@@ -1475,54 +1471,68 @@ def _change_range(base: ResolvedBase | None, committed_only: bool) -> ChangeRang
     return range_of(base.baseline.ref, base.since, committed_only=committed_only)
 
 
-def _edit_validation(graph: DocGraph, run: RunResult, baseline: ChangeBaseline) -> EditValidation:
+def _edit_validation(
+    graph: DocGraph, run: RunResult, baseline: ChangeBaseline
+) -> tuple[EditValidation, list[Finding] | None]:
+    """The verdicts, and the findings this change caused, which are `None` when the change
+    was not compared."""
     warnings = sum(finding.severity.value == "warning" for finding in run.findings)
-    return EditValidation(
+    change, caused = _change_validation(graph, run, baseline)
+    validation = EditValidation(
         repository=RepositoryValidation(
             state="failed" if run.failed() else "passed",
             errors=len(run.failing()),
             warnings=warnings,
             baseline=run.baseline_report(),
         ),
-        change=_change_validation(graph, run, baseline),
+        change=change,
     )
+    return validation, caused
 
 
 def _change_validation(
     graph: DocGraph, run: RunResult, baseline: ChangeBaseline
-) -> ChangeValidation:
+) -> tuple[ChangeValidation, list[Finding] | None]:
     """What this edit introduced, or why that could not be established.
 
     The comparison is `check --delta`'s own, `run_delta`, so "new" means a finding the
     same run at the base did not produce — not a finding whose file the edit happened to
-    touch. Everything that can go wrong here ends as `not_run` with a reason, because the
-    one answer this must never give is a zero it did not measure.
+    touch. It covers every severity, and the passes that judge a change, which the base run
+    does not make, so a finding one of them raised counts as caused. Everything that can go
+    wrong here ends as `not_run` with a reason, because the one answer this must never give
+    is a zero it did not measure.
     """
     from irminsul.change.report import BaselineSource
     from irminsul.checks.pipeline import failing_findings, run_delta
     from irminsul.delta import DeltaError
 
     if baseline.source == BaselineSource.committed:
-        return ChangeValidation(
-            state="not_run",
-            baseline=None,
-            reason=(
-                "--committed-only without a base ends the change where it starts, so no change "
-                "is judged and nothing uncommitted is read; pass --base-ref <ref> to judge a "
-                "branch's commits"
+        return (
+            ChangeValidation(
+                state="not_run",
+                baseline=None,
+                reason=(
+                    "--committed-only without a base ends the change where it starts, so no "
+                    "change is judged and nothing uncommitted is read; pass --base-ref <ref> to "
+                    "judge a branch's commits"
+                ),
             ),
+            None,
         )
     if baseline.changed_paths is None:
-        return ChangeValidation(
-            state="not_run",
-            baseline=baseline.ref,
-            reason=(
-                f"base ref {baseline.ref!r} could not be resolved; pass --base-ref <ref> "
-                "naming a ref this repository has"
-                if baseline.ref is not None
-                else "no diff baseline could be resolved; pass --base-ref <ref> or set "
-                "IRMINSUL_BASE_REF"
+        return (
+            ChangeValidation(
+                state="not_run",
+                baseline=baseline.ref,
+                reason=(
+                    f"base ref {baseline.ref!r} could not be resolved; pass --base-ref <ref> "
+                    "naming a ref this repository has"
+                    if baseline.ref is not None
+                    else "no diff baseline could be resolved; pass --base-ref <ref> or set "
+                    "IRMINSUL_BASE_REF"
+                ),
             ),
+            None,
         )
     rev = baseline.ref or "HEAD"
     try:
@@ -1531,14 +1541,17 @@ def _change_validation(
         # With no base, `rev` is HEAD, which already holds whatever this branch committed:
         # every finding would count as pre-existing and the answer would be a zero that
         # measured nothing.
-        return ChangeValidation(state="not_run", baseline=rev, reason=str(exc))
+        return ChangeValidation(state="not_run", baseline=rev, reason=str(exc)), None
 
     new_errors = len(failing_findings(delta.new))
-    return ChangeValidation(
-        state="passed" if new_errors == 0 else "failed",
-        new_errors=new_errors,
-        baseline=rev,
-        note=_unjudged_note() if graph.change is None else None,
+    return (
+        ChangeValidation(
+            state="passed" if new_errors == 0 else "failed",
+            new_errors=new_errors,
+            baseline=rev,
+            note=_unjudged_note() if graph.change is None else None,
+        ),
+        delta.new,
     )
 
 
@@ -1670,38 +1683,6 @@ def _unique_actions(actions: Iterable[NextAction]) -> list[NextAction]:
     return out
 
 
-def _relevant_findings(
-    findings: list[Finding],
-    node: DocNode,
-    inputs: Iterable[str],
-) -> list[Finding]:
-    input_paths = set(inputs)
-    relevant_paths = {node.path.as_posix(), *input_paths}
-    out: list[Finding] = []
-    for finding in findings:
-        finding_path = finding.path.as_posix() if finding.path else None
-        if finding.doc_id == node.id:
-            out.append(finding)
-            continue
-        if finding_path in relevant_paths:
-            out.append(finding)
-            continue
-    return out
-
-
-def _hints(records: list[dict[str, object]]) -> list[str]:
-    """Next commands for this result: remediations first, then the gate.
-
-    Remediations come from the same finding-to-fix mapping the findings surfaces
-    use, so a hint is only offered when the check actually harvests a fix for
-    that finding. The verification gate stays last because it is the terminal
-    step regardless of what precedes it.
-    """
-    hints = [str(record["fix_command"]) for record in records if "fix_command" in record]
-    hints.append("irminsul check")
-    return _unique(hints)
-
-
 def _doc_ref(node: DocNode) -> DocRef:
     return DocRef(
         id=node.id,
@@ -1715,15 +1696,14 @@ def _report_to_dict(report: ContextReport) -> dict[str, object]:
     payload: dict[str, object] = {
         "version": report.version,
         "mode": report.mode,
-        "results": [
-            _result_to_dict(result, include_active_changes=report.mode != "topic")
-            for result in report.results
-        ],
+        "results": [_result_to_dict(result, mode=report.mode) for result in report.results],
         "unmatched": [_unmatched_to_dict(item) for item in report.unmatched],
         "claim_reviews": [_claim_review_to_dict(review) for review in report.claim_reviews],
     }
     if report.validation is not None:
         payload["validation"] = _validation_to_dict(report.validation)
+    if report.records is not None:
+        payload["findings"] = report.records
     if report.mode != "topic":
         payload["next_actions"] = [_next_action_to_dict(action) for action in report.next_actions]
     else:
@@ -1731,12 +1711,17 @@ def _report_to_dict(report: ContextReport) -> dict[str, object]:
     return payload
 
 
-def _result_to_dict(
-    result: ContextResult,
-    *,
-    include_active_changes: bool = False,
-) -> dict[str, object]:
-    payload: dict[str, object] = {
+def _result_to_dict(result: ContextResult, *, mode: ContextMode) -> dict[str, object]:
+    if mode == "after-edit":
+        payload: dict[str, object] = {
+            "input": result.input,
+            "owner": _doc_ref_to_dict(result.owner),
+            "missing_inputs": result.missing_inputs,
+        }
+        if result.content is not None:
+            payload["content"] = _content_to_dict(result.content)
+        return payload
+    payload = {
         "input": result.input,
         "owner": _doc_ref_to_dict(result.owner),
         "source_claims": result.source_claims,
@@ -1748,10 +1733,7 @@ def _result_to_dict(
         "depends_on_missing": result.depends_on_missing,
         "depended_on_by": [_doc_ref_to_dict(doc) for doc in result.depended_on_by],
     }
-    if result.records is not None:
-        payload["findings"] = result.records
-        payload["hints"] = result.hints
-    if include_active_changes:
+    if mode == "path":
         payload["active_changes"] = {
             "shown": [_active_change_to_dict(change) for change in result.active_changes.shown],
             "omitted": result.active_changes.omitted,
@@ -1889,38 +1871,62 @@ def _format_result(result: ContextResult, *, include_active_changes: bool = Fals
         else:
             lines.append("  active changes: -")
     if result.content is not None:
-        lines.append("  content:")
-        if result.content.included:
-            for excerpt in result.content.included:
-                suffix = " [truncated]" if excerpt.truncated else ""
-                lines.append(f"    [{excerpt.category}] {excerpt.title} ({excerpt.path}){suffix}")
-                lines.append(f"      reason: {excerpt.reason}")
-                lines.extend(f"      {line}" for line in excerpt.text.splitlines())
-        else:
-            lines.append("    (none)")
-        omitted = [
-            f"{category}={count}" for category, count in result.content.omitted.items() if count
-        ]
-        if omitted:
-            lines.append(f"    omitted: {', '.join(omitted)}")
-    if result.findings is None:
-        return lines
-    if result.findings:
-        lines.append("  findings:")
-        for finding in result.findings:
-            location = finding.path.as_posix() if finding.path else "<repo>"
-            if finding.line is not None:
-                location = f"{location}:{finding.line}"
-            # Same identity convention as `irminsul check`: the bracketed code
-            # is what `irminsul explain <code>` accepts; severity stays visible.
-            lines.append(
-                f"    {finding.severity.value}  [{finding.code}] {location}: {finding.message}"
-            )
-            if finding.suggestion:
-                lines.append(f"      suggestion: {finding.suggestion}")
+        lines.extend(_format_content(result.content))
+    return lines
+
+
+def _format_content(content: ContextContent) -> list[str]:
+    lines = ["  content:"]
+    if content.included:
+        for excerpt in content.included:
+            suffix = " [truncated]" if excerpt.truncated else ""
+            lines.append(f"    [{excerpt.category}] {excerpt.title} ({excerpt.path}){suffix}")
+            lines.append(f"      reason: {excerpt.reason}")
+            lines.extend(f"      {line}" for line in excerpt.text.splitlines())
     else:
-        lines.append("  findings: (none)")
-    lines.append(f"  hints: {_format_list(result.hints)}")
+        lines.append("    (none)")
+    omitted = [f"{category}={count}" for category, count in content.omitted.items() if count]
+    if omitted:
+        lines.append(f"    omitted: {', '.join(omitted)}")
+    return lines
+
+
+def _format_changed_owner(result: ContextResult) -> list[str]:
+    """The one line an edit gives an owner: the doc, and the changed inputs it owns."""
+    line = (
+        f"owner: {result.owner.id} ({result.owner.path}), "
+        f"changed: {_format_list(_input_labels(result))}"
+    )
+    lines = [line]
+    if result.content is not None:
+        lines.extend(_format_content(result.content))
+    return lines
+
+
+def _findings_lines(report: ContextReport) -> list[str]:
+    """The findings of the edit, once for the whole report, under the verdict they belong to."""
+    if report.findings is None or report.validation is None:
+        return []
+    change = report.validation.change
+    if change.state == "not_run":
+        header = (
+            "Findings, every one of the run, since the change was not compared: "
+            f"{len(report.findings)}"
+        )
+    else:
+        header = (
+            f"Findings this change caused (compared with {change.baseline}): {len(report.findings)}"
+        )
+    lines = [header]
+    for finding in report.findings:
+        location = finding.path.as_posix() if finding.path else "<repo>"
+        if finding.line is not None:
+            location = f"{location}:{finding.line}"
+        # Same identity convention as `irminsul check`: the bracketed code is what
+        # `irminsul explain <code>` accepts; severity stays visible.
+        lines.append(f"  {finding.severity.value}  [{finding.code}] {location}: {finding.message}")
+        if finding.suggestion:
+            lines.append(f"    suggestion: {finding.suggestion}")
     return lines
 
 

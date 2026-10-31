@@ -78,7 +78,7 @@ def test_a_second_call_sees_a_commit_made_between_calls(tmp_path: Path) -> None:
         path.write_text(path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
 
     def drift() -> list[str]:
-        findings = _after_edit(root).results[0].findings
+        findings = _after_edit(root).findings
         assert findings is not None
         return [f.code for f in findings]
 

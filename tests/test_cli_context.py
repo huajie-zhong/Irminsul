@@ -305,7 +305,7 @@ def _commit_then_edit(repo: Path, rel: str) -> None:
     target.write_text(target.read_text(encoding="utf-8") + "\n", encoding="utf-8")
 
 
-def test_context_hints_offer_fix_for_fixable_finding(
+def test_context_after_edit_offers_the_fix_for_a_fixable_finding(
     fixture_repo: Callable[[str], Path],
 ) -> None:
     repo = fixture_repo("soft-glossary")
@@ -313,18 +313,19 @@ def test_context_hints_offer_fix_for_fixable_finding(
 
     result = runner.invoke(
         app,
-        ["context", "--after-edit", "--format", "json", "--path", str(repo)],
+        ["context", "--after-edit", "--committed-only", "--format", "json", "--path", str(repo)],
     )
 
     assert result.exit_code == 0, result.output
-    [context] = json.loads(result.output)["results"]
-    assert context["hints"] == [
-        "irminsul fix --only glossary-discipline --confirm",
-        "irminsul check",
-    ]
+    fixes = {
+        finding["fix_command"]
+        for finding in json.loads(result.output)["findings"]
+        if finding["code"] == "glossary-discipline/unlinked-term" and "fix_command" in finding
+    }
+    assert fixes == {"irminsul fix --only glossary-discipline --confirm"}
 
 
-def test_context_hints_are_gate_only_without_fixable_finding(tmp_path: Path) -> None:
+def test_context_after_edit_carries_no_hints(tmp_path: Path) -> None:
     repo = _make_context_repo(tmp_path)
     _commit_then_edit(repo, "src/mylib/core.py")
 
@@ -334,8 +335,9 @@ def test_context_hints_are_gate_only_without_fixable_finding(tmp_path: Path) -> 
     )
 
     assert result.exit_code == 0, result.output
-    [context] = json.loads(result.output)["results"]
-    assert context["hints"] == ["irminsul check"]
+    data = json.loads(result.output)
+    assert "hints" not in data
+    assert "hints" not in data["results"][0]
 
 
 def test_context_doc_path_plain_returns_doc_metadata(tmp_path: Path) -> None:
@@ -676,10 +678,13 @@ def test_context_plain_findings_render_code_as_identity(tmp_path: Path) -> None:
     repo = _make_context_repo(tmp_path)
     _commit_then_edit(repo, "src/mylib/core.py")
 
-    result = runner.invoke(app, ["context", "--after-edit", "--path", str(repo)])
+    result = runner.invoke(
+        app, ["context", "--after-edit", "--committed-only", "--path", str(repo)]
+    )
 
-    # The orphan was there before the edit, so the change introduced nothing.
-    assert result.exit_code == 0, result.output
+    # Not compared, so every finding of the run is listed, the orphan among them. The
+    # repository has errors, and an edit that was not compared reports the repository's verdict.
+    assert result.exit_code == 1, result.output
     assert re.search(r"(?m)^\s+error\s+\[orphans/orphan-doc\] ", result.output), result.output
     assert "[warning/orphans]" not in result.output
 
@@ -1158,8 +1163,8 @@ def _core(data: dict[str, Any]) -> dict[str, Any]:
     return next(item for item in data["results"] if item["owner"]["id"] == "core")
 
 
-def _finding_codes(result: dict[str, Any]) -> list[str]:
-    return [finding["code"] for finding in result["findings"]]
+def _finding_codes(data: dict[str, Any]) -> list[str]:
+    return [finding["code"] for finding in data["findings"]]
 
 
 def test_context_after_edit_with_a_base_reports_co_change_for_uncommitted_work(
@@ -1167,9 +1172,9 @@ def test_context_after_edit_with_a_base_reports_co_change_for_uncommitted_work(
 ) -> None:
     repo, base = _dirty_claimed_file_on_a_fresh_branch(tmp_path)
 
-    core = _core(_after_edit(repo, "--base-ref", base))
+    data = _after_edit(repo, "--base-ref", base)
 
-    [found] = [f for f in core["findings"] if f["code"] == _UNREFLECTED]
+    [found] = [f for f in data["findings"] if f["code"] == _UNREFLECTED]
     assert found["path"] == "docs/components/core.md"
     assert "src/mylib/core.py (uncommitted)" in found["message"]
 
@@ -1193,24 +1198,24 @@ def test_context_after_edit_takes_the_base_from_the_environment(
         from_environment = _after_edit(repo)
         monkeypatch.delenv(variable)
         assert from_environment == explicit
-        assert _UNREFLECTED in _finding_codes(_core(from_environment))
+        assert _UNREFLECTED in _finding_codes(from_environment)
 
 
 def test_context_after_edit_without_a_base_runs_no_diff_pass(tmp_path: Path) -> None:
     repo, _ = _dirty_claimed_file_on_a_fresh_branch(tmp_path)
 
-    core = _core(_after_edit(repo))
+    data = _after_edit(repo)
 
-    assert _UNREFLECTED not in _finding_codes(core)
+    assert _UNREFLECTED not in _finding_codes(data)
 
 
 def test_context_after_edit_reports_the_work_a_branch_committed(tmp_path: Path) -> None:
     repo, base = _dirty_claimed_file_on_a_fresh_branch(tmp_path)
     git(repo, "commit", "-qam", "edit core")
 
-    core = _core(_after_edit(repo, "--base-ref", base))
+    data = _after_edit(repo, "--base-ref", base)
 
-    [found] = [f for f in core["findings"] if f["code"] == _UNREFLECTED]
+    [found] = [f for f in data["findings"] if f["code"] == _UNREFLECTED]
     assert "src/mylib/core.py" in found["message"]
     assert "(uncommitted)" not in found["message"]
 
@@ -1231,7 +1236,7 @@ def test_context_has_no_co_change_notion_of_its_own(tmp_path: Path) -> None:
     # Updating the owning doc in the same change closes the gap.
     doc = repo / "docs" / "components" / "core.md"
     doc.write_text(doc.read_text(encoding="utf-8") + "\nUpdated.\n", encoding="utf-8")
-    assert _UNREFLECTED not in _finding_codes(_core(_after_edit(repo, "--base-ref", base)))
+    assert _UNREFLECTED not in _finding_codes(_after_edit(repo, "--base-ref", base))
 
 
 def test_context_after_edit_committed_only_without_a_base_judges_no_change(
@@ -1867,3 +1872,97 @@ def test_after_an_edit_a_recorded_debt_file_still_carries_the_note(tmp_path: Pat
     notes = {item["path"]: item["recorded_debt"] for item in json.loads(result.output)["unmatched"]}
     assert "adoption-debt-touched" in (notes["src/mylib/legacy.py"] or "")
     assert notes["src/mylib/fresh.py"] is None
+
+
+_OWNER_DETAIL_LABELS = (
+    "title:",
+    "entrypoint:",
+    "tests:",
+    "depends_on:",
+    "depended-on-by:",
+    "active changes",
+    "content:",
+    "requirements:",
+    "hints:",
+    "source claims:",
+)
+
+
+def test_after_edit_names_each_owner_and_its_changed_files_only(tmp_path: Path) -> None:
+    repo, base = _dirty_claimed_file_on_a_fresh_branch(tmp_path)
+
+    code, output = invoke(repo, "context", "--after-edit", "--base-ref", base)
+
+    assert code == 0, output
+    assert "owner: core (docs/components/core.md)" in output
+    detail = [line for line in output.splitlines() if line.strip().startswith(_OWNER_DETAIL_LABELS)]
+    assert detail == []
+    data = _after_edit(repo, "--base-ref", base)
+    assert set(_core(data)) == {"owner", "input", "missing_inputs"}
+    assert "hints" not in data
+
+
+def test_a_finding_the_change_caused_is_listed_once_at_the_top(tmp_path: Path) -> None:
+    repo, base = _dirty_claimed_file_on_a_fresh_branch(tmp_path)
+
+    data = _after_edit(repo, "--base-ref", base)
+
+    assert [f["code"] for f in data["findings"]].count(_UNREFLECTED) == 1
+    assert "findings" not in _core(data)
+
+
+def test_a_hint_the_doc_already_had_is_not_listed_as_caused(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("soft-glossary")
+    base = seed_repo(repo, "initial")
+    composer = repo / "docs" / "components" / "composer.md"
+    composer.write_text(composer.read_text(encoding="utf-8") + "\nA plain sentence.\n")
+
+    data = _after_edit(repo, "--base-ref", base)
+
+    assert data["validation"]["change"]["state"] == "passed"
+    assert "glossary-discipline/unlinked-term" not in [f["code"] for f in data["findings"]]
+
+
+def test_a_new_error_on_a_touched_doc_is_listed_once(tmp_path: Path) -> None:
+    repo, base = _dirty_claimed_file_on_a_fresh_branch(tmp_path)
+    core = repo / "docs" / "components" / "core.md"
+    core.write_text(
+        core.read_text(encoding="utf-8") + "\nSee [the missing page](no-such-page.md).\n",
+        encoding="utf-8",
+    )
+
+    _, output = invoke(repo, "context", "--after-edit", "--format", "json", "--base-ref", base)
+    data = json.loads(output)
+
+    errors = [f for f in data["findings"] if f["severity"] == "error"]
+    assert len(errors) == 1
+    assert errors[0]["path"] == "docs/components/core.md"
+    assert data["validation"]["change"]["state"] == "failed"
+
+
+def test_a_run_that_was_not_compared_shows_every_finding_and_says_why(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = fixture_repo("soft-glossary")
+    _commit_then_edit(repo, "docs/components/composer.md")
+
+    code, output = invoke(repo, "context", "--after-edit", "--committed-only")
+
+    assert code == 0, output
+    assert "Change validation: not run" in output
+    assert "glossary-discipline/unlinked-term" in output
+    data = json.loads(
+        invoke(repo, "context", "--after-edit", "--committed-only", "--format", "json")[1]
+    )
+    assert data["validation"]["change"]["state"] == "not_run"
+    assert "glossary-discipline/unlinked-term" in [f["code"] for f in data["findings"]]
+
+
+def test_include_still_returns_owner_content_after_an_edit(tmp_path: Path) -> None:
+    repo, base = _dirty_claimed_file_on_a_fresh_branch(tmp_path)
+
+    data = _after_edit(repo, "--base-ref", base, "--include", "owner")
+
+    assert "content" in _core(data)

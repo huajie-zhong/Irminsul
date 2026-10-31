@@ -39,7 +39,7 @@ claims:
 
 # Agent context command
 
-`irminsul context` tells an agent what governs a file before and after it edits one: the doc that owns the path, the tests that doc declares and the ones that import the file, the dependencies that doc declares, active RFCs that affect it, the next commands to run, and — after the edit — the findings. It is a runtime lookup over the current [DocGraph](docgraph.md), not a generated artifact, and it is a starting map rather than the documentation itself: its excerpts are bounded, so read the owning doc it names before changing code.
+`irminsul context` tells an agent what governs a file before and after it edits one: the doc that owns the path, the tests that doc declares and the ones that import the file, the dependencies that doc declares, active RFCs that affect it, and the next commands to run. After the edit it says less, because an edit's packet is about the change: each owning doc with the changed files it owns, and the findings the change caused. It is a runtime lookup over the current [DocGraph](docgraph.md), not a generated artifact, and it is a starting map rather than the documentation itself: its excerpts are bounded, so read the owning doc it names before changing code.
 
 The command takes exactly one input mode, and `irminsul context --help` says what each takes: `<path...>` is the packet to read before editing, `--topic` finds the docs for a concept, and `--after-edit` maps the change made and is the one mode that runs checks. That change is the one `check --diff` judges ([A change is judged from its merge base to the working tree](../decisions/a-change-is-judged-from-its-merge-base-to-the-working-tree.md)). A source file under a configured root outside the repository, such as the sibling code repository of the [private-docs layout](../guides/private-docs.md), is named by the display spelling `describes:` uses, and its filesystem path maps to that spelling. A path that is not on disk yet is answered too, because that is when an agent asks which doc a new file belongs to: `_repo_relative` gives it the spelling it would have, the owner is the doc whose `describes` glob covers it, and `ContextResult.missing_inputs` (or `UnmatchedPath.missing`, where no glob does) says the file does not exist. A path outside the repository and every configured root is refused whether or not it exists.
 <!-- anchor: src/irminsul/context.py#_repo_relative @sha256:5ce500137ae9 -->
@@ -95,6 +95,11 @@ however long it has been there, as it is under `check --delta`. Where no trustwo
 baseline exists the repository verdict decides instead, which is the safe direction. The
 pull-request gate is independent of this and still fails on the repository's own state.
 
+The findings an edit reports are the ones this change caused: the comparison above, over
+every severity, listed once for the whole report and not under each owner. When the change
+could not be compared, every finding of the run is listed instead, and `validation.change`
+says why, so a list that looks clean is never one nothing measured.
+
 With no base, the change is the working tree against `HEAD` and the passes that judge a
 change (`CHANGE_PASSES`) have no range to read, so they do not run. A `passed` verdict
 then means no new finding from what did run, and `ChangeValidation.note` says so and
@@ -106,11 +111,11 @@ the adoption record excepts passes here and fails under `--base-ref HEAD`.
 
 ## Content excerpts
 
-Path and after-edit reports carry authored content by default: the owning doc's first
-substantive block, its `## Scope & Limitations` section, its claim text, and requirement
-prose from the active RFCs that affect it. `--include` selects among these categories;
-`dependencies`, the direct `depends_on` docs, is not in the default, and a topic lookup
-carries content only when given `--include`.
+Path reports carry authored content by default: the owning doc's first substantive block,
+its `## Scope & Limitations` section, its claim text, and requirement prose from the active
+RFCs that affect it. `--include` selects among these categories; `dependencies`, the direct
+`depends_on` docs, is not in the default. A topic lookup and an after-edit report carry
+content only when given `--include`.
 
 The boundary excerpt is that one section and nothing else, and a doc that draws no
 boundary contributes none rather than an empty one. It carries the section's caveats
