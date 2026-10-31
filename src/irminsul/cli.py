@@ -1188,6 +1188,9 @@ def _echo_fix_result(result: FixResult, *, dry_run: bool) -> None:
     else:
         for written in result.written:
             typer.echo(f"  {written.as_posix()}")
+
+
+def _echo_held(result: FixResult) -> None:
     for held in result.held:
         typer.echo(typer.style(f"  held: {held.path.as_posix()}: {held.description}", fg="yellow"))
 
@@ -1377,7 +1380,8 @@ def fix(
     if result.held:
         typer.echo(
             typer.style(
-                f"held {len(result.held)} fix(es); re-run with --confirm to apply",
+                f"held {len(result.held)} fix(es): --dry-run --confirm lists them, "
+                "--confirm applies them",
                 fg="yellow",
             )
         )
@@ -1863,6 +1867,7 @@ def change_transition(
     plan_only = not confirm
     result = apply_fixes(repo_root, list(plan.fixes), dry_run=plan_only, confirm=True)
     _echo_fix_result(result, dry_run=plan_only)
+    _echo_held(result)
     if result.errors:
         for error in result.errors:
             typer.echo(typer.style(error, fg="red"), err=True)
@@ -1969,6 +1974,7 @@ def change_finalize(
         repo_root, list(plan.component_fixes), dry_run=plan_only, confirm=True
     )
     _echo_fix_result(component_result, dry_run=plan_only)
+    _echo_held(component_result)
     if component_result.errors:
         for error in component_result.errors:
             typer.echo(typer.style(error, fg="red"), err=True)
@@ -1980,6 +1986,7 @@ def change_finalize(
 
     rfc_result = apply_fixes(repo_root, list(plan.rfc_fixes), dry_run=plan_only, confirm=True)
     _echo_fix_result(rfc_result, dry_run=plan_only)
+    _echo_held(rfc_result)
     if rfc_result.errors:
         for error in rfc_result.errors:
             typer.echo(typer.style(error, fg="red"), err=True)

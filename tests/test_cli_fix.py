@@ -12,7 +12,7 @@ from typer.testing import CliRunner
 
 from irminsul.checks.base import Fix
 from irminsul.cli import app
-from irminsul.fix import apply_fixes
+from irminsul.fix import FixResult, apply_fixes
 
 from .conftest import write_config
 
@@ -27,7 +27,8 @@ def test_fix_supersession_dry_run_does_not_write(fixture_repo: Callable[[str], P
     result = runner.invoke(app, ["fix", "--dry-run", "--path", str(repo)])
 
     assert result.exit_code == 0, result.output
-    assert "status: deprecated" in result.output
+    assert "held 1 fix(es)" in result.output
+    assert "status: deprecated" not in result.output
     assert old_doc.read_text(encoding="utf-8") == before
 
 
@@ -292,3 +293,53 @@ def test_fix_only_rejects_an_unknown_name(
     assert result.exit_code == 2, result.output
     assert "unknown check name(s): 'glossary-disipline'" in result.output
     assert "did you mean 'glossary-discipline'" in result.output
+
+
+_HELD_SUMMARY = "held 1 fix(es): --dry-run --confirm lists them, --confirm applies them"
+_HELD_RFC = "docs/rfcs/0002-accepted-bad-status.md"
+
+
+def _planned_and_held_repo(fixture_repo: Callable[[str], Path]) -> Path:
+    """A repository with two fixes that run by default and one that waits for `--confirm`."""
+    repo = fixture_repo("soft-lifecycle")
+    held = fixture_repo("soft-rfc-follow-through") / _HELD_RFC
+    (repo / "docs" / "rfcs" / held.name).write_text(
+        held.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    return repo
+
+
+def test_fix_dry_run_summarises_held_fixes_in_one_line(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = _planned_and_held_repo(fixture_repo)
+
+    result = runner.invoke(app, ["fix", "--dry-run", "--path", str(repo)])
+
+    assert result.exit_code == 0, result.output
+    assert "docs/decisions/0004-no-backlink-adr.md: add implements" in result.output
+    assert "planned 2 fix(es)" in result.output
+    assert [line for line in result.output.splitlines() if "held" in line] == [_HELD_SUMMARY]
+
+
+def test_fix_dry_run_with_confirm_lists_the_held_fixes_as_planned(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = _planned_and_held_repo(fixture_repo)
+
+    result = runner.invoke(app, ["fix", "--dry-run", "--confirm", "--path", str(repo)])
+
+    assert result.exit_code == 0, result.output
+    assert f"{_HELD_RFC}: set status: stable" in result.output
+    assert "planned 3 fix(es)" in result.output
+    assert "held" not in result.output
+
+
+def test_a_change_command_still_lists_each_held_fix(capsys: pytest.CaptureFixture[str]) -> None:
+    from irminsul.cli import _echo_held
+
+    held = Fix(Path(_HELD_RFC), "set status: stable", lambda text: text, requires_confirm=True)
+
+    _echo_held(FixResult(held=[held]))
+
+    assert capsys.readouterr().out == f"  held: {_HELD_RFC}: set status: stable\n"
