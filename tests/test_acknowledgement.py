@@ -338,6 +338,11 @@ def test_an_unused_trailer_on_a_path_with_no_finding_names_no_other_code(graph: 
     assert "the finding on" not in unused.message
 
 
+def test_a_placeholder_reason_is_no_reason() -> None:
+    assert parse('diff-integrity/claim-reworded docs/x.md reason="..."') == "gives no reason"
+    assert parse('diff-integrity/claim-reworded docs/x.md reason=" ... "') == "gives no reason"
+
+
 def test_misuse_is_reported_only_when_the_run_says_so(graph: DocGraph) -> None:
     assert acknowledge([], [_trailer('evidence-drift alpha reason="x"')], graph, ran=None) == []
 
@@ -986,3 +991,27 @@ def test_an_unused_trailer_names_the_code_the_claims_finding_carries(tmp_path: P
         "the finding on `docs/components/widget.md` `governs` is "
         "`diff-integrity/governing-claim-changed`, not `diff-integrity/claim-reworded`"
     ) in unused["message"]
+
+
+@pytest.mark.parametrize(("code", "arrange"), _ROUNDTRIP)
+def test_a_printed_trailer_pasted_unedited_accepts_nothing(
+    tmp_path: Path, code: str, arrange: Arrange
+) -> None:
+    """The placeholder reason is what `trailer_for` prints, so a trailer pasted as printed
+    must not acknowledge the finding it came from."""
+    base = arrange(tmp_path)
+    raised = findings_of(tmp_path, code, "--diff", base)
+    printed = [_printed_trailer(finding) for finding in raised]
+    assert raised and None not in printed
+    git(
+        tmp_path,
+        "commit",
+        "--allow-empty",
+        "-qm",
+        "paste the printed trailers unedited\n\n" + "\n".join(line for line in printed if line),
+    )
+
+    assert severities_of(tmp_path, code, "--diff", base) == [
+        finding["severity"] for finding in raised
+    ]
+    assert findings_of(tmp_path, CODE_INVALID, "--diff", base)

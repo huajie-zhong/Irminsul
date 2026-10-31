@@ -41,6 +41,9 @@ _TRAILER_RE = re.compile(
     r'(?:\s+reason="(?P<reason>[^"]*)")?\s*'
 )
 
+REASON_PLACEHOLDER: Final = "..."
+"""What `trailer_for` and `trailer_form` print in place of a reason. Left unedited it gives none."""
+
 _UNUSED_SUGGESTION: Final = (
     "nothing to do unless it names the wrong path or subject; then add a trailer naming the "
     "right one to a later commit"
@@ -127,7 +130,7 @@ def parse(value: str) -> _Parsed | str:
     if match["path"] is None:
         return "names no path"
     reason = (match["reason"] or "").strip()
-    if not reason:
+    if not reason or reason == REASON_PLACEHOLDER:
         return "gives no reason"
     return _Parsed(match["code"], match["path"], match["subject"], reason)
 
@@ -199,12 +202,12 @@ def trailer_for(finding: Finding) -> str:
     """The trailer that acknowledges `finding`, with the subject left out when it is the path."""
     path = finding.path.as_posix() if finding.path is not None else "<path>"
     subject = "" if finding.subject in (None, path) else f" {finding.subject}"
-    return f'{TRAILER_KEY}: {finding.code} {path}{subject} reason="..."'
+    return f'{TRAILER_KEY}: {finding.code} {path}{subject} reason="{REASON_PLACEHOLDER}"'
 
 
 def trailer_form(code: str) -> str:
     """The shape of a trailer that acknowledges `code`, for `irminsul explain`."""
-    return f'{TRAILER_KEY}: {code} <path> [<subject>] reason="..."'
+    return f'{TRAILER_KEY}: {code} <path> [<subject>] reason="{REASON_PLACEHOLDER}"'
 
 
 _FIX_THE_TRAILER: Final = f"add a valid trailer to a later commit: `{trailer_form('<code>')}`"
