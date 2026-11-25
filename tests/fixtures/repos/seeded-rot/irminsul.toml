@@ -1,0 +1,6 @@
+project_name = "seeded-rot-fixture"
+
+[paths]
+docs_root = "docs"
+source_roots = ["src"]
+extra_docs = ["README.md"]

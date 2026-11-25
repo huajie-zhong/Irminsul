@@ -61,6 +61,20 @@ def write(root: Path, rel: str, text: str) -> Path:
     return path
 
 
+def replace_text(root: Path, rel: str, old: str, new: str) -> None:
+    """Replace the one occurrence of `old` in `root/rel` with `new`, leaving every other byte.
+
+    Text that is absent or repeated fails here, so an edit a test names cannot change nothing
+    or more than it says. The file is read and written as bytes because a fixture is copied
+    with its own line endings, which a text-mode write would turn into the platform's.
+    """
+    path = root / rel
+    text = path.read_bytes().decode("utf-8")
+    count = text.count(old)
+    assert count == 1, f"{rel} holds {old!r} {count} times, not once"
+    path.write_bytes(text.replace(old, new).encode("utf-8"))
+
+
 def config_toml(
     *,
     project_name: str = "r",
@@ -192,6 +206,13 @@ def invoke(root: Path, *args: str) -> tuple[int, str]:
     """Run `irminsul <args> --path root` and return the exit code and everything it printed."""
     result = _runner.invoke(app, [*args, "--path", str(root)])
     return result.exit_code, result.output
+
+
+def invoke_json(root: Path, *args: str) -> Any:
+    """What `irminsul <args> --format json` prints for the repository at `root`, parsed. The exit
+    code is not read: a run that reports findings exits non-zero and still prints its report."""
+    _, output = invoke(root, *args, "--format", "json")
+    return json.loads(output)
 
 
 def check_findings(root: Path, *args: str) -> list[dict[str, Any]]:
