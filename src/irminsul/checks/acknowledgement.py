@@ -188,14 +188,21 @@ def shown_path(path: str, uncommitted: frozenset[str]) -> str:
     return f"{path} (uncommitted)" if path in uncommitted else path
 
 
+def uncommitted_about(finding: Finding, uncommitted: frozenset[str]) -> list[str]:
+    """The files `finding` is about that hold work not committed yet. That work is later than
+    every commit, so it lapses a trailer on any of them, and the commit that will carry it is
+    the first that can sign the finding off."""
+    return [path for path in about_of(finding) if path in uncommitted]
+
+
 def placement(finding: Finding, uncommitted: frozenset[str]) -> str:
     """Where the trailer goes: on the commit that carries uncommitted work, or else on the
     commit that carries the last change to what the finding is about, or a later one."""
-    about = about_of(finding)
-    pending = [path for path in about if path in uncommitted]
+    pending = uncommitted_about(finding, uncommitted)
     if pending:
         return f"in the message of the commit that carries {', '.join(pending)}"
-    return f"on the commit that carries the last change to {', '.join(about)}, or a later one"
+    about = ", ".join(about_of(finding))
+    return f"on the commit that carries the last change to {about}, or a later one"
 
 
 def trailer_for(finding: Finding) -> str:
@@ -216,6 +223,13 @@ def trailer_open(finding: Finding) -> bool:
     from irminsul.checks.pipeline import answer_of
 
     return answer_of(finding.code).kind is AnswerKind.trailer and not accepted(finding)
+
+
+def awaits_commit(finding: Finding, uncommitted: frozenset[str]) -> bool:
+    """Whether only a commit that does not exist yet can answer `finding`: a trailer can
+    still take it, and a file it is about holds uncommitted work, which no commit of the
+    change is late enough to cover. `placement` then names the commit to come."""
+    return trailer_open(finding) and bool(uncommitted_about(finding, uncommitted))
 
 
 def trailer_block(findings: Iterable[Finding]) -> list[str]:

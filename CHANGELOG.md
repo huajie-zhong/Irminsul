@@ -131,6 +131,15 @@ making a feature, a refactor and an RFC-driven change in it.
   had it, in the plain output and the JSON. It named plain `irminsul check`, which runs none of
   the passes that judge a change and so listed nothing for a finding one of them raised. The
   `--after-edit` help and the MCP tool description say which run lists the errors.
+- `context --after-edit` no longer fails on a certain finding that a commit trailer answers
+  while a file it is about has uncommitted work, such as `diff-integrity/check-disabled` after a
+  check is taken out of `checks.enabled`: the trailer belongs in the message of a commit that
+  does not exist yet, so the run could not pass before that commit. The finding is listed after
+  the others, under its own heading, with the trailer to write. The verdict says how many
+  findings wait, and they are not among the new errors: in JSON, `awaiting_trailer` under
+  `validation.change` counts them and each carries `awaiting_trailer: true`. `check --diff`
+  still fails on such a finding until a commit carries the trailer, and so does `--after-edit`
+  once the work is committed without one.
 - `irminsul explain` says a `time` finding is left out of a run that judges a change, which is
   `check --diff` and `context --after-edit` from a base or on uncommitted work. It named `--diff`
   alone.
