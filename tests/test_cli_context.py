@@ -1270,11 +1270,31 @@ def test_context_after_edit_takes_the_base_from_the_environment(
         assert _UNREFLECTED in _finding_codes(from_environment)
 
 
-def test_context_after_edit_without_a_base_runs_no_diff_pass(tmp_path: Path) -> None:
+def test_context_after_edit_without_a_base_judges_uncommitted_work_against_head(
+    tmp_path: Path,
+) -> None:
     repo, _ = _dirty_claimed_file_on_a_fresh_branch(tmp_path)
 
     data = _after_edit(repo)
 
+    [found] = [f for f in data["findings"] if f["code"] == _UNREFLECTED]
+    assert "src/mylib/core.py (uncommitted)" in found["message"]
+    assert data["validation"]["change"]["baseline"] == "HEAD"
+    assert data == _after_edit(repo, "--base-ref", "HEAD")
+
+
+def test_context_after_edit_without_a_base_judges_nothing_on_a_clean_tree(
+    tmp_path: Path,
+) -> None:
+    repo, _ = _dirty_claimed_file_on_a_fresh_branch(tmp_path)
+    git(repo, "commit", "-qam", "edit core")
+
+    # The change was not compared, so the repository's own errors decide the exit code.
+    _, output = invoke(repo, "context", "--after-edit", "--format", "json")
+    data = json.loads(output)
+
+    assert data["results"] == []
+    assert data["validation"]["change"]["state"] == "not_run"
     assert _UNREFLECTED not in _finding_codes(data)
 
 
@@ -1295,12 +1315,10 @@ def test_context_has_no_co_change_notion_of_its_own(tmp_path: Path) -> None:
     data = _after_edit(repo)
     assert "doc_co_changed" not in _core(data)
     assert all("was not updated in this change" not in a["reason"] for a in data["next_actions"])
-    _, plain = invoke(repo, "context", "--after-edit")
-    assert "owning doc not updated" not in plain
-    assert _UNREFLECTED not in plain
-
-    _, plain = invoke(repo, "context", "--after-edit", "--base-ref", base)
-    assert f"[{_UNREFLECTED}]" in plain
+    for base_args in ([], ["--base-ref", base]):
+        _, plain = invoke(repo, "context", "--after-edit", *base_args)
+        assert "owning doc not updated" not in plain
+        assert f"[{_UNREFLECTED}]" in plain
 
     # Updating the owning doc in the same change closes the gap.
     doc = repo / "docs" / "components" / "core.md"

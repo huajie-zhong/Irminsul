@@ -17,6 +17,7 @@ from irminsul.context import build_context_report
 from .conftest import commit_all, seed_repo
 
 _OLD = _dt.datetime(2024, 1, 1, tzinfo=_dt.UTC)
+_LATER = _dt.datetime(2025, 1, 1, tzinfo=_dt.UTC)
 
 
 def _doc(doc_id: str, describes: list[str]) -> str:
@@ -72,10 +73,6 @@ def test_a_second_call_sees_a_commit_made_between_calls(tmp_path: Path) -> None:
     source must reach the next call in the same process, as it does in the MCP server."""
     root = _repo(tmp_path / "r", checks='["mtime-drift"]')
     seed_repo(root, "seed", when=_OLD)
-    # An uncommitted edit puts the file in the change set `--after-edit` maps; the doc is
-    # edited too, so the two are changed together and neither is after the other.
-    for path in (root / "src" / "thing.py", root / "docs" / "components" / "alpha.md"):
-        path.write_text(path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
 
     def drift() -> list[str]:
         findings = _after_edit(root).findings
@@ -84,7 +81,11 @@ def test_a_second_call_sees_a_commit_made_between_calls(tmp_path: Path) -> None:
 
     assert drift() == []
 
-    commit_all(root, "the doc alone, long ago", when=_OLD, paths=["docs/components/alpha.md"])
+    # Committed, so the tree is clean on both calls: uncommitted work would be a change
+    # judged against HEAD, and a run that judges a change leaves out what time caused.
+    source = root / "src" / "thing.py"
+    source.write_text(source.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    commit_all(root, "the source alone, a year on", when=_LATER, paths=["src/thing.py"])
 
     assert drift() == ["mtime-drift/drift-detected"]
 

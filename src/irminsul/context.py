@@ -19,7 +19,7 @@ from irminsul.checks.globs import (
     is_configured_source_path,
     resolve_display_path,
 )
-from irminsul.checks.pipeline import CHANGE_PASSES, RunResult
+from irminsul.checks.pipeline import RunResult
 from irminsul.checks.uniqueness import Claim, most_specific_claims, resolve_claims
 from irminsul.config import IrminsulConfig, in_layer
 from irminsul.declared_tests import governed_as_test, matching_paths
@@ -151,11 +151,10 @@ class ChangeValidation:
 
     state: ValidationState
     new_errors: int | None = None
+    #: The base the verdict was measured against: the ref that was given, or `HEAD` when none
+    #: was. None when no base names a change, as under `--committed-only` with none given.
     baseline: str | None = None
     reason: str | None = None
-    #: What a `passed` or `failed` verdict leaves out, when it leaves something out: with no
-    #: base the checks that judge a change did not run, so a zero says nothing about them.
-    note: str | None = None
 
 
 @dataclass(frozen=True)
@@ -345,7 +344,8 @@ def build_context_report(
     all of the cost of every call.
 
     When a base resolves, the change runs from its merge base with `HEAD` to the working
-    tree, or to `HEAD` under `committed_only`. The graph carries that range, so the passes
+    tree, or to `HEAD` under `committed_only`. With no base given, the uncommitted work is
+    the change and `HEAD` its base. The graph carries that range, so the passes
     `check --diff` adds run here too, and the paths it changed are the ones reported on.
     """
     paths = tuple(target_paths) if target_paths is not None else None
@@ -1450,8 +1450,6 @@ def _validation_lines(validation: EditValidation) -> list[str]:
             f"Change validation: {change.state} "
             f"({change.new_errors} new errors vs {change.baseline})"
         )
-        if change.note:
-            lines.append(f"  note: {change.note}")
     return lines
 
 
@@ -1464,14 +1462,22 @@ def _resolve_base(repo_root: Path, base_ref: str | None, committed_only: bool) -
 
 
 def _change_range(base: ResolvedBase | None, committed_only: bool) -> ChangeRange | None:
-    """The range the diff passes judge, for a base that names one.
+    """The range the passes that judge a change read, or None when no change is judged.
 
-    `HEAD` as the default base gives none: with nothing to compare against, the passes that
-    judge a change have no change to judge, and the comparison with `HEAD` is the delta's.
+    A base that was given names the range. With none given, the uncommitted work is the
+    change and `HEAD` its base, the range `check --diff HEAD` judges, so those passes speak
+    before the first commit. A clean tree then has no change, and neither has
+    `committed_only` with no base, which reads nothing uncommitted: both leave the graph
+    without a range.
     """
-    if base is None or base.since is None or base.baseline.ref is None:
+    if base is None or base.since is None:
         return None
-    return range_of(base.baseline.ref, base.since, committed_only=committed_only)
+    ref = base.baseline.ref
+    if ref is None:
+        if not base.since.changed:
+            return None
+        ref = "HEAD"
+    return range_of(ref, base.since, committed_only=committed_only)
 
 
 def _edit_validation(
@@ -1552,24 +1558,8 @@ def _change_validation(
             state="passed" if new_errors == 0 else "failed",
             new_errors=new_errors,
             baseline=rev,
-            note=_unjudged_note() if graph.change is None else None,
         ),
         delta.new,
-    )
-
-
-def _unjudged_note() -> str:
-    """Why a verdict reached with no change range says nothing about the passes that judge one.
-
-    With no base the working tree is compared with `HEAD` by the delta alone. `check --diff HEAD`
-    is the same uncommitted work with those passes run, so it is the command to name.
-    """
-    *first, last = (f"`{name}`" for name in CHANGE_PASSES)
-    names = f"{', '.join(first)} and {last}"
-    return (
-        f"no base was given, so the working tree was compared with HEAD and {names}, which "
-        "judge a change, did not run; `--base-ref <base>` runs them for the whole branch, "
-        "`--base-ref HEAD` for the uncommitted work alone"
     )
 
 
@@ -1777,7 +1767,6 @@ def _validation_to_dict(validation: EditValidation) -> dict[str, object]:
             "new_errors": change.new_errors,
             "baseline": change.baseline,
             "reason": change.reason,
-            "note": change.note,
         },
     }
     return payload

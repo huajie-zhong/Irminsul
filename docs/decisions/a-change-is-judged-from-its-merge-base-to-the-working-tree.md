@@ -34,11 +34,15 @@ comment can answer them: `co-change/unreflected-change` and `claim-provenance/ev
 ## Decision
 
 - **The working tree ends the range.** `check --diff <base>`, `--source-diff` in each source
-  repository, `context --after-edit` once a base resolves, and the footprint of `change status`
-  and `verify` compare the merge base of `<base>` and `HEAD` with the working tree: staged and
-  unstaged edits, deletions, and untracked files gitignore does not exclude. On a clean tree
-  that is `<base>...HEAD`, which CI sees; `--diff HEAD` is the uncommitted work. The before
-  side is the merge base, for `new-dependency` and `list review --base-ref` too.
+  repository, `context --after-edit`, and the footprint of `change status` and `verify`
+  compare the merge base of `<base>` and `HEAD` with the working tree: staged and unstaged
+  edits, deletions, and untracked files gitignore does not exclude. On a clean tree that is
+  `<base>...HEAD`, which CI sees; `--diff HEAD` is the uncommitted work. The before side is
+  the merge base, for `new-dependency` and `list review --base-ref` too.
+- **With no base, `context --after-edit` judges the uncommitted work against `HEAD`.** That
+  is the range `--diff HEAD` names, so the passes that judge a change speak before the first
+  commit, and the run names `HEAD` as the base it used. A clean tree with no base has no
+  change, so nothing is judged as one.
 - **`--committed-only` means uncommitted work is not a change.** `check`, `context`,
   `change status`, `change verify` and `list review` accept it. The range ends at `HEAD`, files
   are compared as `HEAD` holds them, and history times are commit times; only the checks that
@@ -122,3 +126,6 @@ comment can answer them: `co-change/unreflected-change` and `claim-provenance/ev
 - 2026-10-30: The trailer step is implemented: a finding whose code declares `trailer` is
   accepted by a trailer naming its path and subject, and the co-change acknowledgement codes
   retire.
+- 2026-11-25: The no-base rule is implemented: `context --after-edit` with no base judges the
+  uncommitted work against `HEAD` and names that base, and its note that the change checks
+  did not run is gone.

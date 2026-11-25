@@ -138,9 +138,7 @@ def test_an_inherited_error_is_not_charged_to_this_change(tmp_path: Path) -> Non
         "new_errors": 0,
         "baseline": "HEAD",
         "reason": None,
-        "note": data["validation"]["change"]["note"],
     }
-    assert "no base was given" in data["validation"]["change"]["note"]
     assert code == 0
 
 
@@ -248,7 +246,9 @@ def test_after_edit_without_git_refuses_rather_than_reporting(tmp_path: Path) ->
 
 def test_a_config_change_that_disables_a_check_is_measured_whole_tree(tmp_path: Path) -> None:
     """Turning a check off is not a per-file edit, so only a whole-tree comparison sees
-    it: the findings it used to produce disappear, and none is new."""
+    it: the findings it used to produce disappear, and none is new. What is new is the
+    weakened gate itself, which `diff-integrity` reports because the uncommitted edit is
+    the change it judges."""
     root = _repo(tmp_path)
     _broken(root, "legacy")
     commit_all(root, "inherit a broken doc")
@@ -256,9 +256,10 @@ def test_a_config_change_that_disables_a_check_is_measured_whole_tree(tmp_path: 
 
     code, data = _ctx(root, "--after-edit")
 
-    assert data["validation"]["repository"]["state"] == "passed"
-    assert data["validation"]["change"]["state"] == "passed"
-    assert code == 0
+    assert [f["code"] for f in data["findings"]] == ["diff-integrity/check-disabled"]
+    assert data["validation"]["repository"]["errors"] == 1
+    assert data["validation"]["change"]["new_errors"] == 1
+    assert code == 1
 
 
 def test_plain_and_json_agree_after_an_edit(tmp_path: Path) -> None:
@@ -356,7 +357,7 @@ def test_after_edit_refuses_an_unreadable_baseline(tmp_path: Path) -> None:
     assert "could not read baseline" in out
 
 
-# --- with no base, the checks that judge a change did not run -------------------------
+# --- with no base, the uncommitted work is the change and HEAD its base ---------------
 
 
 def _debt_repo(root: Path) -> Path:
@@ -368,34 +369,64 @@ def _debt_repo(root: Path) -> Path:
     return root
 
 
-def test_with_no_base_the_verdict_says_which_checks_did_not_run(tmp_path: Path) -> None:
-    """`passed (0 new errors vs HEAD)` is true of what was judged and silent about what was
-    not: `diff-integrity` is the pass that fails an edit to recorded debt, and without a base
-    it never ran. The verdict is unchanged; it now says so and names the command that runs
-    them."""
+def test_an_uncommitted_edit_to_recorded_debt_fails_with_no_base(tmp_path: Path) -> None:
+    """`diff-integrity` is the pass that fails an edit to recorded debt, and it reads a change
+    range. With no base the uncommitted work is that range, against `HEAD`, so the edit fails
+    here, before the first commit, and the verdict names the base it was measured against."""
     root = _debt_repo(tmp_path)
+
+    code, data = _ctx(root, "--after-edit")
+
+    assert data["validation"]["change"] == {
+        "state": "failed",
+        "new_errors": 1,
+        "baseline": "HEAD",
+        "reason": None,
+    }
+    assert [f["code"] for f in data["findings"]] == ["diff-integrity/adoption-debt-touched"]
+    assert data["validation"]["repository"]["errors"] == 1
+    assert code == 1
+
+    _, out = _plain(root, "--after-edit")
+    assert "Change validation: failed (1 new errors vs HEAD)" in out
+    assert "Findings this change caused (compared with HEAD): 1" in out
+    assert "note:" not in out
+
+
+def test_no_base_gives_the_report_that_naming_head_gives(tmp_path: Path) -> None:
+    root = _debt_repo(tmp_path)
+
+    assert _ctx(root, "--after-edit") == _ctx(root, "--after-edit", "--base-ref", "HEAD")
+    assert _plain(root, "--after-edit") == _plain(root, "--after-edit", "--base-ref", "HEAD")
+
+
+def test_a_clean_tree_with_no_base_judges_no_change(tmp_path: Path) -> None:
+    """Once the edit is committed nothing uncommitted is left to be the change, and `HEAD`
+    holds it, so no range is judged: the verdict is `not_run`, never a zero nothing measured."""
+    root = _debt_repo(tmp_path)
+    commit_all(root, "edit recorded debt")
 
     code, data = _ctx(root, "--after-edit")
     change = data["validation"]["change"]
 
-    assert (change["state"], change["new_errors"], change["baseline"]) == ("passed", 0, "HEAD")
-    assert data["validation"]["repository"]["errors"] == 0
+    assert (change["state"], change["new_errors"], change["baseline"]) == ("not_run", None, "HEAD")
+    assert "nothing to compare" in change["reason"]
+    assert data["findings"] == []
     assert code == 0
-    for name in ("co-change", "diff-integrity", "new-dependency"):
-        assert f"`{name}`" in change["note"]
-    assert "no base was given" in change["note"]
-    assert "--base-ref <base>" in change["note"] and "--base-ref HEAD" in change["note"]
-
-    _, out = _plain(root, "--after-edit")
-    assert "Change validation: passed (0 new errors vs HEAD)\n  note: no base was given" in out
 
 
-def test_the_command_the_note_names_runs_the_checks_it_says_did_not(tmp_path: Path) -> None:
+def test_committed_only_with_no_base_judges_no_change_and_says_so(tmp_path: Path) -> None:
+    """`--committed-only` reads nothing uncommitted, so the edit to recorded debt is not a
+    change, and with no base no commit is one either."""
     root = _debt_repo(tmp_path)
 
-    code, data = _ctx(root, "--after-edit", "--base-ref", "HEAD")
+    code, data = _ctx(root, "--after-edit", "--committed-only")
     change = data["validation"]["change"]
 
-    assert (change["state"], change["new_errors"], change["note"]) == ("failed", 1, None)
-    assert data["validation"]["repository"]["errors"] == 1
-    assert code == 1
+    assert (change["state"], change["new_errors"], change["baseline"]) == ("not_run", None, None)
+    assert "no change is judged" in change["reason"]
+    assert data["findings"] == []
+    assert code == 0
+
+    _, out = _plain(root, "--after-edit", "--committed-only")
+    assert "Change validation: not run\n  reason: --committed-only without a base" in out

@@ -119,9 +119,13 @@ making a feature, a refactor and an RFC-driven change in it.
 - `context <path>` for a file that does not exist yet answers the other paths, marks it "(does not
   exist)", and names the doc whose `describes:` glob would own it, instead of exiting 2 for the
   whole call. A path outside the repository and every source root is still refused.
-- `context --after-edit` with no `--base-ref` judges the working tree against `HEAD` as before and
-  now says so: `co-change`, `diff-integrity` and `new-dependency` did not run, and `--base-ref
-  <base>` runs them for the branch, or `--base-ref HEAD` for the uncommitted work (JSON `note`).
+- `context --after-edit` with no `--base-ref` judges the uncommitted work as the change, against
+  `HEAD`: `co-change`, `diff-integrity` and `new-dependency` run on it as under `check --diff
+  HEAD`, so an edit to a file the adoption record excepts fails before the first commit, not at
+  the pull request. Findings that elapsed time caused are left out of that run, as under any
+  diff. The verdict names the base it used (`baseline` under `validation.change` in JSON). A
+  clean tree with no base still judges no change, as does `--committed-only` with no base, and
+  `--base-ref <base>` is still what judges the commits a branch already holds.
 - `context --after-edit` leaves the baseline, the adoption record, the manifest and the guidance
   files out of its unmatched list, since none of them has an owner by design, unless a claim cites
   one as evidence.
