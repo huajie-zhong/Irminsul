@@ -81,8 +81,9 @@ def test_a_second_call_sees_a_commit_made_between_calls(tmp_path: Path) -> None:
 
     assert drift() == []
 
-    # Committed, so the tree is clean on both calls: uncommitted work would be a change
-    # judged against HEAD, and a run that judges a change leaves out what time caused.
+    # Committed, so the tree is clean on both calls and neither judges a change. An
+    # uncommitted edit is a change judged against HEAD, in which `co-change` reports the
+    # source its doc did not follow, so the findings would not be the drift alone.
     source = root / "src" / "thing.py"
     source.write_text(source.read_text(encoding="utf-8") + "\n", encoding="utf-8")
     commit_all(root, "the source alone, a year on", when=_LATER, paths=["src/thing.py"])
