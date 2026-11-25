@@ -6,6 +6,9 @@ describes: []
 rfc_state: accepted
 affects:
   - context
+  - checks
+  - cli
+  - mcp-server
 resolved_by: docs/decisions/a-change-is-judged-from-its-merge-base-to-the-working-tree.md
 summary: "`context --after-edit` with no base judges the uncommitted work as the change, against HEAD, so the checks that judge a change speak before the first commit instead of at the pull request."
 required_updates: []
