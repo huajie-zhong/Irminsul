@@ -139,3 +139,5 @@ foundation and architecture layers.
 - 2026-10-30: Authorization for a reworded or removed claim, a changed or removed governing claim
   and a weakened inventory entry is a commit trailer, not a decision record, as the trailer step
   implements.
+- 2026-11-25: Accepted [The change queue asks about what the change did not write](../rfcs/the-change-queue-asks-about-what-the-change-did-not-write.md):
+  deleted prose is queued under `list review --written`.

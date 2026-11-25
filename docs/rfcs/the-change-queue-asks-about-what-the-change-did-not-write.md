@@ -1,14 +1,16 @@
 ---
 id: the-change-queue-asks-about-what-the-change-did-not-write
 title: "The change queue asks about what the change did not write"
-status: draft
-summary: "`list review --changed` stops listing the sentences a change itself wrote or deleted and keeps the sentences the change left as they were and may have made stale; the written sentences move to `list review --written`."
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: accepted
 affects:
   - new-list-regen
   - cli
   - init
+resolved_by: docs/decisions/derive-facts-and-leave-meaning-to-the-reader.md
+summary: "`list review --changed` stops listing the sentences a change itself wrote or deleted and keeps the sentences the change left as they were and may have made stale; the written sentences move to `list review --written`."
+required_updates: []
 weight: large
 ---
 
@@ -198,3 +200,7 @@ given `--base-ref` with neither SHALL print the list `--changed` prints.
 - `T3` Refuse the two flags together and keep `--base-ref` alone on `--changed`. (req: one-list-per-run)
 - `T4` Reword step 4 of the root `AGENTS.md` and its template, and add the reviewer's step and the rule for a change with no second reader to the agent protocol and its scaffold. (component: init)
 - `T5` State the rule in the four records with a dated Changes item each, and in the docs listed under Design detail. (component: new-list-regen)
+
+## Resolution
+
+Accepted by the owner on 2026-11-25, with the answers recorded under Decisions, and resolved by [Derive facts and leave meaning to the reader](../decisions/derive-facts-and-leave-meaning-to-the-reader.md), whose Changes item records it. [Authority follows the kind of claim](../decisions/authority-follows-the-kind-of-claim.md), [Code is named in code spans and bound by anchors](../decisions/code-is-named-in-code-spans-and-bound-by-anchors.md) and [Agents get stateless read-only queries and one written loop](../decisions/agents-get-stateless-read-only-queries-and-one-written-loop.md) record their parts too. Each rule joins its record's Decision with the implementation, as an edit in place.
