@@ -243,7 +243,7 @@ def create_server(repo_root: Path) -> MCPServer:
     @server.tool()
     @guarded
     def context_for_topic(query: str) -> str:
-        """Call when you know a concept but not a file path: substring-searches doc ids, titles, paths, describes, tests, tags, summaries, and headings for matching docs, ranking a metadata match above one only a heading holds. Every whitespace-separated term must match. An empty result carries a `suggestion` naming the fields searched and what to try next."""
+        """Call when you know a concept but not a file path: substring-searches doc ids, titles, paths, describes, tests, tags, summaries, headings and body prose for matching docs, ranking a metadata match above one only a heading holds, and both above one that needs the body prose for any term, which `needs_body` marks. Every match that does not need the body is in `results`; of those that do, the first 8 are, and `omitted` and `omitted_ids` count and name the rest, each of which the `retrieve` command finds by its id. Every whitespace-separated term must match. An empty result carries a `suggestion` naming the fields searched and what to try next."""
         return context_for_topic_json(root, _config(), query)
 
     @server.tool()

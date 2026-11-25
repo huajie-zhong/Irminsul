@@ -1168,6 +1168,169 @@ def test_context_topic_ranks_a_metadata_hit_above_a_heading_only_phrase_hit(
     assert [item["owner"]["id"] for item in data["results"]] == ["zzz-notes", "aaa-flow"]
 
 
+def _make_body_repo(tmp_path: Path) -> Path:
+    """Docs that say "budget" in a heading, in body prose alone, and only where a reader of
+    the prose does not see it, and one whose body names a command in a code span."""
+    repo = tmp_path / "bodies"
+    write_config(repo, project_name="bodies", source_roots=["src"])
+    write_doc(
+        repo,
+        "docs/foundation/principles.md",
+        doc_id="principles",
+        body="## What this will not do\n\nCost dashboards and **budgets** are out of scope.\n",
+    )
+    write_doc(
+        repo,
+        "docs/guides/zzz-planning.md",
+        doc_id="zzz-planning",
+        body="## Setting a budget\n\nHow a team plans.\n",
+    )
+    write_doc(
+        repo,
+        "docs/components/aaa-hidden.md",
+        doc_id="aaa-hidden",
+        body="See [the plan](budget.md).\n\n<!-- budget -->\n\n```text\nbudget\n```\n",
+    )
+    write_doc(
+        repo,
+        "docs/components/machine-form.md",
+        doc_id="machine-form",
+        body="Run `list --json` for the output a script reads.\n",
+    )
+    return repo
+
+
+def _owner_ids(data: dict[str, Any]) -> list[str]:
+    return [item["owner"]["id"] for item in data["results"]]
+
+
+def test_context_topic_finds_a_doc_by_a_word_only_its_body_holds(tmp_path: Path) -> None:
+    """The foundation names budgets as a non-goal in its prose and nowhere else, and a search
+    for "budget" used to answer `(none)`."""
+    repo = _make_body_repo(tmp_path)
+
+    data = _topic_json(repo, "budget")
+
+    assert {item["owner"]["id"]: item["needs_body"] for item in data["results"]} == {
+        "zzz-planning": False,
+        "principles": True,
+    }
+    assert data["suggestion"] is None
+    assert (data["omitted"], data["omitted_ids"], data["retrieve"]) == (0, [], None)
+
+
+def test_context_topic_ranks_a_heading_match_above_a_match_that_needs_the_body(
+    tmp_path: Path,
+) -> None:
+    repo = _make_body_repo(tmp_path)
+
+    data = _topic_json(repo, "budget")
+
+    # "principles" sorts first by path, but only its body holds the word.
+    assert _owner_ids(data) == ["zzz-planning", "principles"]
+
+
+def test_context_topic_marks_a_match_split_between_metadata_and_body(tmp_path: Path) -> None:
+    """One word of the query is in the doc's title and the other only in its body. The match
+    needed the body and is not the body's alone, so the mark says the first and not the
+    second, and the doc still ranks below one that matches without its body."""
+    repo = tmp_path / "split"
+    write_config(repo, project_name="split", source_roots=["src"])
+    write_doc(repo, "docs/components/quarterly.md", doc_id="quarterly", body="A zebra count.\n")
+    write_doc(
+        repo,
+        "docs/components/zzz-plan.md",
+        doc_id="zzz-plan",
+        body="## The quarterly zebra\n\nA heading holds both words.\n",
+    )
+
+    data = _topic_json(repo, "quarterly zebra")
+    _, plain = invoke(repo, "context", "--topic", "quarterly zebra")
+
+    # "quarterly" sorts first by path and its title holds a word, but it needs its body.
+    assert [(item["owner"]["id"], item["needs_body"]) for item in data["results"]] == [
+        ("zzz-plan", False),
+        ("quarterly", True),
+    ]
+    assert "body_only" not in data["results"][0]
+    assert plain.count("  matched: needs body prose") == 1
+    assert "alone" not in plain
+
+
+def test_context_topic_reads_the_prose_a_reader_sees(tmp_path: Path) -> None:
+    """A code span is prose. A fenced block, a comment and a link's target are not, so
+    "aaa-hidden", which holds the word only in those, is not a match."""
+    repo = _make_body_repo(tmp_path)
+
+    assert _owner_ids(_topic_json(repo, "list --json")) == ["machine-form"]
+    assert "aaa-hidden" not in _owner_ids(_topic_json(repo, "budget"))
+
+
+def test_context_topic_reads_a_written_url_and_no_raw_html_block(tmp_path: Path) -> None:
+    """The limits the component doc states. A link's destination is not prose, but a URL
+    written out, bare or as an autolink, is text a reader sees. The lines of a raw HTML block
+    are not prose, and a paragraph set between its tags by blank lines is."""
+    repo = tmp_path / "limits"
+    write_config(repo, project_name="limits", source_roots=["src"])
+    bodies = {
+        "autolink": "See <https://example.test/zebra-auto> here.\n",
+        "bare-url": "See https://example.test/zebra-bare here.\n",
+        "destination": "See [the plan](https://example.test/zebra-destination) here.\n",
+        "html-block": (
+            "<details>\n<summary>zebra-summary</summary>\n\nzebra-inside a paragraph.\n\n"
+            "</details>\n"
+        ),
+        "indented": "A paragraph.\n\n    zebra-indented\n",
+    }
+    for doc_id, body in bodies.items():
+        write_doc(repo, f"docs/components/{doc_id}.md", doc_id=doc_id, body=body)
+
+    def found(term: str) -> list[str]:
+        return _owner_ids(_topic_json(repo, term))
+
+    assert found("zebra-auto") == ["autolink"]
+    assert found("zebra-bare") == ["bare-url"]
+    assert found("zebra-destination") == []
+    assert found("zebra-summary") == []
+    assert found("zebra-inside") == ["html-block"]
+    assert found("zebra-indented") == []
+
+
+def test_context_topic_caps_only_the_matches_that_need_the_body(tmp_path: Path) -> None:
+    """A match through the other fields is always listed, as before bodies were read. The
+    matches that need the body can be most of the tree, so the packet lists eight of them and
+    counts and names the rest, in the JSON as in plain output: the JSON is what an MCP caller
+    gets, and it bounds the active RFCs the same way."""
+    repo = tmp_path / "many"
+    write_config(repo, project_name="many", source_roots=["src"])
+    named = [f"quota-{index:02}" for index in range(10)]
+    prose = [f"note-{index:02}" for index in range(11)]
+    for doc_id in named:
+        write_doc(repo, f"docs/components/{doc_id}.md", doc_id=doc_id, body="Limits.\n")
+    for doc_id in prose:
+        write_doc(
+            repo, f"docs/components/{doc_id}.md", doc_id=doc_id, body="A quota applies here.\n"
+        )
+
+    data = _topic_json(repo, "quota")
+    code, plain = invoke(repo, "context", "--topic", "quota")
+
+    assert _owner_ids(data) == [*named, *prose[:8]]
+    assert [item["needs_body"] for item in data["results"]] == [False] * 10 + [True] * 8
+    assert data["omitted"] == 3
+    assert data["omitted_ids"] == prose[8:]
+    assert data["retrieve"] == "irminsul context --topic <doc-id>"
+    assert code == 0
+    assert re.findall(r"^owner: (\S+)", plain, flags=re.MULTILINE) == _owner_ids(data)
+    assert plain.count("  matched: needs body prose") == 8
+    assert plain.rstrip().endswith(
+        "… 3 more need body prose: note-08, note-09, note-10; "
+        "see `irminsul context --topic <doc-id>`"
+    )
+    # The command the packet names finds an omitted doc, through its id.
+    assert _owner_ids(_topic_json(repo, "note-09"))[0] == "note-09"
+
+
 def test_context_topic_miss_names_the_fields_searched_and_what_to_try(tmp_path: Path) -> None:
     repo = _make_heading_repo(tmp_path)
 
@@ -1178,7 +1341,7 @@ def test_context_topic_miss_names_the_fields_searched_and_what_to_try(tmp_path: 
     first, _, rest = plain.partition("\n")
     assert first == "(none)"
     assert (
-        "id, title, path, describes, tests, tags, summary and headings" in rest
+        "id, title, path, describes, tests, tags, summary, headings and body prose" in rest
         and "try fewer words" in rest
         and "`irminsul explain <name>`" in rest
     )
@@ -1186,15 +1349,16 @@ def test_context_topic_miss_names_the_fields_searched_and_what_to_try(tmp_path: 
     assert data["suggestion"] == rest.strip()
 
 
-def test_context_topic_miss_says_the_words_may_appear_only_in_doc_bodies(tmp_path: Path) -> None:
+def test_context_topic_miss_does_not_send_the_reader_to_search_bodies(tmp_path: Path) -> None:
+    """Bodies are searched, so a miss means no doc holds the words anywhere it is read."""
     repo = _make_heading_repo(tmp_path)
 
     _, plain = invoke(repo, "context", "--topic", "prose-file-reference")
     data = _topic_json(repo, "prose-file-reference")
 
-    clause = "The words may appear only in doc bodies, so search them directly."
-    assert clause in plain
-    assert clause in data["suggestion"]
+    for text in (plain, data["suggestion"]):
+        assert "search them directly" not in text
+        assert "doc bodies" not in text
 
 
 def test_context_topic_help_describes_quoted_keyword_search() -> None:

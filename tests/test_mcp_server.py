@@ -18,6 +18,7 @@ from typer.testing import CliRunner
 from irminsul import mcp_server
 from irminsul.cli import app
 from irminsul.config import IrminsulConfig, find_config, load
+from irminsul.context import _MAX_BODY_MATCHES
 from irminsul.delta import DeltaError
 from irminsul.errors import UserError
 from irminsul.git.changes import GitChangesError
@@ -72,7 +73,11 @@ def test_context_for_topic_json_finds_doc() -> None:
     out = mcp_server.context_for_topic_json(_GOOD_FIXTURE, _load_config(_GOOD_FIXTURE), "composer")
     data = json.loads(out)
     assert data["mode"] == "topic"
-    assert {result["owner"]["id"] for result in data["results"]} == {"composer"}
+    # The second needs its body: a link's text in the components index.
+    assert [(result["owner"]["id"], result["needs_body"]) for result in data["results"]] == [
+        ("composer", False),
+        ("components", True),
+    ]
 
 
 def test_context_after_edit_json_maps_untracked_files_and_validates(
@@ -317,14 +322,19 @@ def test_mcp_server_registers_expected_tools() -> None:
     assert {tool.name for tool in tools} == EXPECTED_TOOL_NAMES
 
 
-def test_context_for_topic_tool_says_headings_are_searched() -> None:
+def test_context_for_topic_tool_says_headings_and_body_prose_are_searched() -> None:
     pytest.importorskip("mcp")
     import asyncio
 
     server = mcp_server.create_server(_GOOD_FIXTURE)
     tools = {tool.name: tool for tool in asyncio.run(server.list_tools())}
+    description = tools["context_for_topic"].description or ""
 
-    assert "headings" in (tools["context_for_topic"].description or "")
+    assert "headings" in description
+    assert "body prose" in description and "`needs_body`" in description
+    # The JSON this tool returns is bounded, so the description says where the rest went.
+    assert f"the first {_MAX_BODY_MATCHES} are" in description
+    assert "`omitted`" in description and "`omitted_ids`" in description
 
 
 def test_context_for_path_tool_says_tests_are_ranked_with_reasons() -> None:

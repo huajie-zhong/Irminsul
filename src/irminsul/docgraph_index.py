@@ -577,6 +577,14 @@ def _rendered_text(children: list[Token]) -> str:
     return "".join(parts)
 
 
+def prose_of(tokens: list[Token]) -> list[str]:
+    """The prose of a parsed body as a reader sees it, one string for each paragraph, heading,
+    list item and quote: its text, its code spans and the descriptions of its images. A code
+    block, a comment, the lines of a raw HTML block and a link's destination are not prose
+    and are left out. A URL written out, bare or as an autolink, is text."""
+    return [_rendered_text(token.children or []) for token in tokens if token.type == "inline"]
+
+
 def headings_of(tokens: list[Token]) -> list[Heading]:
     """Every heading in a parsed body, in reading order.
 

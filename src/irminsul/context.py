@@ -24,7 +24,7 @@ from irminsul.checks.uniqueness import Claim, most_specific_claims, resolve_clai
 from irminsul.config import IrminsulConfig, in_layer
 from irminsul.declared_tests import governed_as_test, matching_paths
 from irminsul.docgraph import ChangeRange, DocGraph, DocNode, build_graph
-from irminsul.docgraph_index import headings_of, linked_node, section_lines
+from irminsul.docgraph_index import headings_of, linked_node, prose_of, section_lines
 from irminsul.errors import UserError
 from irminsul.frontmatter import RFC_OPEN_STATES, ClaimRelationEnum
 from irminsul.git.changes import working_tree_changed_paths
@@ -72,6 +72,11 @@ _MAX_CONTENT_EXCERPTS = 8
 #: deliberately *not* capped — they are the obligations a reader must answer, not
 #: supporting material.
 _MAX_ACTIVE_CHANGES = 8
+#: How many topic matches that needed body prose a packet lists before it counts and names
+#: the rest. A common word is in most bodies, so that list grows with the repository as the
+#: active RFCs do, and it takes their bound, in the JSON as in plain output. A match through
+#: any other field is always listed.
+_MAX_BODY_MATCHES = _MAX_ACTIVE_CHANGES
 _MAX_EXCERPT_LINES = 20
 _MAX_EXCERPT_CHARS = 1_200
 #: How many tests plain output lists when none has a reason to be named. A test with a
@@ -232,6 +237,10 @@ class ContextResult:
     #: The inputs that do not exist yet. They are owned by the doc whose `describes:` glob
     #: would cover them, which is what a path packet is asked for before a file is created.
     missing_inputs: list[str] = field(default_factory=list)
+    #: A topic result that needed the doc's body prose: at least one word of the query is in
+    #: no other field searched, whatever holds the other words. Such results come after every
+    #: result that matches without its body.
+    needs_body: bool = False
 
 
 @dataclass(frozen=True)
@@ -280,6 +289,21 @@ class ClaimReview:
 
 
 @dataclass(frozen=True)
+class OmittedMatches:
+    """The topic matches that needed body prose and that a packet names without listing.
+
+    The same three facts `ActiveChanges` gives for an RFC left out: `omitted` counts them,
+    because a reader cannot tell a complete list from a bounded one, `omitted_ids` names
+    them, because a count is not retrievable, and `retrieve` is the command that takes an
+    id, a topic search for it, which finds the doc through its id whatever its body says.
+    """
+
+    omitted: int = 0
+    omitted_ids: list[str] = field(default_factory=list)
+    retrieve: str | None = None
+
+
+@dataclass(frozen=True)
 class ContextReport:
     """What one `irminsul context` call reports, in the shape `--format json` prints.
 
@@ -293,7 +317,9 @@ class ContextReport:
     among them, marked `awaiting_trailer` in `records`. `next_actions` are
     command-and-reason pairs derived from the report's own state; a topic report carries
     `suggestion` in their place, null when a doc matched and otherwise the sentence the
-    plain output prints after `(none)`.
+    plain output prints after `(none)`. A topic report's `results` are bounded: every match
+    that did not need body prose, then the first few that did, with `omitted_matches`
+    counting and naming the rest.
     """
 
     version: int
@@ -308,6 +334,8 @@ class ContextReport:
     #: `findings` as `check --format json` reports them, each with its `irminsul fix`
     #: command when one remediates it; `None` exactly when `findings` is.
     records: list[dict[str, object]] | None = None
+    #: The topic matches left out of `results`; empty in every other mode.
+    omitted_matches: OmittedMatches = field(default_factory=OmittedMatches)
 
 
 @dataclass(frozen=True)
@@ -325,6 +353,8 @@ class _PendingResult:
     source_claims: tuple[str, ...]
     #: The inputs that are not on disk yet, owned by the glob that would cover them.
     missing: tuple[str, ...] = ()
+    #: A topic match that needed the doc's body prose for at least one word.
+    needs_body: bool = False
 
 
 @dataclass
@@ -382,10 +412,11 @@ def build_context_report(
         committed_only=committed_only,
     )
 
+    omitted_matches = OmittedMatches()
     if paths is not None:
         pending, unmatched = _pending_for_paths(repo_root, graph, paths)
     elif topic is not None:
-        pending = _pending_for_topic(graph, topic)
+        pending, omitted_matches = _bound_topic_matches(_pending_for_topic(graph, topic))
         unmatched = []
     else:
         assert base is not None
@@ -448,6 +479,7 @@ def build_context_report(
         suggestion=_TOPIC_MISS_SUGGESTION if mode == "topic" and not results else None,
         findings=findings,
         records=None if findings is None else _records(findings, graph),
+        omitted_matches=omitted_matches,
     )
 
 
@@ -517,6 +549,13 @@ def format_context_plain(report: ContextReport) -> str:
             if lines:
                 lines.append("")
             lines.extend(_format_result(result, include_active_changes=report.mode == "path"))
+        left_out = report.omitted_matches
+        if left_out.omitted:
+            lines.append("")
+            lines.append(
+                f"… {left_out.omitted} more need body prose: "
+                f"{', '.join(left_out.omitted_ids)}; see `{left_out.retrieve}`"
+            )
 
     reviewed = {(review.doc.path, review.claim_id) for review in report.claim_reviews}
     if report.unmatched:
@@ -714,6 +753,7 @@ def _pending_for_topic(graph: DocGraph, topic: str) -> list[_PendingResult]:
 
     matches.sort(
         key=lambda match: (
+            match.needs_body,
             match.needs_headings,
             0 if _normalize_topic_phrase(match.node.id) == normalized_phrase else 1,
             0 if match.exact_phrase else 1,
@@ -728,9 +768,31 @@ def _pending_for_topic(graph: DocGraph, topic: str) -> list[_PendingResult]:
             node=match.node,
             inputs=(query,),
             source_claims=tuple(match.node.frontmatter.describes),
+            needs_body=match.needs_body,
         )
         for match in matches
     ]
+
+
+def _bound_topic_matches(
+    matches: list[_PendingResult],
+) -> tuple[list[_PendingResult], OmittedMatches]:
+    """The topic matches a packet lists, and the ones it only names.
+
+    A match through any other field is always listed, as before bodies were read. The
+    matches that needed body prose rank last, so the ones the bound leaves out are the
+    tail: they are counted and named by id, as `_bound_active_changes` names an RFC it
+    leaves out, and no result is built for them.
+    """
+    left_out = sum(match.needs_body for match in matches) - _MAX_BODY_MATCHES
+    if left_out <= 0:
+        return matches, OmittedMatches()
+    rest = matches[-left_out:]
+    return matches[:-left_out], OmittedMatches(
+        omitted=len(rest),
+        omitted_ids=[match.node.id for match in rest],
+        retrieve="irminsul context --topic <doc-id>",
+    )
 
 
 def _pending_for_changed(
@@ -886,6 +948,7 @@ class _TopicMatch:
     exact_phrase: bool
     fields_hit: int
     needs_headings: bool
+    needs_body: bool
 
 
 _TOPIC_METADATA: dict[str, Callable[[DocNode], str]] = {
@@ -897,11 +960,11 @@ _TOPIC_METADATA: dict[str, Callable[[DocNode], str]] = {
     "tags": lambda node: " ".join(node.frontmatter.tags),
     "summary": lambda node: node.frontmatter.summary or "",
 }
-_TOPIC_FIELDS = (*_TOPIC_METADATA, "headings")
+_TOPIC_FIELDS = (*_TOPIC_METADATA, "headings", "body prose")
 _TOPIC_MISS_SUGGESTION = (
     f"Searched {', '.join(_TOPIC_FIELDS[:-1])} and {_TOPIC_FIELDS[-1]}, and every term must "
-    "match, so try fewer words. The words may appear only in doc bodies, so search them "
-    "directly. A check name or finding code is described by `irminsul explain <name>`."
+    "match, so try fewer words. A check name or finding code is described by "
+    "`irminsul explain <name>`."
 )
 
 
@@ -919,16 +982,20 @@ def _match_topic(
     terms: tuple[str, ...],
     normalized_phrase: str,
 ) -> _TopicMatch | None:
-    """A doc matches when every term is in its metadata or its heading texts.
+    """A doc matches when every term is in its metadata, its heading texts or its body prose.
 
-    Headings are the fallback: a term only a heading holds makes the match rank below
-    every doc whose metadata holds all the terms, and ranking signals come from the
-    metadata alone unless a heading was needed.
+    Each is the fallback of the one before. A term only a heading holds makes the match rank
+    below every doc whose metadata holds all the terms, and a term only the body prose holds
+    makes it rank below every doc that matches without its body. Ranking signals come from
+    the metadata alone unless a heading or the body was needed. The prose is `prose_of` the
+    tokens the graph already parsed, read only for a term nothing else holds.
     """
     haystack = _topic_haystack(node)
     heading_texts = [heading.lower() for heading in headings]
+    prose: list[str] = []
     fields_hit: set[str] = set()
     needs_headings = False
+    needs_body = False
     for term in terms:
         term_fields = [field for field, text in haystack.items() if term in text]
         if term_fields:
@@ -936,14 +1003,23 @@ def _match_topic(
         elif any(term in text for text in heading_texts):
             needs_headings = True
         else:
-            return None
-    searched = [*haystack.values(), *heading_texts] if needs_headings else haystack.values()
+            if not needs_body:
+                prose = [text.lower() for text in prose_of(node.tokens)]
+                needs_body = True
+            if not any(term in text for text in prose):
+                return None
+    searched = list(haystack.values())
+    if needs_headings:
+        searched += heading_texts
+    if needs_body:
+        searched += prose
     exact_phrase = any(normalized_phrase in _normalize_topic_phrase(text) for text in searched)
     return _TopicMatch(
         node=node,
         exact_phrase=exact_phrase,
         fields_hit=len(fields_hit),
         needs_headings=needs_headings,
+        needs_body=needs_body,
     )
 
 
@@ -1183,6 +1259,7 @@ def _build_result(
         ),
         test_reasons=ranking.reasons if ranking is not None else {},
         missing_inputs=list(pending.missing),
+        needs_body=pending.needs_body,
     )
 
 
@@ -1773,9 +1850,14 @@ def _report_to_dict(report: ContextReport) -> dict[str, object]:
         "version": report.version,
         "mode": report.mode,
         "results": [_result_to_dict(result, mode=report.mode) for result in report.results],
-        "unmatched": [_unmatched_to_dict(item) for item in report.unmatched],
-        "claim_reviews": [_claim_review_to_dict(review) for review in report.claim_reviews],
     }
+    if report.mode == "topic":
+        left_out = report.omitted_matches
+        payload["omitted"] = left_out.omitted
+        payload["omitted_ids"] = left_out.omitted_ids
+        payload["retrieve"] = left_out.retrieve
+    payload["unmatched"] = [_unmatched_to_dict(item) for item in report.unmatched]
+    payload["claim_reviews"] = [_claim_review_to_dict(review) for review in report.claim_reviews]
     if report.validation is not None:
         payload["validation"] = _validation_to_dict(report.validation)
     if report.records is not None:
@@ -1810,6 +1892,8 @@ def _result_to_dict(result: ContextResult, *, mode: ContextMode) -> dict[str, ob
         "depends_on_missing": result.depends_on_missing,
         "depended_on_by": [_doc_ref_to_dict(doc) for doc in result.depended_on_by],
     }
+    if mode == "topic":
+        payload["needs_body"] = result.needs_body
     if mode == "path":
         payload["active_changes"] = {
             "shown": [_active_change_to_dict(change) for change in result.active_changes.shown],
@@ -1924,6 +2008,7 @@ def _format_result(result: ContextResult, *, include_active_changes: bool = Fals
         f"owner: {result.owner.id} ({result.owner.path})",
         f"  title: {result.owner.title}",
         f"  input: {_format_list(_input_labels(result))}",
+        *(["  matched: needs body prose"] if result.needs_body else []),
         f"  source claims: {_format_list(result.source_claims)}",
         f"  entrypoint: {result.entrypoint or '-'}",
         *_format_tests(result),

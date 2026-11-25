@@ -14,6 +14,7 @@ from irminsul.docgraph_index import (
     headings_of,
     links_of,
     parse_markdown,
+    prose_of,
     resolve_href,
     section_lines,
     slugify,
@@ -260,6 +261,36 @@ def test_headings_of_reads_levels_and_lines_in_order() -> None:
         (1, "Top", 1),
         (2, "Sub", 7),
         (2, "Setext", 13),
+    ]
+
+
+def test_prose_of_is_what_a_reader_sees_outside_fences_and_comments() -> None:
+    body = (
+        "# Top\n\nRun `list --json` for [the plan](budget.md), **now**\nor later.\n\n"
+        "<!-- a comment -->\n\n```text\nfenced\n```\n\n- An item <!-- aside --> here.\n"
+    )
+
+    assert prose_of(parse_markdown(body)) == [
+        "Top",
+        "Run list --json for the plan, now or later.",
+        "An item  here.",
+    ]
+
+
+def test_prose_of_reads_a_written_url_and_skips_a_raw_html_block() -> None:
+    """A link's destination is not prose, but a URL written out is the text itself. The lines
+    of a raw HTML block are skipped; a paragraph set between its tags by blank lines is read,
+    as are a quote and an image's description."""
+    body = (
+        "See <https://example.test/auto> and https://example.test/bare, not [this](target.md).\n\n"
+        "<details>\n<summary>hidden</summary>\n\nShown.\n\n</details>\n\n"
+        "> Quoted ![a chart](chart.png).\n\n    indented\n"
+    )
+
+    assert prose_of(parse_markdown(body)) == [
+        "See https://example.test/auto and https://example.test/bare, not this.",
+        "Shown.",
+        "Quoted a chart.",
     ]
 
 

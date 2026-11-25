@@ -6,6 +6,8 @@ describes: []
 rfc_state: accepted
 affects:
   - context
+  - docgraph
+  - mcp-server
 resolved_by: docs/decisions/agents-get-stateless-read-only-queries-and-one-written-loop.md
 summary: "`context --topic` matches words in doc bodies too, ranked below matches in a doc's title, summary or headings, so a topic named only in prose, such as a non-goal, is found."
 required_updates: []
@@ -19,13 +21,21 @@ weight: small
 A topic search also finds a doc whose body uses the words, ranked after the docs whose title,
 summary or headings do. Today it reads only those fields, so in the 2026-10-29 dogfood a search
 for "budget" found nothing although the foundation lists budgets as a non-goal, and the agent
-built the feature anyway. One decision, answered.
+built the feature anyway. Two decisions, answered.
 
 ## Decisions
 
 Answered by the owner on 2026-10-29:
 
 1. **Search bodies too, ranked below the other fields**, rather than leaving bodies to grep.
+
+Answered by the owner on 2026-11-25:
+
+2. **The matches that need a body are bounded, and no flag turns them off.** The design said
+   the packet's cap applies, and topic results had none. A match that does not need the body
+   is listed as before. Of the matches that do, the first eight are results and the rest are
+   counted and named by id, in the plain output and in the JSON, since a common word otherwise
+   more than doubles what a caller receives. Ranked last and bounded, they need no flag.
 
 ## Design detail
 
@@ -59,11 +69,24 @@ headings.
 - **WHEN** one doc has "budget" in a heading and another only in its body
 - **THEN** the heading match is listed first
 
+### Requirement: The matches that need a body are bounded
+ID: matches-that-need-a-body-are-bounded
+Provenance: code
+
+`context --topic` SHALL list every match that does not need body prose, then at most eight
+matches that do, and SHALL report how many more needed it and their ids, in the plain output
+and in the JSON.
+
+#### Scenario: Twelve docs match through their bodies
+- **WHEN** a query matches three docs without their bodies and twelve only with them
+- **THEN** the results are those three and eight of the twelve, and the other four are counted and named by id
+
 ## Tasks
 
 - `T1` Match body prose and rank body-only matches last. (req: topic-search-matches-body-prose)
 - `T2` Drop the "search them directly" hint. (component: context)
+- `T3` Bound the matches that need a body, in the plain output and the JSON. (req: matches-that-need-a-body-are-bounded)
 
 ## Resolution
 
-Accepted by the owner on 2026-10-29, with the answer recorded under Decisions, and resolved by [Agents get stateless read-only queries and one written loop](../decisions/agents-get-stateless-read-only-queries-and-one-written-loop.md), whose Changes item records it. Each rule joins its record's Decision with the implementation, as an edit in place once decision records are living topics.
+Accepted by the owner on 2026-10-29, with the answers recorded under Decisions, the second given on 2026-11-25, and resolved by [Agents get stateless read-only queries and one written loop](../decisions/agents-get-stateless-read-only-queries-and-one-written-loop.md), whose Changes item records it. Each rule joins its record's Decision with the implementation, as an edit in place once decision records are living topics.
