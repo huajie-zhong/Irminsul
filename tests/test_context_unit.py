@@ -105,7 +105,7 @@ def test_topic_mode_matches_and_misses(fixture_repo: FixtureRepo) -> None:
     hit = build_context_report(repo, config, topic="composer")
     assert hit.mode == "topic"
     # The components index names the doc only in the text of a link, which is body prose.
-    assert [(result.owner.id, result.body_only) for result in hit.results] == [
+    assert [(result.owner.id, result.needs_body) for result in hit.results] == [
         ("composer", False),
         ("components", True),
     ]

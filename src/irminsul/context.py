@@ -72,11 +72,11 @@ _MAX_CONTENT_EXCERPTS = 8
 #: deliberately *not* capped — they are the obligations a reader must answer, not
 #: supporting material.
 _MAX_ACTIVE_CHANGES = 8
-#: How many body-only topic matches plain output lists before it counts the rest. A common
-#: word is in most bodies, so that list grows with the repository as the active RFCs do, and
-#: it takes their bound. A match through any other field is always listed, and the JSON
-#: carries every match.
-_MAX_BODY_ONLY_MATCHES = _MAX_ACTIVE_CHANGES
+#: How many topic matches that needed body prose plain output lists before it counts the
+#: rest. A common word is in most bodies, so that list grows with the repository as the active
+#: RFCs do, and it takes their bound. A match through any other field is always listed, and
+#: the JSON carries every match.
+_MAX_BODY_MATCHES = _MAX_ACTIVE_CHANGES
 _MAX_EXCERPT_LINES = 20
 _MAX_EXCERPT_CHARS = 1_200
 #: How many tests plain output lists when none has a reason to be named. A test with a
@@ -232,9 +232,10 @@ class ContextResult:
     #: The inputs that do not exist yet. They are owned by the doc whose `describes:` glob
     #: would cover them, which is what a path packet is asked for before a file is created.
     missing_inputs: list[str] = field(default_factory=list)
-    #: A topic result that only the doc's body prose makes: at least one word of the query
-    #: is in no other field searched. Such results come after every other one.
-    body_only: bool = False
+    #: A topic result that needed the doc's body prose: at least one word of the query is in
+    #: no other field searched, whatever holds the other words. Such results come after every
+    #: result that matches without its body.
+    needs_body: bool = False
 
 
 @dataclass(frozen=True)
@@ -326,8 +327,8 @@ class _PendingResult:
     source_claims: tuple[str, ...]
     #: The inputs that are not on disk yet, owned by the glob that would cover them.
     missing: tuple[str, ...] = ()
-    #: A topic match that needed the doc's body prose.
-    body_only: bool = False
+    #: A topic match that needed the doc's body prose for at least one word.
+    needs_body: bool = False
 
 
 @dataclass
@@ -513,19 +514,17 @@ def format_context_plain(report: ContextReport) -> str:
         for result in report.results:
             lines.extend(_format_changed_owner(result))
     else:
-        # Body-only topic matches rank last, so the ones the bound leaves out are the tail.
-        body_only = sum(result.body_only for result in report.results)
-        unlisted = max(body_only - _MAX_BODY_ONLY_MATCHES, 0)
+        # Matches that needed body prose rank last, so the ones the bound leaves out are the
+        # tail.
+        needing = sum(result.needs_body for result in report.results)
+        unlisted = max(needing - _MAX_BODY_MATCHES, 0)
         for result in report.results[: len(report.results) - unlisted]:
             if lines:
                 lines.append("")
             lines.extend(_format_result(result, include_active_changes=report.mode == "path"))
         if unlisted:
             lines.append("")
-            lines.append(
-                f"… {unlisted} more matched through body prose alone "
-                "(--format json lists every match)"
-            )
+            lines.append(f"… {unlisted} more need body prose (--format json lists every match)")
 
     reviewed = {(review.doc.path, review.claim_id) for review in report.claim_reviews}
     if report.unmatched:
@@ -738,7 +737,7 @@ def _pending_for_topic(graph: DocGraph, topic: str) -> list[_PendingResult]:
             node=match.node,
             inputs=(query,),
             source_claims=tuple(match.node.frontmatter.describes),
-            body_only=match.needs_body,
+            needs_body=match.needs_body,
         )
         for match in matches
     ]
@@ -1208,7 +1207,7 @@ def _build_result(
         ),
         test_reasons=ranking.reasons if ranking is not None else {},
         missing_inputs=list(pending.missing),
-        body_only=pending.body_only,
+        needs_body=pending.needs_body,
     )
 
 
@@ -1783,7 +1782,7 @@ def _result_to_dict(result: ContextResult, *, mode: ContextMode) -> dict[str, ob
         "depended_on_by": [_doc_ref_to_dict(doc) for doc in result.depended_on_by],
     }
     if mode == "topic":
-        payload["body_only"] = result.body_only
+        payload["needs_body"] = result.needs_body
     if mode == "path":
         payload["active_changes"] = {
             "shown": [_active_change_to_dict(change) for change in result.active_changes.shown],
@@ -1897,7 +1896,7 @@ def _format_result(result: ContextResult, *, include_active_changes: bool = Fals
         f"owner: {result.owner.id} ({result.owner.path})",
         f"  title: {result.owner.title}",
         f"  input: {_format_list(_input_labels(result))}",
-        *(["  matched: body prose alone"] if result.body_only else []),
+        *(["  matched: needs body prose"] if result.needs_body else []),
         f"  source claims: {_format_list(result.source_claims)}",
         f"  entrypoint: {result.entrypoint or '-'}",
         *_format_tests(result),

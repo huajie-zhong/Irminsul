@@ -1211,20 +1211,49 @@ def test_context_topic_finds_a_doc_by_a_word_only_its_body_holds(tmp_path: Path)
 
     data = _topic_json(repo, "budget")
 
-    assert {item["owner"]["id"]: item["body_only"] for item in data["results"]} == {
+    assert {item["owner"]["id"]: item["needs_body"] for item in data["results"]} == {
         "zzz-planning": False,
         "principles": True,
     }
     assert data["suggestion"] is None
 
 
-def test_context_topic_ranks_a_heading_match_above_a_body_only_match(tmp_path: Path) -> None:
+def test_context_topic_ranks_a_heading_match_above_a_match_that_needs_the_body(
+    tmp_path: Path,
+) -> None:
     repo = _make_body_repo(tmp_path)
 
     data = _topic_json(repo, "budget")
 
     # "principles" sorts first by path, but only its body holds the word.
     assert _owner_ids(data) == ["zzz-planning", "principles"]
+
+
+def test_context_topic_marks_a_match_split_between_metadata_and_body(tmp_path: Path) -> None:
+    """One word of the query is in the doc's title and the other only in its body. The match
+    needed the body and is not the body's alone, so the mark says the first and not the
+    second, and the doc still ranks below one that matches without its body."""
+    repo = tmp_path / "split"
+    write_config(repo, project_name="split", source_roots=["src"])
+    write_doc(repo, "docs/components/quarterly.md", doc_id="quarterly", body="A zebra count.\n")
+    write_doc(
+        repo,
+        "docs/components/zzz-plan.md",
+        doc_id="zzz-plan",
+        body="## The quarterly zebra\n\nA heading holds both words.\n",
+    )
+
+    data = _topic_json(repo, "quarterly zebra")
+    _, plain = invoke(repo, "context", "--topic", "quarterly zebra")
+
+    # "quarterly" sorts first by path and its title holds a word, but it needs its body.
+    assert [(item["owner"]["id"], item["needs_body"]) for item in data["results"]] == [
+        ("zzz-plan", False),
+        ("quarterly", True),
+    ]
+    assert "body_only" not in data["results"][0]
+    assert plain.count("  matched: needs body prose") == 1
+    assert "alone" not in plain
 
 
 def test_context_topic_reads_the_prose_a_reader_sees(tmp_path: Path) -> None:
@@ -1236,10 +1265,12 @@ def test_context_topic_reads_the_prose_a_reader_sees(tmp_path: Path) -> None:
     assert "aaa-hidden" not in _owner_ids(_topic_json(repo, "budget"))
 
 
-def test_context_topic_plain_output_caps_only_the_body_only_matches(tmp_path: Path) -> None:
+def test_context_topic_plain_output_caps_only_the_matches_that_need_the_body(
+    tmp_path: Path,
+) -> None:
     """A match through the other fields is always listed, as before bodies were read. The
-    body-only matches can be most of the tree, so plain output lists eight of them and counts
-    the rest, and the JSON carries every one."""
+    matches that need the body can be most of the tree, so plain output lists eight of them
+    and counts the rest, and the JSON carries every one."""
     repo = tmp_path / "many"
     write_config(repo, project_name="many", source_roots=["src"])
     named = [f"quota-{index:02}" for index in range(10)]
@@ -1255,13 +1286,11 @@ def test_context_topic_plain_output_caps_only_the_body_only_matches(tmp_path: Pa
     code, plain = invoke(repo, "context", "--topic", "quota")
 
     assert _owner_ids(data) == [*named, *prose]
-    assert [item["body_only"] for item in data["results"]] == [False] * 10 + [True] * 11
+    assert [item["needs_body"] for item in data["results"]] == [False] * 10 + [True] * 11
     assert code == 0
     assert re.findall(r"^owner: (\S+)", plain, flags=re.MULTILINE) == [*named, *prose[:8]]
-    assert plain.count("  matched: body prose alone") == 8
-    assert plain.rstrip().endswith(
-        "… 3 more matched through body prose alone (--format json lists every match)"
-    )
+    assert plain.count("  matched: needs body prose") == 8
+    assert plain.rstrip().endswith("… 3 more need body prose (--format json lists every match)")
 
 
 def test_context_topic_miss_names_the_fields_searched_and_what_to_try(tmp_path: Path) -> None:

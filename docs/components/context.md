@@ -61,10 +61,10 @@ A flat list of an owner's tests buries the one that exercises the file in hand, 
 <!-- anchor: src/irminsul/context.py#_match_topic @sha256:c8f69df5714b -->
 <!-- anchor: src/irminsul/docgraph_index.py#prose_of @sha256:cced70dc6f16 -->
 
-`_pending_for_topic` ranks a doc that needs a heading for a term below every doc whose metadata holds all the terms, and a doc that needs its body prose below every doc that matches without it. `ContextResult.body_only` marks a match that needed the body: `body_only` in the JSON, and `matched: body prose alone` in plain output. A common word is in most bodies, so plain output lists the first `_MAX_BODY_ONLY_MATCHES` body-only matches and counts the rest in one line. A match through any other field is always listed, and the JSON carries every match.
-<!-- anchor: src/irminsul/context.py#_pending_for_topic @sha256:28e195fc567b -->
-<!-- anchor: src/irminsul/context.py#ContextResult.body_only @sha256:6f17b0b30ebd -->
-<!-- anchor: src/irminsul/context.py#_MAX_BODY_ONLY_MATCHES @sha256:18dafa2609c9 -->
+`_pending_for_topic` ranks a doc that needs a heading for a term below every doc whose metadata holds all the terms, and a doc that needs its body prose for a term below every doc that matches without it. `ContextResult.needs_body` marks a match that needed the body, whatever holds the query's other terms: `needs_body` in the JSON, and `matched: needs body prose` in plain output. A common word is in most bodies, so plain output lists the first `_MAX_BODY_MATCHES` of those matches and counts the rest in one line. A match through any other field is always listed, and the JSON carries every match.
+<!-- anchor: src/irminsul/context.py#_pending_for_topic @sha256:61ec7a8f51b7 -->
+<!-- anchor: src/irminsul/context.py#ContextResult.needs_body @sha256:a8a0e49d986a -->
+<!-- anchor: src/irminsul/context.py#_MAX_BODY_MATCHES @sha256:633c47a6dbbe -->
 
 ## Claims to review
 

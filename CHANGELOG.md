@@ -136,10 +136,10 @@ making a feature, a refactor and an RFC-driven change in it.
   alone.
 - `context --topic` also matches words in a doc's body prose: the text and code spans of its
   paragraphs, headings and list items, not fenced blocks, comments or link targets. A doc that
-  matches only through its body ranks below every doc that matches without it and is marked
-  (`body_only` on each topic result in JSON, `matched: body prose alone` in plain output). Plain
-  output lists the first eight body-only matches and counts the rest, and the JSON carries every
-  match. A search that finds nothing no longer says to search doc bodies directly.
+  needs its body for any word of the query ranks below every doc that matches without it and is
+  marked (`needs_body` on each topic result in JSON, `matched: needs body prose` in plain
+  output). Plain output lists the first eight such matches and counts the rest, and the JSON
+  carries every match. A search that finds nothing no longer says to search doc bodies directly.
 - `context --after-edit` leaves the baseline, the adoption record, the manifest and the guidance
   files out of its unmatched list, since none of them has an owner by design, unless a claim cites
   one as evidence.

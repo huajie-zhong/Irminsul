@@ -72,8 +72,8 @@ def test_context_for_topic_json_finds_doc() -> None:
     out = mcp_server.context_for_topic_json(_GOOD_FIXTURE, _load_config(_GOOD_FIXTURE), "composer")
     data = json.loads(out)
     assert data["mode"] == "topic"
-    # The second matches through its body alone: a link's text in the components index.
-    assert [(result["owner"]["id"], result["body_only"]) for result in data["results"]] == [
+    # The second needs its body: a link's text in the components index.
+    assert [(result["owner"]["id"], result["needs_body"]) for result in data["results"]] == [
         ("composer", False),
         ("components", True),
     ]
@@ -330,7 +330,7 @@ def test_context_for_topic_tool_says_headings_and_body_prose_are_searched() -> N
     description = tools["context_for_topic"].description or ""
 
     assert "headings" in description
-    assert "body prose" in description and "`body_only`" in description
+    assert "body prose" in description and "`needs_body`" in description
 
 
 def test_context_for_path_tool_says_tests_are_ranked_with_reasons() -> None:
