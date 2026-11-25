@@ -129,9 +129,11 @@ class ActiveChanges:
 
 @dataclass(frozen=True)
 class RepositoryValidation:
-    """What the checks said about the whole tree, after the baseline — the verdict plain
-    `irminsul check` reaches. `baseline` is the run's baseline report, the same object
-    `check --format json` carries, so what the baseline hid is never left out."""
+    """What the run said about the whole tree, after the baseline: the verdict plain
+    `irminsul check` reaches when no change was judged, and the one `check --diff <base>`
+    reaches when one was, because the passes that judge a change are then part of the run.
+    `baseline` is the run's baseline report, the same object `check --format json` carries,
+    so what the baseline hid is never left out."""
 
     state: Literal["passed", "failed"]
     errors: int
@@ -423,6 +425,7 @@ def build_context_report(
             validation,
             has_unowned_source=_has_unowned_source(repo_root, config, unmatched),
             claim_reviews=claim_reviews,
+            change_range=graph.change,
         )
         if mode != "topic"
         else []
@@ -1108,7 +1111,8 @@ def _ownership_for_source_path(claims: list[Claim]) -> _Ownership:
 
 
 def _run_checks(graph: DocGraph) -> RunResult:
-    """The run plain `irminsul check` makes over this graph, baseline and all.
+    """The run `irminsul check` makes over this graph, baseline and all: the plain run for a
+    graph with no range, and the run `check --diff` makes for a graph that carries one.
 
     `--after-edit` is the step the agent loop puts between editing and committing, and its
     verdict is what an agent acts on, so it is the shared run rather than one assembled
@@ -1571,6 +1575,7 @@ def _next_actions(
     *,
     has_unowned_source: bool,
     claim_reviews: list[ClaimReview],
+    change_range: ChangeRange | None = None,
 ) -> list[NextAction]:
     actions: list[NextAction] = []
 
@@ -1626,7 +1631,7 @@ def _next_actions(
         if validation.change.state == "failed":
             actions.append(
                 NextAction(
-                    command="irminsul check",
+                    command=_change_check_command(change_range),
                     reason="This change introduced errors.",
                 )
             )
@@ -1651,6 +1656,20 @@ def _next_actions(
         )
 
     return _unique_actions(actions)
+
+
+def _change_check_command(change: ChangeRange | None) -> str:
+    """The run that lists the errors a change introduced.
+
+    Plain `irminsul check` makes none of the passes that judge a change, so it lists nothing
+    for a finding one of them raised. When this run judged a range, the command is the run it
+    made: `check --diff` with the base the range was read from, ended at `HEAD` when this
+    run's was. With no range the errors are the tree's own, which the plain run lists.
+    """
+    if change is None:
+        return "irminsul check"
+    command = f"irminsul check --diff {change.base}"
+    return command if change.head is None else f"{command} --committed-only"
 
 
 def _has_unowned_source(

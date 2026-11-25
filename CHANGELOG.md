@@ -126,6 +126,11 @@ making a feature, a refactor and an RFC-driven change in it.
   diff. The verdict names the base it used (`baseline` under `validation.change` in JSON). A
   clean tree with no base still judges no change, as does `--committed-only` with no base, and
   `--base-ref <base>` is still what judges the commits a branch already holds.
+- When `context --after-edit` judged a change and it introduced errors, the next action names
+  `irminsul check --diff <base>` with the base the run used, and `--committed-only` when the run
+  had it, in the plain output and the JSON. It named plain `irminsul check`, which runs none of
+  the passes that judge a change and so listed nothing for a finding one of them raised. The
+  `--after-edit` help and the MCP tool description say which run lists the errors.
 - `context --after-edit` leaves the baseline, the adoption record, the manifest and the guidance
   files out of its unmatched list, since none of them has an owner by design, unless a claim cites
   one as evidence.

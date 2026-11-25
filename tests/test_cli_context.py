@@ -653,8 +653,9 @@ def test_context_after_edit_runs_global_hard_validation(tmp_path: Path) -> None:
     # the agent to work out which half of the repository's errors it is answerable for.
     assert data["validation"]["change"]["state"] == "failed"
     assert data["validation"]["change"]["new_errors"] > 0
+    # The untracked doc is a change judged against HEAD, so that is the run to repeat.
     assert data["next_actions"][-1] == {
-        "command": "irminsul check",
+        "command": "irminsul check --diff HEAD",
         "reason": "This change introduced errors.",
     }
     assert all(
