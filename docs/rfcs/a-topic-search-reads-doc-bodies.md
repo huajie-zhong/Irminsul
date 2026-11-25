@@ -6,6 +6,8 @@ describes: []
 rfc_state: accepted
 affects:
   - context
+  - docgraph
+  - mcp-server
 resolved_by: docs/decisions/agents-get-stateless-read-only-queries-and-one-written-loop.md
 summary: "`context --topic` matches words in doc bodies too, ranked below matches in a doc's title, summary or headings, so a topic named only in prose, such as a non-goal, is found."
 required_updates: []
