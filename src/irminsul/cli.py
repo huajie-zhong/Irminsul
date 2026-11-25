@@ -1028,10 +1028,11 @@ def context_command(
             "--after-edit",
             help=(
                 "Map the change to its owners and run the checks: the findings this change "
-                "caused, and how many repository errors remain for `irminsul check` to list. "
-                "The change runs from the merge base of its base and HEAD to the working "
-                "tree, and the passes `check --diff` adds run on it. With no base given, the "
-                "uncommitted work is the change and HEAD its base."
+                "caused, and how many errors the repository has. The change runs from the "
+                "merge base of its base and HEAD to the working tree, and the passes "
+                "`check --diff` adds run on it, so `irminsul check --diff <base>` lists those "
+                "errors and plain `irminsul check` only the ones no such pass raised. With no "
+                "base given, the uncommitted work is the change and HEAD its base."
             ),
         ),
     ] = False,
