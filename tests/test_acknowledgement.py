@@ -17,10 +17,12 @@ from irminsul.checks.acknowledgement import (
     CODE_UNUSED,
     Trailer,
     acknowledge,
+    awaits_commit,
     parse,
     placement,
     trailer_for,
     trailer_form,
+    uncommitted_about,
 )
 from irminsul.checks.base import AnswerKind, Finding, Severity
 from irminsul.checks.pipeline import answer_of
@@ -456,6 +458,43 @@ def test_placement_names_an_uncommitted_file_or_the_last_change() -> None:
         placement(_finding(about=("app/alpha.py", "app/beta.py")), frozenset())
         == "on the commit that carries the last change to app/alpha.py, app/beta.py, or a later one"
     )
+
+
+def test_a_finding_awaits_the_commit_that_carries_its_uncommitted_files(graph: DocGraph) -> None:
+    """One rule says a finding is about work not committed yet: a file it is about has
+    uncommitted changes. It is the rule that lapses an earlier trailer and places the next one
+    on the commit to come, so a finding waits for that commit exactly where its suggestion
+    says the trailer goes in the message of the commit that carries the file."""
+    pending = frozenset({"app/alpha.py"})
+    both = _finding(about=("app/alpha.py", "app/beta.py"))
+
+    assert uncommitted_about(both, pending) == ["app/alpha.py"]
+    assert uncommitted_about(both, frozenset({"app/gamma.py"})) == []
+    assert uncommitted_about(_finding(about=()), frozenset({_DOC})) == [_DOC]
+
+    assert awaits_commit(both, pending)
+    assert "in the message of the commit that carries app/alpha.py" == placement(both, pending)
+    assert not awaits_commit(both, frozenset({"app/gamma.py"}))
+    assert not awaits_commit(both, frozenset())
+
+    lapsed = _trailer(f'{_CO_CHANGE} {_DOC} reason="re-read"', changed_after=pending)
+    [still_open] = acknowledge([both], [lapsed], graph, ran=None)
+    assert still_open.severity is Severity.warning
+    assert awaits_commit(still_open, pending)
+
+
+def test_a_finding_no_trailer_can_take_awaits_no_commit(graph: DocGraph) -> None:
+    """A code answered by a fix has no trailer to wait for, and a finding a trailer of the
+    change already accepted is signed off."""
+    pending = frozenset({"app/alpha.py"})
+    fixed = _finding(code="frontmatter/missing-summary")
+    assert answer_of(fixed.code).kind is AnswerKind.fix
+    assert not awaits_commit(fixed, pending)
+
+    live = _trailer(f'{_CO_CHANGE} {_DOC} reason="re-read"')
+    [accepted] = acknowledge([_finding()], [live], graph, ran=None)
+    assert accepted.severity is Severity.info
+    assert not awaits_commit(accepted, pending)
 
 
 def test_the_printed_trailer_leaves_out_a_subject_equal_to_the_path() -> None:

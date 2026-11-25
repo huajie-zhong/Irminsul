@@ -36,6 +36,11 @@ The core component.
 """
 
 
+_WITHOUT_FRONTMATTER = _CONFIG.replace('"frontmatter", "uniqueness"', '"uniqueness"')
+_WITHOUT_UNIQUENESS = _CONFIG.replace('"frontmatter", "uniqueness"', '"frontmatter"')
+_CHECK_DISABLED = "diff-integrity/check-disabled"
+
+
 def _repo(root: Path) -> Path:
     write(root, "irminsul.toml", _CONFIG)
     write(root, "src/core.py", "X = 1\n")
@@ -136,6 +141,7 @@ def test_an_inherited_error_is_not_charged_to_this_change(tmp_path: Path) -> Non
     assert data["validation"]["change"] == {
         "state": "passed",
         "new_errors": 0,
+        "awaiting_trailer": 0,
         "baseline": "HEAD",
         "reason": None,
     }
@@ -248,18 +254,20 @@ def test_a_config_change_that_disables_a_check_is_measured_whole_tree(tmp_path: 
     """Turning a check off is not a per-file edit, so only a whole-tree comparison sees
     it: the findings it used to produce disappear, and none is new. What is new is the
     weakened gate itself, which `diff-integrity` reports because the uncommitted edit is
-    the change it judges."""
+    the change it judges. A trailer answers it, on a commit that does not exist yet, so it
+    waits for that commit and is no new error."""
     root = _repo(tmp_path)
     _broken(root, "legacy")
     commit_all(root, "inherit a broken doc")
-    write(root, "irminsul.toml", _CONFIG.replace('"frontmatter", "uniqueness"', '"uniqueness"'))
+    write(root, "irminsul.toml", _WITHOUT_FRONTMATTER)
 
     code, data = _ctx(root, "--after-edit")
 
-    assert [f["code"] for f in data["findings"]] == ["diff-integrity/check-disabled"]
+    assert [f["code"] for f in data["findings"]] == [_CHECK_DISABLED]
     assert data["validation"]["repository"]["errors"] == 1
-    assert data["validation"]["change"]["new_errors"] == 1
-    assert code == 1
+    assert data["validation"]["change"]["new_errors"] == 0
+    assert data["validation"]["change"]["awaiting_trailer"] == 1
+    assert code == 0
 
 
 def test_plain_and_json_agree_after_an_edit(tmp_path: Path) -> None:
@@ -380,6 +388,7 @@ def test_an_uncommitted_edit_to_recorded_debt_fails_with_no_base(tmp_path: Path)
     assert data["validation"]["change"] == {
         "state": "failed",
         "new_errors": 1,
+        "awaiting_trailer": 0,
         "baseline": "HEAD",
         "reason": None,
     }
@@ -469,3 +478,225 @@ def test_committed_only_with_no_base_judges_no_change_and_says_so(tmp_path: Path
 
     _, out = _plain(root, "--after-edit", "--committed-only")
     assert "Change validation: not run\n  reason: --committed-only without a base" in out
+
+
+# --- a finding only the next commit's trailer can answer --------------------------------
+
+
+def _disabled_trailer(check: str) -> str:
+    return f'Irminsul-Reviewed: {_CHECK_DISABLED} irminsul.toml {check} reason="..."'
+
+
+_WAITING = "Of these, findings that wait for the commit's trailer and do not fail this run: "
+
+
+def test_a_finding_the_commits_trailer_answers_does_not_fail_before_the_commit(
+    tmp_path: Path,
+) -> None:
+    """Taking a check out of `checks.enabled` is answered by a trailer in the message of the
+    commit that carries the edit. Until that commit exists nothing can carry the trailer, so
+    the run reports the finding apart from the new errors, with the trailer to write, counts
+    it as waiting and exits 0. `check --diff HEAD` is the gate and still fails on it."""
+    root = _repo(tmp_path)
+    write(root, "irminsul.toml", _WITHOUT_FRONTMATTER)
+
+    code, data = _ctx(root, "--after-edit")
+
+    assert code == 0
+    assert data["validation"]["change"] == {
+        "state": "passed",
+        "new_errors": 0,
+        "awaiting_trailer": 1,
+        "baseline": "HEAD",
+        "reason": None,
+    }
+    [finding] = data["findings"]
+    assert (finding["code"], finding["severity"]) == (_CHECK_DISABLED, "error")
+    assert finding["awaiting_trailer"] is True
+    assert finding["trailer"] == _disabled_trailer("frontmatter")
+    assert "in the message of the commit that carries irminsul.toml" in finding["suggestion"]
+    # The repository verdict is the one `check --diff HEAD` reaches, so it still counts it.
+    assert data["validation"]["repository"]["errors"] == 1
+    assert data["next_actions"] == []
+
+    plain_code, out = _plain(root, "--after-edit")
+    lines = out.splitlines()
+
+    assert plain_code == 0
+    verdict = "Change validation: passed (0 new errors vs HEAD; 1 finding waits for the commit's "
+    assert verdict + "trailer)" in lines
+    caused = lines.index("Findings this change caused (compared with HEAD): 1")
+    waiting = lines.index(_WAITING + "1")
+    assert caused < waiting
+    assert lines[waiting + 1].startswith(f"  error  [{_CHECK_DISABLED}] irminsul.toml: ")
+    assert f"  {_disabled_trailer('frontmatter')}" in lines[waiting:]
+
+    assert _check(root, "--diff", "HEAD") == (1, [_CHECK_DISABLED])
+
+
+def test_a_waiting_finding_does_not_excuse_an_ordinary_new_error(tmp_path: Path) -> None:
+    """The run still fails on what the work introduced and a trailer does not answer, and
+    counts the two apart."""
+    root = _repo(tmp_path)
+    write(root, "irminsul.toml", _WITHOUT_UNIQUENESS)
+    _broken(root, "fresh")
+
+    code, data = _ctx(root, "--after-edit")
+
+    assert code == 1
+    change = data["validation"]["change"]
+    assert (change["state"], change["new_errors"], change["awaiting_trailer"]) == ("failed", 1, 1)
+    waiting = [f["code"] for f in data["findings"] if f.get("awaiting_trailer")]
+    assert waiting == [_CHECK_DISABLED]
+    failing = [f for f in data["findings"] if f["severity"] == "error" and f["code"] not in waiting]
+    assert [f["check"] for f in failing] == ["frontmatter"]
+    assert all("awaiting_trailer" not in f for f in failing)
+    assert data["next_actions"][-1]["reason"] == "This change introduced errors."
+
+    plain_code, out = _plain(root, "--after-edit")
+    lines = out.splitlines()
+
+    assert plain_code == 1
+    verdict = "Change validation: failed (1 new errors vs HEAD; 1 finding waits for the commit's "
+    assert verdict + "trailer)" in lines
+    caused = lines.index("Findings this change caused (compared with HEAD): 2")
+    waiting_at = lines.index(_WAITING + "1")
+    assert any("[frontmatter/" in line for line in lines[caused:waiting_at])
+    assert not any(_CHECK_DISABLED in line for line in lines[caused:waiting_at])
+
+
+def test_a_committed_finding_with_no_trailer_fails(tmp_path: Path) -> None:
+    """Once the work is committed and nothing is uncommitted, an existing commit could have
+    carried the trailer, so the finding is a new error as it is under `check --diff`."""
+    root = _repo(tmp_path)
+    base = git(root, "rev-parse", "HEAD")
+    write(root, "irminsul.toml", _WITHOUT_FRONTMATTER)
+    commit_all(root, "take frontmatter out, with no trailer")
+
+    code, data = _ctx(root, "--after-edit", "--base-ref", base)
+
+    assert code == 1
+    change = data["validation"]["change"]
+    assert (change["state"], change["new_errors"], change["awaiting_trailer"]) == ("failed", 1, 0)
+    [finding] = data["findings"]
+    assert finding["code"] == _CHECK_DISABLED
+    assert "awaiting_trailer" not in finding
+
+    _, out = _plain(root, "--after-edit", "--base-ref", base)
+    assert f"Change validation: failed (1 new errors vs {base})" in out
+    assert _WAITING not in out
+
+
+def test_a_finding_waits_only_while_a_file_it_is_about_is_uncommitted(tmp_path: Path) -> None:
+    """Uncommitted work elsewhere does not make a committed finding wait: the rule is the one
+    that lapses a trailer, a later change to a file the finding is about. A further
+    uncommitted edit to that file is such a change, so the finding waits for its commit."""
+    root = _repo(tmp_path)
+    base = git(root, "rev-parse", "HEAD")
+    write(root, "irminsul.toml", _WITHOUT_FRONTMATTER)
+    commit_all(root, "take frontmatter out, with no trailer")
+    write(root, "src/core.py", "X = 2\n")
+
+    code, data = _ctx(root, "--after-edit", "--base-ref", base)
+
+    assert code == 1
+    assert data["validation"]["change"]["awaiting_trailer"] == 0
+
+    write(root, "irminsul.toml", _WITHOUT_FRONTMATTER + "\n")
+
+    code, data = _ctx(root, "--after-edit", "--base-ref", base)
+
+    assert code == 0
+    change = data["validation"]["change"]
+    assert (change["state"], change["new_errors"], change["awaiting_trailer"]) == ("passed", 0, 1)
+
+
+def test_a_finding_the_commits_trailer_accepted_neither_waits_nor_fails(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    base = git(root, "rev-parse", "HEAD")
+    write(root, "irminsul.toml", _WITHOUT_FRONTMATTER)
+    answered = _disabled_trailer("frontmatter").replace("...", "one check is enough here")
+    commit_all(root, f"take frontmatter out\n\n{answered}")
+
+    code, data = _ctx(root, "--after-edit", "--base-ref", base)
+
+    assert code == 0
+    change = data["validation"]["change"]
+    assert (change["state"], change["new_errors"], change["awaiting_trailer"]) == ("passed", 0, 0)
+    [finding] = data["findings"]
+    assert (finding["code"], finding["severity"]) == (_CHECK_DISABLED, "info")
+    assert "awaiting_trailer" not in finding
+
+
+def test_a_waiting_warning_is_listed_with_what_the_change_caused(tmp_path: Path) -> None:
+    """Only a finding that would fail the run is set apart. A hint a trailer answers, such as
+    `co-change` on an uncommitted source edit, never failed it, so it stays where it was."""
+    root = _repo(tmp_path)
+    write(root, "irminsul.toml", _CONFIG)
+    write(root, "src/core.py", "X = 2\n")
+
+    code, data = _ctx(root, "--after-edit")
+
+    assert code == 0
+    [finding] = data["findings"]
+    assert (finding["code"], finding["severity"]) == ("co-change/unreflected-change", "warning")
+    assert finding["trailer"] is not None
+    assert "awaiting_trailer" not in finding
+    assert data["validation"]["change"]["awaiting_trailer"] == 0
+    _, out = _plain(root, "--after-edit")
+    assert "Change validation: passed (0 new errors vs HEAD)" in out
+    assert _WAITING not in out
+
+
+def _sibling_docs_repo(tmp_path: Path) -> Path:
+    """A docs repository whose source root is a sibling code repository, which no base
+    checkout holds, so its change is never compared and the repository verdict decides."""
+    code = tmp_path / "code"
+    write(code, "src/core.py", "X = 1\n")
+    git_init(code)
+    commit_all(code, "seed")
+    root = tmp_path / "docs-repo"
+    write(root, "irminsul.toml", _CONFIG.replace('["src"]', '["../code/src"]'))
+    write(root, "docs/components/core.md", _DOC.replace("src/core.py", "core.py"))
+    git_init(root)
+    commit_all(root, "seed")
+    return root
+
+
+def test_a_waiting_finding_does_not_fail_a_change_that_was_not_compared(tmp_path: Path) -> None:
+    """Where no comparison can be made the repository verdict decides the exit code, and the
+    finding that waits for the commit's trailer is left out of that too: it is no less
+    unanswerable there. An error a trailer does not answer still fails."""
+    root = _sibling_docs_repo(tmp_path)
+    write(
+        root, "irminsul.toml", (root / "irminsul.toml").read_text().replace('"frontmatter", ', "")
+    )
+
+    code, data = _ctx(root, "--after-edit")
+
+    change = data["validation"]["change"]
+    assert (change["state"], change["new_errors"], change["awaiting_trailer"]) == (
+        "not_run",
+        None,
+        1,
+    )
+    assert data["validation"]["repository"]["errors"] == 1
+    assert [f.get("awaiting_trailer") for f in data["findings"]] == [True]
+    assert data["next_actions"] == []
+    assert code == 0
+
+    plain_code, out = _plain(root, "--after-edit")
+    lines = out.splitlines()
+    assert plain_code == 0
+    assert "Change validation: not run (1 finding waits for the commit's trailer)" in lines
+    assert "Findings, every one of the run, since the change was not compared: 1" in lines
+    assert _WAITING + "1" in lines
+
+    write(root, "docs/components/core.md", _DOC.replace("src/core.py", "core.py") + _UNUSED_IGNORE)
+
+    code, data = _ctx(root, "--after-edit")
+
+    assert data["validation"]["repository"]["errors"] == 2
+    assert data["validation"]["change"]["awaiting_trailer"] == 1
+    assert data["next_actions"][-1]["command"] == "irminsul check"
+    assert code == 1

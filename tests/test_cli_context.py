@@ -1210,6 +1210,17 @@ def test_context_topic_help_describes_quoted_keyword_search() -> None:
     assert "must match" in text
 
 
+def test_context_after_edit_help_says_what_waits_for_the_commits_trailer() -> None:
+    result = runner.invoke(app, ["context", "--help"], terminal_width=160)
+
+    assert result.exit_code == 0, result.output
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+    text = " ".join(re.sub(r"[│╭╮╰╯─]", " ", plain).split())
+    assert "A finding that a commit trailer answers" in text
+    assert "does not fail the run" in text
+    assert "until a commit carries the trailer" in text
+
+
 _UNREFLECTED = "co-change/unreflected-change"
 
 

@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Literal
 
 from irminsul.adoption import recorded_debt
 from irminsul.checks import Finding, finding_records
-from irminsul.checks.acknowledgement import trailer_block
+from irminsul.checks.acknowledgement import awaits_commit, trailer_block
 from irminsul.checks.change_range import range_of
 from irminsul.checks.globs import (
     external_display_for_path,
@@ -77,6 +77,8 @@ _MAX_EXCERPT_CHARS = 1_200
 #: How many tests plain output lists when none has a reason to be named. A test with a
 #: reason is always listed; the JSON carries every test either way.
 _MAX_UNREASONED_TESTS = 10
+#: What the plain output prints over the findings `_awaiting_trailer` names, after the others.
+_WAITING_HEADING = "Of these, findings that wait for the commit's trailer and do not fail this run"
 
 
 class ContextError(UserError):
@@ -153,6 +155,9 @@ class ChangeValidation:
 
     state: ValidationState
     new_errors: int | None = None
+    #: How many findings wait for the trailer of a commit that does not exist yet
+    #: (`_awaiting_trailer`). They are not among `new_errors` and do not fail the run.
+    awaiting_trailer: int = 0
     #: The base the verdict was measured against: the ref that was given, or `HEAD` when none
     #: was. None when no base names a change, as under `--committed-only` with none given.
     baseline: str | None = None
@@ -284,9 +289,11 @@ class ContextReport:
     that ran no checks leaves it out of the JSON rather than reporting an empty verdict.
     `findings` is the same edit's findings, once for the whole report: those the change
     caused, or every finding of the run when the change was not compared, which
-    `validation.change` says. `next_actions` are command-and-reason pairs derived from the
-    report's own state; a topic report carries `suggestion` in their place, null when a doc
-    matched and otherwise the sentence the plain output prints after `(none)`.
+    `validation.change` says. One that waits for the trailer of a commit not made yet is
+    among them, marked `awaiting_trailer` in `records`. `next_actions` are
+    command-and-reason pairs derived from the report's own state; a topic report carries
+    `suggestion` in their place, null when a doc matched and otherwise the sentence the
+    plain output prints after `(none)`.
     """
 
     version: int
@@ -440,7 +447,7 @@ def build_context_report(
         claim_reviews=claim_reviews,
         suggestion=_TOPIC_MISS_SUGGESTION if mode == "topic" and not results else None,
         findings=findings,
-        records=None if findings is None else finding_records(findings, graph),
+        records=None if findings is None else _records(findings, graph),
     )
 
 
@@ -450,6 +457,9 @@ def context_report_should_fail(report: ContextReport) -> bool:
     After an edit the edit-specific signal is what this change introduced, so a sound
     change comparison decides. Where none could be established the whole-repository
     verdict decides instead — the safe existing behaviour, rather than a silent success.
+    Neither fails on a finding that waits for the trailer of a commit not made yet
+    (`_awaiting_trailer`): the comparison does not count it a new error, and the repository's
+    errors fail the run only when some of them are not waiting.
     A mode that ran no checks never fails on validation: it established nothing, and
     exit 0 there means the packet was produced, not that the tree is clean. A path packet
     in which no named path has an owner does fail.
@@ -458,7 +468,7 @@ def context_report_should_fail(report: ContextReport) -> bool:
     if validation is not None:
         if validation.change.state != "not_run":
             return validation.change.state == "failed"
-        return validation.repository.state == "failed"
+        return validation.repository.errors > validation.change.awaiting_trailer
     return report.mode == "path" and not report.results
 
 
@@ -1445,14 +1455,21 @@ def _validation_lines(validation: EditValidation) -> list[str]:
             f"{baseline.get('path')}{stale_note}; irminsul list baseline shows them"
         )
     change = validation.change
+    waits = change.awaiting_trailer
+    waiting = (
+        f"{waits} finding{' waits' if waits == 1 else 's wait'} for the commit's trailer"
+        if waits
+        else ""
+    )
     if change.state == "not_run":
-        lines.append("Change validation: not run")
+        lines.append("Change validation: not run" + (f" ({waiting})" if waiting else ""))
         if change.reason:
             lines.append(f"  reason: {change.reason}")
     else:
         lines.append(
             f"Change validation: {change.state} "
-            f"({change.new_errors} new errors vs {change.baseline})"
+            f"({change.new_errors} new errors vs {change.baseline}"
+            + (f"; {waiting})" if waiting else ")")
         )
     return lines
 
@@ -1511,9 +1528,10 @@ def _change_validation(
     The comparison is `check --delta`'s own, `run_delta`, so "new" means a finding the
     same run at the base did not produce — not a finding whose file the edit happened to
     touch. It covers every severity, and the passes that judge a change, which the base run
-    does not make, so a finding one of them raised counts as caused. Everything that can go
-    wrong here ends as `not_run` with a reason, because the one answer this must never give
-    is a zero it did not measure.
+    does not make, so a finding one of them raised counts as caused. A caused finding that
+    waits for the trailer of a commit not made yet is counted as that and not as a new error
+    (`_awaiting_trailer`). Everything that can go wrong here ends as `not_run` with a reason,
+    because the one answer this must never give is a zero it did not measure.
     """
     from irminsul.change.report import BaselineSource
     from irminsul.checks.pipeline import failing_findings, run_delta
@@ -1554,17 +1572,61 @@ def _change_validation(
         # With no base, `rev` is HEAD, which already holds whatever this branch committed:
         # every finding would count as pre-existing and the answer would be a zero that
         # measured nothing.
-        return ChangeValidation(state="not_run", baseline=rev, reason=str(exc)), None
+        return (
+            ChangeValidation(
+                state="not_run",
+                awaiting_trailer=len(_awaiting_trailer(run.findings, graph.change)),
+                baseline=rev,
+                reason=str(exc),
+            ),
+            None,
+        )
 
-    new_errors = len(failing_findings(delta.new))
+    awaiting = len(_awaiting_trailer(delta.new, graph.change))
+    new_errors = len(failing_findings(delta.new)) - awaiting
     return (
         ChangeValidation(
             state="passed" if new_errors == 0 else "failed",
             new_errors=new_errors,
+            awaiting_trailer=awaiting,
             baseline=rev,
         ),
         delta.new,
     )
+
+
+def _awaiting_trailer(findings: list[Finding], change: ChangeRange | None) -> list[Finding]:
+    """The findings that would fail the run and that only a commit not made yet can answer.
+
+    Each is certain, its code declares the answer `trailer`, and a file it is about holds
+    uncommitted work, which is `awaits_commit`, the rule that lapses a trailer on an earlier
+    commit. No commit of the change can carry the trailer, so failing on the finding would
+    refuse the work for something only committing it can answer. The run reports it apart,
+    with the trailer to write, and `check --diff` still fails on it until a commit carries
+    that trailer. A finding about committed work alone is not one: a commit could have
+    carried its trailer. Only a pass that judges a change raises a code declared `trailer`,
+    so every one of these is the change's own.
+    """
+    from irminsul.checks.pipeline import failing_findings
+
+    if change is None:
+        return []
+    return [
+        finding
+        for finding in failing_findings(findings)
+        if awaits_commit(finding, change.uncommitted)
+    ]
+
+
+def _records(findings: list[Finding], graph: DocGraph) -> list[dict[str, object]]:
+    """`findings` as `check --format json` reports them, each one of `_awaiting_trailer`
+    marked `awaiting_trailer`, which a finding that does not wait has no key for."""
+    records = finding_records(findings, graph)
+    waiting = {id(finding) for finding in _awaiting_trailer(findings, graph.change)}
+    for finding, record in zip(findings, records, strict=True):
+        if id(finding) in waiting:
+            record["awaiting_trailer"] = True
+    return records
 
 
 def _next_actions(
@@ -1635,7 +1697,9 @@ def _next_actions(
                     reason="This change introduced errors.",
                 )
             )
-        elif validation.repository.state == "failed":
+        elif validation.repository.errors > validation.change.awaiting_trailer:
+            # A finding that waits for the commit's trailer is this change's, and the plain
+            # run does not list it, so it alone sends nobody there.
             actions.append(
                 NextAction(
                     command="irminsul check",
@@ -1784,6 +1848,7 @@ def _validation_to_dict(validation: EditValidation) -> dict[str, object]:
         "change": {
             "state": change.state,
             "new_errors": change.new_errors,
+            "awaiting_trailer": change.awaiting_trailer,
             "baseline": change.baseline,
             "reason": change.reason,
         },
@@ -1916,21 +1981,32 @@ def _format_changed_owner(result: ContextResult) -> list[str]:
 
 
 def _findings_lines(report: ContextReport) -> list[str]:
-    """The findings of the edit, once for the whole report, under the verdict they belong to."""
+    """The findings of the edit, once for the whole report, under the verdict they belong to.
+
+    The heading counts them all. The ones that wait for the commit's trailer come after the
+    rest, under a heading of their own, so the errors the change introduced are not read as
+    including them.
+    """
     if report.findings is None or report.records is None or report.validation is None:
         return []
     change = report.validation.change
+    pairs = list(zip(report.findings, report.records, strict=True))
+    waiting = [pair for pair in pairs if pair[1].get("awaiting_trailer")]
     if change.state == "not_run":
-        header = (
-            "Findings, every one of the run, since the change was not compared: "
-            f"{len(report.findings)}"
-        )
+        header = f"Findings, every one of the run, since the change was not compared: {len(pairs)}"
     else:
-        header = (
-            f"Findings this change caused (compared with {change.baseline}): {len(report.findings)}"
-        )
-    lines = [header]
-    for finding, record in zip(report.findings, report.records, strict=True):
+        header = f"Findings this change caused (compared with {change.baseline}): {len(pairs)}"
+    rest = [pair for pair in pairs if not pair[1].get("awaiting_trailer")]
+    lines = [header, *_finding_lines(rest)]
+    if waiting:
+        lines.append(f"{_WAITING_HEADING}: {len(waiting)}")
+        lines.extend(_finding_lines(waiting))
+    return lines
+
+
+def _finding_lines(pairs: list[tuple[Finding, dict[str, object]]]) -> list[str]:
+    lines: list[str] = []
+    for finding, record in pairs:
         location = finding.path.as_posix() if finding.path else "<repo>"
         if finding.line is not None:
             location = f"{location}:{finding.line}"
