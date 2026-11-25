@@ -1032,7 +1032,7 @@ def context_command(
                 "merge base of its base and HEAD to the working tree, and the passes "
                 "`check --diff` adds run on it, so `irminsul check --diff <base>` lists those "
                 "errors and plain `irminsul check` only the ones no such pass raised. With no "
-                "base given, the uncommitted work is the change and HEAD its base. A finding "
+                "base given, the uncommitted work is the change and HEAD its base. A certain finding "
                 "that a commit trailer answers, about a file with uncommitted work, is listed "
                 "apart with the trailer to write and does not fail the run; `check --diff` "
                 "fails on it until a commit carries the trailer."
