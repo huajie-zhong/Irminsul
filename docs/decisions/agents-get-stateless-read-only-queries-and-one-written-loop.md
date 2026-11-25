@@ -160,3 +160,6 @@ rate-limited and makes a run depend on the network.
 - 2026-11-25: The body search is implemented: `context --topic` matches body prose, ranks a
   doc that matches only through its body last, applies the packet's cap with the count of the
   rest, and no longer says to search bodies directly.
+- 2026-11-25: Accepted [The change queue asks about what the change did not write](../rfcs/the-change-queue-asks-about-what-the-change-did-not-write.md):
+  the author's loop asks for the queue alone, and the agent protocol gains a reviewer's step for
+  the written list.

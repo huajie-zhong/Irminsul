@@ -711,6 +711,126 @@ def test_a_sentence_moved_elsewhere_in_the_file_is_not_queued(tmp_path: Path) ->
     assert items == []
 
 
+def test_removing_a_list_item_queues_its_removal_and_not_the_items_it_renumbered(
+    tmp_path: Path,
+) -> None:
+    """A list item's number is its position: dropping an earlier item renumbers the ones
+    after it without changing a word of them."""
+    items = _review_pipeline_edit(
+        _repo(tmp_path),
+        "1. Keep the first step.\n2. Drop this step.\n3. Keep the last step.\n",
+        "1. Keep the first step.\n2. Keep the last step.\n",
+    )
+    assert _edits(items) == []
+    assert _removed(items) == ["2. Drop this step."]
+
+
+def test_adding_a_list_item_queues_it_and_not_the_items_it_renumbered(tmp_path: Path) -> None:
+    items = _review_pipeline_edit(
+        _repo(tmp_path),
+        "1. Keep the first step.\n2. Keep the last step.\n",
+        "1. Keep the first step.\n2. Add this step.\n3. Keep the last step.\n",
+    )
+    assert _edits(items) == [("2. Add this step.", None)]
+    assert _removed(items) == []
+
+
+def test_an_item_renumbered_beyond_an_unchanged_sentence_is_not_queued(tmp_path: Path) -> None:
+    """The removed item and the last one sit in different runs of the change, split by the
+    second sentence of the item between them, and the removal still explains the number."""
+    items = _review_pipeline_edit(
+        _repo(tmp_path),
+        "1. Drop this step.\n2. Run the gate. Read what it says.\n3. Keep the last step.\n",
+        "1. Run the gate. Read what it says.\n2. Keep the last step.\n",
+    )
+    assert _edits(items) == []
+    assert _removed(items) == ["1. Drop this step."]
+
+
+def test_a_reworded_list_item_is_an_edit(tmp_path: Path) -> None:
+    items = _review_pipeline_edit(
+        _repo(tmp_path),
+        "1. Keep the first step.\n2. Run the gate.\n",
+        "1. Keep the first step.\n2. Run the gate twice.\n",
+    )
+    assert _edits(items) == [("2. Run the gate twice.", "2. Run the gate.")]
+    assert _removed(items) == []
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "edit"),
+    [
+        pytest.param(
+            "1. Findings were reported.\n2. The command was misused.\n",
+            "1. Findings were reported.\n3. The command was misused.\n",
+            ("3. The command was misused.", "2. The command was misused."),
+            id="a list of exit codes",
+        ),
+        pytest.param(
+            "2019. That was the year of adoption.\n",
+            "2021. That was the year of adoption.\n",
+            ("2021. That was the year of adoption.", "2019. That was the year of adoption."),
+            id="a year that opens a paragraph",
+        ),
+        pytest.param(
+            "| Code | Meaning |\n|---|---|\n| 2. | Usage error |\n",
+            "| Code | Meaning |\n|---|---|\n| 3. | Usage error |\n",
+            ("3. | Usage error", "2. | Usage error"),
+            id="a table row",
+        ),
+        pytest.param(
+            "The cap on findings is\n100. Above that the run stops.\n",
+            "The cap on findings is\n200. Above that the run stops.\n",
+            ("200. Above that the run stops.", "100. Above that the run stops."),
+            id="a number a wrapped line opens with",
+        ),
+    ],
+)
+def test_a_number_changed_with_no_item_added_or_removed_is_an_edit(
+    tmp_path: Path, before: str, after: str, edit: tuple[str, str]
+) -> None:
+    """Nothing explains the new number, so it may be what the line says."""
+    items = _review_pipeline_edit(_repo(tmp_path), before, after)
+    assert _edits(items) == [edit]
+    assert _removed(items) == []
+
+
+def test_swapping_two_list_items_is_two_edits(tmp_path: Path) -> None:
+    """As many items gone as new: the file gained and lost none, so both numbers are edits."""
+    items = _review_pipeline_edit(
+        _repo(tmp_path),
+        "1. Run the gate.\n2. Commit the change.\n",
+        "1. Commit the change.\n2. Run the gate.\n",
+    )
+    assert [sentence for sentence, _ in _edits(items)] == [
+        "1. Commit the change.",
+        "2. Run the gate.",
+    ]
+
+
+def test_a_renumbered_item_stays_queued_in_a_guidance_file_that_is_not_markdown(
+    tmp_path: Path,
+) -> None:
+    """A deletion is queued only in Markdown, so here the renumbered step is the one trace
+    the deleted step leaves."""
+    root = _repo(tmp_path)
+    write_config(root, source_roots=["src"], extra='extra_docs = [".cursorrules"]\n')
+    write(
+        root,
+        ".cursorrules",
+        "1. Keep the first step.\n2. Drop this step.\n3. Keep the last step.\n",
+    )
+    git_init(root)
+    commit_all(root, "init", when=_dt.datetime(2020, 1, 1, tzinfo=_dt.UTC))
+    write(root, ".cursorrules", "1. Keep the first step.\n2. Keep the last step.\n")
+    report = review_json(
+        root, load(root / "irminsul.toml"), changed=changed_line_numbers(GitReader(), root)
+    )
+    items = json.loads(report)["items"]
+    assert _edits(items) == [("2. Keep the last step.", "2. Drop this step.")]
+    assert _removed(items) == []
+
+
 def test_a_sentence_deleted_outright_is_removed_and_not_an_edit(tmp_path: Path) -> None:
     items = _review_pipeline_edit(_repo(tmp_path), PARAGRAPH + "\n", f"{FIND} {EMITS}\n")
     assert _removed(items) == [PLAIN]

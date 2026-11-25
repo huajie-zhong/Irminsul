@@ -139,3 +139,6 @@ its change connects to.
   `foreign` goes, and a bare flag no program precedes becomes a hint.
 - 2026-10-29: Accepted [A change re-asks the sentences that name its code](../rfcs/a-change-re-asks-the-sentences-that-name-its-code.md):
   `list review --changed` queues each sentence naming code the change touched.
+- 2026-11-25: Accepted [The change queue asks about what the change did not write](../rfcs/the-change-queue-asks-about-what-the-change-did-not-write.md):
+  `list review --changed` drops the sentences a change wrote or deleted, and `list review --written`
+  lists them for the change's reviewer.

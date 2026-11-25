@@ -87,6 +87,7 @@ _GLOSSARY_META_RE = re.compile(r"^\s*(?:match|forbidden_synonyms|case_sensitive)
 _SPAN_RE = re.compile(r"(`+)(.+?)\1")
 _SENTENCE_END_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z`\[*(])")
 _LIST_MARKER_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
+_ORDERED_MARKER_RE = re.compile(r"^\d+[.)]\s+")
 _TABLE_SEPARATOR_RE = re.compile(r"^\s*\|?[\s:|-]+\|?\s*$")
 _LINK_RE = re.compile(r"\[([^\]]*)\]\(([^)]*)\)")
 _CODE_OR_COMMENT_RE = re.compile(r"(`+).+?\1|<!--.*?-->")
@@ -298,7 +299,9 @@ def build_review(
         for position, (file_line, last_line, sentence) in enumerate(rows):
             if changed is not None and not _touches(changed, path, file_line, last_line):
                 continue
-            if revision is not None and _comparable(sentence) in revision.known:
+            if revision is not None and (
+                _comparable(sentence) in revision.known or position in revision.renumbered
+            ):
                 continue
             spans = [m.group(2) for m in _SPAN_RE.finditer(sentence)]
             references = [ref for span in spans for ref in resolver.resolve(span)]
@@ -459,13 +462,16 @@ class _Revision:
     `known` holds the base's sentences, so a sentence already there is not new. `replaced`
     pairs each new sentence that took the place of an old one: {position now: position at
     the base}. `now` holds every sentence now, one to a line, so a deleted sentence whose
-    words the file still has inside a merged sentence is not deleted.
+    words the file still has inside a merged sentence is not deleted. `renumbered` pairs the
+    ordered list items that only took a new number, the same way round as `replaced`: they
+    are neither new nor deleted.
     """
 
     before: list[tuple[int, int, str]]
     known: frozenset[str]
     replaced: dict[int, int]
     now: str
+    renumbered: dict[int, int]
 
     def replaced_text(self, position: int) -> str | None:
         old = self.replaced.get(position)
@@ -476,6 +482,7 @@ class _Revision:
         still carries. Only a replacement the queue showed takes a base sentence: an edit it
         did not queue was never read, so the sentence it stood for is still to be read."""
         taken = {self.replaced[position] for position in queued if position in self.replaced}
+        taken.update(self.renumbered.values())
         return [
             (line, sentence)
             for index, (line, _, sentence) in enumerate(self.before)
@@ -501,6 +508,14 @@ def _revision(
     sides are filtered before pairing, so a sentence the file still has is never named as
     replaced. An insertion before a rewrite can still shift the pairing: order is the only
     thing that pairs them.
+
+    An ordered list item whose words the base has under another number is set aside first,
+    when the file gained or lost an ordered item: adding or removing a step renumbers the
+    steps after it without changing a word of them. With as many ordered items gone as new,
+    nothing explains a changed number, so it stays an edit: the number may be what the line
+    says, as in a table of exit codes or a year that opens a paragraph. Markdown only,
+    because a deletion is queued only there, and a renumbered step is the one trace a
+    deleted step leaves in any other file.
     """
     base = _prose_at_ref(repo_root, config, graph, base_ref, path, guidance)
     before = [] if base is None else _text_sentences(base)
@@ -508,13 +523,49 @@ def _revision(
     new = [_comparable(sentence) for _, _, sentence in rows]
     known = frozenset(old)
     current = frozenset(new)
-    replaced: dict[int, int] = {}
+    runs: list[tuple[list[int], list[int]]] = []
     for tag, i1, i2, j1, j2 in SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
-        if tag == "replace":
+        if tag != "equal":
             gone = [index for index in range(i1, i2) if old[index] not in current]
             fresh = [position for position in range(j1, j2) if new[position] not in known]
-            replaced.update(zip(fresh, gone, strict=False))
-    return _Revision(before, known, replaced, "\n".join(new))
+            runs.append((gone, fresh))
+    renumbered = _renumbered(old, new, runs) if path.endswith(".md") else {}
+    replaced: dict[int, int] = {}
+    for gone, fresh in runs:
+        gone = [index for index in gone if index not in renumbered.values()]
+        fresh = [position for position in fresh if position not in renumbered]
+        replaced.update(zip(fresh, gone, strict=False))
+    return _Revision(before, known, replaced, "\n".join(new), renumbered)
+
+
+def _renumbered(
+    old: list[str], new: list[str], runs: list[tuple[list[int], list[int]]]
+) -> dict[int, int]:
+    """{position now: position at the base} of ordered list items that only took a new number.
+
+    Within a run the change rewrote, a new item pairs with the first old item that has its
+    words under another number. The pairs count only when the ordered items left over, gone
+    and new, differ in number across the file, which is what adding or removing an item does.
+    """
+    pairs: dict[int, int] = {}
+    surplus = 0
+    for gone, fresh in runs:
+        unpaired = [index for index in gone if _ORDERED_MARKER_RE.match(old[index])]
+        for position in fresh:
+            if not _ORDERED_MARKER_RE.match(new[position]):
+                continue
+            words = _ORDERED_MARKER_RE.sub("", new[position], count=1)
+            match = next(
+                (i for i in unpaired if _ORDERED_MARKER_RE.sub("", old[i], count=1) == words),
+                None,
+            )
+            if match is None:
+                surplus += 1
+            else:
+                unpaired.remove(match)
+                pairs[position] = match
+        surplus -= len(unpaired)
+    return pairs if surplus else {}
 
 
 def _removed_sentences(

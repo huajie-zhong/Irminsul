@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from irminsul.git.changes import changed_since
+import pytest
+
+from irminsul.git.changes import changed_line_numbers, changed_since, renamed_paths
 from irminsul.git.reader import GitReader
 
 from .conftest import commit_all, commit_file, git, git_init, write
@@ -174,3 +176,59 @@ def test_a_ref_git_cannot_resolve_or_a_missing_history_reads_as_none(tmp_path: P
 
     assert _since(root, "no-such-ref") is None
     assert _since(tmp_path / "elsewhere", "main") is None
+
+
+@pytest.mark.parametrize(
+    "setting",
+    [None, "diff.noprefix=true", "diff.mnemonicPrefix=true", "diff.relative=true"],
+)
+def test_changed_lines_are_read_whatever_the_users_diff_settings(
+    tmp_path: Path, setting: str | None
+) -> None:
+    """Each of these settings changes the path git prints for a changed file, and a path the
+    parse does not recognise used to leave the change with no lines at all. The project sits
+    below the git root, which is where `diff.relative` changes the path."""
+    git_init(tmp_path, branch="main")
+    project = tmp_path / "project"
+    write(project, "docs/notes.md", "one\ntwo\n")
+    commit_all(tmp_path, "base", when=_at(1))
+    if setting is not None:
+        git(tmp_path, "config", *setting.split("="))
+    write(project, "docs/notes.md", "one\nchanged\n")
+
+    assert changed_line_numbers(GitReader(), project) == {"docs/notes.md": {2}}
+
+
+def test_two_edits_are_two_lines_whatever_the_users_hunk_setting(tmp_path: Path) -> None:
+    """`diff.interHunkContext` joins nearby hunks, and the lines between two edits then read
+    as changed."""
+    git_init(tmp_path, branch="main")
+    write(tmp_path, "docs/notes.md", "1\n2\n3\n4\n5\n6\n7\n")
+    commit_all(tmp_path, "base", when=_at(1))
+    git(tmp_path, "config", "diff.interHunkContext", "5")
+    write(tmp_path, "docs/notes.md", "1\n2\nthree\n4\n5\nsix\n7\n")
+
+    assert changed_line_numbers(GitReader(), tmp_path) == {"docs/notes.md": {3, 6}}
+
+
+def test_changed_lines_are_read_in_a_file_whose_name_holds_a_space(tmp_path: Path) -> None:
+    """git ends such a name with a tab, which used to be kept as part of the path, so the
+    lines were filed under a path no doc has."""
+    git_init(tmp_path, branch="main")
+    write(tmp_path, "docs/my notes.md", "one\ntwo\n")
+    commit_all(tmp_path, "base", when=_at(1))
+    write(tmp_path, "docs/my notes.md", "one\nchanged\n")
+
+    assert changed_line_numbers(GitReader(), tmp_path) == {"docs/my notes.md": {2}}
+
+
+def test_a_rename_below_the_git_root_is_read_whatever_diff_relative_says(tmp_path: Path) -> None:
+    git_init(tmp_path, branch="main")
+    project = tmp_path / "project"
+    write(project, "docs/old.md", "one\ntwo\nthree\n")
+    base = commit_all(tmp_path, "base", when=_at(1))
+    git(tmp_path, "config", "diff.relative", "true")
+    git(tmp_path, "mv", "project/docs/old.md", "project/docs/new.md")
+    commit_all(tmp_path, "rename", when=_at(2))
+
+    assert renamed_paths(GitReader(), project, base, "HEAD") == {"docs/old.md": "docs/new.md"}

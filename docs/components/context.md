@@ -23,6 +23,7 @@ owns_tests:
   - tests/test_context_test_ranking.py
   - tests/test_context_unit.py
   - tests/test_context_validation_states.py
+  - tests/test_seeded_rot.py
 claims:
   - id: context-is-stateless
     state: implemented
@@ -177,6 +178,9 @@ limit as a rule the tool checks is the misreading the excerpt exists to prevent.
 Topic search is deterministic per-term substring matching over doc metadata, heading texts and body prose, every term required, not fuzzy or semantic search. A term is matched as written, so `budget` finds a doc that says "budgets" and the plural does not find the singular. A word that appears only in a fenced or indented code block, in a comment, or in the lines of a raw HTML block such as `<details>`, which run to its next blank line, finds nothing; a paragraph set between such tags by blank lines is prose and is read. Outside a heading, whose text is searched as written, the destination and title of a `[text](destination)` link, the definition of a reference link and the source of an image find nothing. A URL written out, bare or as an autolink in angle brackets, is text a reader sees, so a word in it does match.
 
 `--after-edit` reads the paths `changed_since` reports for its base, which is `HEAD` when none is given. A file moved without `git mv` reads as a deletion plus a new file until it is staged. For a repository with no commits and for a project below its git root, where there is no history of its own to diff, it falls back to the staged, unstaged, and untracked paths from `git status` and judges no change; outside a git worktree it reports the git error instead of guessing. <!-- anchor: src/irminsul/git/changes.py#working_tree_changed_paths @sha256:86b253bf9d54 -->
+
+`tests/test_seeded_rot.py` makes one sentence of a fixture's docs false by changing only its code, and pins how far `check --diff`, `list review --changed` and `context --after-edit` then lead a reader, for an uncommitted change in the docs' own repository: to the sentence when its paragraph is anchored to the changed code, to the declaration of its claim when it carries one that cites the changed file, otherwise to its doc alone when that doc owns the changed file, and nowhere when it does not, whether or not the sentence names the code in a code span. A probe run against the fixture's code shows that each edit changes what its sentences state. Each case that stops short of the sentence is also a strict expected failure whose reason names the accepted RFC or backlog entry for that gap, so a change that closes one fails the suite until it updates the case.
+<!-- anchor: tests/test_seeded_rot.py#CASES @sha256:c97ede2c119e -->
 
 Test ranking is evidence of relation, not of coverage: nothing runs a test, and one that imports a file or changed with it may not exercise the change in hand. Only Python imports are read, so a test in another language ranks by history alone, and the history count follows no rename and skips merge commits.
 

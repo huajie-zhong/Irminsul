@@ -102,6 +102,35 @@ what you ran into:
 
 Name the command, the finding code or the doc, what you expected, and what happened.
 
+## Fix what you find, one kind of work per branch
+
+A gap you report is also yours to fix when the fix is small and restores a rule instead of
+changing one: a bug, once you have decided as above whether the code or the sentence is the
+wrong one; a message that sends a reader wrong; a `BACKLOG.md` entry the tree has closed. Fix
+it without asking, one commit per fix with its test, its doc and its `CHANGELOG.md` line, and
+give it one line in your report.
+
+Ask first when the fix would change a rule: what a decision record decides, what a check or
+the review queue reports beyond what its doc already says, a finding code or its class, what
+the scaffolded gate fails on, the config schema, a command's flags, exit code or JSON shape,
+or the prose of a foundation doc.
+[Changing direction](docs/guides/agent-protocol.md#changing-direction) says which of those
+take an RFC. Write the gap into `BACKLOG.md`, checked against the code, and name it in your
+report as a call for the user.
+
+A branch and its pull request hold one kind of work, so a reviewer reads one kind at a time.
+Code still lands with its tests and its docs in one commit, as the loop says; the kinds are:
+
+- small fixes, as above, with the backlog entries they close or open and the edits to
+  guidance they call for;
+- one RFC, or one slice of a large one;
+- a test suite or a measurement that changes no behaviour;
+- a doc change no code goes with, such as a draft RFC.
+
+A gap met while implementing an RFC goes to a branch of small fixes, unless the RFC cannot
+land without it. Push only to a branch the user or the harness gave you, and ask for another
+when the work needs one.
+
 ## This repository
 
 **Gates.** Every change passes `irminsul check` and `irminsul check --diff origin/main`,
@@ -110,6 +139,9 @@ On a branch, every command that compares a change takes `--base-ref origin/main`
 
 **Setup and tests.** Python 3.12 or later: install with `py -3.12 -m pip install -e
 ".[dev]"` rather than a bare `python`, whose meaning depends on PATH.
+Where `pip` refuses to install into the system Python, as in a cloud session, `uv sync --locked
+--extra dev` builds `.venv` from `uv.lock` as CI does; the MCP server in `.mcp.json` needs that
+environment's `irminsul` on PATH.
 
 ```bash
 pytest -q                                # parallel; -n0 runs serially, e.g. under a debugger

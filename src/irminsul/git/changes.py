@@ -146,10 +146,20 @@ def changed_line_numbers(
         repo_root,
         "-c",
         "core.quotePath=false",
+        # The parse below reads `+++ b/<path from the git root>` and one hunk per edit, which
+        # the user's `diff.relative`, `diff.noprefix`, `diff.mnemonicPrefix` and
+        # `diff.interHunkContext` would each change. `diff.relative` is turned off as a
+        # setting because `--no-relative` came with it in git 2.28: an older git ignores a
+        # setting it does not know and refuses a flag it does not know.
+        "-c",
+        "diff.relative=false",
         "diff",
         "-U0",
+        "--inter-hunk-context=0",
         "--no-color",
         "--no-ext-diff",
+        "--src-prefix=a/",
+        "--dst-prefix=b/",
         base_ref or "HEAD",
         *(["HEAD"] if committed_only else []),
         "--",
@@ -163,7 +173,8 @@ def changed_line_numbers(
     current: str | None = None
     for line in result.stdout.splitlines():
         if line.startswith("+++ "):
-            target = line[4:]
+            # git ends the name of a file with a space in it with a tab
+            target = line[4:].removesuffix("\t")
             current = (
                 _project_relative_git_path(target[2:], prefix) if target.startswith("b/") else None
             )
@@ -396,6 +407,8 @@ def renamed_paths(
         repo_root,
         "-c",
         "core.quotePath=false",
+        "-c",
+        "diff.relative=false",
         "diff",
         "--find-renames",
         "--diff-filter=R",
