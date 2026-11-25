@@ -30,6 +30,9 @@ entry expected to close the gap, so the change that closes one fails here until 
 The fixture is committed on a fixed day in 2024 and the edit is uncommitted, which reads as
 today, so `mtime-drift` sees an owning doc more than its 30 days behind the source in every
 case. A doc committed within that threshold would not get the finding.
+
+That a sentence is false after its edit is not taken on trust: each edit carries a probe, an
+expression run against the fixture's code, and the value it gives while the sentence holds.
 """
 
 from __future__ import annotations
@@ -46,6 +49,7 @@ from .conftest import commit_all, invoke, invoke_json, load_graph, replace_text,
 from .test_private_docs_siblings import _build_siblings
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+FIXTURE = REPO_ROOT / "tests" / "fixtures" / "repos" / "seeded-rot"
 SEEDED = _dt.datetime(2024, 1, 1, 12, tzinfo=_dt.UTC)
 
 Outcome = Literal["sentence", "doc", "miss"]
@@ -67,26 +71,42 @@ CLAIM_REVIEWS = "claim_reviews"
 
 #: What is expected to close a gap: an accepted RFC under `docs/rfcs/`, or a `BACKLOG.md` entry.
 RFC_NAMES_CODE = "RFC a-change-re-asks-the-sentences-that-name-its-code"
-RFC_GOVERNS = "RFC decision-records-govern-what-they-decide"
 BACKLOG_NO_CODE = "BACKLOG.md connected-doc-hides-unconnected-sections"
+BACKLOG_GOVERNS = "BACKLOG.md governed-code-does-not-re-ask-its-record"
 
 
 @dataclass(frozen=True)
 class Edit:
-    """One change to the fixture's code: the exact `old` text of `path` becomes `new`."""
+    """One change to the fixture's code: the exact `old` text of `path` becomes `new`.
+
+    `probe` is an expression over the fixture's functions, and `holds` what it gives while
+    the sentences this edit is aimed at are true; after the edit it gives something else.
+    """
 
     path: str
     old: str
     new: str
+    probe: str
+    holds: object
 
 
-CAP = Edit("src/loans/policy.py", "* 25, 500)", "* 25, 800)")
-EARLY = Edit("src/loans/policy.py", "max(days_late, 0)", "abs(days_late)")
-RENEWALS = Edit("src/loans/policy.py", "renewals < 2", "renewals < 3")
-LENGTH = Edit("src/loans/policy.py", "days: int = 14", "days: int = 21")
-CHECK_OUT = Edit("src/loans/desk.py", '"renewals": 0}', '"renewals": 1}')
+CAP = Edit("src/loans/policy.py", "* 25, 500)", "* 25, 800)", "late_fee(100)", 500)
+EARLY = Edit("src/loans/policy.py", "max(days_late, 0)", "abs(days_late)", "late_fee(-3)", 0)
+RENEWALS = Edit("src/loans/policy.py", "renewals < 2", "renewals < 3", "can_renew(2)", False)
+LENGTH = Edit("src/loans/policy.py", "days: int = 14", "days: int = 21", "due_day(0)", 14)
+CHECK_OUT = Edit(
+    "src/loans/desk.py",
+    '"renewals": 0}',
+    '"renewals": 1}',
+    'check_out("a book", 0)["renewals"]',
+    0,
+)
 RENEW = Edit(
-    "src/loans/desk.py", 'due_day(day), "renewals": loan', 'due_day(loan["due"]), "renewals": loan'
+    "src/loans/desk.py",
+    'due_day(day), "renewals": loan',
+    'due_day(loan["due"]), "renewals": loan',
+    'renew({"due": 5, "renewals": 0}, 10)["due"]',
+    24,
 )
 REFUSE = Edit(
     "src/loans/desk.py",
@@ -94,7 +114,10 @@ REFUSE = Edit(
     '    if day - loan["due"] > 365:\n'
     '        raise ValueError("lost")\n'
     '    return late_fee(day - loan["due"])\n',
+    'check_in({"due": 0}, 400)',
+    500,
 )
+EDITS = (CAP, EARLY, RENEWALS, LENGTH, CHECK_OUT, RENEW, REFUSE)
 
 
 @dataclass(frozen=True)
@@ -222,7 +245,7 @@ CASES = (
         RENEWALS,
         "S is the Decision of a record whose `governs:` names the changed function",
         "miss",
-        closes=RFC_GOVERNS,
+        closes=BACKLOG_GOVERNS,
     ),
 )
 GAPS = tuple(case for case in CASES if case.today != case.wanted)
@@ -321,11 +344,10 @@ def _judge(
         assert len(quotes) == 2, f"{doc} declares no claim {claim}"
 
     def names_sentence(pointer: Pointer) -> bool:
-        on_doc = pointer.path == doc
-        return (
-            (on_doc and pointer.line in paragraph)
+        return pointer.path == doc and (
+            pointer.line in paragraph
             or any(quote in pointer.text for quote in quotes)
-            or (on_doc and claim is not None and claim in pointer.text)
+            or (claim is not None and claim in pointer.text)
         )
 
     on_sentence = [pointer for pointer in new if names_sentence(pointer)]
@@ -361,7 +383,11 @@ def test_what_leads_to_a_sentence_the_code_made_false(
 @pytest.mark.parametrize(
     "case",
     [
-        pytest.param(case, id=case.id, marks=pytest.mark.xfail(strict=True, reason=case.closes))
+        pytest.param(
+            case,
+            id=case.id,
+            marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason=case.closes),
+        )
         for case in GAPS
     ],
 )
@@ -373,7 +399,9 @@ def test_a_sentence_the_code_made_false_is_pointed_at(
 
 def test_every_gap_names_a_live_rfc_or_backlog_entry() -> None:
     """A gap's reason says what is expected to close it, so it has to name an RFC still
-    waiting to be implemented or an entry the backlog still holds."""
+    waiting to be implemented or an entry the backlog still holds. When this fails, the case
+    is out of date: move its `today` to what the views now report, or point its `closes` at
+    whatever is now expected to close the gap."""
     assert all(case.wanted == "sentence" for case in CASES)
     assert [case.id for case in CASES if case.closes is not None] == [case.id for case in GAPS]
     backlog = (REPO_ROOT / "BACKLOG.md").read_text(encoding="utf-8")
@@ -381,10 +409,49 @@ def test_every_gap_names_a_live_rfc_or_backlog_entry() -> None:
         where, slug = closes.split()
         if where == "RFC":
             rfc = (REPO_ROOT / "docs" / "rfcs" / f"{slug}.md").read_text(encoding="utf-8")
-            assert "\nrfc_state: accepted\n" in rfc, f"{slug} is no longer waiting to be built"
+            assert "\nrfc_state: accepted\n" in rfc, (
+                f"{slug} is no longer waiting to be built: update the cases that name it"
+            )
         else:
             assert where == "BACKLOG.md"
-            assert f"\n### `{slug}`\n" in backlog, f"BACKLOG.md no longer holds {slug}"
+            assert f"\n### `{slug}`\n" in backlog, (
+                f"BACKLOG.md no longer holds {slug}: update the cases that name it"
+            )
+
+
+def _behaviour(probe: str, edit: Edit | None = None) -> object:
+    """What `probe` gives against the fixture's code, with `edit` made or not.
+
+    The two modules run in one namespace in place of the import between them, so nothing is
+    imported and no bytecode of one run is read by the next. A raised error is an answer too.
+    """
+    bridge = "from loans.policy import can_renew, due_day, late_fee\n"
+    scope: dict[str, object] = {}
+    for rel in ("src/loans/policy.py", "src/loans/desk.py"):
+        text = (FIXTURE / rel).read_text(encoding="utf-8")
+        assert text.count(bridge) == (rel == "src/loans/desk.py")
+        if edit is not None and edit.path == rel:
+            assert text.count(edit.old) == 1, (
+                f"{rel} holds {edit.old!r} {text.count(edit.old)} times"
+            )
+            text = text.replace(edit.old, edit.new)
+        exec(compile(text.replace(bridge, ""), rel, "exec"), scope)
+    try:
+        return eval(probe, scope)
+    except Exception as error:
+        return type(error).__name__
+
+
+@pytest.mark.parametrize("edit", EDITS, ids=[edit.probe for edit in EDITS])
+def test_each_edit_changes_what_its_sentences_state(edit: Edit) -> None:
+    """The oracle. A sentence is false after its edit because the behaviour it states
+    changed: an edit to a docstring alone would draw the same pointers and falsify nothing."""
+    assert _behaviour(edit.probe) == edit.holds
+    assert _behaviour(edit.probe, edit) != edit.holds
+
+
+def test_every_case_uses_a_probed_edit() -> None:
+    assert {case.edit for case in CASES} == set(EDITS)
 
 
 def test_the_untouched_fixture_reports_nothing(fixture_repo: Callable[[str], Path]) -> None:
