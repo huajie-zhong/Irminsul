@@ -89,7 +89,10 @@ status that excused every error would make one word of frontmatter the cheapest 
   `classes` beside its explanation. A test requires one for every explained code, and
   `irminsul explain <code>` prints it; this record keeps no table, which would drift.
   - **Certain:** the tree provably breaks a rule. An error, which fails every run unless a
-    baseline or `--delta` filters it out, or a trailer of the change accepts it.
+    baseline or `--delta` filters it out, or a trailer of the change accepts it. One run is
+    excepted: `context --after-edit` does not fail on a certain finding that only the commit
+    to come can sign off
+    ([A change is judged from its merge base to the working tree](a-change-is-judged-from-its-merge-base-to-the-working-tree.md)).
   - **Hint:** deciding needs judgment. A warning, which fails a run only under
     `--fail-on hint`, or an info, which never does. It is answered by fixing the doc, a
     reasoned ignore comment, or an acknowledgement
@@ -172,3 +175,4 @@ status that excused every error would make one word of frontmatter the cheapest 
 - 2026-10-29: Accepted [Each finding code has one answer](../rfcs/every-warning-hint-has-an-answer.md).
 - 2026-10-30: The answer bullet is implemented, and the three co-change acknowledgement codes retire to `acknowledgement/*`.
 - 2026-10-30: A trailer of the change accepts a certain finding whose code declares `trailer`, which then reports at info, so a certain code is no longer always an error. The Certain and draft bullets say so.
+- 2026-11-25: `context --after-edit` does not fail on a certain finding that waits for the commit's trailer, as [An edit with no base is judged against HEAD](../rfcs/an-edit-with-no-base-is-judged-against-head.md) decides. The Certain bullet names that exception.
