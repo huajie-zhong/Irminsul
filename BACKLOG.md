@@ -120,6 +120,23 @@ doc's claims, or stop pinning evidence that nothing reads. The accepted RFC
 `claim-evidence-names-a-part` judges every layer, as its last step. Until then, a read-only way to list the pins that no longer match would
 let an agent see them without `--re-pin --all` rewriting them.
 
+### `same-tree-test-answers-two-questions`
+
+`base_is_the_working_tree` (`src/irminsul/delta.py`) decides both whether `check --delta` would
+compare a tree with itself and whether `context --after-edit` has a change to judge, from one
+list of watched paths: the docs root, the source roots, the guidance files, `irminsul.toml` and
+the workflows. The two questions have different answers. With only the adoption record changed
+and not committed, `context --after-edit --base-ref HEAD` says the tree is identical to `HEAD`
+and judges no change, though `diff-integrity` judges that record (run on 2026-11-25). A new test
+file no doc owns fails `irminsul check` with `test-ownership/unowned-test` while `check --delta`
+refuses the run as identical to `HEAD`, because `paths.test_roots` is not watched, and deleting
+a file a claim cites as evidence outside those roots, such as `action.yml`, is refused the same
+way (a review, 2026-11-25). Watching the baseline and the adoption record for both was tried
+that day and withdrawn: `--delta` applies no baseline to either side, so a tree that differs
+only there compares equal and the run exits 0 having measured nothing, which the refusal exists
+to prevent. Ask the two questions apart: for `--delta`, every path a check reads, test roots and
+cited evidence included; for a change, the baseline and the adoption record as well.
+
 ### `rfc-supersedes-unchecked`
 
 `supersession` skips RFCs entirely (`src/irminsul/checks/supersession.py:43`), and no other
@@ -303,8 +320,8 @@ changed code; four of the eight name no code, which is
 `connected-doc-hides-unconnected-sections`. Until it lands, say in the output that changed
 source is not read. The owner's direction on 2026-11-25 is that this queue asks only about what
 the change did not write and may have made stale, and leaves the sentences the change wrote to
-its reviewer; a draft RFC, `the-change-queue-asks-about-what-the-change-did-not-write`, on a
-branch of that name and not on main, proposes it. These counts replace the ones in
+its reviewer; a draft RFC, `the-change-queue-asks-about-what-the-change-did-not-write`, on the
+branch `rfc/change-queue-asks-what-the-change-did-not-write` and not on main, proposes it. These counts replace the ones in
 `queue-is-unranked`, measured before the fixes of 2026-10-31.
 
 ### `stale-summary-asks-after-any-body-edit`
