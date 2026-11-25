@@ -127,9 +127,8 @@ a pin that no longer matches falls back to the commit-time comparison
 (`_scan_evidence_drift`, `:256`), so a doc touched in the same commit, or on the other
 side of a merge, hides it. The PR 12 lanes met this each time they edited a component's
 code (four stale pins after 12d, a `context.py` pin after 12f). Either judge every stable
-doc's claims, or stop pinning evidence that nothing reads. A draft RFC,
-`claim-evidence-names-a-part` (branch `rfc/claim-evidence-parts`, not on main), proposes
-judging every layer. Until then, a read-only way to list the pins that no longer match would
+doc's claims, or stop pinning evidence that nothing reads. The accepted RFC
+`claim-evidence-names-a-part` judges every layer, as its last step. Until then, a read-only way to list the pins that no longer match would
 let an agent see them without `--re-pin --all` rewriting them.
 
 ### `rfc-supersedes-unchecked`
@@ -300,23 +299,24 @@ did not write first.
 
 ### `changed-queue-reads-doc-edits-not-code-edits`
 
-`list review --changed` reads only the docs the change touched
-(`src/irminsul/listing/review.py:292`), so it holds the sentences the change wrote, the claims
-that cite a changed evidence file, stale summaries, and moved or removed sentences. A change to
-code alone queues nothing: commit `460c44c`, which changed `review.py` and its test, prints
+`list review --changed` reads sentences only from the docs the change touched
+(`src/irminsul/listing/review.py:292`). Beside those it holds the claims that cite a changed
+file as evidence, stale summaries, and moved or removed sentences. A change to code that no
+claim cites queues nothing: commit `460c44c`, which changed `review.py` and its test, prints
 "0 items", which reads as "nothing to re-read". Run with today's code on 2026-11-25 over the
 three pull requests merged on 2026-10-30 and 2026-10-31 (heads `89772e4`, `dde68e0`, `ffa39b4`)
 and two single commits, the queue held 189 items: 99 sentences the change itself wrote, 29
 summaries of docs whose body changed, 20 claims whose evidence file changed in a part they do
-not rest on, 19 removed or renumbered sentences, 8 with a wrong reference, and 14 worth the
-re-read. Eight sentences those pull requests made false and did not edit were in no queue. The
+not rest on, 19 removed sentences, 8 with a wrong reference, and 14 worth the re-read. A few
+of the 19 were list items a deletion had only renumbered, which are no longer queued. Eight sentences those pull requests made false and did not edit were in no queue. The
 accepted RFC `a-change-re-asks-the-sentences-that-name-its-code` queues the ones that name
 changed code; four of the eight name no code, which is
 `connected-doc-hides-unconnected-sections`. Until it lands, say in the output that changed
-source is not read. Order is by reference and path today (the `sorted` call that ends
-`build_review`): print the items the author did not write first, since the top of a
-list is what gets read. This replaces the counts in `queue-is-unranked`, measured before the
-fixes of 2026-10-31.
+source is not read. The owner's direction on 2026-11-25 is that this queue asks only about what
+the change did not write and may have made stale, and leaves the sentences the change wrote to
+its reviewer; a draft RFC, `the-change-queue-asks-about-what-the-change-did-not-write`, on a
+branch of that name and not on main, proposes it. These counts replace the ones in
+`queue-is-unranked`, measured before the fixes of 2026-10-31.
 
 ### `stale-summary-asks-after-any-body-edit`
 
@@ -330,8 +330,8 @@ closes the plain output, or decide what "rewritten" means; the second is a decis
 ### `lifecycle-queue-shows-no-progress`
 
 `irminsul list lifecycle --queue` prints one line per accepted RFC, each ending "accepted RFC
-is not yet implemented": ten identical lines on 2026-11-25, for RFCs of 2 tasks and of 27, five
-of whose tasks had landed. Which tasks are done is readable only from pull request titles, and
+is not yet implemented": ten lines alike but for the RFC they name on 2026-11-25, for RFCs of 2
+tasks and of 27, five of whose tasks had landed. Which tasks are done is readable only from pull request titles, and
 the order the RFCs depend on each other in only from their prose. Tasks T23, T25 and T27 of
 `every-warning-hint-has-an-answer` (a checkbox per task and "N of M tasks done" in
 `change status`) answer the first; the queue should print the same count.
@@ -351,8 +351,21 @@ cases chosen by someone who knew the rules give counts per kind of connection, n
 it as a fixture under `tests/fixtures/repos/` with one case per kind of connection and its
 outcome asserted, so recall cannot fall unseen and the code-span cases change when the re-ask
 RFC lands; a sampled run on this tree, with each case stored as a sentence and a patch, gives
-the number. Whether the scaffolded gate should fail on hints once every hint has an answer is
-a decision nobody has made.
+the number. The owner decided on 2026-11-25 that `init` should scaffold a gate that fails on
+hints as well, once every hint has an answer. That reverses the Scope of
+`every-warning-hint-has-an-answer`, which keeps the scaffolded default at certain findings
+alone, so it needs its own RFC.
+
+### `decision-edit-is-confirmed-twice`
+
+The accepted RFC `decision-records-govern-what-they-decide` answers an edit of a record's
+Decision twice: a dated item under `## Changes`, which `diff-integrity/change-unrecorded` asks
+for, and a trailer, which answers `diff-integrity/decision-rewritten`. Both say that the
+decision was changed on purpose and why. The owner asked on 2026-11-25 whether they can merge.
+One finding answered by adding the dated item would do it: the item is in the tree, so it
+survives a squash merge or a history reset, which a trailer does not, and the trailer stays
+the answer of every other seal. Amend the RFC before its tasks T6 to T8 are built; accepting
+the amendment is the owner's.
 
 ### `init-writes-no-gitattributes`
 
@@ -529,8 +542,9 @@ it is on.
 `docs/guides/private-docs.md:206` names mtime drift as the cross-repository signal. Task T16 of
 `every-warning-hint-has-an-answer` deletes that check and T22 makes `co-change` read the source
 range in its place. Land T22 first or both in one change: T16 alone leaves this layout with pins
-and nothing else. T22's answer is a trailer in the code repository's pull request, where the
-doc cannot be edited and where no trailer is read today, so it needs the entry above.
+and nothing else. T22 also reads the trailers of the source range, which nothing reads today:
+in the code repository's pull request the doc cannot be edited, so a trailer is the one
+answer there, and a doc that is wrong has none.
 
 ### `siblings-time-signals-clear-on-any-doc-commit`
 
