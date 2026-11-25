@@ -150,6 +150,11 @@ def changed_line_numbers(
         "-U0",
         "--no-color",
         "--no-ext-diff",
+        # The parse below reads `+++ b/<path from the git root>`, which the user's
+        # `diff.noprefix`, `diff.mnemonicPrefix` or `diff.relative` would each change.
+        "--src-prefix=a/",
+        "--dst-prefix=b/",
+        "--no-relative",
         base_ref or "HEAD",
         *(["HEAD"] if committed_only else []),
         "--",
