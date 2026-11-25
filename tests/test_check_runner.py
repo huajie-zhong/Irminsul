@@ -156,8 +156,8 @@ def test_a_diff_pass_reports_only_for_a_graph_that_carries_a_range(tmp_path: Pat
 
 
 def test_the_change_passes_are_the_passes_that_read_the_graphs_change() -> None:
-    """`context --after-edit` names `CHANGE_PASSES` as the checks a run with no base did not
-    make, so a pass that reads `graph.change` and is missing from it would go unnamed."""
+    """The test above asks each pass in `CHANGE_PASSES` to report nothing for a graph with no
+    range, so a pass that reads `graph.change` and is missing from it would go unasked."""
     import inspect
     import sys
 

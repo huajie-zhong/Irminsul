@@ -106,13 +106,20 @@ finding by its fingerprint, so when a doc has the same finding twice and the cou
 first one in report order is taken as the old one. The finding named can then sit on the
 line that did not change, and the verdict is still right: one more of them was introduced.
 
-With no base, the change is the working tree against `HEAD` and the passes that judge a
-change (`CHANGE_PASSES`) have no range to read, so they do not run. A `passed` verdict
-then means no new finding from what did run, and `ChangeValidation.note` says so and
-names `--base-ref <base>` for the whole branch and `--base-ref HEAD` for the uncommitted
-work alone. The verdict itself is the same with or without the note: an edit to a file
-the adoption record excepts passes here and fails under `--base-ref HEAD`.
-<!-- anchor: src/irminsul/context.py#ChangeValidation.note @sha256:fdfc2efcbd75 -->
+With no base given, the uncommitted work is the change and `HEAD` its base. `_change_range`
+puts on the graph the range `check --diff HEAD` judges, so the passes that judge a change
+(`CHANGE_PASSES`) run before the first commit: an edit to a file the adoption record
+excepts fails here, as it does under `--base-ref HEAD`. The run names the base it used.
+`ChangeValidation.baseline` is `HEAD` then and the given ref otherwise, and the plain
+output prints it in the verdict and in the heading of the findings. `HEAD` holds whatever
+the branch already committed, so that work is judged only when `--base-ref` names the
+branch point. A clean tree with no base has no change, and neither has `--committed-only`
+with no base, which reads nothing uncommitted: the graph gets no range, those passes
+report nothing, and the verdict is `not_run` with its reason. A run that judges a change
+leaves out the findings elapsed time caused, so those show after an edit only when no
+change was judged.
+<!-- anchor: src/irminsul/context.py#_change_range @sha256:f00cafabdda8 -->
+<!-- anchor: src/irminsul/context.py#ChangeValidation.baseline @sha256:585832c6aa9e -->
 <!-- anchor: src/irminsul/checks/pipeline.py#CHANGE_PASSES @sha256:14a5db692c54 -->
 
 ## Content excerpts
@@ -132,7 +139,7 @@ limit as a rule the tool checks is the misreading the excerpt exists to prevent.
 
 Topic search is deterministic per-term substring matching over doc metadata and heading texts, every term required, not fuzzy or semantic search. Prose under a heading is not searched, so a word that appears only in a body, such as a plural of a heading's word, finds nothing.
 
-With a base, `--after-edit` reads the paths `changed_since` reports. A file moved without `git mv` reads as a deletion plus a new file until it is staged. With no base it reads the staged, unstaged, and untracked paths from `git status`, which is also the fallback for a repository with no commits and for a project below its git root, where there is no history of its own to diff; outside a git worktree it reports the git error instead of guessing. <!-- anchor: src/irminsul/git/changes.py#working_tree_changed_paths @sha256:86b253bf9d54 -->
+`--after-edit` reads the paths `changed_since` reports for its base, which is `HEAD` when none is given. A file moved without `git mv` reads as a deletion plus a new file until it is staged. For a repository with no commits and for a project below its git root, where there is no history of its own to diff, it falls back to the staged, unstaged, and untracked paths from `git status` and judges no change; outside a git worktree it reports the git error instead of guessing. <!-- anchor: src/irminsul/git/changes.py#working_tree_changed_paths @sha256:86b253bf9d54 -->
 
 `tests/test_seeded_rot.py` makes one sentence of a fixture's docs false by changing only its code, and pins how far `check --diff`, `list review --changed` and `context --after-edit` then lead a reader, for an uncommitted change in the docs' own repository: to the sentence when its paragraph is anchored to the changed code, to the declaration of its claim when it carries one that cites the changed file, otherwise to its doc alone when that doc owns the changed file, and nowhere when it does not, whether or not the sentence names the code in a code span. A probe run against the fixture's code shows that each edit changes what its sentences state. Each case that stops short of the sentence is also a strict expected failure whose reason names the accepted RFC or backlog entry for that gap, so a change that closes one fails the suite until it updates the case.
 <!-- anchor: tests/test_seeded_rot.py#CASES @sha256:c97ede2c119e -->

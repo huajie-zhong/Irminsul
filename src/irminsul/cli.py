@@ -1029,9 +1029,9 @@ def context_command(
             help=(
                 "Map the change to its owners and run the checks: the findings this change "
                 "caused, and how many repository errors remain for `irminsul check` to list. "
-                "With a base, the change runs "
-                "from its merge base with HEAD to the working tree, and the passes "
-                "`check --diff` adds run too."
+                "The change runs from the merge base of its base and HEAD to the working "
+                "tree, and the passes `check --diff` adds run on it. With no base given, the "
+                "uncommitted work is the change and HEAD its base."
             ),
         ),
     ] = False,
@@ -1042,9 +1042,9 @@ def context_command(
             help=(
                 "Branch point --after-edit measures this change against, such as "
                 "origin/main; IRMINSUL_BASE_REF and GITHUB_BASE_REF name one when this "
-                "is not given. Without a base the working tree is compared with HEAD, "
-                "which says nothing about work this branch already committed, and the "
-                "diff passes do not run."
+                "is not given. With none, the uncommitted work is judged against HEAD, "
+                "which says nothing about work this branch already committed, and a clean "
+                "tree has no change to judge."
             ),
         ),
     ] = None,
