@@ -87,13 +87,19 @@ What does outlive a call is an external check's cache of what it observed: with
 `external-links` enabled, a call can report what a link returned earlier, and the finding
 carries its observation time.
 
-`--after-edit` exits non-zero when **this change** introduced errors, so the same
-command doubles as a gate in a pre-commit hook or CI step without failing forever on
-debt the change did not create. What counts as debt is the baseline's rule: a finding
-from outside the check registry, or one auditing a suppression, is charged to the change
-however long it has been there, as it is under `check --delta`. Where no trustworthy
-baseline exists the repository verdict decides instead, which is the safe direction. The
-pull-request gate is independent of this and still fails on the repository's own state.
+`--after-edit` exits non-zero when **this change** introduced errors, so it does not
+fail forever on debt the change did not create. Before a commit the change is the
+uncommitted work, and the run says what the next commit would be judged for. As a gate
+in a pre-commit hook it has one limit: a certain finding that a commit trailer answers,
+such as `diff-integrity/check-disabled` after a check is taken out of `checks.enabled`,
+fails the run until the commit that carries the trailer exists, so the hook refuses the
+commit that would answer it. Once the work is committed, a run given `--base-ref` reads
+the trailer, so a CI step can gate on the exit code. What counts as debt is the
+baseline's rule: a finding from outside the check registry, or one auditing a
+suppression, is charged to the change however long it has been there, as it is under
+`check --delta`. Where no trustworthy baseline exists the repository verdict decides
+instead, which is the safe direction. The pull-request gate is independent of this and
+still fails on the repository's own state.
 
 The findings an edit reports are the ones this change caused: the comparison above, over
 every severity, listed once for the whole report and not under each owner. When the change
