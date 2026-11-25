@@ -126,6 +126,14 @@ making a feature, a refactor and an RFC-driven change in it.
   diff. The verdict names the base it used (`baseline` under `validation.change` in JSON). A
   clean tree with no base still judges no change, as does `--committed-only` with no base, and
   `--base-ref <base>` is still what judges the commits a branch already holds.
+- When `context --after-edit` judged a change and it introduced errors, the next action names
+  `irminsul check --diff <base>` with the base the run used, and `--committed-only` when the run
+  had it, in the plain output and the JSON. It named plain `irminsul check`, which runs none of
+  the passes that judge a change and so listed nothing for a finding one of them raised. The
+  `--after-edit` help and the MCP tool description say which run lists the errors.
+- `irminsul explain` says a `time` finding is left out of a run that judges a change, which is
+  `check --diff` and `context --after-edit` from a base or on uncommitted work. It named `--diff`
+  alone.
 - `context --topic` also matches words in a doc's body prose: the text and code spans of its
   paragraphs, headings and list items, not fenced blocks, comments or link targets. A doc that
   matches only through its body ranks below every doc that matches without it and is marked

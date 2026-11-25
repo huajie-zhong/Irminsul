@@ -343,6 +343,20 @@ def test_context_for_path_tool_says_tests_are_ranked_with_reasons() -> None:
     assert "test_reasons" in (tools["context_for_path"].description or "")
 
 
+def test_context_after_edit_tool_names_the_run_that_lists_a_changes_errors() -> None:
+    """Plain `irminsul check` makes none of the passes that judge a change, so a description
+    that sends a caller there for the errors sends it to a run that may list none."""
+    pytest.importorskip("mcp")
+    import asyncio
+
+    server = mcp_server.create_server(_GOOD_FIXTURE)
+    tools = {tool.name: tool for tool in asyncio.run(server.list_tools())}
+    description = tools["context_after_edit"].description or ""
+
+    assert "`irminsul check --diff <base>`" in description
+    assert "which `irminsul check` lists" not in description
+
+
 def test_check_tool_sees_a_commit_made_between_calls(tmp_path: Path) -> None:
     """The server lives for a whole editor session, so git history read for one call must
     not answer the next: a commit that makes a doc lag its source has to show up."""

@@ -393,6 +393,45 @@ def test_an_uncommitted_edit_to_recorded_debt_fails_with_no_base(tmp_path: Path)
     assert "note:" not in out
 
 
+def _check(root: Path, *args: str) -> tuple[int, list[str]]:
+    result = runner.invoke(app, ["check", *args, "--format", "json", "--path", str(root)])
+    return result.exit_code, [f["code"] for f in json.loads(result.output)["findings"]]
+
+
+def test_the_next_action_names_the_run_that_lists_what_the_change_introduced(
+    tmp_path: Path,
+) -> None:
+    """Plain `irminsul check` makes none of the passes that judge a change, so for an edit to
+    recorded debt it lists nothing and exits 0. The next action names the run this one made,
+    `check --diff` with the base it used, which lists the finding."""
+    root = _debt_repo(tmp_path)
+    introduced = {
+        "command": "irminsul check --diff HEAD",
+        "reason": "This change introduced errors.",
+    }
+
+    _, data = _ctx(root, "--after-edit")
+    assert data["next_actions"][-1] == introduced
+    _, out = _plain(root, "--after-edit")
+    assert "  irminsul check --diff HEAD\n    reason: This change introduced errors.\n" in out
+
+    assert _check(root) == (0, [])
+    assert _check(root, "--diff", "HEAD") == (1, ["diff-integrity/adoption-debt-touched"])
+
+
+def test_the_next_action_names_the_base_and_the_end_the_run_was_given(tmp_path: Path) -> None:
+    root = _debt_repo(tmp_path)
+    base = git(root, "rev-parse", "HEAD")
+    commit_all(root, "edit recorded debt")
+
+    _, data = _ctx(root, "--after-edit", "--base-ref", base)
+    assert data["next_actions"][-1]["command"] == f"irminsul check --diff {base}"
+
+    _, data = _ctx(root, "--after-edit", "--base-ref", base, "--committed-only")
+    assert data["validation"]["change"]["state"] == "failed"
+    assert data["next_actions"][-1]["command"] == f"irminsul check --diff {base} --committed-only"
+
+
 def test_no_base_gives_the_report_that_naming_head_gives(tmp_path: Path) -> None:
     root = _debt_repo(tmp_path)
 

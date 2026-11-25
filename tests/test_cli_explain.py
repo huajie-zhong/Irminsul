@@ -238,6 +238,18 @@ def test_explain_reports_the_finding_class() -> None:
     assert "class: hint" in hint.output
 
 
+def test_explain_says_which_runs_leave_a_time_finding_out() -> None:
+    """A time finding is left out of every run that judges a change. `check --diff` is one,
+    and `context --after-edit` is another, from a base or, with none, on uncommitted work."""
+    result = runner.invoke(app, ["explain", "stale-reaper/stale-deprecated-doc"])
+    assert result.exit_code == 0, result.output
+    [line] = [line for line in result.output.splitlines() if line.startswith("class: time")]
+
+    assert "a run that judges a change" in line
+    assert "check --diff" in line and "context --after-edit" in line
+    assert "uncommitted work" in line
+
+
 def test_every_explainable_code_declares_a_class() -> None:
     """A code the pipeline cannot classify is one `explain` describes without saying
     whether it blocks."""

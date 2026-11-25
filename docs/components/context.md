@@ -73,7 +73,7 @@ A report's `claim_reviews` lists every claim whose `evidence` names a path in ha
 
 ## Active RFCs and next actions
 
-The packet lists the active RFCs whose `affects` names the owner's id or whose `required_updates` names its doc path. Both are exact matches on authored frontmatter, and neither is transitive: an RFC affecting a component this one depends on, or a path child of it, does not appear. `rfc_state` must be `draft` or `accepted`, but supersession is not consulted, so a superseded draft still counts as active. Requirement prose is quoted, not matched against the edit: whether the edit meets a requirement is the agent's judgment, not a finding. The packet names a few RFCs and counts the rest by id, and its next actions are commands, each with a reason derived from the report's own state.
+The packet lists the active RFCs whose `affects` names the owner's id or whose `required_updates` names its doc path. Both are exact matches on authored frontmatter, and neither is transitive: an RFC affecting a component this one depends on, or a path child of it, does not appear. `rfc_state` must be `draft` or `accepted`, but supersession is not consulted, so a superseded draft still counts as active. Requirement prose is quoted, not matched against the edit: whether the edit meets a requirement is the agent's judgment, not a finding. The packet names a few RFCs and counts the rest by id, and its next actions are commands, each with a reason derived from the report's own state. After an edit that introduced errors, the command is the run that lists them, which `_change_check_command` picks: `irminsul check --diff <base>` with the base the run used when a change was judged, with `--committed-only` when the run had it, and plain `irminsul check` when none was. The plain run makes none of the passes that judge a change, so it lists nothing for a finding one of them raised. Errors the change did not introduce are still left to plain `irminsul check`.
 <!-- anchor: src/irminsul/context.py#ContextResult.active_changes @sha256:62a843d4c211 -->
 <!-- anchor: src/irminsul/context.py#ContextReport.next_actions @sha256:48a958a14349 -->
 
@@ -98,13 +98,19 @@ What does outlive a call is an external check's cache of what it observed: with
 `external-links` enabled, a call can report what a link returned earlier, and the finding
 carries its observation time.
 
-`--after-edit` exits non-zero when **this change** introduced errors, so the same
-command doubles as a gate in a pre-commit hook or CI step without failing forever on
-debt the change did not create. What counts as debt is the baseline's rule: a finding
-from outside the check registry, or one auditing a suppression, is charged to the change
-however long it has been there, as it is under `check --delta`. Where no trustworthy
-baseline exists the repository verdict decides instead, which is the safe direction. The
-pull-request gate is independent of this and still fails on the repository's own state.
+`--after-edit` exits non-zero when **this change** introduced errors, so it does not
+fail forever on debt the change did not create. Before a commit the change is the
+uncommitted work, and the run says what the next commit would be judged for. As a gate
+in a pre-commit hook it has one limit: a certain finding that a commit trailer answers,
+such as `diff-integrity/check-disabled` after a check is taken out of `checks.enabled`,
+fails the run until the commit that carries the trailer exists, so the hook refuses the
+commit that would answer it. Once the work is committed, a run given `--base-ref` reads
+the trailer, so a CI step can gate on the exit code. What counts as debt is the
+baseline's rule: a finding from outside the check registry, or one auditing a
+suppression, is charged to the change however long it has been there, as it is under
+`check --delta`. Where no trustworthy baseline exists the repository verdict decides
+instead, which is the safe direction. The pull-request gate is independent of this and
+still fails on the repository's own state.
 
 The findings an edit reports are the ones this change caused: the comparison above, over
 every severity, listed once for the whole report and not under each owner. When the change
