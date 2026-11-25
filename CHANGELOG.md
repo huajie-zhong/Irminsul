@@ -153,6 +153,10 @@ making a feature, a refactor and an RFC-driven change in it.
 - `list review --changed` reads a change's lines whatever the user's `diff.noprefix`,
   `diff.mnemonicPrefix` and `diff.relative` git settings are. With any of them set, the queue of
   a change used to come back empty and say nothing.
+- An uncommitted change to the baseline or the adoption record counts as a change to the tree.
+  With only one of them changed, `context --after-edit --base-ref HEAD` used to say the tree was
+  identical to `HEAD` and judge no change, and `check --delta` refused the run as having nothing
+  to compare.
 - The JSON of `change status` and `change verify` reports the RFC's changed source and tests once,
   not per task. Each task has `id`, `text`, `req` and `component`; the changed files are in
   `evidence`, and one `semantic_review` clue says what to check. `evidence_measured` is a top-level
