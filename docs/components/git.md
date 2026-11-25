@@ -41,6 +41,10 @@ at a ref (a file's content, whether it exists, every tracked path, a merge base,
 trailers) and lists the working tree's staged, unstaged and untracked files. For a command
 run with no base it can also say how many commits `HEAD` holds that the default branch's
 remote ref lacks, `unmerged_branch_commits`, so that command can name the base it did not use.
+`changed_line_numbers`, which gives the review queue the lines a change touched, tells git which
+path prefixes to print and keeps paths relative to the git root, so a `diff.noprefix`,
+`diff.mnemonicPrefix` or `diff.relative` in the user's git settings cannot leave it reading no
+file.
 
 `reader.py` holds `GitReader`, which every helper here asks through. It runs a git command
 at most once per reader and keeps only the answers a run cannot change (what a commit, a

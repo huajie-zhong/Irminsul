@@ -150,6 +150,9 @@ making a feature, a refactor and an RFC-driven change in it.
   `edited` item whose `was` named the deleted step, and the old step 3 as a `removed-sentence`;
   now only the deleted step is queued. A number that changes with no ordered item added or
   removed is still an edit.
+- `list review --changed` reads a change's lines whatever the user's `diff.noprefix`,
+  `diff.mnemonicPrefix` and `diff.relative` git settings are. With any of them set, the queue of
+  a change used to come back empty and say nothing.
 - The JSON of `change status` and `change verify` reports the RFC's changed source and tests once,
   not per task. Each task has `id`, `text`, `req` and `component`; the changed files are in
   `evidence`, and one `semantic_review` clue says what to check. `evidence_measured` is a top-level

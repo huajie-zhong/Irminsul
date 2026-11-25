@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from irminsul.git.changes import changed_since
+import pytest
+
+from irminsul.git.changes import changed_line_numbers, changed_since
 from irminsul.git.reader import GitReader
 
 from .conftest import commit_all, commit_file, git, git_init, write
@@ -174,3 +176,21 @@ def test_a_ref_git_cannot_resolve_or_a_missing_history_reads_as_none(tmp_path: P
 
     assert _since(root, "no-such-ref") is None
     assert _since(tmp_path / "elsewhere", "main") is None
+
+
+@pytest.mark.parametrize("setting", [None, "diff.noprefix", "diff.mnemonicPrefix", "diff.relative"])
+def test_changed_lines_are_read_whatever_the_users_diff_settings(
+    tmp_path: Path, setting: str | None
+) -> None:
+    """Each of these settings changes the path git prints for a changed file, and a path the
+    parse does not recognise used to leave the change with no lines at all. The project sits
+    below the git root, which is where `diff.relative` changes the path."""
+    git_init(tmp_path, branch="main")
+    project = tmp_path / "project"
+    write(project, "docs/notes.md", "one\ntwo\n")
+    commit_all(tmp_path, "base", when=_at(1))
+    if setting is not None:
+        git(tmp_path, "config", setting, "true")
+    write(project, "docs/notes.md", "one\nchanged\n")
+
+    assert changed_line_numbers(GitReader(), project) == {"docs/notes.md": {2}}
