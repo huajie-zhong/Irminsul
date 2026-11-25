@@ -139,7 +139,7 @@ making a feature, a refactor and an RFC-driven change in it.
   findings wait, and they are not among the new errors: in JSON, `awaiting_trailer` under
   `validation.change` counts them and each carries `awaiting_trailer: true`. `check --diff`
   still fails on such a finding until a commit carries the trailer, and so does `--after-edit`
-  once the work is committed without one.
+  given a base, once the work is committed without one.
 - `irminsul explain` says a `time` finding is left out of a run that judges a change, which is
   `check --diff` and `context --after-edit` from a base or on uncommitted work. It named `--diff`
   alone.

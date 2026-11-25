@@ -34,7 +34,7 @@ Answered by the owner on 2026-10-29:
 Answered by the owner on 2026-11-25:
 
 2. **A finding that waits for the commit's trailer does not fail the run.** In
-   `context --after-edit`, a finding whose answer is a commit trailer, raised by work that is
+   `context --after-edit`, a certain finding whose answer is a commit trailer, raised by work that is
    not committed yet, is reported with the trailer to write and does not fail the run.
    `check --diff` is the gate and is unchanged: it still fails on that finding until a commit
    carries the trailer.
@@ -113,4 +113,4 @@ on the finding until a commit of the change carries the trailer.
 
 ## Resolution
 
-Accepted by the owner on 2026-10-29, with the answer recorded under Decisions, and resolved by [A change is judged from its merge base to the working tree](../decisions/a-change-is-judged-from-its-merge-base-to-the-working-tree.md), whose Changes item records it. Each rule joins its record's Decision with the implementation, as an edit in place once decision records are living topics.
+Accepted by the owner on 2026-10-29, with the answers recorded under Decisions, the second given on 2026-11-25, and resolved by [A change is judged from its merge base to the working tree](../decisions/a-change-is-judged-from-its-merge-base-to-the-working-tree.md), whose Changes items record them. Each rule joins its record's Decision with the implementation, as an edit in place once decision records are living topics.
