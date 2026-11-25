@@ -1224,7 +1224,12 @@ _CLASS_BLURB: dict[FindingClass, str] = {
         "needs judgment; a warning fails under --fail-on hint, while a "
         "hint reported at info severity never fails a run"
     ),
-    FindingClass.time: "caused by elapsed time; left out of a run given --diff",
+    # `context --after-edit` judges a change too: from the base it is given, and with none
+    # the uncommitted work against `HEAD`.
+    FindingClass.time: (
+        "caused by elapsed time; left out of a run that judges a change: check --diff, and "
+        "context --after-edit from a base or on uncommitted work"
+    ),
 }
 
 

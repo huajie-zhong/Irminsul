@@ -39,7 +39,7 @@ claims:
       - src/irminsul/cli.py
     pinned:
       src/irminsul/checks/pipeline.py: sha256:f1a8e696a4a4
-      src/irminsul/cli.py: sha256:ce651015df9b
+      src/irminsul/cli.py: sha256:bc04127d930f
   - id: fix-remediation-available
     state: implemented
     kind: auto_fix
@@ -49,7 +49,7 @@ claims:
       - src/irminsul/cli.py
       - src/irminsul/fix.py
     pinned:
-      src/irminsul/cli.py: sha256:ce651015df9b
+      src/irminsul/cli.py: sha256:bc04127d930f
       src/irminsul/fix.py: sha256:cc4c24a9385c
   - id: source-deletion-reckoning-available
     state: enabled
@@ -61,7 +61,7 @@ claims:
       - src/irminsul/checks/co_change.py
     pinned:
       .github/workflows/ci.yml: sha256:18ef8c6bad1a
-      src/irminsul/checks/co_change.py: sha256:411718444fe4
+      src/irminsul/checks/co_change.py: sha256:e9928abd9565
 ---
 
 # Mechanical Enforcement

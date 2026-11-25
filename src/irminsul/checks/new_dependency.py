@@ -1,8 +1,8 @@
 """New-dependency review — an import edge this change introduced that no doc declares.
 
 A pass, not a registered graph check: like `co-change` and the diff-integrity pass it
-needs the diff range, which `--diff <base>` or `context --after-edit` with a base puts on
-the graph.
+needs the diff range, which `--diff <base>` or `context --after-edit` puts on the graph;
+with no base, `--after-edit` judges the uncommitted work against `HEAD`.
 
 The question this answers is "did this change add a dependency nobody has said anything
 about?", not "is this dependency allowed?". Nothing here declares a forbidden edge. A

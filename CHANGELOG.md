@@ -131,6 +131,9 @@ making a feature, a refactor and an RFC-driven change in it.
   had it, in the plain output and the JSON. It named plain `irminsul check`, which runs none of
   the passes that judge a change and so listed nothing for a finding one of them raised. The
   `--after-edit` help and the MCP tool description say which run lists the errors.
+- `irminsul explain` says a `time` finding is left out of a run that judges a change, which is
+  `check --diff` and `context --after-edit` from a base or on uncommitted work. It named `--diff`
+  alone.
 - `context --after-edit` leaves the baseline, the adoption record, the manifest and the guidance
   files out of its unmatched list, since none of them has an owner by design, unless a claim cites
   one as evidence.

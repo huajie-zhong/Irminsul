@@ -2,11 +2,12 @@
 
 A pass, not a registered graph check: it needs the changed-file set of the range on the
 graph, from the merge base to the working tree, which only `--diff <base>` or
-`context --after-edit` with a base supplies. It reads the diff itself, where
-`mtime-drift` compares commit times. Ownership is resolved through the exact `describes`
-glob logic the uniqueness check uses (`resolve_claims` / `most_specific_claims`), so "who
-owns this file?" has one answer everywhere. Findings are hints, so `--fail-on hint` makes
-them fail the run like any other hint.
+`context --after-edit` supplies; with no base, `--after-edit` judges the uncommitted work
+against `HEAD`. It reads the diff itself, where `mtime-drift` compares commit times.
+Ownership is resolved through the exact `describes` glob logic the uniqueness check uses
+(`resolve_claims` / `most_specific_claims`), so "who owns this file?" has one answer
+everywhere. Findings are hints, so `--fail-on hint` makes them fail the run like any other
+hint.
 
 A reader who re-reads the doc and finds it still right signs the warning off with an
 `Irminsul-Reviewed` trailer in the change. This pass reports the warning, with the doc as
@@ -38,8 +39,9 @@ CODE_UNREFLECTED_CHANGE: Final = "co-change/unreflected-change"
 class CoChangePass:
     """Docs must ship in the same change as the code they claim.
 
-    It judges the change rather than the tree, so it reports only when the CLI's `--diff`
-    flag puts a range on the graph.
+    It judges the change rather than the tree, so it reports only for a graph that carries
+    a range: `check --diff` puts one there, and so does `context --after-edit`, which with
+    no base judges the uncommitted work against `HEAD`.
     """
 
     name: ClassVar[str] = CHECK_NAME
