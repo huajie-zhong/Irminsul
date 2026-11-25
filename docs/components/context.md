@@ -57,9 +57,9 @@ A flat list of an owner's tests buries the one that exercises the file in hand, 
 
 ## What a topic search reads
 
-`--topic` splits the query into case-folded terms and returns each doc that holds every term as a substring. `_match_topic` looks for a term in the doc's id, title, path, `describes`, tests, tags and `summary`, then in its heading texts, then in its body prose, so a topic a doc names only in a sentence, such as a non-goal, is found. The prose is `prose_of` the body tokens the graph already parsed, which is the text and the code spans a reader sees, without fenced blocks, comments or link targets, so no file is read a second time.
+`--topic` splits the query into case-folded terms and returns each doc that holds every term as a substring. `_match_topic` looks for a term in the doc's id, title, path, `describes`, tests, tags and `summary`, then in its heading texts, then in its body prose, so a topic a doc names only in a sentence, such as a non-goal, is found. The prose is `prose_of` the body tokens the graph already parsed, so no file is read a second time: the text and the code spans of each paragraph, heading, list item and quote, and the description of an image. A code block, a comment, the lines of a raw HTML block and the destination of a link are not in it.
 <!-- anchor: src/irminsul/context.py#_match_topic @sha256:c8f69df5714b -->
-<!-- anchor: src/irminsul/docgraph_index.py#prose_of @sha256:cced70dc6f16 -->
+<!-- anchor: src/irminsul/docgraph_index.py#prose_of @sha256:4a4b8f432b4d -->
 
 `_pending_for_topic` ranks a doc that needs a heading for a term below every doc whose metadata holds all the terms, and a doc that needs its body prose for a term below every doc that matches without it. `ContextResult.needs_body` marks a match that needed the body, whatever holds the query's other terms: `needs_body` in the JSON, and `matched: needs body prose` in plain output.
 <!-- anchor: src/irminsul/context.py#_pending_for_topic @sha256:61ec7a8f51b7 -->
@@ -157,7 +157,7 @@ limit as a rule the tool checks is the misreading the excerpt exists to prevent.
 
 ## Scope & Limitations
 
-Topic search is deterministic per-term substring matching over doc metadata, heading texts and body prose, every term required, not fuzzy or semantic search. A term is matched as written, so `budget` finds a doc that says "budgets" and the plural does not find the singular. A word that appears only in a fenced block or a comment, or in the target of a link outside a heading, finds nothing.
+Topic search is deterministic per-term substring matching over doc metadata, heading texts and body prose, every term required, not fuzzy or semantic search. A term is matched as written, so `budget` finds a doc that says "budgets" and the plural does not find the singular. A word that appears only in a fenced or indented code block, in a comment, or in the lines of a raw HTML block such as `<details>`, which run to its next blank line, finds nothing; a paragraph set between such tags by blank lines is prose and is read. Outside a heading, whose text is searched as written, the destination and title of a `[text](destination)` link, the definition of a reference link and the source of an image find nothing. A URL written out, bare or as an autolink in angle brackets, is text a reader sees, so a word in it does match.
 
 `--after-edit` reads the paths `changed_since` reports for its base, which is `HEAD` when none is given. A file moved without `git mv` reads as a deletion plus a new file until it is staged. For a repository with no commits and for a project below its git root, where there is no history of its own to diff, it falls back to the staged, unstaged, and untracked paths from `git status` and judges no change; outside a git worktree it reports the git error instead of guessing. <!-- anchor: src/irminsul/git/changes.py#working_tree_changed_paths @sha256:86b253bf9d54 -->
 

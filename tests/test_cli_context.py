@@ -1266,6 +1266,36 @@ def test_context_topic_reads_the_prose_a_reader_sees(tmp_path: Path) -> None:
     assert "aaa-hidden" not in _owner_ids(_topic_json(repo, "budget"))
 
 
+def test_context_topic_reads_a_written_url_and_no_raw_html_block(tmp_path: Path) -> None:
+    """The limits the component doc states. A link's destination is not prose, but a URL
+    written out, bare or as an autolink, is text a reader sees. The lines of a raw HTML block
+    are not prose, and a paragraph set between its tags by blank lines is."""
+    repo = tmp_path / "limits"
+    write_config(repo, project_name="limits", source_roots=["src"])
+    bodies = {
+        "autolink": "See <https://example.test/zebra-auto> here.\n",
+        "bare-url": "See https://example.test/zebra-bare here.\n",
+        "destination": "See [the plan](https://example.test/zebra-destination) here.\n",
+        "html-block": (
+            "<details>\n<summary>zebra-summary</summary>\n\nzebra-inside a paragraph.\n\n"
+            "</details>\n"
+        ),
+        "indented": "A paragraph.\n\n    zebra-indented\n",
+    }
+    for doc_id, body in bodies.items():
+        write_doc(repo, f"docs/components/{doc_id}.md", doc_id=doc_id, body=body)
+
+    def found(term: str) -> list[str]:
+        return _owner_ids(_topic_json(repo, term))
+
+    assert found("zebra-auto") == ["autolink"]
+    assert found("zebra-bare") == ["bare-url"]
+    assert found("zebra-destination") == []
+    assert found("zebra-summary") == []
+    assert found("zebra-inside") == ["html-block"]
+    assert found("zebra-indented") == []
+
+
 def test_context_topic_caps_only_the_matches_that_need_the_body(tmp_path: Path) -> None:
     """A match through the other fields is always listed, as before bodies were read. The
     matches that need the body can be most of the tree, so the packet lists eight of them and

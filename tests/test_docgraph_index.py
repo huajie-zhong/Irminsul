@@ -277,6 +277,23 @@ def test_prose_of_is_what_a_reader_sees_outside_fences_and_comments() -> None:
     ]
 
 
+def test_prose_of_reads_a_written_url_and_skips_a_raw_html_block() -> None:
+    """A link's destination is not prose, but a URL written out is the text itself. The lines
+    of a raw HTML block are skipped; a paragraph set between its tags by blank lines is read,
+    as are a quote and an image's description."""
+    body = (
+        "See <https://example.test/auto> and https://example.test/bare, not [this](target.md).\n\n"
+        "<details>\n<summary>hidden</summary>\n\nShown.\n\n</details>\n\n"
+        "> Quoted ![a chart](chart.png).\n\n    indented\n"
+    )
+
+    assert prose_of(parse_markdown(body)) == [
+        "See https://example.test/auto and https://example.test/bare, not this.",
+        "Shown.",
+        "Quoted a chart.",
+    ]
+
+
 def test_section_lines_run_to_the_next_heading_of_the_same_or_higher_level() -> None:
     body = (
         "# Doc\n\n## Scope\n\nKept.\n\n```\n# in a fence\n```\n\n### Deeper\n\nAlso kept.\n\n"
