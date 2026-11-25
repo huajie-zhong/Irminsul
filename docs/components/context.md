@@ -77,7 +77,7 @@ A report's `claim_reviews` lists every claim whose `evidence` names a path in ha
 
 ## Active RFCs and next actions
 
-The packet lists the active RFCs whose `affects` names the owner's id or whose `required_updates` names its doc path. Both are exact matches on authored frontmatter, and neither is transitive: an RFC affecting a component this one depends on, or a path child of it, does not appear. `rfc_state` must be `draft` or `accepted`, but supersession is not consulted, so a superseded draft still counts as active. Requirement prose is quoted, not matched against the edit: whether the edit meets a requirement is the agent's judgment, not a finding. The packet names a few RFCs and counts the rest by id, and its next actions are commands, each with a reason derived from the report's own state. After an edit that introduced errors, the command is the run that lists them, which `_change_check_command` picks: `irminsul check --diff <base>` with the base the run used when a change was judged, with `--committed-only` when the run had it, and plain `irminsul check` when none was. The plain run makes none of the passes that judge a change, so it lists nothing for a finding one of them raised. Errors the change did not introduce are still left to plain `irminsul check`.
+The packet lists the active RFCs whose `affects` names the owner's id or whose `required_updates` names its doc path. Both are exact matches on authored frontmatter, and neither is transitive: an RFC affecting a component this one depends on, or a path child of it, does not appear. `rfc_state` must be `draft` or `accepted`, but supersession is not consulted, so a superseded draft still counts as active. Requirement prose is quoted, not matched against the edit: whether the edit meets a requirement is the agent's judgment, not a finding. The packet names a few RFCs and counts the rest by id, and its next actions are commands, each with a reason derived from the report's own state. After an edit that introduced errors, the command is the run that lists them, which `_change_check_command` picks: `irminsul check --diff <base>` with the base the run used when a change was judged, with `--committed-only` when the run had it, and plain `irminsul check` when none was. The plain run makes none of the passes that judge a change, so it lists nothing for a finding one of them raised. Errors the change did not introduce are still left to plain `irminsul check`; a finding that waits for the commit's trailer is the change's own, so it names no command when it is the only error.
 <!-- anchor: src/irminsul/context.py#ContextResult.active_changes @sha256:62a843d4c211 -->
 <!-- anchor: src/irminsul/context.py#ContextReport.next_actions @sha256:48a958a14349 -->
 
@@ -104,27 +104,44 @@ carries its observation time.
 
 `--after-edit` exits non-zero when **this change** introduced errors, so it does not
 fail forever on debt the change did not create. Before a commit the change is the
-uncommitted work, and the run says what the next commit would be judged for. As a gate
-in a pre-commit hook it has one limit: a certain finding that a commit trailer answers,
-such as `diff-integrity/check-disabled` after a check is taken out of `checks.enabled`,
-fails the run until the commit that carries the trailer exists, so the hook refuses the
-commit that would answer it. Once the work is committed, a run given `--base-ref` reads
-the trailer, so a CI step can gate on the exit code. What counts as debt is the
-baseline's rule: a finding from outside the check registry, or one auditing a
-suppression, is charged to the change however long it has been there, as it is under
+uncommitted work, and the run says what the next commit would be judged for. What counts
+as debt is the baseline's rule: a finding from outside the check registry, or one auditing
+a suppression, is charged to the change however long it has been there, as it is under
 `check --delta`. Where no trustworthy baseline exists the repository verdict decides
 instead, which is the safe direction. The pull-request gate is independent of this and
 still fails on the repository's own state.
+
+One kind of error the run reports and does not fail on: a certain finding that a commit
+trailer answers and that is about a file with uncommitted work, such as
+`diff-integrity/check-disabled` after a check is taken out of `checks.enabled`. Its trailer
+goes in the message of the commit that carries that work, and that commit does not exist
+yet, so failing would refuse the work for something only committing it can answer.
+`_awaiting_trailer` picks these findings with `awaits_commit`, the rule that lapses a
+trailer on an earlier commit ([checks](checks.md)). `ChangeValidation.awaiting_trailer`
+counts them apart from the new errors, the verdict line says how many wait, and where the
+repository verdict decides the exit code they are left out of that too. So the run passes
+in a pre-commit hook on work whose only error waits for its commit. It does not see whether
+the trailer gets written: `check --diff` is the gate, and it fails on the finding until a
+commit of the change carries the trailer. Once the work is committed, a run given
+`--base-ref` reads the trailer, so a CI step can gate on the exit code: with no trailer, and
+no further uncommitted work in the file, the finding is a new error here too, because a
+commit could have carried it.
+<!-- anchor: src/irminsul/context.py#_awaiting_trailer @sha256:076a76025743 -->
+<!-- anchor: src/irminsul/context.py#ChangeValidation.awaiting_trailer @sha256:f22d1c9532bf -->
 
 The findings an edit reports are the ones this change caused: the comparison above, over
 every severity, listed once for the whole report and not under each owner. When the change
 could not be compared, every finding of the run is listed instead, and `validation.change`
 says why, so a list that looks clean is never one nothing measured. Under those findings
 the plain output lists the trailer each open one can take, under the heading `irminsul check`
-uses, and the JSON gives each finding that trailer as `trailer`. The comparison counts a
+uses, and the JSON gives each finding that trailer as `trailer`. A finding that waits for
+the commit's trailer is one of the findings and is counted in their heading; the plain
+output lists it after the others, under `_WAITING_HEADING`, and the JSON marks it
+`awaiting_trailer`, a key no other finding has. The comparison counts a
 finding by its fingerprint, so when a doc has the same finding twice and the count grew, the
 first one in report order is taken as the old one. The finding named can then sit on the
 line that did not change, and the verdict is still right: one more of them was introduced.
+<!-- anchor: src/irminsul/context.py#_WAITING_HEADING @sha256:304d249e147e -->
 
 With no base given, the uncommitted work is the change and `HEAD` its base. `_change_range`
 puts on the graph the range `check --diff HEAD` judges, so the passes that judge a change

@@ -361,6 +361,40 @@ def test_context_after_edit_tool_names_the_run_that_lists_a_changes_errors() -> 
     assert "which `irminsul check` lists" not in description
 
 
+def test_context_after_edit_tool_marks_a_finding_that_waits_for_the_commits_trailer(
+    tmp_path: Path,
+) -> None:
+    """The tool returns the report the CLI prints, so a finding a trailer answers that is
+    about uncommitted work is marked and counted there too, and the description says what the
+    mark means, since a caller of the tool sees no exit code."""
+    pytest.importorskip("mcp")
+    import asyncio
+
+    enabled = ["frontmatter", "uniqueness"]
+    write_config(tmp_path, project_name="m", enabled=enabled)
+    seed_repo(tmp_path, "init")
+    write_config(tmp_path, project_name="m", enabled=enabled[:1])
+
+    data = json.loads(mcp_server.context_after_edit_json(tmp_path, _load_config(tmp_path)))
+
+    assert data["validation"]["change"]["awaiting_trailer"] == 1
+    assert data["validation"]["change"]["new_errors"] == 0
+    [finding] = data["findings"]
+    assert finding["code"] == "diff-integrity/check-disabled"
+    assert finding["awaiting_trailer"] is True
+    cli = runner.invoke(
+        app, ["context", "--after-edit", "--format", "json", "--path", str(tmp_path)]
+    )
+    assert cli.exit_code == 0, cli.output
+    assert data == json.loads(cli.output)
+
+    server = mcp_server.create_server(_GOOD_FIXTURE)
+    tools = {tool.name: tool for tool in asyncio.run(server.list_tools())}
+    description = tools["context_after_edit"].description or ""
+    assert "`awaiting_trailer`" in description
+    assert "`validation.change.awaiting_trailer`" in description
+
+
 def test_check_tool_sees_a_commit_made_between_calls(tmp_path: Path) -> None:
     """The server lives for a whole editor session, so git history read for one call must
     not answer the next: a commit that makes a doc lag its source has to show up."""

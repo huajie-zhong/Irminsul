@@ -43,6 +43,14 @@ comment can answer them: `co-change/unreflected-change` and `claim-provenance/ev
   is the range `--diff HEAD` names, so the passes that judge a change speak before the first
   commit, and the run names `HEAD` as the base it used. A clean tree with no base has no
   change, so nothing is judged as one.
+- **`context --after-edit` does not fail on a finding that waits for the commit's trailer.**
+  A certain finding whose code declares `trailer`, about a file with uncommitted work, can be
+  signed off only in the message of the commit that will carry that work, by the rule that
+  lapses an earlier trailer. The run reports it apart from the errors the change introduced,
+  with the trailer to write, says how many findings wait, and neither counts it as a new error
+  nor fails on it. `check --diff` is the gate and fails on it until a commit of the change
+  carries the trailer. A finding about committed work alone fails `context --after-edit` too,
+  because a commit could have carried its trailer.
 - **`--committed-only` means uncommitted work is not a change.** `check`, `context`,
   `change status`, `change verify` and `list review` accept it. The range ends at `HEAD`, files
   are compared as `HEAD` holds them, and history times are commit times; only the checks that
@@ -129,3 +137,8 @@ comment can answer them: `co-change/unreflected-change` and `claim-provenance/ev
 - 2026-11-25: The no-base rule is implemented: `context --after-edit` with no base judges the
   uncommitted work against `HEAD` and names that base, and its note that the change checks
   did not run is gone.
+- 2026-11-25: Decided by the owner, recorded in
+  [An edit with no base is judged against HEAD](../rfcs/an-edit-with-no-base-is-judged-against-head.md),
+  and implemented: `context --after-edit` does not fail on a finding that a commit trailer
+  answers while a file it is about has uncommitted work. `check --diff` still fails on it
+  until a commit carries the trailer.

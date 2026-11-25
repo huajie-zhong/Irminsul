@@ -188,6 +188,7 @@ def test_an_unrelated_insertion_does_not_introduce_the_old_violation(tmp_path: P
     assert validation["change"] == {
         "state": "passed",
         "new_errors": 0,
+        "awaiting_trailer": 0,
         "baseline": "HEAD",
         "reason": None,
     }
