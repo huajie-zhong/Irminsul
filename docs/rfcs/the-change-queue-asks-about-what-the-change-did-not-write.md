@@ -20,7 +20,7 @@ After a change, the review queue asks one question: you changed this, so does th
 hold? It lists only sentences the change left as they were and may have made stale. The
 sentences the change itself wrote or deleted leave that list and get one of their own, for
 whoever reviews the change. Measured on three merged pull requests and two commits, two thirds
-of the queue was the change's own text. Three decisions, none answered yet.
+of the queue was the change's own text. Three decisions, all answered.
 
 ## Problem
 
@@ -63,25 +63,21 @@ shorter list.
 The risk is a wrong new sentence that nobody re-reads. The pull request above wrote three
 sentences it corrected before merging, and two of the three name no code, so only a second
 reading catches them. The loop is scaffolded for every adopter, and nothing in it today
-describes a reviewer. An adopter with no second reader loses the author's re-read unless the
-author is asked for both lists.
+describes a reviewer. So the protocol asks a change with no second reader to have its author
+read the written list once, before the pull request.
 
 ## Decisions
 
-1. **The sentences a change wrote or deleted leave its queue.** Kept, the list is three times
-   as long as the part that asks about staleness, and the author re-reads its own text.
-   Dropped, a wrong new sentence is caught by a second reader or not at all. Recommended:
-   drop them.
-2. **They stay reachable under a flag of their own**, or go altogether. Under a flag a
-   reviewer gets each new sentence beside the code it names. Gone, the diff is all there is.
-   Recommended: the flag.
-3. **Who is asked to read the written list.** Either (a) a new reviewer's step in the agent
-   protocol names it, and the author's loop names only the queue; or (b) the author's loop
-   names both lists, one after the other. Under (a) an adopter with no second reader loses the
-   re-read. Under (b) nothing is lost, and the author still reads its own text, apart from the
-   staleness questions. Recommended: (a). The owner's direction of 2026-11-25 is that an
-   author's own statements are not what the queue is for, and this repository has every pull
-   request read by an agent that did not write it.
+Answered by the owner on 2026-11-25:
+
+1. **The sentences a change wrote or deleted leave its queue.** What that writing may have
+   made stale stays in it: the summary of the doc it is in, and the claims that cite that doc
+   as evidence.
+2. **They stay reachable under a flag of their own**, for whoever reviews the change, its docs
+   included.
+3. **A reviewer's step in the agent protocol names the written list, and the author's loop
+   names only the queue.** A change with no second reader has its author read the written
+   list once, before opening the pull request, not after every edit.
 
 ## Design detail
 
@@ -125,15 +121,16 @@ author is asked for both lists.
   - `code-is-named-in-code-spans-and-bound-by-anchors`: an unbound name is marked "under
     `list review --changed`".
   - `agents-get-stateless-read-only-queries-and-one-written-loop`, which governs the loop's
-    template: decision 3(a) adds a procedure to the two the protocol carries.
+    template: decision 3 adds a procedure to the two the protocol carries.
 - **Docs that state it.** `docs/components/new-list-regen.md`, `docs/components/anchors.md`,
   the style guide's sentence on a removed sentence, the README's command table, and the help
   of `list review`.
 - **The loop's wording.** Step 4 of the root `AGENTS.md` and its template
   `src/irminsul/init/scaffolds/AGENTS.md.j2` say "`irminsul list review --changed` to re-read
-  each sentence you added or changed against the code it names". Under 3(a) step 4 names what
-  the change may have made stale, and `docs/guides/agent-protocol.md` with its scaffold gains
-  the reviewer's step. Under 3(b) step 4 names both flags.
+  each sentence you added or changed against the code it names". Step 4 will name what the
+  change may have made stale. `docs/guides/agent-protocol.md` and its scaffold gain a
+  reviewer's step that names `--written`, and say that a change with no second reader has its
+  author read that list once, before the pull request.
 - **Tests that assert today's lists.** `tests/test_list_review.py`, `tests/test_binding.py`
   and `tests/test_cli_list.py` read `edited` and `removed-sentence` items under `--changed`.
 - **Measured** on 2026-11-25 with the code of `ffa39b4`, by `irminsul list review --changed
@@ -142,7 +139,10 @@ author is asked for both lists.
   their parents. Of 189 items, 108 were `edited`, 18 `removed-sentence`, 33 `governing-claim`
   and 30 `stale-summary`. The three corrected sentences are in the queue at `db3c929`, before
   the commit that corrected them.
-- **Not chosen.** Ordering the queue so the items the author did not write come first: the
+- **Left open.** A doc that links to a doc the change edited is not queued. `irminsul refs`
+  lists those docs, and whether an edit should ask about them is a later change.
+- **Not chosen.** An author's loop that names both lists after every edit: the author would
+  still re-read its own text on each run. Ordering the queue so the items the author did not write come first: the
   reader is a model, which reads the whole list, so order shortens nothing. Keeping only the
   written sentences that name code: it splits one kind of item by what the tool can add to it,
   not by what the reader is asked. Folding the written sentences into a count per doc: a count
@@ -196,5 +196,5 @@ given `--base-ref` with neither SHALL print the list `--changed` prints.
 - `T1` Split the items of a change in `build_review` into the two lists. (req: change-queue-holds-no-written-sentence)
 - `T2` Add `--written`, the `list` key and the raised report version, and move the tests that read `edited` and `removed-sentence` items to it. (req: written-sentences-are-their-own-list)
 - `T3` Refuse the two flags together and keep `--base-ref` alone on `--changed`. (req: one-list-per-run)
-- `T4` Reword step 4 of the root `AGENTS.md` and its template as decision 3 is answered, with the agent protocol and its scaffold. (component: init)
+- `T4` Reword step 4 of the root `AGENTS.md` and its template, and add the reviewer's step and the rule for a change with no second reader to the agent protocol and its scaffold. (component: init)
 - `T5` State the rule in the four records with a dated Changes item each, and in the docs listed under Design detail. (component: new-list-regen)
