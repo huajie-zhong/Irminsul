@@ -152,3 +152,6 @@ rate-limited and makes a run depend on the network.
   `context <path>` lists the sentences that name the path's code.
 - 2026-10-29: Accepted [A topic search reads doc bodies](../rfcs/a-topic-search-reads-doc-bodies.md):
   `context --topic` matches body prose, ranked below the other fields.
+- 2026-11-25: Accepted [The change queue asks about what the change did not write](../rfcs/the-change-queue-asks-about-what-the-change-did-not-write.md):
+  the author's loop asks for the queue alone, and the agent protocol gains a reviewer's step for
+  the written list.

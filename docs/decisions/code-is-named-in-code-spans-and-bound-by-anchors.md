@@ -182,3 +182,5 @@ paragraphs, which trains a reader to re-pin without reading.
 - 2026-10-28: Accepted [Claim evidence names a part](../rfcs/claim-evidence-names-a-part.md):
   claim evidence and anchors name a part of a file through one set of finders.
 - 2026-10-29: Accepted [A path is named when git lists it](../rfcs/a-path-is-named-when-git-lists-it.md).
+- 2026-11-25: Accepted [The change queue asks about what the change did not write](../rfcs/the-change-queue-asks-about-what-the-change-did-not-write.md):
+  an unbound name is marked under `list review --written`.
