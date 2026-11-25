@@ -711,6 +711,28 @@ def test_a_sentence_moved_elsewhere_in_the_file_is_not_queued(tmp_path: Path) ->
     assert items == []
 
 
+def test_renumbering_a_list_item_queues_nothing(tmp_path: Path) -> None:
+    """A list item's number is its position, not its words: dropping an earlier item
+    renumbers the ones after it, and they only moved."""
+    items = _review_pipeline_edit(
+        _repo(tmp_path),
+        "1. Keep the first step.\n2. Drop this step.\n3. Keep the last step.\n",
+        "1. Keep the first step.\n2. Keep the last step.\n",
+    )
+    assert _edits(items) == []
+    assert _removed(items) == ["2. Drop this step."]
+
+
+def test_a_reworded_list_item_is_still_an_edit(tmp_path: Path) -> None:
+    items = _review_pipeline_edit(
+        _repo(tmp_path),
+        "1. Keep the first step.\n2. Run the gate.\n",
+        "1. Keep the first step.\n2. Run the gate twice.\n",
+    )
+    assert _edits(items) == [("2. Run the gate twice.", "2. Run the gate.")]
+    assert _removed(items) == []
+
+
 def test_a_sentence_deleted_outright_is_removed_and_not_an_edit(tmp_path: Path) -> None:
     items = _review_pipeline_edit(_repo(tmp_path), PARAGRAPH + "\n", f"{FIND} {EMITS}\n")
     assert _removed(items) == [PLAIN]

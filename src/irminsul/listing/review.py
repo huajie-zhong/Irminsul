@@ -87,6 +87,7 @@ _GLOSSARY_META_RE = re.compile(r"^\s*(?:match|forbidden_synonyms|case_sensitive)
 _SPAN_RE = re.compile(r"(`+)(.+?)\1")
 _SENTENCE_END_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z`\[*(])")
 _LIST_MARKER_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
+_ORDERED_MARKER_RE = re.compile(r"^\s*\d+[.)]\s+")
 _TABLE_SEPARATOR_RE = re.compile(r"^\s*\|?[\s:|-]+\|?\s*$")
 _LINK_RE = re.compile(r"\[([^\]]*)\]\(([^)]*)\)")
 _CODE_OR_COMMENT_RE = re.compile(r"(`+).+?\1|<!--.*?-->")
@@ -577,14 +578,17 @@ def _comparable(text: str) -> str:
     sentence that links it. What the queue asks is whether the claim is gone, and the
     claim is the prose around the link rather than the file it points at. An HTML comment
     after a sentence, such as an anchor's pin, is dropped for the same reason; one quoted
-    in a code span is prose and stays.
+    in a code span is prose and stays. The number that opens an ordered list item is
+    dropped too: it says where the item sits, so deleting an earlier item renumbers the
+    ones after it without changing a word of them.
 
     Reduce one sentence at a time on both sides: a `[` that never closes pairs with the
     next link's brackets however much text lies between, so a whole file does not reduce
     to the sentences it holds.
     """
     uncommented = _CODE_OR_COMMENT_RE.sub(lambda m: m.group(0) if m.group(1) else "", text)
-    return " ".join(_LINK_RE.sub("[]", uncommented).split())
+    unnumbered = _ORDERED_MARKER_RE.sub("", uncommented, count=1)
+    return " ".join(_LINK_RE.sub("[]", unnumbered).split())
 
 
 def _body_of(text: str) -> str:
