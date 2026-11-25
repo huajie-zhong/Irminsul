@@ -102,6 +102,28 @@ what you ran into:
 
 Name the command, the finding code or the doc, what you expected, and what happened.
 
+## Fix what you find, one kind of work per branch
+
+A gap you report is also yours to fix when the fix is small and changes no rule: code that
+does not do what its doc or its decision record says, a message that sends a reader wrong, a
+`BACKLOG.md` entry the tree has closed. Fix it without asking, one commit per fix with its
+test, its doc and its `CHANGELOG.md` line, and give it one line in your report.
+
+Ask before a fix that changes what a decision record decides, adds or retires a finding code
+or changes its class, changes what the scaffolded gate fails on, changes the config schema or
+a command's flags, or edits a foundation doc. Write that gap into `BACKLOG.md`, checked
+against the code, and name it in your report as a call for the user.
+
+A branch and its pull request hold one kind of work, so a reviewer reads one kind at a time:
+
+- small fixes, as above, together;
+- one RFC, or one slice of a large one;
+- tests and measurements that change no behaviour;
+- docs alone.
+
+A gap met while implementing an RFC goes to the fixes branch, unless the RFC cannot land
+without it.
+
 ## This repository
 
 **Gates.** Every change passes `irminsul check` and `irminsul check --diff origin/main`,
@@ -110,6 +132,9 @@ On a branch, every command that compares a change takes `--base-ref origin/main`
 
 **Setup and tests.** Python 3.12 or later: install with `py -3.12 -m pip install -e
 ".[dev]"` rather than a bare `python`, whose meaning depends on PATH.
+Where `pip` refuses to install into the system Python, as in a cloud session, `uv sync --extra
+dev --extra mcp` builds `.venv` from `uv.lock`; the MCP server in `.mcp.json` needs that
+environment's `irminsul` on PATH.
 
 ```bash
 pytest -q                                # parallel; -n0 runs serially, e.g. under a debugger
