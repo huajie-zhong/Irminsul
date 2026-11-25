@@ -72,10 +72,10 @@ _MAX_CONTENT_EXCERPTS = 8
 #: deliberately *not* capped — they are the obligations a reader must answer, not
 #: supporting material.
 _MAX_ACTIVE_CHANGES = 8
-#: How many topic matches that needed body prose plain output lists before it counts the
-#: rest. A common word is in most bodies, so that list grows with the repository as the active
-#: RFCs do, and it takes their bound. A match through any other field is always listed, and
-#: the JSON carries every match.
+#: How many topic matches that needed body prose a packet lists before it counts and names
+#: the rest. A common word is in most bodies, so that list grows with the repository as the
+#: active RFCs do, and it takes their bound, in the JSON as in plain output. A match through
+#: any other field is always listed.
 _MAX_BODY_MATCHES = _MAX_ACTIVE_CHANGES
 _MAX_EXCERPT_LINES = 20
 _MAX_EXCERPT_CHARS = 1_200
@@ -284,6 +284,21 @@ class ClaimReview:
 
 
 @dataclass(frozen=True)
+class OmittedMatches:
+    """The topic matches that needed body prose and that a packet names without listing.
+
+    The same three facts `ActiveChanges` gives for an RFC left out: `omitted` counts them,
+    because a reader cannot tell a complete list from a bounded one, `omitted_ids` names
+    them, because a count is not retrievable, and `retrieve` is the command that takes an
+    id, a topic search for it, which finds the doc through its id whatever its body says.
+    """
+
+    omitted: int = 0
+    omitted_ids: list[str] = field(default_factory=list)
+    retrieve: str | None = None
+
+
+@dataclass(frozen=True)
 class ContextReport:
     """What one `irminsul context` call reports, in the shape `--format json` prints.
 
@@ -295,7 +310,9 @@ class ContextReport:
     caused, or every finding of the run when the change was not compared, which
     `validation.change` says. `next_actions` are command-and-reason pairs derived from the
     report's own state; a topic report carries `suggestion` in their place, null when a doc
-    matched and otherwise the sentence the plain output prints after `(none)`.
+    matched and otherwise the sentence the plain output prints after `(none)`. A topic
+    report's `results` are bounded: every match that did not need body prose, then the first
+    few that did, with `omitted_matches` counting and naming the rest.
     """
 
     version: int
@@ -310,6 +327,8 @@ class ContextReport:
     #: `findings` as `check --format json` reports them, each with its `irminsul fix`
     #: command when one remediates it; `None` exactly when `findings` is.
     records: list[dict[str, object]] | None = None
+    #: The topic matches left out of `results`; empty in every other mode.
+    omitted_matches: OmittedMatches = field(default_factory=OmittedMatches)
 
 
 @dataclass(frozen=True)
@@ -386,10 +405,11 @@ def build_context_report(
         committed_only=committed_only,
     )
 
+    omitted_matches = OmittedMatches()
     if paths is not None:
         pending, unmatched = _pending_for_paths(repo_root, graph, paths)
     elif topic is not None:
-        pending = _pending_for_topic(graph, topic)
+        pending, omitted_matches = _bound_topic_matches(_pending_for_topic(graph, topic))
         unmatched = []
     else:
         assert base is not None
@@ -452,6 +472,7 @@ def build_context_report(
         suggestion=_TOPIC_MISS_SUGGESTION if mode == "topic" and not results else None,
         findings=findings,
         records=None if findings is None else finding_records(findings, graph),
+        omitted_matches=omitted_matches,
     )
 
 
@@ -514,17 +535,17 @@ def format_context_plain(report: ContextReport) -> str:
         for result in report.results:
             lines.extend(_format_changed_owner(result))
     else:
-        # Matches that needed body prose rank last, so the ones the bound leaves out are the
-        # tail.
-        needing = sum(result.needs_body for result in report.results)
-        unlisted = max(needing - _MAX_BODY_MATCHES, 0)
-        for result in report.results[: len(report.results) - unlisted]:
+        for result in report.results:
             if lines:
                 lines.append("")
             lines.extend(_format_result(result, include_active_changes=report.mode == "path"))
-        if unlisted:
+        left_out = report.omitted_matches
+        if left_out.omitted:
             lines.append("")
-            lines.append(f"… {unlisted} more need body prose (--format json lists every match)")
+            lines.append(
+                f"… {left_out.omitted} more need body prose: "
+                f"{', '.join(left_out.omitted_ids)}; see `{left_out.retrieve}`"
+            )
 
     reviewed = {(review.doc.path, review.claim_id) for review in report.claim_reviews}
     if report.unmatched:
@@ -741,6 +762,27 @@ def _pending_for_topic(graph: DocGraph, topic: str) -> list[_PendingResult]:
         )
         for match in matches
     ]
+
+
+def _bound_topic_matches(
+    matches: list[_PendingResult],
+) -> tuple[list[_PendingResult], OmittedMatches]:
+    """The topic matches a packet lists, and the ones it only names.
+
+    A match through any other field is always listed, as before bodies were read. The
+    matches that needed body prose rank last, so the ones the bound leaves out are the
+    tail: they are counted and named by id, as `_bound_active_changes` names an RFC it
+    leaves out, and no result is built for them.
+    """
+    left_out = sum(match.needs_body for match in matches) - _MAX_BODY_MATCHES
+    if left_out <= 0:
+        return matches, OmittedMatches()
+    rest = matches[-left_out:]
+    return matches[:-left_out], OmittedMatches(
+        omitted=len(rest),
+        omitted_ids=[match.node.id for match in rest],
+        retrieve="irminsul context --topic <doc-id>",
+    )
 
 
 def _pending_for_changed(
@@ -1744,9 +1786,14 @@ def _report_to_dict(report: ContextReport) -> dict[str, object]:
         "version": report.version,
         "mode": report.mode,
         "results": [_result_to_dict(result, mode=report.mode) for result in report.results],
-        "unmatched": [_unmatched_to_dict(item) for item in report.unmatched],
-        "claim_reviews": [_claim_review_to_dict(review) for review in report.claim_reviews],
     }
+    if report.mode == "topic":
+        left_out = report.omitted_matches
+        payload["omitted"] = left_out.omitted
+        payload["omitted_ids"] = left_out.omitted_ids
+        payload["retrieve"] = left_out.retrieve
+    payload["unmatched"] = [_unmatched_to_dict(item) for item in report.unmatched]
+    payload["claim_reviews"] = [_claim_review_to_dict(review) for review in report.claim_reviews]
     if report.validation is not None:
         payload["validation"] = _validation_to_dict(report.validation)
     if report.records is not None:

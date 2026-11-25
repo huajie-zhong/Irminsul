@@ -76,9 +76,8 @@ rate-limited and makes a run depend on the network.
 - **A topic search reads doc bodies.** `context --topic` returns a doc when every word of the
   query is in its id, title, path, `describes`, tests, tags, `summary`, headings or body
   prose, matched as case-folded substrings and not as meaning. A doc that matches only
-  through its body ranks below every doc that matches without it. Plain output lists the
-  first eight body-only matches and counts the rest; the JSON carries every match and marks
-  the body-only ones.
+  through its body ranks below every doc that matches without it. The packet's cap applies,
+  with the count of the rest.
 - **Context keeps no session.** A call stores nothing for a later call: no task or agent
   session, no selection of paths or owners, no ownership result, packet or other
   repository-derived result; every call derives them from the repository as it stands. A lower
@@ -159,5 +158,5 @@ rate-limited and makes a run depend on the network.
 - 2026-10-29: Accepted [A topic search reads doc bodies](../rfcs/a-topic-search-reads-doc-bodies.md):
   `context --topic` matches body prose, ranked below the other fields.
 - 2026-11-25: The body search is implemented: `context --topic` matches body prose, ranks a
-  body-only match last, and no longer says to search bodies directly. The RFC's "the packet's
-  cap applies" is read as a cap of eight on the body-only matches in plain output alone.
+  doc that matches only through its body last, applies the packet's cap with the count of the
+  rest, and no longer says to search bodies directly.

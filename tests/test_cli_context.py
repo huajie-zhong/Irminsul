@@ -1216,6 +1216,7 @@ def test_context_topic_finds_a_doc_by_a_word_only_its_body_holds(tmp_path: Path)
         "principles": True,
     }
     assert data["suggestion"] is None
+    assert (data["omitted"], data["omitted_ids"], data["retrieve"]) == (0, [], None)
 
 
 def test_context_topic_ranks_a_heading_match_above_a_match_that_needs_the_body(
@@ -1265,12 +1266,11 @@ def test_context_topic_reads_the_prose_a_reader_sees(tmp_path: Path) -> None:
     assert "aaa-hidden" not in _owner_ids(_topic_json(repo, "budget"))
 
 
-def test_context_topic_plain_output_caps_only_the_matches_that_need_the_body(
-    tmp_path: Path,
-) -> None:
+def test_context_topic_caps_only_the_matches_that_need_the_body(tmp_path: Path) -> None:
     """A match through the other fields is always listed, as before bodies were read. The
-    matches that need the body can be most of the tree, so plain output lists eight of them
-    and counts the rest, and the JSON carries every one."""
+    matches that need the body can be most of the tree, so the packet lists eight of them and
+    counts and names the rest, in the JSON as in plain output: the JSON is what an MCP caller
+    gets, and it bounds the active RFCs the same way."""
     repo = tmp_path / "many"
     write_config(repo, project_name="many", source_roots=["src"])
     named = [f"quota-{index:02}" for index in range(10)]
@@ -1285,12 +1285,20 @@ def test_context_topic_plain_output_caps_only_the_matches_that_need_the_body(
     data = _topic_json(repo, "quota")
     code, plain = invoke(repo, "context", "--topic", "quota")
 
-    assert _owner_ids(data) == [*named, *prose]
-    assert [item["needs_body"] for item in data["results"]] == [False] * 10 + [True] * 11
+    assert _owner_ids(data) == [*named, *prose[:8]]
+    assert [item["needs_body"] for item in data["results"]] == [False] * 10 + [True] * 8
+    assert data["omitted"] == 3
+    assert data["omitted_ids"] == prose[8:]
+    assert data["retrieve"] == "irminsul context --topic <doc-id>"
     assert code == 0
-    assert re.findall(r"^owner: (\S+)", plain, flags=re.MULTILINE) == [*named, *prose[:8]]
+    assert re.findall(r"^owner: (\S+)", plain, flags=re.MULTILINE) == _owner_ids(data)
     assert plain.count("  matched: needs body prose") == 8
-    assert plain.rstrip().endswith("… 3 more need body prose (--format json lists every match)")
+    assert plain.rstrip().endswith(
+        "… 3 more need body prose: note-08, note-09, note-10; "
+        "see `irminsul context --topic <doc-id>`"
+    )
+    # The command the packet names finds an omitted doc, through its id.
+    assert _owner_ids(_topic_json(repo, "note-09"))[0] == "note-09"
 
 
 def test_context_topic_miss_names_the_fields_searched_and_what_to_try(tmp_path: Path) -> None:

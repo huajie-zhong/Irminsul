@@ -61,10 +61,14 @@ A flat list of an owner's tests buries the one that exercises the file in hand, 
 <!-- anchor: src/irminsul/context.py#_match_topic @sha256:c8f69df5714b -->
 <!-- anchor: src/irminsul/docgraph_index.py#prose_of @sha256:cced70dc6f16 -->
 
-`_pending_for_topic` ranks a doc that needs a heading for a term below every doc whose metadata holds all the terms, and a doc that needs its body prose for a term below every doc that matches without it. `ContextResult.needs_body` marks a match that needed the body, whatever holds the query's other terms: `needs_body` in the JSON, and `matched: needs body prose` in plain output. A common word is in most bodies, so plain output lists the first `_MAX_BODY_MATCHES` of those matches and counts the rest in one line. A match through any other field is always listed, and the JSON carries every match.
+`_pending_for_topic` ranks a doc that needs a heading for a term below every doc whose metadata holds all the terms, and a doc that needs its body prose for a term below every doc that matches without it. `ContextResult.needs_body` marks a match that needed the body, whatever holds the query's other terms: `needs_body` in the JSON, and `matched: needs body prose` in plain output.
 <!-- anchor: src/irminsul/context.py#_pending_for_topic @sha256:61ec7a8f51b7 -->
 <!-- anchor: src/irminsul/context.py#ContextResult.needs_body @sha256:a8a0e49d986a -->
+
+A common word is in most bodies, so the packet bounds the matches that needed the body as it bounds the active RFCs. `_bound_topic_matches` keeps the first `_MAX_BODY_MATCHES` of them, eight, among the results and leaves the rest out, and `OmittedMatches` counts them and names them by id. The JSON, which is also what an MCP caller gets, carries that as `omitted`, `omitted_ids` and `retrieve` beside `results`, and plain output as one closing line. `retrieve` is a topic search for a doc's id, which finds the doc through its id whatever its body says. A match through any other field is always listed.
+<!-- anchor: src/irminsul/context.py#_bound_topic_matches @sha256:60d7090f8ddc -->
 <!-- anchor: src/irminsul/context.py#_MAX_BODY_MATCHES @sha256:633c47a6dbbe -->
+<!-- anchor: src/irminsul/context.py#OmittedMatches.omitted_ids @sha256:a19e05dee87a -->
 
 ## Claims to review
 

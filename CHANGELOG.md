@@ -138,8 +138,10 @@ making a feature, a refactor and an RFC-driven change in it.
   paragraphs, headings and list items, not fenced blocks, comments or link targets. A doc that
   needs its body for any word of the query ranks below every doc that matches without it and is
   marked (`needs_body` on each topic result in JSON, `matched: needs body prose` in plain
-  output). Plain output lists the first eight such matches and counts the rest, and the JSON
-  carries every match. A search that finds nothing no longer says to search doc bodies directly.
+  output). The first eight such matches are listed and the rest are counted and named by id, in
+  the JSON (`omitted`, `omitted_ids` and `retrieve` beside `results`) as in plain output, so the
+  MCP tool's answer is bounded too. A search that finds nothing no longer says to search doc
+  bodies directly.
 - `context --after-edit` leaves the baseline, the adoption record, the manifest and the guidance
   files out of its unmatched list, since none of them has an owner by design, unless a claim cites
   one as evidence.
