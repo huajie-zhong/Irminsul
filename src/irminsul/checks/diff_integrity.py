@@ -1,11 +1,12 @@
 """Diff integrity — a change must not quietly lower the gates it is judged by.
 
 A pass, not a registered graph check: like `co-change`, it needs the diff range, which
-`--diff <base>` or `context --after-edit` with a base puts on the graph. It compares files
-with their content at the merge base, which a pull request cannot rewrite, and always
-reports what it finds. Each finding names a subject, and the acknowledgement step accepts
-it when a trailer of the change names that subject, so the lists below say what the pass
-reports, not what a trailer can answer.
+`--diff <base>` or `context --after-edit` puts on the graph; with no base, `--after-edit`
+judges the uncommitted work against `HEAD`. It compares files with their content at the
+merge base, which a pull request cannot rewrite, and always reports what it finds. Each
+finding names a subject, and the acknowledgement step accepts it when a trailer of the
+change names that subject, so the lists below say what the pass reports, not what a trailer
+can answer.
 
 - the baseline gained entries, so new findings were recorded instead of fixed;
 - an RFC that was implemented at the base changed, or no longer exists. A change whose

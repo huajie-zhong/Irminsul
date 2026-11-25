@@ -1,10 +1,12 @@
 """The diff range a run judges, resolved once from git and carried on the graph.
 
-`check --diff <base>` names it. Every pass that judges the change rather than the tree —
-`co-change`, `diff-integrity` and `new-dependency` — reads it from `DocGraph.change`, so
-no two of them can be handed different ideas of what changed. A graph without one is a run that judges the tree alone: every run not
-given `--diff`, and the base pass of `--delta`, so what those passes report is never
-pre-existing.
+`check --diff <base>` names it, and `context --after-edit` judges one too: from the base it
+was given, or the uncommitted work against `HEAD` when it was given none. Every pass that
+judges the change rather than the tree — `co-change`, `diff-integrity` and `new-dependency`
+— reads it from `DocGraph.change`, so no two of them can be handed different ideas of what
+changed. A graph without one is a run that judges the tree alone: every other run, a
+`context --after-edit` with no base and nothing uncommitted to judge among them, and the
+base pass of `--delta`, so what those passes report is never pre-existing.
 
 The range runs from the merge base of `<base>` and `HEAD` to the working tree, so work
 not yet committed is judged as the commit that will carry it. `--committed-only` ends it
