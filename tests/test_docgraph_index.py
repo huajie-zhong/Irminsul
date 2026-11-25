@@ -14,6 +14,7 @@ from irminsul.docgraph_index import (
     headings_of,
     links_of,
     parse_markdown,
+    prose_of,
     resolve_href,
     section_lines,
     slugify,
@@ -260,6 +261,19 @@ def test_headings_of_reads_levels_and_lines_in_order() -> None:
         (1, "Top", 1),
         (2, "Sub", 7),
         (2, "Setext", 13),
+    ]
+
+
+def test_prose_of_is_what_a_reader_sees_outside_fences_and_comments() -> None:
+    body = (
+        "# Top\n\nRun `list --json` for [the plan](budget.md), **now**\nor later.\n\n"
+        "<!-- a comment -->\n\n```text\nfenced\n```\n\n- An item <!-- aside --> here.\n"
+    )
+
+    assert prose_of(parse_markdown(body)) == [
+        "Top",
+        "Run list --json for the plan, now or later.",
+        "An item  here.",
     ]
 
 

@@ -126,6 +126,12 @@ making a feature, a refactor and an RFC-driven change in it.
   diff. The verdict names the base it used (`baseline` under `validation.change` in JSON). A
   clean tree with no base still judges no change, as does `--committed-only` with no base, and
   `--base-ref <base>` is still what judges the commits a branch already holds.
+- `context --topic` also matches words in a doc's body prose: the text and code spans of its
+  paragraphs, headings and list items, not fenced blocks, comments or link targets. A doc that
+  matches only through its body ranks below every doc that matches without it and is marked
+  (`body_only` on each topic result in JSON, `matched: body prose alone` in plain output). Plain
+  output lists the first eight body-only matches and counts the rest, and the JSON carries every
+  match. A search that finds nothing no longer says to search doc bodies directly.
 - `context --after-edit` leaves the baseline, the adoption record, the manifest and the guidance
   files out of its unmatched list, since none of them has an owner by design, unless a claim cites
   one as evidence.

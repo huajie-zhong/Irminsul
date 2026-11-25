@@ -1167,6 +1167,102 @@ def test_context_topic_ranks_a_metadata_hit_above_a_heading_only_phrase_hit(
     assert [item["owner"]["id"] for item in data["results"]] == ["zzz-notes", "aaa-flow"]
 
 
+def _make_body_repo(tmp_path: Path) -> Path:
+    """Docs that say "budget" in a heading, in body prose alone, and only where a reader of
+    the prose does not see it, and one whose body names a command in a code span."""
+    repo = tmp_path / "bodies"
+    write_config(repo, project_name="bodies", source_roots=["src"])
+    write_doc(
+        repo,
+        "docs/foundation/principles.md",
+        doc_id="principles",
+        body="## What this will not do\n\nCost dashboards and **budgets** are out of scope.\n",
+    )
+    write_doc(
+        repo,
+        "docs/guides/zzz-planning.md",
+        doc_id="zzz-planning",
+        body="## Setting a budget\n\nHow a team plans.\n",
+    )
+    write_doc(
+        repo,
+        "docs/components/aaa-hidden.md",
+        doc_id="aaa-hidden",
+        body="See [the plan](budget.md).\n\n<!-- budget -->\n\n```text\nbudget\n```\n",
+    )
+    write_doc(
+        repo,
+        "docs/components/machine-form.md",
+        doc_id="machine-form",
+        body="Run `list --json` for the output a script reads.\n",
+    )
+    return repo
+
+
+def _owner_ids(data: dict[str, Any]) -> list[str]:
+    return [item["owner"]["id"] for item in data["results"]]
+
+
+def test_context_topic_finds_a_doc_by_a_word_only_its_body_holds(tmp_path: Path) -> None:
+    """The foundation names budgets as a non-goal in its prose and nowhere else, and a search
+    for "budget" used to answer `(none)`."""
+    repo = _make_body_repo(tmp_path)
+
+    data = _topic_json(repo, "budget")
+
+    assert {item["owner"]["id"]: item["body_only"] for item in data["results"]} == {
+        "zzz-planning": False,
+        "principles": True,
+    }
+    assert data["suggestion"] is None
+
+
+def test_context_topic_ranks_a_heading_match_above_a_body_only_match(tmp_path: Path) -> None:
+    repo = _make_body_repo(tmp_path)
+
+    data = _topic_json(repo, "budget")
+
+    # "principles" sorts first by path, but only its body holds the word.
+    assert _owner_ids(data) == ["zzz-planning", "principles"]
+
+
+def test_context_topic_reads_the_prose_a_reader_sees(tmp_path: Path) -> None:
+    """A code span is prose. A fenced block, a comment and a link's target are not, so
+    "aaa-hidden", which holds the word only in those, is not a match."""
+    repo = _make_body_repo(tmp_path)
+
+    assert _owner_ids(_topic_json(repo, "list --json")) == ["machine-form"]
+    assert "aaa-hidden" not in _owner_ids(_topic_json(repo, "budget"))
+
+
+def test_context_topic_plain_output_caps_only_the_body_only_matches(tmp_path: Path) -> None:
+    """A match through the other fields is always listed, as before bodies were read. The
+    body-only matches can be most of the tree, so plain output lists eight of them and counts
+    the rest, and the JSON carries every one."""
+    repo = tmp_path / "many"
+    write_config(repo, project_name="many", source_roots=["src"])
+    named = [f"quota-{index:02}" for index in range(10)]
+    prose = [f"note-{index:02}" for index in range(11)]
+    for doc_id in named:
+        write_doc(repo, f"docs/components/{doc_id}.md", doc_id=doc_id, body="Limits.\n")
+    for doc_id in prose:
+        write_doc(
+            repo, f"docs/components/{doc_id}.md", doc_id=doc_id, body="A quota applies here.\n"
+        )
+
+    data = _topic_json(repo, "quota")
+    code, plain = invoke(repo, "context", "--topic", "quota")
+
+    assert _owner_ids(data) == [*named, *prose]
+    assert [item["body_only"] for item in data["results"]] == [False] * 10 + [True] * 11
+    assert code == 0
+    assert re.findall(r"^owner: (\S+)", plain, flags=re.MULTILINE) == [*named, *prose[:8]]
+    assert plain.count("  matched: body prose alone") == 8
+    assert plain.rstrip().endswith(
+        "… 3 more matched through body prose alone (--format json lists every match)"
+    )
+
+
 def test_context_topic_miss_names_the_fields_searched_and_what_to_try(tmp_path: Path) -> None:
     repo = _make_heading_repo(tmp_path)
 
@@ -1177,7 +1273,7 @@ def test_context_topic_miss_names_the_fields_searched_and_what_to_try(tmp_path: 
     first, _, rest = plain.partition("\n")
     assert first == "(none)"
     assert (
-        "id, title, path, describes, tests, tags, summary and headings" in rest
+        "id, title, path, describes, tests, tags, summary, headings and body prose" in rest
         and "try fewer words" in rest
         and "`irminsul explain <name>`" in rest
     )
@@ -1185,15 +1281,16 @@ def test_context_topic_miss_names_the_fields_searched_and_what_to_try(tmp_path: 
     assert data["suggestion"] == rest.strip()
 
 
-def test_context_topic_miss_says_the_words_may_appear_only_in_doc_bodies(tmp_path: Path) -> None:
+def test_context_topic_miss_does_not_send_the_reader_to_search_bodies(tmp_path: Path) -> None:
+    """Bodies are searched, so a miss means no doc holds the words anywhere it is read."""
     repo = _make_heading_repo(tmp_path)
 
     _, plain = invoke(repo, "context", "--topic", "prose-file-reference")
     data = _topic_json(repo, "prose-file-reference")
 
-    clause = "The words may appear only in doc bodies, so search them directly."
-    assert clause in plain
-    assert clause in data["suggestion"]
+    for text in (plain, data["suggestion"]):
+        assert "search them directly" not in text
+        assert "doc bodies" not in text
 
 
 def test_context_topic_help_describes_quoted_keyword_search() -> None:

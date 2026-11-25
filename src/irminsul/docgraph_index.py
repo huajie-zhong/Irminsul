@@ -577,6 +577,13 @@ def _rendered_text(children: list[Token]) -> str:
     return "".join(parts)
 
 
+def prose_of(tokens: list[Token]) -> list[str]:
+    """The prose of a parsed body as a reader sees it, one string for each paragraph, heading
+    and list item: its text and code spans. A fenced block, a comment and a link's target are
+    not prose and are left out."""
+    return [_rendered_text(token.children or []) for token in tokens if token.type == "inline"]
+
+
 def headings_of(tokens: list[Token]) -> list[Heading]:
     """Every heading in a parsed body, in reading order.
 

@@ -24,7 +24,7 @@ from irminsul.checks.uniqueness import Claim, most_specific_claims, resolve_clai
 from irminsul.config import IrminsulConfig, in_layer
 from irminsul.declared_tests import governed_as_test, matching_paths
 from irminsul.docgraph import ChangeRange, DocGraph, DocNode, build_graph
-from irminsul.docgraph_index import headings_of, linked_node, section_lines
+from irminsul.docgraph_index import headings_of, linked_node, prose_of, section_lines
 from irminsul.errors import UserError
 from irminsul.frontmatter import RFC_OPEN_STATES, ClaimRelationEnum
 from irminsul.git.changes import working_tree_changed_paths
@@ -72,6 +72,11 @@ _MAX_CONTENT_EXCERPTS = 8
 #: deliberately *not* capped — they are the obligations a reader must answer, not
 #: supporting material.
 _MAX_ACTIVE_CHANGES = 8
+#: How many body-only topic matches plain output lists before it counts the rest. A common
+#: word is in most bodies, so that list grows with the repository as the active RFCs do, and
+#: it takes their bound. A match through any other field is always listed, and the JSON
+#: carries every match.
+_MAX_BODY_ONLY_MATCHES = _MAX_ACTIVE_CHANGES
 _MAX_EXCERPT_LINES = 20
 _MAX_EXCERPT_CHARS = 1_200
 #: How many tests plain output lists when none has a reason to be named. A test with a
@@ -225,6 +230,9 @@ class ContextResult:
     #: The inputs that do not exist yet. They are owned by the doc whose `describes:` glob
     #: would cover them, which is what a path packet is asked for before a file is created.
     missing_inputs: list[str] = field(default_factory=list)
+    #: A topic result that only the doc's body prose makes: at least one word of the query
+    #: is in no other field searched. Such results come after every other one.
+    body_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -316,6 +324,8 @@ class _PendingResult:
     source_claims: tuple[str, ...]
     #: The inputs that are not on disk yet, owned by the glob that would cover them.
     missing: tuple[str, ...] = ()
+    #: A topic match that needed the doc's body prose.
+    body_only: bool = False
 
 
 @dataclass
@@ -500,10 +510,19 @@ def format_context_plain(report: ContextReport) -> str:
         for result in report.results:
             lines.extend(_format_changed_owner(result))
     else:
-        for result in report.results:
+        # Body-only topic matches rank last, so the ones the bound leaves out are the tail.
+        body_only = sum(result.body_only for result in report.results)
+        unlisted = max(body_only - _MAX_BODY_ONLY_MATCHES, 0)
+        for result in report.results[: len(report.results) - unlisted]:
             if lines:
                 lines.append("")
             lines.extend(_format_result(result, include_active_changes=report.mode == "path"))
+        if unlisted:
+            lines.append("")
+            lines.append(
+                f"… {unlisted} more matched through body prose alone "
+                "(--format json lists every match)"
+            )
 
     reviewed = {(review.doc.path, review.claim_id) for review in report.claim_reviews}
     if report.unmatched:
@@ -701,6 +720,7 @@ def _pending_for_topic(graph: DocGraph, topic: str) -> list[_PendingResult]:
 
     matches.sort(
         key=lambda match: (
+            match.needs_body,
             match.needs_headings,
             0 if _normalize_topic_phrase(match.node.id) == normalized_phrase else 1,
             0 if match.exact_phrase else 1,
@@ -715,6 +735,7 @@ def _pending_for_topic(graph: DocGraph, topic: str) -> list[_PendingResult]:
             node=match.node,
             inputs=(query,),
             source_claims=tuple(match.node.frontmatter.describes),
+            body_only=match.needs_body,
         )
         for match in matches
     ]
@@ -873,6 +894,7 @@ class _TopicMatch:
     exact_phrase: bool
     fields_hit: int
     needs_headings: bool
+    needs_body: bool
 
 
 _TOPIC_METADATA: dict[str, Callable[[DocNode], str]] = {
@@ -884,11 +906,11 @@ _TOPIC_METADATA: dict[str, Callable[[DocNode], str]] = {
     "tags": lambda node: " ".join(node.frontmatter.tags),
     "summary": lambda node: node.frontmatter.summary or "",
 }
-_TOPIC_FIELDS = (*_TOPIC_METADATA, "headings")
+_TOPIC_FIELDS = (*_TOPIC_METADATA, "headings", "body prose")
 _TOPIC_MISS_SUGGESTION = (
     f"Searched {', '.join(_TOPIC_FIELDS[:-1])} and {_TOPIC_FIELDS[-1]}, and every term must "
-    "match, so try fewer words. The words may appear only in doc bodies, so search them "
-    "directly. A check name or finding code is described by `irminsul explain <name>`."
+    "match, so try fewer words. A check name or finding code is described by "
+    "`irminsul explain <name>`."
 )
 
 
@@ -906,16 +928,20 @@ def _match_topic(
     terms: tuple[str, ...],
     normalized_phrase: str,
 ) -> _TopicMatch | None:
-    """A doc matches when every term is in its metadata or its heading texts.
+    """A doc matches when every term is in its metadata, its heading texts or its body prose.
 
-    Headings are the fallback: a term only a heading holds makes the match rank below
-    every doc whose metadata holds all the terms, and ranking signals come from the
-    metadata alone unless a heading was needed.
+    Each is the fallback of the one before. A term only a heading holds makes the match rank
+    below every doc whose metadata holds all the terms, and a term only the body prose holds
+    makes it rank below every doc that matches without its body. Ranking signals come from
+    the metadata alone unless a heading or the body was needed. The prose is `prose_of` the
+    tokens the graph already parsed, read only for a term nothing else holds.
     """
     haystack = _topic_haystack(node)
     heading_texts = [heading.lower() for heading in headings]
+    prose: list[str] = []
     fields_hit: set[str] = set()
     needs_headings = False
+    needs_body = False
     for term in terms:
         term_fields = [field for field, text in haystack.items() if term in text]
         if term_fields:
@@ -923,14 +949,23 @@ def _match_topic(
         elif any(term in text for text in heading_texts):
             needs_headings = True
         else:
-            return None
-    searched = [*haystack.values(), *heading_texts] if needs_headings else haystack.values()
+            if not needs_body:
+                prose = [text.lower() for text in prose_of(node.tokens)]
+                needs_body = True
+            if not any(term in text for text in prose):
+                return None
+    searched = list(haystack.values())
+    if needs_headings:
+        searched += heading_texts
+    if needs_body:
+        searched += prose
     exact_phrase = any(normalized_phrase in _normalize_topic_phrase(text) for text in searched)
     return _TopicMatch(
         node=node,
         exact_phrase=exact_phrase,
         fields_hit=len(fields_hit),
         needs_headings=needs_headings,
+        needs_body=needs_body,
     )
 
 
@@ -1169,6 +1204,7 @@ def _build_result(
         ),
         test_reasons=ranking.reasons if ranking is not None else {},
         missing_inputs=list(pending.missing),
+        body_only=pending.body_only,
     )
 
 
@@ -1727,6 +1763,8 @@ def _result_to_dict(result: ContextResult, *, mode: ContextMode) -> dict[str, ob
         "depends_on_missing": result.depends_on_missing,
         "depended_on_by": [_doc_ref_to_dict(doc) for doc in result.depended_on_by],
     }
+    if mode == "topic":
+        payload["body_only"] = result.body_only
     if mode == "path":
         payload["active_changes"] = {
             "shown": [_active_change_to_dict(change) for change in result.active_changes.shown],
@@ -1840,6 +1878,7 @@ def _format_result(result: ContextResult, *, include_active_changes: bool = Fals
         f"owner: {result.owner.id} ({result.owner.path})",
         f"  title: {result.owner.title}",
         f"  input: {_format_list(_input_labels(result))}",
+        *(["  matched: body prose alone"] if result.body_only else []),
         f"  source claims: {_format_list(result.source_claims)}",
         f"  entrypoint: {result.entrypoint or '-'}",
         *_format_tests(result),

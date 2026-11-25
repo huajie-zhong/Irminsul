@@ -55,6 +55,17 @@ A flat list of an owner's tests buries the one that exercises the file in hand, 
 <!-- anchor: src/irminsul/ranked_tests.py#Ranker.rank @sha256:252d7b905161 -->
 <!-- anchor: src/irminsul/context.py#ContextResult.test_reasons @sha256:d4d118e24f76 -->
 
+## What a topic search reads
+
+`--topic` splits the query into case-folded terms and returns each doc that holds every term as a substring. `_match_topic` looks for a term in the doc's id, title, path, `describes`, tests, tags and `summary`, then in its heading texts, then in its body prose, so a topic a doc names only in a sentence, such as a non-goal, is found. The prose is `prose_of` the body tokens the graph already parsed, which is the text and the code spans a reader sees, without fenced blocks, comments or link targets, so no file is read a second time.
+<!-- anchor: src/irminsul/context.py#_match_topic @sha256:c8f69df5714b -->
+<!-- anchor: src/irminsul/docgraph_index.py#prose_of @sha256:cced70dc6f16 -->
+
+`_pending_for_topic` ranks a doc that needs a heading for a term below every doc whose metadata holds all the terms, and a doc that needs its body prose below every doc that matches without it. `ContextResult.body_only` marks a match that needed the body: `body_only` in the JSON, and `matched: body prose alone` in plain output. A common word is in most bodies, so plain output lists the first `_MAX_BODY_ONLY_MATCHES` body-only matches and counts the rest in one line. A match through any other field is always listed, and the JSON carries every match.
+<!-- anchor: src/irminsul/context.py#_pending_for_topic @sha256:28e195fc567b -->
+<!-- anchor: src/irminsul/context.py#ContextResult.body_only @sha256:6f17b0b30ebd -->
+<!-- anchor: src/irminsul/context.py#_MAX_BODY_ONLY_MATCHES @sha256:18dafa2609c9 -->
+
 ## Claims to review
 
 A report's `claim_reviews` lists every claim whose `evidence` names a path in hand — a named path, or a changed one after an edit — except `follows-evidence` claims, where the code wins outright. Each carries a question that quotes the claim back at those files. It is a request to a reader, not a finding: the change reached the code a contract is written against, and only a reader can say whether the contract still holds, so it prints outside the findings, `--after-edit` exits 0 on it, and `check` never reports it. The signal is the change itself, an exact match on `evidence:`, so it does not go quiet once the doc is touched, as `claim-provenance`'s commit-time comparison can, and it reaches code the declaring doc does not own. `irminsul list review --changed` queues the same claims as `governing-claim` items.
@@ -136,7 +147,7 @@ limit as a rule the tool checks is the misreading the excerpt exists to prevent.
 
 ## Scope & Limitations
 
-Topic search is deterministic per-term substring matching over doc metadata and heading texts, every term required, not fuzzy or semantic search. Prose under a heading is not searched, so a word that appears only in a body, such as a plural of a heading's word, finds nothing.
+Topic search is deterministic per-term substring matching over doc metadata, heading texts and body prose, every term required, not fuzzy or semantic search. A term is matched as written, so `budget` finds a doc that says "budgets" and the plural does not find the singular. A word that appears only in a fenced block or a comment, or in the target of a link outside a heading, finds nothing.
 
 `--after-edit` reads the paths `changed_since` reports for its base, which is `HEAD` when none is given. A file moved without `git mv` reads as a deletion plus a new file until it is staged. For a repository with no commits and for a project below its git root, where there is no history of its own to diff, it falls back to the staged, unstaged, and untracked paths from `git status` and judges no change; outside a git worktree it reports the git error instead of guessing. <!-- anchor: src/irminsul/git/changes.py#working_tree_changed_paths @sha256:86b253bf9d54 -->
 
