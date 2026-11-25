@@ -145,6 +145,10 @@ making a feature, a refactor and an RFC-driven change in it.
   insertion before a rewrite can pair a new sentence with an old one it did not replace; both
   texts are shown. A sentence that is both moved and reworded in one edit is queued as an `edited`
   item and as a `removed-sentence`.
+- `list review --changed` no longer queues an ordered list item that an edit above it only
+  renumbered. Deleting step 2 of a list used to queue step 3 as an `edited` item whose `was` named
+  the deleted step, and the old step 3 as a `removed-sentence`; now only the deleted step is
+  queued.
 - The JSON of `change status` and `change verify` reports the RFC's changed source and tests once,
   not per task. Each task has `id`, `text`, `req` and `component`; the changed files are in
   `evidence`, and one `semantic_review` clue says what to check. `evidence_measured` is a top-level
