@@ -237,26 +237,15 @@ claim, and a help-string edit in the `refs` fix re-asked three claims citing `cl
 dogfood fix lanes the same night re-pinned the three `cli.py` claims once per lane and again at
 each rebase, about eight re-reads of three unchanged claims.
 
-### `after-edit-buries-its-findings`
+### `confirm-applies-every-held-fix`
 
-`irminsul context --after-edit` prints the whole owner packet, excerpts and active RFC
-requirements included, before the findings the change introduced, so an agent greps for the
-findings section (the `refs` fix lane, 2026-10-29). Print the findings first, or give the
-packet a flag that leaves it out.
-
-### `fix-buries-its-own-output`
-
-On a clean tree `irminsul fix` lists every held fix, one line each, and ends with "held 44
-fix(es); re-run with --confirm to apply" (58 on 2026-10-22), every one a glossary link for
-an info finding (`_echo_fix_result`, `src/irminsul/cli.py:1129`; the summary at `:1318`), so
-the line that matters in a real run is buried. Summarize held fixes by check and code, and
-keep info-level fixes out of the default summary unless `--only` names their check.
-
-`--confirm` then applies every held fix at once. An agent confirming the one fix its change
-needed also wrote 60 glossary links into 40 files, stable decision records among them, and
-had to restore `docs` and redo its edits (PR 10c lane, 2026-10-28). Let `--confirm` leave
-info-level fixes alone unless `--only` names their check, or apply only the fixes in the
-files the change touched.
+`irminsul fix --confirm` applies every held fix at once. An agent confirming the one fix its
+change needed also wrote 60 glossary links into 40 files, stable decision records among them,
+and had to restore `docs` and redo its edits (PR 10c lane, 2026-10-28). On 2026-11-25 a clean
+tree holds 33 such fixes, every one a glossary link for an info finding. Let `--confirm` leave
+info-level fixes alone unless `--only` names their check, or apply only the fixes in the files
+the change touched. The other half of this entry, the held fixes printed one line each, was
+closed on 2026-10-31: `fix` prints one summary line and `--dry-run --confirm` lists them.
 
 ### `review-binds-common-words`
 
@@ -308,6 +297,62 @@ A feature that adds docs queues every sentence of them: 85 items for the dogfood
 about 70 of them the agent's own new sentences, with the claims whose evidence changed under a
 doc nobody edited mixed in (2026-10-29). Group the plain output by marker, the items the change
 did not write first.
+
+### `changed-queue-reads-doc-edits-not-code-edits`
+
+`list review --changed` reads only the docs the change touched
+(`src/irminsul/listing/review.py:292`), so it holds the sentences the change wrote, the claims
+that cite a changed evidence file, stale summaries, and moved or removed sentences. A change to
+code alone queues nothing: commit `460c44c`, which changed `review.py` and its test, prints
+"0 items", which reads as "nothing to re-read". Run with today's code on 2026-11-25 over the
+three pull requests merged on 2026-10-30 and 2026-10-31 (heads `89772e4`, `dde68e0`, `ffa39b4`)
+and two single commits, the queue held 189 items: 99 sentences the change itself wrote, 29
+summaries of docs whose body changed, 20 claims whose evidence file changed in a part they do
+not rest on, 19 removed or renumbered sentences, 8 with a wrong reference, and 14 worth the
+re-read. Eight sentences those pull requests made false and did not edit were in no queue. The
+accepted RFC `a-change-re-asks-the-sentences-that-name-its-code` queues the ones that name
+changed code; four of the eight name no code, which is
+`connected-doc-hides-unconnected-sections`. Until it lands, say in the output that changed
+source is not read. Order is by reference and path today (the `sorted` call that ends
+`build_review`): print the items the author did not write first, since the top of a
+list is what gets read. This replaces the counts in `queue-is-unranked`, measured before the
+fixes of 2026-10-31.
+
+### `stale-summary-asks-after-any-body-edit`
+
+`_stale_summaries` (`src/irminsul/listing/review.py:386`) queues a doc's `summary:` whenever a
+body line changed and the summary line did not. In the measurement above, 29 of 30 such items
+were summaries the edit could not have affected: "CLI entry point." for
+`docs/components/cli.md` was queued by each of three consecutive pull requests. The decision
+record says "a rewritten body", and one changed line is not that. Print them as one group that
+closes the plain output, or decide what "rewritten" means; the second is a decision.
+
+### `lifecycle-queue-shows-no-progress`
+
+`irminsul list lifecycle --queue` prints one line per accepted RFC, each ending "accepted RFC
+is not yet implemented": ten identical lines on 2026-11-25, for RFCs of 2 tasks and of 27, five
+of whose tasks had landed. Which tasks are done is readable only from pull request titles, and
+the order the RFCs depend on each other in only from their prose. Tasks T23, T25 and T27 of
+`every-warning-hint-has-an-answer` (a checkbox per task and "N of M tasks done" in
+`change status`) answer the first; the queue should print the same count.
+
+### `no-measure-of-recall`
+
+Nothing measures whether a code change that makes a sentence false leads a reader to that
+sentence. A pilot on 2026-11-25 seeded 14 such changes into a clone of this tree, the sentence
+chosen before the change and the doc left untouched, and ran `check --diff HEAD`,
+`list review --changed` and `context --after-edit`. Three were pointed at by sentence, all
+through an anchor or a claim. Six were pointed at by doc only, through `co-change`, which a
+one-word edit elsewhere in that doc cleared in the two cases tried. Five were not pointed at:
+the root `README.md` and `AGENTS.md`, a guide, a decision record whose `governs:` names the
+changed function, and a code span in a doc that does not own the file. Every new finding was a
+hint, so the gate an adopter is scaffolded with exited 0 in the three cases tried. Fourteen
+cases chosen by someone who knew the rules give counts per kind of connection, not a rate. Keep
+it as a fixture under `tests/fixtures/repos/` with one case per kind of connection and its
+outcome asserted, so recall cannot fall unseen and the code-span cases change when the re-ask
+RFC lands; a sampled run on this tree, with each case stored as a sentence and a patch, gives
+the number. Whether the scaffolded gate should fail on hints once every hint has an answer is
+a decision nobody has made.
 
 ### `init-writes-no-gitattributes`
 
@@ -454,6 +499,74 @@ The edges are real, but the warning repeats one fact per importer. Report a new 
 module once, naming its importers, with one fix that writes every `depends_on`. Found by the
 PR 10b lane on 2026-10-28.
 
+## Two repositories
+
+Found by a trial of the `siblings` layout on 2026-11-25: a code repository and a docs
+repository side by side, each with its own history, and a single-repository control. Checks
+that read the tree, and pins, which hash content, behaved as in one repository. The layout stays
+supported; these are what is left before a change in the code repository is judged as one in
+the docs repository is.
+
+### `siblings-change-views-read-the-docs-repository-only`
+
+Every view of a change reads the docs repository's range alone: `co-change` (`change.changed`,
+`src/irminsul/checks/co_change.py:69`), `new-dependency`
+(`src/irminsul/checks/new_dependency.py:117`), `list review --changed`, `change verify`, and the
+trailers (`reviewed_trailers`, `src/irminsul/checks/acknowledgement.py:248`). `--source-diff`
+(`src/irminsul/cli.py:731`) reaches only `diff-integrity/adoption-debt-touched`, as the Scope of
+`docs/guides/private-docs.md` says. In the trial a commit in the code repository made three
+sentences and two claims false: `list review --changed` printed "0 items", `check --diff` with
+`--source-diff` reported no `co-change`, and `change verify` read the RFC that commit
+implemented as not started. Only a pinned architecture claim and one anchor reported. The
+single-repository control reported `co-change/unreflected-change` and
+`new-dependency/undeclared-new-dependency` for the same edit. `list review --changed` and
+`change verify` do not say that a declared source was left out. Say so in both first; then give
+every view of a change the source range, with a trailer read from the repository whose commit
+it is on.
+
+### `mtime-drift-is-the-only-cross-repository-signal`
+
+`docs/guides/private-docs.md:206` names mtime drift as the cross-repository signal. Task T16 of
+`every-warning-hint-has-an-answer` deletes that check and T22 makes `co-change` read the source
+range in its place. Land T22 first or both in one change: T16 alone leaves this layout with pins
+and nothing else. T22's answer is a trailer in the code repository's pull request, where the
+doc cannot be edited and where no trailer is read today, so it needs the entry above.
+
+### `siblings-time-signals-clear-on-any-doc-commit`
+
+Where no pin exists, drift is a comparison of the code repository's commit time with the doc's
+last commit: the fallback of `claim-provenance/evidence-drift`, `mtime-drift`, and `list review`
+without a change. In the trial a one-word edit to the doc cleared `evidence-drift` on a claim
+that was still false, though `anchors --re-pin --all` would still have moved its pin, and took
+`list review` from three marked sentences to none. It is the second paragraph of
+`component-claim-drift-unreported`, and in this layout it is the only signal unpinned prose has.
+
+### `siblings-gates-deadlock-on-a-rename`
+
+Each generated workflow checks out the other repository's default branch. With an exact path in
+`describes`, renaming that file fails the code pull request against the docs' default branch
+(`globs/empty-describes-pattern`, `uniqueness/undocumented-file`) and fails the docs pull
+request against the code's, while the two heads together pass, a pair no workflow builds. A
+glob in `describes` avoids it. Let each workflow check out the other repository's branch of the
+same name when one exists, and say so in the guide.
+
+### `shallow-source-clone-reads-as-drift`
+
+`history-depth` asks the docs repository alone (`history_state(git, repo_root)`,
+`src/irminsul/checks/history_depth.py:76`). With the code repository cloned at depth 1 and the
+docs repository whole, every source file read as changed at the tip: two false
+`mtime-drift/drift-detected`, exit 1 under `--fail-on hint`, and no
+`history-depth/shallow-clone`. The generated workflows set `fetch-depth: 0`, so only a
+hand-written checkout meets it. Ask each declared source too.
+
+### `siblings-paths-have-two-spellings`
+
+An anchor resolves only as `../code/src/ledger/store.py#open_store`, the spelling from the docs
+root; `ledger/store.py#open_store`, the spelling `describes` takes, is
+`claim-anchor/missing-file`, and `change finalize` refuses it as an unresolvable binding.
+`recommended_tests: [test_store.py]` is `coverage/tests-path-missing` while `owns_tests` accepts
+the same path. One spelling for a file in a declared source, in every field that names one.
+
 ## Release pipeline
 
 v0.3.0 was tagged and published on 2026-09-25: PyPI carries the wheel and sdist with
@@ -468,4 +581,5 @@ provenance attestations, and `ghcr.io/huajie-zhong/irminsul` carries `0.3.0` and
 Cross-repository adoption (the `siblings` layout, declared sources, and the adoption
 record's `{path, source}` bindings) shipped in v0.3.0 without a clean external review
 round. Eleven findings were raised against it across two rounds and all eleven were valid,
-four of them in code written the same day. Treat that surface as unsettled.
+four of them in code written the same day. Treat that surface as unsettled. The entries under
+"Two repositories" are what a trial of it found on 2026-11-25.
