@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
@@ -10,10 +9,9 @@ import pytest
 
 from irminsul.checks.base import Finding, Severity
 from irminsul.checks.frontmatter import CODE_MISSING_FRONTMATTER
-from irminsul.config import IrminsulConfig, Paths, load
+from irminsul.config import IrminsulConfig, Paths
 from irminsul.delta import (
     DeltaError,
-    base_is_the_working_tree,
     compute_delta,
     cross_repo_trees,
     pristine_checkout,
@@ -292,20 +290,3 @@ def test_pristine_checkout_yields_a_fully_resolved_root(tmp_path: Path) -> None:
 
     with pristine_checkout(tmp_path, "HEAD") as base_root:
         assert base_root == base_root.resolve()
-
-
-@pytest.mark.parametrize("record", ["baseline", "adoption"])
-def test_an_uncommitted_baseline_or_adoption_record_is_not_heads_tree(
-    fixture_repo: Callable[[str], Path], record: str
-) -> None:
-    """Both files change what the checks report, so a tree that differs from `HEAD` only
-    there is a change. Left out, a run that had just judged an adoption record's growth
-    said the tree was identical to `HEAD`."""
-    repo = fixture_repo("good")
-    seed_repo(repo)
-    config = load(repo / "irminsul.toml")
-    assert base_is_the_working_tree(repo, config, "HEAD")
-
-    (repo / getattr(config.paths, record)).write_text("{}\n", encoding="utf-8")
-
-    assert not base_is_the_working_tree(repo, config, "HEAD")

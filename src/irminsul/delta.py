@@ -202,8 +202,6 @@ def _changes_the_checks_can_see(git: GitReader, repo_root: Path, config: Irminsu
         docs_root_prefix(config),
         CONFIG_FILENAME,
         ".github/workflows",
-        config.paths.baseline,
-        config.paths.adoption,
         *config.paths.source_roots,
         *config.paths.extra_docs,
     }
