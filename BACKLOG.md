@@ -55,6 +55,17 @@ rules, per section and per changed definition, were considered and deferred by
 `docs/decisions/derive-facts-and-leave-meaning-to-the-reader.md`; until then the root
 `AGENTS.md` asks the writer to name, anchor, or claim the code a sentence explains.
 
+### `governed-code-does-not-re-ask-its-record`
+
+A decision record's `governs:` names the code it decides, and nothing reads that list yet. The
+accepted RFC `decision-records-govern-what-they-decide` makes `irminsul context <path>` name the
+governing record before an edit; it does not re-ask the record's Decision when that code
+changes. A Decision that names the code in a code span will be queued by
+`a-change-re-asks-the-sentences-that-name-its-code`. One that states the rule in plain words, as
+most do, is reached by neither, and the case `decision-governs-the-function` of
+`tests/test_seeded_rot.py` pins that. Queue a record's Decision when a change touches what the
+record governs.
+
 ### `defined-means-two-things`
 
 The review queue and `anchors --suggest` ask `CodeResolver.resolve` whether a code span
