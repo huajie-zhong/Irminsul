@@ -23,7 +23,8 @@ what the sentence says.
    such as `test_roots = ["tests"]` under `[paths]`, `irminsul anchors --suggest --doc <doc>`
    lists the tests that name a function or class the doc names, each as a marker ready to
    paste, and for a sentence that names no code, `irminsul context <source file>` lists the
-   tests that import the file, if a doc owns it. Otherwise, or when neither lists the test,
+   tests that import the file, if a doc owns it. Declaring a test root also asks that a doc
+   list each test file in it under `owns_tests:`. Otherwise, or when neither lists the test,
    search the test files for the function's name.
 2. **See it fail once.** Change the code so the sentence is false, run the test and see it
    fail, then restore the code. A test that does not fail is the wrong test, or the

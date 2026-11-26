@@ -426,6 +426,23 @@ sentence, and a reader cannot tell three from three hundred. Print the count bes
 and keep it in each row's JSON. Found by a review of the RFC
 `a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts` on 2026-11-26.
 
+### `suggest-json-hides-that-no-test-was-read`
+
+With no `paths.test_roots` declared, `anchors --suggest --doc <doc>` prints "no test file was
+read" in its plain output alone (`_suggest_anchors` in `src/irminsul/cli.py`); in the JSON each
+row's `tests` is `[]`, the same as for a function no test names, so an agent reading the JSON,
+or the MCP tool that returns it, cannot tell the two apart. The plain output also prints "no
+test names it" under each name when it read no test at all. Found by a review on 2026-11-26.
+
+### `a-file-level-rebinding-still-names-the-definition`
+
+`anchors --suggest --doc` counts a test as naming a function when its body uses a name the
+file imported from the defining module and the test does not bind itself. A test file that
+imports `late_fee` and then rebinds it at file level, by `def late_fee`, an assignment or a
+later import of another `late_fee`, still has its tests offered for the function
+(`src/irminsul/binding.py`). Found by a review on 2026-11-26; no test of this repository does
+it.
+
 ### `decision-edit-is-confirmed-twice`
 
 The accepted RFC `decision-records-govern-what-they-decide` answers an edit of a record's

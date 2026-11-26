@@ -107,8 +107,13 @@ paragraphs, which trains a reader to re-pin without reading.
   also lists each code span of that doc that resolves to one Python function or class, with
   up to three test functions that name it, ordered by path and line, each as a marker to
   paste. A test function is a function whose name starts with `test`, in a Python file under
-  `paths.test_roots` that imports the defining module, whose body names the definition. A name
-  no test names is listed and said to have none, the closing line counts these names apart
+  `paths.test_roots` that imports the defining module, whose body names the definition through
+  the file's imports: a name imported from that module, under an alias too, or an attribute of
+  a name bound to it. A name the test binds itself, as a parameter, a local or a fixture, does
+  not count. A method is matched by its name as an attribute, in a test whose file imports its
+  class or module, since the syntax tree does not say what class an object has. With no test
+  root declared, the listing says that no test file was read. A name no test names is listed
+  and said to have none, the closing line counts these names apart
   from the unbound ones, and the JSON keeps `unbound` and gains a list `resolved`. A test file
   that does not parse is skipped. Without `--doc` the listing is the unbound names alone, and
   tests in another language are not offered.
@@ -214,5 +219,6 @@ paragraphs, which trains a reader to re-pin without reading.
   that name it, and a sentence about what code does is best anchored to the test that asserts it.
 - 2026-11-26: Both are implemented and stated in the Decision: the advice to anchor a sentence
   about behaviour to its test, with the written step of seeing the test fail once, and the
-  tests `anchors --suggest --doc` offers. A command that changes a function in several ways
+  tests `anchors --suggest --doc` offers, a test naming a definition through its file's
+  imports as the RFC's decision 4 has it. A command that changes a function in several ways
   and lists the changes no anchored test noticed is left to the backlog.

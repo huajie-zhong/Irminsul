@@ -355,6 +355,10 @@ def _read_function(display: str, symbol: str, function: _Function) -> _TestFunct
             elif isinstance(node, _Binder):
                 if node.name:
                     rebound.add(node.name)
+            elif isinstance(node, ast.MatchMapping):
+                # `case {**rest}:` binds `rest`, which the node carries as a plain string.
+                if node.rest:
+                    rebound.add(node.rest)
             elif isinstance(node, _Import):
                 imports.append(node)
     return _TestFunction(
