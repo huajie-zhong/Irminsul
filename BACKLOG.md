@@ -411,8 +411,8 @@ plain `git commit` the checkout failed, so inherited debt failed every commit (a
 
 ### `change-status-says-ready-before-any-work`
 
-`irminsul change status` prints "mechanically ready for: implemented" for an RFC accepted
-minutes earlier, with "0 changed path(s)" and none of its five tasks built (run on 2026-11-26 for
+`irminsul change status` prints "mechanically ready for: implemented" for an RFC accepted the
+evening before, with "0 changed path(s)" and none of its five tasks built (run on 2026-11-26 for
 `the-change-queue-asks-about-what-the-change-did-not-write`). With no base given it finds no
 blocker because it measured nothing. Say that nothing was measured, as `context --after-edit`
 says of a change it did not compare.
@@ -421,10 +421,10 @@ says of a change it did not compare.
 
 Among the topic matches that needed body prose, `_pending_for_topic`
 (`src/irminsul/context.py`) orders by path once the other keys tie, so a doc under
-`docs/foundation` sorts after the architecture, component and decision docs. With more than
-eight such matches the case `a-topic-search-reads-doc-bodies` was written for, a non-goal named
-only in the foundation's prose, is among the ids left out. Which order serves a reader is a
-decision.
+`docs/foundation` sorts after the architecture, component and decision docs. When eight such
+matches sort ahead of it, the case `a-topic-search-reads-doc-bodies` was written for, a non-goal
+named only in the foundation's prose, is among the ids left out: `context --topic "will not"`
+leaves `principles` out (a review, 2026-11-26). Which order serves a reader is a decision.
 
 ### `a-doc-that-restates-a-linked-doc-is-not-asked-about`
 
@@ -464,8 +464,8 @@ Seen three times on 2026-10-22. Let the acknowledgement name the source revision
 against, so it survives being written before or after the code and is voided only by a
 change to that code. A merge shows it too: after one branch was merged into another on
 2026-11-25, each branch's trailer for `docs/components/mcp-server.md` counted the other's commit
-as later, a trailer on the merge commit was not read, and a third trailer on a commit after the
-merge was needed.
+as later, so the warning both had answered came back until a trailer on the merge commit, or on
+one after it, answered it again.
 
 ### `renamed-doc-has-no-review-base`
 
