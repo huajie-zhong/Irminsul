@@ -140,6 +140,10 @@ making a feature, a refactor and an RFC-driven change in it.
   no sentence on a line inside one, as it already read none on the line that opens it. The
   guiding comment `irminsul new component` writes shows a dotted method name as an example, which
   `--suggest --doc` listed as an unbound name in every new component doc.
+- `diff-integrity/decision-rewritten` quotes where the record's `## Decision` first differs from
+  the base, as it reads now and as it read there. Its message used to say only "accepted decision
+  section rewritten", which after a later commit that only added an alternative, and so lapsed
+  the trailer that had answered the rewrite, read as a complaint about the alternative.
 
 **Queries.**
 - `anchors --suggest --doc <doc>` also lists each code span of that doc that resolves to one

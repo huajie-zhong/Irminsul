@@ -818,7 +818,7 @@ def _sealed_rewrites(
                 CODE_DECISION_REWRITTEN,
                 Severity.warning,
                 path,
-                f"accepted decision section rewritten since {base_ref}",
+                _decision_rewritten_message(old, new, base_ref),
                 _DECISION_REWRITTEN_SUGGESTION,
                 subject=path,
             )
@@ -1786,7 +1786,7 @@ def _renamed_record(
                 CODE_DECISION_REWRITTEN,
                 Severity.warning,
                 new_path,
-                f"accepted decision section rewritten since {base_ref}, where it was {old_path}",
+                _decision_rewritten_message(old, new, f"{base_ref}, where it was {old_path}"),
                 _DECISION_REWRITTEN_SUGGESTION,
                 subject=new_path,
                 about=(old_path, new_path),
@@ -2158,6 +2158,44 @@ def _decision_wording(text: str | None) -> str | None:
     if decision is None:
         return None
     return _INLINE_LINK_RE.sub(r"\1", without_pins(decision)).replace("`", "")
+
+
+_EXCERPT_BEFORE: Final = 4
+_EXCERPT_WORDS: Final = 12
+
+
+def _decision_rewritten_message(old: str, new: str | None, since: str) -> str:
+    """The finding's message, quoting where the `## Decision` first reads differently.
+
+    The comparison spans the whole change, so a later commit that edits only another
+    section of the record still finds the Decision an earlier commit rewrote; quoting the
+    words that differ says which edit it is, where "rewritten" alone sends a reader to look
+    for one in what they just changed.
+    """
+    before = (_decision_wording(old) or "").split()
+    after_wording = _decision_wording(new)
+    head = f"the `## Decision` section of this accepted record was rewritten since {since}"
+    if after_wording is None:
+        return f"{head}: the record no longer has that section"
+    after = after_wording.split()
+    first = next(
+        (i for i, (a, b) in enumerate(zip(before, after, strict=False)) if a != b),
+        min(len(before), len(after)),
+    )
+    now, was = _excerpt(after, first), _excerpt(before, first)
+    return f'{head}: it now reads "{now}" where it read "{was}"'
+
+
+def _excerpt(words: list[str], first: int) -> str:
+    """A few words of `words` from just before index `first`, with an ellipsis where it
+    cuts, or `(nothing)` when the words end before it."""
+    start = max(0, first - _EXCERPT_BEFORE)
+    end = start + _EXCERPT_WORDS
+    if start >= len(words):
+        return "(nothing)"
+    lead = "... " if start else ""
+    tail = " ..." if end < len(words) else ""
+    return f"{lead}{' '.join(words[start:end])}{tail}"
 
 
 def _finding(

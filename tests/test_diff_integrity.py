@@ -544,6 +544,36 @@ def test_rewriting_an_accepted_decision_warns_but_other_sections_do_not(tmp_path
     assert "diff-integrity/decision-rewritten" in check_codes(root, "--diff", middle)
 
 
+def test_a_rewritten_decision_is_quoted_where_it_differs(tmp_path: Path) -> None:
+    """A later commit that only adds an alternative lapses the trailer that answered the
+    rewrite, and the finding comes back; quoting the words that differ shows it is the
+    earlier commit's Decision it asks about, not the alternative just added."""
+    root = _repo(tmp_path)
+    path = "docs/decisions/0001-choice.md"
+    write(root, path, _ADR)
+    base = commit_all(root, "adr", when=_AT)
+    rewritten = _ADR.replace("Use A.", "Use B.")
+    write(root, path, rewritten)
+    trailer = reviewed("diff-integrity/decision-rewritten", path, path, "carries out an RFC")
+    commit_all(root, f"rewrite decision\n\n{trailer}", when=_AT)
+    write(
+        root,
+        path,
+        rewritten.replace(
+            "## Consequences", "## Alternatives Considered\n\n- C.\n\n## Consequences"
+        ),
+    )
+    commit_all(root, "add an alternative", when=_AT)
+
+    (finding,) = findings_of(root, "diff-integrity/decision-rewritten", "--diff", base)
+
+    assert finding["message"] == (
+        "the `## Decision` section of this accepted record was rewritten since "
+        f'{base}: it now reads "Use B." where it read "Use A."'
+    )
+    assert "which predates the change to docs/decisions/0001-choice.md" in finding["suggestion"]
+
+
 def _owned_repo(root: Path) -> str:
     _repo(root)
     write_config(root, source_roots=["src"], enabled=["frontmatter"])
