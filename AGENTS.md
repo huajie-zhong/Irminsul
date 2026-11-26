@@ -162,8 +162,11 @@ owner's decision each time. Finalizing has the owner's standing approval, given 
 once a review by an agent that did not write the change finds no blocker, run
 `irminsul change finalize --confirm` and commit what it writes as the last commit of the pull
 request that completes the RFC's tasks. An RFC whose
-text needs a change while it is being implemented is not finished being designed: stop, bring
-the question to the owner, and do not finalize it.
+decisions need a change while it is being implemented is not finished being designed: stop,
+bring the question to the owner, and do not finalize it. A correction to its wording that
+changes no decision, such as a sentence the build shows untrue of the code, has the owner's
+standing approval, given on 2026-11-26: make it in the RFC's pull request and name it in the
+report.
 
 **Where to start reading.** [`overview.md`](docs/architecture/overview.md), then
 [`check-pipeline.md`](docs/architecture/check-pipeline.md). A check receives only the
