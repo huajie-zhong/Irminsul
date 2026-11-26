@@ -135,7 +135,7 @@ see them.
 
 A stale pin is also unreported in any layer when the doc was committed after the evidence:
 a pin that no longer matches falls back to the commit-time comparison
-(`_scan_evidence_drift`, `:256`), so a doc touched in the same commit, or on the other
+(`_scan_evidence_drift`), so a doc touched in the same commit, or on the other
 side of a merge, hides it. The PR 12 lanes met this each time they edited a component's
 code (four stale pins after 12d, a `context.py` pin after 12f). On 2026-11-26 it reached main
 in the foundation and architecture layers too: a merge took main's `cli.py` pins for three
