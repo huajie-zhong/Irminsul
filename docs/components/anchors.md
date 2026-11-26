@@ -117,9 +117,13 @@ re-reads a whole repository at once, and `--all` is for the rare case that is re
 happened, such as a formatting-only sweep or a move to a new pin format. A re-read is rarely of a whole doc either, so
 `--claim` and `--anchor` narrow a re-pin to what was re-read, `--evidence` narrows a claim
 to one of its evidence files, and the `evidence-drift` and `claim-anchor` suggestions print
-that narrow form. A `--doc` or a selector that names
+that narrow form. An `evidence-drift` finding names every evidence file of its claim that
+changed after the doc, and its suggestion gives each one `--evidence`, so a pin of the claim's
+other evidence that no longer matches, which the finding did not ask about, is left for its
+own re-read. A `--doc` or a selector that names
 nothing exits 2 and writes nothing, because re-pinning nothing would read as success.
 <!-- anchor: src/irminsul/anchors.py#repin_doc @sha256:a335249a82a0 -->
+<!-- anchor: tests/test_cli_anchors.py#test_the_evidence_drift_suggestion_re_pins_only_the_evidence_it_names @sha256:4de675f9c06d -->
 
 ## Scope & Limitations
 

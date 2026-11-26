@@ -473,7 +473,79 @@ def test_the_evidence_drift_suggestion_re_pins_only_the_claim_it_reports(tmp_pat
     (finding,) = [f for f in check_findings(repo) if f["code"] == "claim-provenance/evidence-drift"]
 
     assert (
-        "`irminsul anchors --re-pin --doc docs/foundation/rules.md --claim alpha-works`"
+        "`irminsul anchors --re-pin --doc docs/foundation/rules.md --claim alpha-works "
+        "--evidence src/mod.py`"
+    ) in (finding["suggestion"])
+    assert _run_suggested(repo, finding["suggestion"]) == 0
+    assert _drift(repo) == []
+
+
+def _claim_pins(repo: Path) -> dict[str, str]:
+    (claim,) = load_graph(repo).nodes["rules"].frontmatter.claims
+    return dict(claim.pinned)
+
+
+def _two_evidence_repo(tmp_path: Path, *, util_after_doc: bool) -> Path:
+    """A claim pinned to both its evidence files, then both files changed: `src/util.py`
+    before the doc's last commit, or after it with `util_after_doc`, and `src/mod.py` after."""
+    from irminsul.anchors import file_pin
+
+    repo = _drifted_claim_repo(tmp_path)
+    doc = repo / "docs" / "foundation" / "rules.md"
+    write(repo, "src/mod.py", "def alpha():\n    return 1\n")
+    pins = (
+        "    pinned:\n"
+        f"      src/mod.py: {file_pin(repo / 'src' / 'mod.py')}\n"
+        f"      src/util.py: {file_pin(repo / 'src' / 'util.py')}\n"
+    )
+    text = doc.read_text(encoding="utf-8")
+    doc.write_text(
+        text.replace("      - src/util.py\n", "      - src/util.py\n" + pins), encoding="utf-8"
+    )
+    commit_all(repo, "pin both", when="2024-03-01T00:00:00Z")
+    util_at = "2024-03-20T00:00:00Z" if util_after_doc else "2024-03-02T00:00:00Z"
+    write(repo, "src/util.py", "LIMIT = 2\n")
+    commit_all(repo, "raise the limit", when=util_at, paths=["src/util.py"])
+    doc.write_text(doc.read_text(encoding="utf-8") + "\nAnd more.\n", encoding="utf-8")
+    commit_all(repo, "a doc edit", when="2024-03-10T00:00:00Z", paths=["docs/foundation/rules.md"])
+    write(repo, "src/mod.py", "def alpha():\n    return 3\n")
+    commit_all(repo, "alpha returns three", when="2024-04-01T00:00:00Z", paths=["src/mod.py"])
+    return repo
+
+
+def test_the_evidence_drift_suggestion_re_pins_only_the_evidence_it_names(
+    tmp_path: Path,
+) -> None:
+    """A pin of the claim's other evidence that no longer matches, but changed before the
+    doc did, is not reported, so the re-pin the finding suggests leaves it alone."""
+    repo = _two_evidence_repo(tmp_path, util_after_doc=False)
+    before = _claim_pins(repo)
+    (finding,) = [f for f in check_findings(repo) if f["code"] == "claim-provenance/evidence-drift"]
+
+    assert finding["message"] == (
+        "claim 'alpha-works' cites evidence changed after the doc and since it was pinned: "
+        "'src/mod.py'"
+    )
+    assert (
+        "`irminsul anchors --re-pin --doc docs/foundation/rules.md --claim alpha-works "
+        "--evidence src/mod.py`"
+    ) in finding["suggestion"]
+    assert _run_suggested(repo, finding["suggestion"]) == 0
+    after = _claim_pins(repo)
+    assert after["src/mod.py"] != before["src/mod.py"]
+    assert after["src/util.py"] == before["src/util.py"]
+
+
+def test_evidence_drift_names_every_evidence_file_that_drifted(tmp_path: Path) -> None:
+    repo = _two_evidence_repo(tmp_path, util_after_doc=True)
+    (finding,) = [f for f in check_findings(repo) if f["code"] == "claim-provenance/evidence-drift"]
+
+    assert finding["message"] == (
+        "claim 'alpha-works' cites evidence changed after the doc and since they were pinned: "
+        "'src/mod.py', 'src/util.py'"
+    )
+    assert (
+        "--claim alpha-works --evidence src/mod.py --evidence src/util.py`"
         in (finding["suggestion"])
     )
     assert _run_suggested(repo, finding["suggestion"]) == 0

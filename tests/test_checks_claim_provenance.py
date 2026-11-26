@@ -442,9 +442,9 @@ def test_a_pinned_claim_drifts_when_its_evidence_changes(tmp_path: Path) -> None
         "claim 'enabled-claim' cites evidence changed after the doc and since it was pinned: "
         "'action.yml'"
     ]
-    assert "--re-pin --doc docs/foundation/enforcement.md --claim enabled-claim`" in (
-        findings[0].suggestion or ""
-    )
+    assert (
+        "--re-pin --doc docs/foundation/enforcement.md --claim enabled-claim --evidence action.yml`"
+    ) in (findings[0].suggestion or "")
 
 
 _CITED_DOC = "docs/components/checks.md"
