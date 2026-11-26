@@ -97,6 +97,22 @@ paragraphs, which trains a reader to re-pin without reading.
   listed as out of reach rather than dropped; a file that only mentions the name is offered
   only when nothing defines it. The agent chooses and writes the anchor.
   <!-- anchor: src/irminsul/binding.py#suggest @sha256:c38ecde76ec0 -->
+- **A sentence about behaviour is best anchored to the test that asserts it.** A test
+  function is a symbol, so an anchor names it, pins it and drifts with it like any other. The
+  paragraph is then asked about when that test changes, and the test fails when the code stops
+  doing what the sentence says. Whoever adds such an anchor first changes the code so the
+  sentence is false and sees the test fail, then restores the code: a written step, since
+  Irminsul runs no code, and a test that still passes does not guard the sentence.
+- **Asked about one doc, the suggestion offers tests.** `irminsul anchors --suggest --doc <doc>`
+  also lists each code span of that doc that resolves to one Python function or class, with
+  up to three test functions that name it, ordered by path and line, each as a marker to
+  paste. A test function is a function whose name starts with `test`, in a Python file under
+  `paths.test_roots` that imports the defining module, whose body names the definition. A name
+  no test names is listed and said to have none, the closing line counts these names apart
+  from the unbound ones, and the JSON keeps `unbound` and gains a list `resolved`. A test file
+  that does not parse is skipped. Without `--doc` the listing is the unbound names alone, and
+  tests in another language are not offered.
+  <!-- anchor: tests/test_binding.py#test_suggest_offers_the_test_that_calls_a_function_the_doc_names @sha256:94b5c37f7a7b -->
 - **Framework extractors stay** as precision for the kinds they know, such as an option checked
   against its own command.
 - **Claim evidence and anchors name a part of a file** (accepted, not yet implemented):
@@ -129,6 +145,10 @@ paragraphs, which trains a reader to re-pin without reading.
 - **Anchors to definitions inside a function.** Rejected for now: such a name is not
   addressable from outside its enclosing body.
 - **Offer mentions beside a definition.** Rejected: a mention is the wrong place to bind.
+- **A check that asks every sentence about behaviour for a test.** Rejected: no check knows
+  which sentences state behaviour.
+- **A command that breaks the code and reports which changes the tests miss, now.** Left to
+  the backlog: it runs code, so it is no check, and each language runs tests its own way.
 - **Flag a span as certain, or keep a check's own markers.** Rejected: an example names files
   never meant to exist, and two grammars for one syntax drift.
 - **Demote `unlinked-reference` to a hint.** Rejected: it is provably an unwritten link.
@@ -156,6 +176,9 @@ paragraphs, which trains a reader to re-pin without reading.
   did not change.
 - Binding is incremental, and a name defined only inside a function stays unbound with the
   suggestion saying why.
+- An anchor to a test that does not assert its sentence looks like protection and is none.
+  Seeing the test fail is the only guard, and nothing verifies that it was done. A test edited
+  for another reason asks about its paragraphs again, which is a reading and not an error.
 - A span is accepted while any file ends with it, so a renamed file whose old name another file
   still ends with is not reported. A quoted value is read without its quotes, and a name
   followed by `#anchor` or `:line` is not judged.
@@ -187,3 +210,7 @@ paragraphs, which trains a reader to re-pin without reading.
 - 2026-11-26: Accepted [A sentence about behaviour is anchored to the test that asserts it](../rfcs/a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts.md):
   under `--doc`, `anchors --suggest` lists each function or class the doc names with the tests
   that name it, and a sentence about what code does is best anchored to the test that asserts it.
+- 2026-11-26: Both are implemented and stated in the Decision: the advice to anchor a sentence
+  about behaviour to its test, with the written step of seeing the test fail once, and the
+  tests `anchors --suggest --doc` offers. A command that changes a function in several ways
+  and lists the changes no anchored test noticed is left to the backlog.
