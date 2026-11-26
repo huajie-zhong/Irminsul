@@ -530,7 +530,7 @@ it.
 ### `a-stale-pin-is-silent-while-its-doc-is-newer`
 
 `claim-provenance/evidence-drift` reads a pin that no longer matches its evidence as no pin and
-falls back to comparing commit times (`_evidence_drift` in
+falls back to comparing commit times (`_scan_evidence_drift` in
 `src/irminsul/checks/claim_provenance.py`), so a stale pin goes unreported while the doc's
 last commit is no older than the evidence's. On 2026-11-26 a merge resolved a conflict over
 `cli.py` pins in `docs/architecture/overview.md` and `docs/foundation/enforcement.md` by
