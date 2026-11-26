@@ -90,15 +90,16 @@ Jest, has no name an anchor can point at; it is reached through the part markers
 CPython 3.10 to 3.14 on Linux (glibc on x86-64 and ARM64, musl on x86-64), macOS and Windows,
 and none for musl on ARM64, PyPy or a free-threaded build. There, installing Irminsul compiles
 its C code and needs a C compiler, and that reaches adopters whose code is all Python. Each
-grammar package (MIT) ships one wheel per platform for every CPython. With the TypeScript, Go
+grammar package (MIT) ships one wheel per platform that serves every CPython but a
+free-threaded build, and `tree-sitter-typescript` has none for musl on ARM64 either. With the TypeScript, Go
 and Rust grammars it installed 6.7 MB. It is required, not an extra: an
 extra would let a file resolve on one machine and fail on another, which
 `checks-are-deterministic` in [enforcement](../foundation/enforcement.md) rules out, as the
 accepted `claim-evidence-names-a-part` already says.
 
 **A grammar's release can rename a node** and break a query, and under decision 4(a) it can
-move every pin of its language. Each grammar is pinned to one exact version, so two machines
-cannot disagree, and each language's queries are tested against a fixture of its code. A
+move every pin of its language. Each grammar and the `tree-sitter` runtime are pinned to one
+exact version, so two machines cannot disagree, and each language's queries are tested against a fixture of its code. A
 grammar upgrade is a release of Irminsul whose notes say which pins move.
 
 **Every non-Python anchor's pin moves once** if its hash changes from text to syntax tree
@@ -197,7 +198,7 @@ Open, for the owner:
   that tests in another language are not offered yet. The loop's wording drops "Python".
 - **Records this changes.** `surface-rules-and-language-profiles-are-data` decides "The
   reader is not a profile field, because a profile is data" and that `import-deps` reads
-  Python: a profile stays data, a reader is registered beside it, and `import-deps` reads every
+  Python: a profile stays data and names its reader, which is code, and `import-deps` reads every
   language that answers imports. `code-is-named-in-code-spans-and-bound-by-anchors` decides
   how a pin is hashed.
 - **Measured** on 2026-11-26 with `tree-sitter` 0.26.0, `tree-sitter-typescript` 0.23.2,
