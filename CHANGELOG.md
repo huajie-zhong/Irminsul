@@ -121,10 +121,13 @@ making a feature, a refactor and an RFC-driven change in it.
 
 **Queries.**
 - `anchors --suggest --doc <doc>` also lists each code span of that doc that resolves to one
-  Python function or class, with where it is defined and up to three test functions that name
-  it, each as an anchor marker ready to paste: a function whose name starts with `test`, in a
-  Python file under `paths.test_roots` that imports the defining module, whose body names the
-  definition. A name no test names is listed and said to have none, the closing line counts
+  Python function or class, once for each definition, with where it is defined and up to three
+  test functions that name it, each as an anchor marker ready to paste: a function whose name
+  starts with `test`, in a Python file under `paths.test_roots` that imports the defining
+  module, whose body refers to the definition through an import of that module. A parameter, a
+  fixture or a local variable spelled like the definition does not count, and a method counts
+  as an attribute of its name in a test whose imports reach its class or its module. A name no
+  test names is listed and said to have none, the closing line counts
   these names apart from the unbound ones, and the JSON gains a list `resolved` beside
   `unbound`, each row with the doc's `path` and `line`, the `name`, its `definition` and its
   `tests`. With no test root declared it says that no test file was read. Without `--doc` the

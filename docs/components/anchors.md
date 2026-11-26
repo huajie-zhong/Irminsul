@@ -7,6 +7,7 @@ describes:
   - src/irminsul/anchors.py
   - src/irminsul/binding.py
 depends_on:
+  - checks
   - context
   - docgraph
   - frontmatter
@@ -68,20 +69,30 @@ sentence says, where an anchor to the function is asked about on every edit to i
 ([Code is named in code spans and bound by anchors](../decisions/code-is-named-in-code-spans-and-bound-by-anchors.md)).
 A test function is a definition in a file, so an anchor names it, pins it and drifts with
 it like any other. To find one, `irminsul anchors --suggest --doc <doc>` also lists each
-code span of that doc that resolves to one Python function or class, with where it is
+code span of that doc that resolves to one Python function or class, once for each
+definition, so two methods of one name in one file are two rows, with where it is
 defined and up to three test functions that name it, ordered by path and line, each as a
 marker to paste. `naming_tests` reads a test function as one whose name starts with
 `test`, at the top level of a file or in a class there, in a Python file under
 `paths.test_roots` that imports the defining module, which is the reading
-`Ranker.importers` makes for the [context packet](context.md#which-tests-a-source-file-gets);
-it names the definition when its body uses that name as an identifier. A name no test
-names is listed and said to have none, the closing line counts these names apart from the
-unbound ones, and the JSON gains a list `resolved` beside `unbound`. Without `--doc` the
-command lists the unbound names alone.
+`Ranker.importers` makes for the [context packet](context.md#which-tests-a-source-file-gets).
+It names the definition when its body refers to it through an import of that module, in
+the file or in the test's own body, each import read by `imported_paths` as the
+[import checks](checks.md) read it (`_names`): a function or class at the top level of its
+module by a name imported from it, under an alias too, that the test does not bind itself
+as a parameter, a fixture or a local variable, or as an attribute of a name bound to the
+module itself; a method by an attribute of its name, in a test whose imports reach its
+class or its module. A name no test names is listed and said to have none, the closing
+line counts these names apart from the unbound ones, and the JSON gains a list `resolved`
+beside `unbound`. Without `--doc` the command lists the unbound names alone.
 <!-- anchor: tests/test_binding.py#test_suggest_offers_the_test_that_calls_a_function_the_doc_names @sha256:94b5c37f7a7b -->
-<!-- anchor: tests/test_binding.py#test_suggest_offers_at_most_three_tests_by_path_and_line @sha256:176a91af5722 -->
+<!-- anchor: tests/test_binding.py#test_suggest_offers_at_most_three_tests_by_path_and_line @sha256:5b74b5ae3195 -->
 <!-- anchor: tests/test_binding.py#test_suggest_says_so_when_no_test_names_the_definition @sha256:a96352d4b56f -->
 <!-- anchor: tests/test_binding.py#test_suggest_without_a_doc_lists_unbound_names_and_no_test @sha256:d85d40281025 -->
+<!-- anchor: tests/test_binding.py#test_suggest_lists_two_methods_of_one_name_in_one_file @sha256:80050085aed1 -->
+<!-- anchor: tests/test_binding.py#test_a_test_names_a_definition_through_an_import_of_its_module @sha256:a6e3bf78495a -->
+<!-- anchor: tests/test_binding.py#test_a_name_the_test_binds_itself_does_not_name_the_definition @sha256:ad1bee32b830 -->
+<!-- anchor: tests/test_binding.py#test_a_method_is_named_by_a_test_whose_file_imports_its_class @sha256:3b01720c19d0 -->
 
 The command runs nothing, so an offered test is one that names the function, not one
 known to assert the sentence. Whoever pastes its marker first changes the code so the
@@ -124,12 +135,18 @@ a second function the same paragraph describes, and a behaviour changed through 
 anchor names is not seen. Anchoring each name a paragraph depends on is the answer;
 nothing derives that set.
 
-The tests `--suggest --doc` offers are found by name. A test that reaches the function
-through a helper, a fixture or the command line is not offered, one that uses the same
-name on another object is, and the three listed are the first by path and line, which for
-a widely used class need not be the three that say most. Only Python tests under
-`paths.test_roots` are read, and with no test root declared the listing says that no test
-file was read. Nothing measures how much of a function its tests guard.
+The tests `--suggest --doc` offers are found in the syntax tree, and nothing is run. A
+test that reaches the function through a helper, a fixture or the command line is not
+offered. A method is still found by name, since the tree does not say what class an
+object has: a test whose file imports `Answer` and reads `finding.line` is offered for
+`Answer.line`, and one that reads `load_graph(root).guidance_files` with no import of
+`DocGraph` or its module is not offered for `DocGraph.guidance_files`. A name bound
+anywhere in a test's body, a function nested in it included, counts as the test's own
+throughout it, which can miss a test and never offers one. The three listed are the first
+by path and line, which for a widely used class need not be the three that say most. Only
+Python tests under `paths.test_roots` are read, and with no test root declared the
+listing says that no test file was read. Nothing measures how much of a function its
+tests guard.
 
 ## Implemented requirements
 
