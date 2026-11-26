@@ -112,9 +112,11 @@ rate-limited and makes a run depend on the network.
   is then asked about when that test changes and the test fails when the code stops doing it.
   The comment a new component doc starts with gives the same advice, and the agent protocol
   and its scaffold give the procedure: find the test with `irminsul anchors --suggest --doc
-  <doc>`, or with `irminsul context <source file>` for a sentence that names no code; change
-  the code so the sentence is false, run the test, see it fail and restore the code; paste the
-  marker and pin it. Seeing it fail is a written step that nothing verifies. The advice ships
+  <doc>`, or with `irminsul context <source file>` for a sentence that names no code, which
+  read only the test roots the configuration declares, the second for a file a doc owns, and
+  otherwise search the tests for the function's name, since `irminsul init` declares no test
+  root; change the code so the sentence is false, run the test, see it fail and restore the
+  code; paste the marker and pin it. Seeing it fail is a written step that nothing verifies. The advice ships
   to every adopter, and the skill is unchanged, since it points at the root `AGENTS.md`.
 - **The [manifest](../AGENTS.md) is generated, with two curated sections:** a table of every doc
   that `irminsul fix` rewrites from the graph, a `Foundations` that in a scaffold holds the Three
@@ -178,4 +180,5 @@ rate-limited and makes a run depend on the network.
   the test fail once.
 - 2026-11-26: That advice is implemented and stated in the Decision: step 3 of the loop and the
   component scaffold's comment carry it, and the agent protocol and its scaffold carry the
-  procedure for tying a sentence to a test.
+  procedure for tying a sentence to a test, with the search the RFC's decision 5 gives where
+  no test root is declared.

@@ -719,6 +719,9 @@ SPELLING_FILES = {
     "    assert late_fee(100) == 500\n",
     "the module's name rebound by a parameter": "from loans import policy\n\n\n"
     "def test_it(policy: object) -> None:\n    assert policy.late_fee(100) == 500\n",
+    "the rest of a mapping pattern": "from loans.policy import late_fee\n\n\n"
+    "def test_it() -> None:\n    match {'a': 1}:\n        case {**late_fee}:\n"
+    "            assert late_fee == {'a': 1}\n",
 }
 
 
