@@ -8,6 +8,8 @@ affects:
   - anchors
   - init
   - new-list-regen
+  - cli
+  - context
 resolved_by: docs/decisions/code-is-named-in-code-spans-and-bound-by-anchors.md
 summary: "The loop, the scaffolds and the agent protocol advise anchoring a sentence that says what code does to the test that asserts it, `anchors --suggest` offers those tests, and whoever adds such an anchor sees the test fail once."
 required_updates: []
@@ -39,7 +41,7 @@ Tie it to the test, and neither happens. A change that moves the cap fails the t
 change cannot merge until the test is edited, and editing the test asks about the sentence.
 
 In the seeded-rot suite 3 of 11 false sentences are pointed at, each through an anchor or a
-claim. In this repository 11 of 91 anchors name a test: ten written by the command that
+claim. In this repository 11 of 90 anchors name a test: ten written by the command that
 finalizes an [RFC](../GLOSSARY.md#rfc), and one by hand. The loop names tests once, to say they are run before a
 commit.
 
@@ -52,8 +54,11 @@ test function is one, and its paragraph is asked about when that function change
 doc starts with, and the agent protocol gain the advice: a sentence about what code does is
 best tied to the test that asserts it.
 
-**The suggesting command offers tests.** For a name a doc uses, it lists where the name is
-defined; it will also list the tests that use it, each as a marker ready to paste.
+**The suggesting command offers tests.** Today it lists only the names in a doc that resolve
+to no code, with where each could be defined. Asked about one doc, it will also list each
+function or class that doc names, with the tests that name it, each as a marker ready to
+paste. For a sentence that names no code, the packet for the source file already lists the
+tests that import the file.
 
 **See it fail once.** Whoever ties a sentence to a test changes the code so the sentence is
 false, runs the test and sees it fail, then restores the code. A test that still passes does
@@ -79,7 +84,10 @@ Answered by the owner on 2026-11-26:
    the agent protocol, and not in this repository's own guidance alone.
 2. **Seeing the test fail is a written step.** A command that breaks the code in many ways
    and reports which of them the tests miss is left to the backlog.
-3. **The suggesting command offers tests** beside the definitions it offers today.
+3. **The suggesting command offers tests for the functions and classes a doc names**, when it
+   is asked about one doc. First written as "beside the definitions it offers today": a review
+   found that it offers a definition only for a name that resolves to nothing, so that
+   wording would have offered a test for almost no sentence.
 
 ## Design detail
 
@@ -95,22 +103,34 @@ Answered by the owner on 2026-11-26:
   and the test fails when the code stops doing it.
 - **The component scaffold.** Its comment gains the same advice as a fourth line.
 - **The agent protocol.** `docs/guides/agent-protocol.md` and its scaffold gain a short
-  procedure for tying a sentence to a test. Find the test, with `irminsul anchors --suggest`.
+  procedure for tying a sentence to a test. Find the test: `irminsul anchors --suggest --doc
+  <doc>` lists the tests that name a function the doc names, and `irminsul context <source
+  file>` the tests that import a file, for a sentence that names no code.
   Change the code so the sentence is false, run the test and see it fail, and restore the
   code. Paste the marker and pin it, as an anchor to code is pinned. A test that does not
   fail is the wrong test, or the sentence has none yet.
-- **The suggesting command.** `suggest` in `src/irminsul/binding.py` offers up to three
-  definitions of a name from the source roots. For each Python definition it will also offer
-  up to three test functions, from the files under `paths.test_roots` that import the
-  defining module, whose body names that definition, each printed as a marker like the
-  definitions. JSON carries them under the candidate. A test file that does not parse is
-  skipped, as a source file is. Another language's tests are not offered: a suggestion names
-  only what an anchor can resolve.
+- **The suggesting command.** `irminsul anchors --suggest` lists each unbound name, a code
+  span that resolves to nothing, with up to three places that define it, from the source
+  roots (`suggest` in `src/irminsul/binding.py`, printed by `_suggest_anchors` in
+  `src/irminsul/cli.py`). A function with one definition resolves, so it is not listed.
+  Given `--doc <doc>`, the command will also list each code span of that doc that resolves to
+  one Python function or class, with up to three test functions that name it. A test
+  function is a function whose name starts with `test`, in a Python file under
+  `paths.test_roots` that imports the defining module, which is the reading `Ranker` in
+  `src/irminsul/ranked_tests.py` already makes for the packet. They are ordered by path and
+  line, printed as markers like the definitions, and carried in the JSON under `tests`. A
+  test file that does not parse is skipped, as a source file is. Without `--doc` the output
+  is as today. Tests in another language are not offered yet.
+- **A sentence that names no code.** The procedure sends its reader to
+  `irminsul context <source file>`, whose packet lists the tests that import that file.
+- **The skill** is unchanged: it points at the loop and the protocol.
 - **What already works.** An anchor to a test resolves, is pinned and drifts like any other:
   `claim-anchor/pinned-drift`, a hint a re-pin answers after the paragraph is re-read.
-- **The seeded-rot suite** gains a case whose sentence is anchored to a test of its fixture:
-  the edit that makes the sentence false makes that test fail, and editing the test to pass
-  again draws `pinned-drift` on the sentence's paragraph.
+- **The seeded-rot suite** gains a case whose sentence is anchored to a test of its fixture.
+  The fixture's test file, a placeholder today, gains that test. The case shows two things:
+  the edit that makes the sentence false makes the test fail, run as the suite's probes run
+  the fixture's code; and editing the test to pass again draws `pinned-drift` on the
+  sentence's paragraph.
 - **Governing records.** `code-is-named-in-code-spans-and-bound-by-anchors` decides anchors
   and what the suggesting command prints;
   `agents-get-stateless-read-only-queries-and-one-written-loop` decides the loop and the
@@ -128,21 +148,26 @@ Answered by the owner on 2026-11-26:
 ID: suggest-offers-the-tests-of-a-definition
 Provenance: code
 
-`irminsul anchors --suggest` SHALL list, with each Python definition it offers for a name, up
-to three test functions in files under the configured test roots that import the defining
-module and whose body names that definition, each as an anchor marker ready to paste.
+`irminsul anchors --suggest --doc <doc>` SHALL list each code span of that doc that resolves
+to one Python function or class, with up to three test functions, in files under the
+configured test roots that import the defining module, whose body names that definition,
+each as an anchor marker ready to paste. Without `--doc` it SHALL list what it lists today.
 
 #### Scenario: A test calls the function
-- **WHEN** a doc names `` `late_fee()` `` with no anchor, `src/loans/policy.py` defines it, and `test_fee_is_capped` in `tests/test_loans.py` imports that module and calls it
-- **THEN** `anchors --suggest` offers the definition and, with it, a marker for `tests/test_loans.py#test_fee_is_capped`
+- **WHEN** `irminsul anchors --suggest --doc docs/guides/lending.md` runs, the guide names `` `late_fee()` ``, `src/loans/policy.py` defines it, and `test_fee_is_capped` in `tests/test_loans.py` imports that module and calls it
+- **THEN** the output lists `late_fee` with a marker for `tests/test_loans.py#test_fee_is_capped`
 
 #### Scenario: No test names it
 - **WHEN** no test function names the definition
-- **THEN** `anchors --suggest` offers the definition alone
+- **THEN** the output lists no test for that name
+
+#### Scenario: No doc is given
+- **WHEN** `irminsul anchors --suggest` runs with no `--doc`
+- **THEN** it lists the unbound names and their definitions, and no test
 
 ## Tasks
 
-- `T1` Offer the tests of a definition in `suggest`, in the plain output and the JSON. (req: suggest-offers-the-tests-of-a-definition)
+- `T1` Offer the tests of each function or class a doc names under `anchors --suggest --doc`, in the plain output and the JSON. (req: suggest-offers-the-tests-of-a-definition)
 - `T2` Add the advice to step 3 of the root `AGENTS.md` and its template, and to the comment of the component scaffold. (component: init)
 - `T3` Add the procedure for tying a sentence to a test to the agent protocol and its scaffold. (component: init)
 - `T4` Add the seeded-rot case of a sentence anchored to a test. (component: anchors)
