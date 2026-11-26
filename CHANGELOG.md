@@ -144,6 +144,10 @@ making a feature, a refactor and an RFC-driven change in it.
   the base, as it reads now and as it read there. Its message used to say only "accepted decision
   section rewritten", which after a later commit that only added an alternative, and so lapsed
   the trailer that had answered the rewrite, read as a complaint about the alternative.
+- `irminsul context --after-edit` leaves the files `paths.source_excludes` names out of its
+  unmatched list, as it leaves out the files Irminsul writes, unless a claim cites one. Adding a
+  fixture repository under an excluded directory listed each of its files as having no owning
+  doc, an owner the config says none of them should have.
 
 **Queries.**
 - `anchors --suggest --doc <doc>` also lists each code span of that doc that resolves to one

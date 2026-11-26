@@ -426,6 +426,15 @@ def is_configured_source_path(
     return False
 
 
+def excluded_by_config(config: IrminsulConfig, display: str) -> bool:
+    """Whether `paths.source_excludes` names `display`, a repo-relative path: the config says
+    no doc owns it, as source or as a test."""
+    if not config.paths.source_excludes:
+        return False
+    spec = GitIgnoreSpec.from_lines(config.paths.source_excludes)
+    return _matches(spec, PurePosixPath(display.replace("\\", "/")).as_posix())
+
+
 def _is_excluded(parts: tuple[str, ...]) -> bool:
     if any(part.startswith(".") or part == "__pycache__" for part in parts):
         return True
