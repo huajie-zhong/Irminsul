@@ -1688,6 +1688,7 @@ def _suggest_anchors(
     import json
 
     from irminsul.binding import (
+        Definition,
         bound_names,
         load_sources,
         named_definition,
@@ -1702,9 +1703,10 @@ def _suggest_anchors(
     sources = load_sources(graph.source)
     wanted = doc.replace("\\", "/") if doc else None
     rows: list[dict[str, object]] = []
-    # Under `--doc` only: each function or class the doc names, by the file and name that
-    # define it, with the row that will carry its tests.
-    named: dict[tuple[str, str], dict[str, object]] = {}
+    # Under `--doc` only: each function or class the doc names, by the file and line that
+    # define it, so two methods of one name in one file are two rows, with the row that
+    # will carry its tests.
+    named: dict[Definition, dict[str, object]] = {}
     for node in sorted(graph.nodes.values(), key=lambda n: n.path.as_posix()):
         if wanted is not None and node.path.as_posix() != wanted:
             continue
@@ -1743,12 +1745,12 @@ def _suggest_anchors(
             definition = named_definition(span.text, resolver)
             if definition is not None:
                 named.setdefault(
-                    (definition.defined_at, definition.identity),
+                    definition,
                     {
                         "path": node.path.as_posix(),
                         "line": node.file_line(span.body_line),
                         "name": resolver.strip_program(span.text)[0].removesuffix("()"),
-                        "definition": {"path": definition.defined_at, "line": definition.line},
+                        "definition": {"path": definition.path, "line": definition.line},
                     },
                 )
     for key, tests in naming_tests(graph, list(named)).items():
