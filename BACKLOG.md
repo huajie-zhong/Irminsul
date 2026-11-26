@@ -391,6 +391,41 @@ failure shows one way of breaking the code. The command the RFC
 anchored to, and list the changes no test noticed. It runs code, so it is no check, and each
 language runs tests its own way. Recorded on 2026-11-26, when that RFC was implemented.
 
+### `init-declares-no-test-roots`
+
+`irminsul init` writes no `paths.test_roots`, and `SourceTree.test_walk`
+(`src/irminsul/source_tree.py`) walks nothing without it, so in a freshly initialized
+repository `anchors --suggest --doc <doc>` says "no test names it" and "no test file was read"
+for a function its test calls, and `context <source file>` prints `tests: -` (both run on
+2026-11-26). The agent protocol's step on finding a test now says so and sends the reader to
+search the test files. Declaring the roots is the adopter's fix, and it raises
+`test-ownership/unowned-test`, an error, for every test file no doc lists in `owns_tests`
+(`src/irminsul/checks/owned_tests.py`), so the first declaration turns a passing repository
+red. Decide whether `init` detects a test tree and declares it, and how the files in it that
+predate adoption are excepted, as the adoption record excepts source files. Found by a review
+of the RFC `a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts` on 2026-11-26.
+
+### `context-lists-no-tests-for-an-unowned-source-file`
+
+`irminsul context <source file>` for a file no doc owns answers "no owning doc found", exits 1
+and lists no test, even when a file under the declared test roots imports it (run on
+2026-11-26): `Ranker.rank` (`src/irminsul/ranked_tests.py`) ranks the tests for an owning doc
+(`src/irminsul/context.py`, where it is called once per owner), and an unowned file has none.
+The agent protocol sends a sentence that names no code to this packet for its test, and an
+undocumented file is where such a sentence is most likely. List the importing tests of an
+unowned source file in the packet as well, with the reason each is listed. Found by a review of
+the RFC `a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts` on 2026-11-26.
+
+### `suggest-hides-how-many-tests-name-a-definition`
+
+`anchors --suggest --doc <doc>` offers at most three tests for a definition, the first by path
+and line (`naming_tests` in `src/irminsul/binding.py`), and neither its plain output nor its
+JSON says how many more name it. In this repository 23 tests name `acknowledge` and 14 name
+`Finding` (counted on 2026-11-26), so three by path order says little about which assert the
+sentence, and a reader cannot tell three from three hundred. Print the count beside the three,
+and keep it in each row's JSON. Found by a review of the RFC
+`a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts` on 2026-11-26.
+
 ### `decision-edit-is-confirmed-twice`
 
 The accepted RFC `decision-records-govern-what-they-decide` answers an edit of a record's
