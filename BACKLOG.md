@@ -577,6 +577,16 @@ later import of another `late_fee`, still has its tests offered for the function
 (`src/irminsul/binding.py`). Found by a review on 2026-11-26; no test of this repository does
 it.
 
+### `prose-beside-a-comment-marker-is-misread`
+
+The review queue reads no sentence on the lines of a multi-line HTML comment
+(`src/irminsul/checks/code_spans.py`), and two edges of that reading are wrong both ways: prose
+after `-->` on the line that closes a comment is dropped with the comment, though
+`anchors --suggest` still reads a code span in it; and a comment opened after prose on a line
+is read with that line, its words in the sentence. A review probe found both on 2026-11-26;
+this repository's own `list review --all` is the same before and after the fix that skips
+comment lines, 699 items each.
+
 ### `decision-edit-is-confirmed-twice`
 
 The accepted RFC `decision-records-govern-what-they-decide` answers an edit of a record's
