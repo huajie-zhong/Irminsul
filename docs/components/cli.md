@@ -2,7 +2,10 @@
 id: cli
 title: CLI
 status: stable
-summary: CLI entry point.
+describes:
+  - src/irminsul/cli.py
+  - src/irminsul/__init__.py
+  - src/irminsul/__main__.py
 depends_on:
   - change
   - checks
@@ -14,17 +17,6 @@ depends_on:
   - refs
   - seed
   - user-errors
-describes:
-  - src/irminsul/cli.py
-  - src/irminsul/__init__.py
-  - src/irminsul/__main__.py
-owns_tests:
-  - tests/test_cli.py
-  - tests/test_cli_check.py
-  - tests/test_cli_check_now.py
-  - tests/test_cli_cochange.py
-  - tests/test_cli_explain.py
-  - tests/test_cli_format_github.py
 recommended_tests:
   - tests/test_cli.py
   - tests/test_cli_check.py
@@ -33,6 +25,16 @@ recommended_tests:
   - tests/test_cli_context.py
   - tests/test_cli_explain.py
   - tests/test_cli_format_github.py
+owns_tests:
+  - tests/test_cli.py
+  - tests/test_cli_check.py
+  - tests/test_cli_check_now.py
+  - tests/test_cli_cochange.py
+  - tests/test_cli_explain.py
+  - tests/test_cli_format_github.py
+summary: CLI entry point.
+implements:
+  - the-change-queue-asks-about-what-the-change-did-not-write
 inventory:
   - kind: cli-options
     source: src/irminsul/cli.py
@@ -98,3 +100,10 @@ The CLI is meant to be thin: every subcommand resolves config, builds a graph, c
 ## Scope & Limitations
 
 The CLI holds no domain rule: what a finding is, how a change is judged and what a baseline hides are decided in the modules it dispatches to. It does carry orchestration of its own: flag validation, the re-pin sweep of `anchors`, the plan printing of `change`, and the ownership guard of `new component`. It does not communicate with external services. Invocations share no state except files on disk that a user asked for or a check caches: the baseline written by `irminsul baseline init` and shrunk by `irminsul baseline update`, and the `external-links` result cache when that check is enabled.
+
+## Implemented requirements
+
+- **the-change-queue-asks-about-what-the-change-did-not-write#one-list-per-run** — `list review` given `--changed` and `--written` together SHALL exit 2 and print no queue, and given `--base-ref` with neither SHALL print the list `--changed` prints. (provenance: code; [RFC](../rfcs/the-change-queue-asks-about-what-the-change-did-not-write.md))
+  <!-- anchor: src/irminsul/cli.py#list_review @sha256:48f63f0f8194 -->
+  <!-- anchor: tests/test_cli_list.py#test_changed_and_written_together_exit_2_and_name_both_flags @sha256:9dff7ffbfd3a -->
+  <!-- anchor: tests/test_cli_list.py#test_base_ref_alone_prints_the_list_changed_prints @sha256:6a71aefdbe15 -->

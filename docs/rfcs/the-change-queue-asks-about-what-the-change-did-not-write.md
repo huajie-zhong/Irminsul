@@ -3,7 +3,7 @@ id: the-change-queue-asks-about-what-the-change-did-not-write
 title: "The change queue asks about what the change did not write"
 status: stable
 describes: []
-rfc_state: accepted
+rfc_state: implemented
 affects:
   - new-list-regen
   - cli

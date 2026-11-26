@@ -36,6 +36,7 @@ summary: "`new`, `list`, and `fix` commands, and the agent manifest `fix` rewrit
 implements:
   - an-rfc-has-an-owners-part-and-an-agents-part
   - a-change-re-asks-the-sentences-that-name-its-code
+  - the-change-queue-asks-about-what-the-change-did-not-write
 inventory:
   - kind: cli
     source: src/irminsul/cli.py
@@ -112,3 +113,11 @@ A check that judges the manifest's prose reads it through `without_generated_reg
   <!-- anchor: tests/test_review_changed_code.py#test_deleting_the_function_below_one_does_not_touch_the_one_above @sha256:40021132186f -->
   <!-- anchor: tests/test_review_changed_code.py#test_a_command_whose_function_changed_queues_no_sentence_that_names_it @sha256:d239d1d4297f -->
   <!-- anchor: tests/test_review_changed_code.py#test_a_file_that_is_named_and_edited_queues_no_sentence_that_names_it @sha256:9e98fda5ed20 -->
+- **the-change-queue-asks-about-what-the-change-did-not-write#change-queue-holds-no-written-sentence** — `list review --changed` SHALL queue no `edited` item and no `removed-sentence` item, and SHALL queue every other item as it does without this change. (provenance: code; [RFC](../rfcs/the-change-queue-asks-about-what-the-change-did-not-write.md))
+  <!-- anchor: src/irminsul/listing/review.py#build_review @sha256:b68ad280167f -->
+  <!-- anchor: tests/test_list_review.py#test_a_reworded_sentence_queues_its_docs_summary_and_no_edit @sha256:918a135bffac -->
+  <!-- anchor: tests/test_list_review.py#test_a_governing_claim_is_queued_when_only_its_code_changed @sha256:3e2c48d3081e -->
+- **the-change-queue-asks-about-what-the-change-did-not-write#written-sentences-are-their-own-list** — `list review --written` SHALL queue the `edited` and `removed-sentence` items of the change, each as `list review --changed` built it before this change, and SHALL queue nothing else. (provenance: code; [RFC](../rfcs/the-change-queue-asks-about-what-the-change-did-not-write.md))
+  <!-- anchor: src/irminsul/listing/review.py#build_review @sha256:b68ad280167f -->
+  <!-- anchor: tests/test_list_review.py#test_a_reworded_sentence_under_the_flag_is_one_edit_beside_the_one_it_replaced @sha256:0d1c52069390 -->
+  <!-- anchor: tests/test_list_review.py#test_a_deleted_sentence_under_the_flag_is_a_removed_sentence @sha256:034e2c315117 -->
