@@ -379,11 +379,11 @@ Since 2026-11-26 `irminsul context <path>` names the docs that name code in the 
 (`_named_by`, `src/irminsul/context.py`). To count their sentences, `docs_naming`
 (`src/irminsul/listing/review.py`) builds a `CodeResolver`, which extracts every surface and
 indexes every function and class of the source, and pairs every code span in the docs, whatever
-the path. `irminsul context src/irminsul/cli.py --format json` went from 2.2 to 2.8 seconds that
-day, the median of five runs on one machine, and an MCP caller of `context_for_path` waits as
-long; about two thirds of the added time is building the resolver. The JSON went from 26 to
-32 KB, with 50 docs under `named_by`, where a first build that listed each sentence gave 112 KB.
-`list review --changed` on the pull request `dde68e0..ffa39b4` went from 3.1 to 3.8 seconds on
+the path. `irminsul context src/irminsul/cli.py --format json` went from 1.5 to 2.6 seconds that
+day, the median of fifteen runs on one machine, and an MCP caller of `context_for_path` waits as
+long; building the resolver is 0.9 of the added 1.1 seconds. The JSON went from 26 to 32 KB,
+with 50 docs under `named_by`, where a first build that listed each sentence gave 112 KB.
+`list review --changed` on the pull request `dde68e0..ffa39b4` went from 2.3 to 3.0 seconds on
 the same machine, because it builds a second resolver for the merge base. Not measured: which
 surfaces a packet could leave unextracted without changing what a span names.
 
