@@ -135,9 +135,13 @@ see them.
 
 A stale pin is also unreported in any layer when the doc was committed after the evidence:
 a pin that no longer matches falls back to the commit-time comparison
-(`_scan_evidence_drift`, `:256`), so a doc touched in the same commit, or on the other
+(`_scan_evidence_drift`), so a doc touched in the same commit, or on the other
 side of a merge, hides it. The PR 12 lanes met this each time they edited a component's
-code (four stale pins after 12d, a `context.py` pin after 12f). Either judge every stable
+code (four stale pins after 12d, a `context.py` pin after 12f). On 2026-11-26 it reached main
+in the foundation and architecture layers too: a merge took main's `cli.py` pins for three
+claims, which no longer matched the merged file, and touched both docs, so the branch's gates
+passed; squashed onto main, the commit touched `cli.py` and not the docs, and three
+`evidence-drift` warnings appeared there. Either judge every stable
 doc's claims, or stop pinning evidence that nothing reads. The accepted RFC
 `claim-evidence-names-a-part` judges every layer, as its last step. Until then, a read-only way to list the pins that no longer match would
 let an agent see them without `--re-pin --all` rewriting them.
