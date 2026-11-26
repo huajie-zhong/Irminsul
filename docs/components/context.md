@@ -38,6 +38,7 @@ claims:
 summary: What governs a path — owning doc, ranked tests, active RFCs and next commands before an edit, findings after it.
 implements:
   - an-edit-with-no-base-is-judged-against-head
+  - a-topic-search-reads-doc-bodies
 ---
 
 # Agent context command
@@ -196,3 +197,9 @@ Content extraction does not rank relationships, estimate tokens, perform semanti
 - **an-edit-with-no-base-is-judged-against-head#a-finding-that-waits-for-the-commits-trailer-does-not-fail** — `context --after-edit` SHALL NOT count as a new error, and SHALL NOT fail on, a certain finding whose code declares the answer `trailer` and that is about a file with uncommitted changes. It SHALL report that finding apart from the errors the change introduced, with the trailer to write, and SHALL say how many such findings wait. `check --diff` SHALL still fail on the finding until a commit of the change carries the trailer. (provenance: code; [RFC](../rfcs/an-edit-with-no-base-is-judged-against-head.md))
   <!-- anchor: src/irminsul/context.py#_awaiting_trailer @sha256:076a76025743 -->
   <!-- anchor: tests/test_context_validation_states.py#test_a_finding_the_commits_trailer_answers_does_not_fail_before_the_commit @sha256:c6ab05e586ee -->
+- **a-topic-search-reads-doc-bodies#topic-search-matches-body-prose** — `context --topic` SHALL return a doc whose body prose contains every word of the query, ranked below each doc that matches through its id, title, path, `describes`, tests, tags, `summary` or headings. (provenance: code; [RFC](../rfcs/a-topic-search-reads-doc-bodies.md))
+  <!-- anchor: src/irminsul/context.py#_pending_for_topic @sha256:61ec7a8f51b7 -->
+  <!-- anchor: tests/test_cli_context.py#test_context_topic_finds_a_doc_by_a_word_only_its_body_holds @sha256:3b3ca161ec62 -->
+- **a-topic-search-reads-doc-bodies#matches-that-need-a-body-are-bounded** — `context --topic` SHALL list every match that does not need body prose, then at most eight matches that do, and SHALL report how many more needed it and their ids, in the plain output and in the JSON. (provenance: code; [RFC](../rfcs/a-topic-search-reads-doc-bodies.md))
+  <!-- anchor: src/irminsul/context.py#_bound_topic_matches @sha256:60d7090f8ddc -->
+  <!-- anchor: tests/test_cli_context.py#test_context_topic_caps_only_the_matches_that_need_the_body @sha256:04ba8d67e9b5 -->
