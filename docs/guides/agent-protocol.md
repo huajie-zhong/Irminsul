@@ -3,7 +3,7 @@ id: agent-protocol
 title: Agent lifecycle protocol
 status: stable
 describes: []
-summary: How an agent acts on a finding and changes the project's direction; the edit loop every change follows is in the root AGENTS.md.
+summary: How an agent ties a sentence to a test, acts on a finding and changes the project's direction; the edit loop every change follows is in the root AGENTS.md.
 inventory:
   - kind: cli
     source: src/irminsul/cli.py
@@ -24,8 +24,34 @@ inventory:
 # Agent lifecycle protocol
 
 The root [`AGENTS.md`](../../AGENTS.md) carries the edit loop every change follows and
-what a finding does and does not tell you. This guide carries the two procedures that
-loop points to: acting on a finding, and changing the project's direction.
+what a finding does and does not tell you. This guide carries the three procedures that
+loop points to: tying a sentence to a test, acting on a finding, and changing the
+project's direction.
+
+## Tying a sentence to a test
+
+A sentence that says what code does is best anchored to the test that asserts it. It is
+then asked about when that test changes, and the test fails when the code stops doing
+what the sentence says. Anchored to the function instead, it is asked about on every edit
+to that function, a reworded docstring included, and not at all when the behaviour moves
+into a function it calls.
+
+1. **Find the test.** Once `irminsul.toml` declares the directories that hold the tests,
+   such as `test_roots = ["tests"]` under `[paths]`, `irminsul anchors --suggest --doc <doc>`
+   lists the tests that name a function or class the doc names, each as a marker ready to
+   paste, and for a sentence that names no code, `irminsul context <source file>` lists the
+   tests that import the file, if a doc owns it. Declaring a test root also asks that a doc
+   list each test file in it under `owns_tests:`. Otherwise, or when neither lists the test,
+   search the test files for the function's name.
+2. **See it fail once.** Change the code so the sentence is false, run the test and see it
+   fail, then restore the code. A test that does not fail is the wrong test, or the
+   sentence has none yet. Irminsul runs no code, so nothing verifies that this was done.
+3. **Paste the marker and pin it,** as an anchor to code is pinned: put it on the line
+   after the paragraph and run the `irminsul anchors --re-pin` command that
+   `claim-anchor/unpinned` prints for it.
+
+A test edited for another reason asks about its paragraphs again, which is a reading and
+not an error.
 
 ## Acting on a finding
 
@@ -101,8 +127,9 @@ renaming a code name or a directory, search the tree for it.
 - This guide does not enumerate doc-system rules ([`CONTRIBUTING.md`](../CONTRIBUTING.md)
   does) or coding conventions, nor which checks run or block: that is the registry in
   `src/irminsul/checks/__init__.py`, each code's class, and `irminsul.toml`.
-- Neither procedure is one check; `rfc-lifecycle`, `rfc-follow-through` and
-  `change-binding` enforce individual transitions.
+- No procedure here is one check; `rfc-lifecycle`, `rfc-follow-through` and
+  `change-binding` enforce individual transitions, and no check knows whether a test an
+  anchor names was seen to fail.
 
 ## Rationale and alternatives
 

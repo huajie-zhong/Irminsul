@@ -1485,13 +1485,21 @@ def anchors_command(
         bool,
         typer.Option(
             "--suggest",
-            help="List code names no anchor binds, with source files that contain them.",
+            help=(
+                "List code names no anchor binds, with source files that contain them. With "
+                "--doc, also list each function or class the doc names, with the tests "
+                "that name it."
+            ),
         ),
     ] = False,
     doc: Annotated[
         str | None,
         typer.Option(
-            "--doc", help="Only this doc, by id or repo-relative path, for --suggest or --re-pin."
+            "--doc",
+            help=(
+                "Only this doc, by id or repo-relative path, for --suggest or --re-pin. "
+                "--suggest then offers tests as well."
+            ),
         ),
     ] = None,
     every: Annotated[
@@ -1680,7 +1688,15 @@ def _suggest_anchors(
 ) -> None:
     import json
 
-    from irminsul.binding import bound_names, load_sources, suggest, unbound_names
+    from irminsul.binding import (
+        Definition,
+        bound_names,
+        load_sources,
+        named_definition,
+        naming_tests,
+        suggest,
+        unbound_names,
+    )
     from irminsul.checks.code_spans import code_spans, is_live_doc
     from irminsul.code_references import CodeResolver
 
@@ -1688,6 +1704,10 @@ def _suggest_anchors(
     sources = load_sources(graph.source)
     wanted = doc.replace("\\", "/") if doc else None
     rows: list[dict[str, object]] = []
+    # Under `--doc` only: each function or class the doc names, by the file and line that
+    # define it, so two methods of one name in one file are two rows, with the row that
+    # will carry its tests.
+    named: dict[Definition, dict[str, object]] = {}
     for node in sorted(graph.nodes.values(), key=lambda n: n.path.as_posix()):
         if wanted is not None and node.path.as_posix() != wanted:
             continue
@@ -1721,8 +1741,29 @@ def _suggest_anchors(
                         ],
                     }
                 )
+            if wanted is None or span.fenced:
+                continue
+            definition = named_definition(span.text, resolver)
+            if definition is not None:
+                named.setdefault(
+                    definition,
+                    {
+                        "path": node.path.as_posix(),
+                        "line": node.file_line(span.body_line),
+                        "name": resolver.strip_program(span.text)[0].removesuffix("()"),
+                        "definition": {"path": definition.path, "line": definition.line},
+                    },
+                )
+    for key, tests in naming_tests(graph, list(named)).items():
+        named[key]["tests"] = [
+            {"path": t.path, "line": t.line, "symbol": t.symbol, "marker": t.marker} for t in tests
+        ]
+    resolved = list(named.values())
     if fmt == OutputFormat.json:
-        typer.echo(json.dumps({"version": 1, "unbound": rows}, indent=2))
+        report: dict[str, object] = {"version": 1, "unbound": rows}
+        if wanted is not None:
+            report["resolved"] = resolved
+        typer.echo(json.dumps(report, indent=2))
         return
     for row in rows:
         typer.echo(f"{row['path']}:{row['line']} `{row['name']}`")
@@ -1739,7 +1780,29 @@ def _suggest_anchors(
             )
         if not candidates and not unreachable:
             typer.echo("  no source file defines it; reword it if it is not this repo's code")
-    typer.echo(f"{len(rows)} unbound code name(s)")
+    if wanted is None:
+        typer.echo(f"{len(rows)} unbound code name(s)")
+        return
+    with_a_test = 0
+    for row in resolved:
+        where, offered = row["definition"], row["tests"]
+        assert isinstance(where, dict) and isinstance(offered, list)
+        typer.echo(
+            f"{row['path']}:{row['line']} `{row['name']}`, "
+            f"defined at {where['path']}:{where['line']}"
+        )
+        for offer in offered:
+            typer.echo(f"  {offer['path']}:{offer['line']} (test)  {offer['marker']}")
+        if offered:
+            with_a_test += 1
+        else:
+            typer.echo("  no test names it")
+    if resolved and not config.paths.test_roots:
+        typer.echo("no test file was read: `paths.test_roots` declares no test root")
+    typer.echo(
+        f"{len(rows)} unbound code name(s), {len(resolved)} function or class name(s), "
+        f"{with_a_test} named by a test"
+    )
 
 
 _change_app = typer.Typer(

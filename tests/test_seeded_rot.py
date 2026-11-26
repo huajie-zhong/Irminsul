@@ -33,6 +33,15 @@ case. A doc committed within that threshold would not get the finding.
 
 That a sentence is false after its edit is not taken on trust: each edit carries a probe, an
 expression run against the fixture's code, and the value it gives while the sentence holds.
+
+One case's sentence is anchored to a test of the fixture and not to its code. The edit that
+makes it false draws three warnings on the component doc that owns the changed function and
+none on the sentence's own doc, and what says the sentence is false is the test, which fails.
+No view runs a test, so that case carries a second edit, the one its writer must make before
+the change can merge: the test is edited to pass again, and the views are judged after both.
+The fixture's test is run the way a probe is, and this repository's own test run does not
+collect it (`collect_ignore` in `conftest.py`), because it imports a package only the fixture
+has.
 """
 
 from __future__ import annotations
@@ -121,6 +130,10 @@ REFUSE = Edit(
 )
 EDITS = (CAP, EARLY, RENEWALS, LENGTH, CHECK_OUT, RENEW, REFUSE)
 
+#: The edit to the fixture's test of the cap that makes it pass again once `CAP` has made it
+#: fail. Its probe calls the test, which gives None when the test passes.
+CAP_TEST = Edit("tests/test_loans.py", "== 500", "== 800", "test_fee_is_capped()", None)
+
 
 @dataclass(frozen=True)
 class Case:
@@ -129,7 +142,9 @@ class Case:
     `sentence` is S as the doc at `doc` writes it, on one line. `kind` is the connection
     between S and the code `edit` changes. `by` names what gives `today`: finding codes,
     the first marker of a review-queue item, and `claim_reviews`. `claim` is the id of the
-    claim S carries, and `closes` what is expected to move `today` to `wanted`.
+    claim S carries, and `closes` what is expected to move `today` to `wanted`. `repair`
+    is the edit to the test S's paragraph is anchored to, which `edit` makes fail: it is
+    made after `edit` and makes that test pass again.
     """
 
     id: str
@@ -142,6 +157,7 @@ class Case:
     claim: str | None = None
     wanted: Outcome = "sentence"
     closes: str | None = None
+    repair: Edit | None = None
 
 
 CASES = (
@@ -153,6 +169,16 @@ CASES = (
         "S's paragraph is anchored to the changed function",
         "sentence",
         (PINNED_DRIFT,),
+    ),
+    Case(
+        "anchored-to-a-test",
+        GUIDE,
+        "The fine for a late book stops growing once it reaches 5 dollars.",
+        CAP,
+        "S's paragraph is anchored to a test, which the edit makes fail and `repair` passes",
+        "sentence",
+        (PINNED_DRIFT,),
+        repair=CAP_TEST,
     ),
     Case(
         "component-claim",
@@ -367,10 +393,17 @@ def _seeded(fixture_repo: Callable[[str], Path]) -> Path:
     return root
 
 
+def _make(root: Path, edit: Edit) -> None:
+    replace_text(root, edit.path, edit.old, edit.new)
+
+
 def _observe(root: Path, case: Case) -> Seen:
-    """Make `case`'s edit in the working tree at `root` and judge what it introduced."""
+    """Make `case`'s edit in the working tree at `root`, then the repair of its test where
+    it has one, and judge what that introduced."""
     before = _views(root)
-    replace_text(root, case.edit.path, case.edit.old, case.edit.new)
+    _make(root, case.edit)
+    if case.repair is not None:
+        _make(root, case.repair)
     return _judge(root, _since(root, before), case.doc, case.sentence, case.claim)
 
 
@@ -420,23 +453,36 @@ def test_every_gap_names_a_live_rfc_or_backlog_entry() -> None:
             )
 
 
-def _behaviour(probe: str, edit: Edit | None = None) -> object:
-    """What `probe` gives against the fixture's code, with `edit` made or not.
+#: The fixture's Python files in the order they run, each with the import of the fixture's
+#: own package that one shared namespace stands in for.
+_FIXTURE_CODE = (
+    ("src/loans/policy.py", None),
+    ("src/loans/desk.py", "from loans.policy import can_renew, due_day, late_fee\n"),
+    ("tests/test_loans.py", "from loans.policy import late_fee\n"),
+)
 
-    The two modules run in one namespace in place of the import between them, so nothing is
-    imported and no bytecode of one run is read by the next. A raised error is an answer too.
+
+def _behaviour(probe: str, *edits: Edit) -> object:
+    """What `probe` gives against the fixture's code and its test, with `edits` made.
+
+    The files run in one namespace in place of the imports between them, so nothing is
+    imported and no bytecode of one run is read by the next. A raised error is an answer too,
+    which is how a failing test answers: a probe that calls a test gives None when it passes
+    and `AssertionError` when it does not.
     """
-    bridge = "from loans.policy import can_renew, due_day, late_fee\n"
     scope: dict[str, object] = {}
-    for rel in ("src/loans/policy.py", "src/loans/desk.py"):
+    for rel, bridge in _FIXTURE_CODE:
         text = (FIXTURE / rel).read_text(encoding="utf-8")
-        assert text.count(bridge) == (rel == "src/loans/desk.py")
-        if edit is not None and edit.path == rel:
-            assert text.count(edit.old) == 1, (
-                f"{rel} holds {edit.old!r} {text.count(edit.old)} times"
-            )
-            text = text.replace(edit.old, edit.new)
-        exec(compile(text.replace(bridge, ""), rel, "exec"), scope)
+        if bridge is not None:
+            assert text.count(bridge) == 1, f"{rel} holds {bridge!r} {text.count(bridge)} times"
+            text = text.replace(bridge, "")
+        for edit in edits:
+            if edit.path == rel:
+                assert text.count(edit.old) == 1, (
+                    f"{rel} holds {edit.old!r} {text.count(edit.old)} times"
+                )
+                text = text.replace(edit.old, edit.new)
+        exec(compile(text, rel, "exec"), scope)
     try:
         return eval(probe, scope)
     except Exception as error:
@@ -453,6 +499,45 @@ def test_each_edit_changes_what_its_sentences_state(edit: Edit) -> None:
 
 def test_every_case_uses_a_probed_edit() -> None:
     assert {case.edit for case in CASES} == set(EDITS)
+
+
+REPAIRED = tuple(case for case in CASES if case.repair is not None)
+
+
+@pytest.mark.parametrize("case", REPAIRED, ids=[case.id for case in REPAIRED])
+def test_the_edit_fails_the_test_its_sentence_is_anchored_to(case: Case) -> None:
+    """The oracle of a sentence anchored to a test. The test passes while the sentence
+    holds, the edit that makes the sentence false makes it fail, which is what tells its
+    writer, and the repair makes it pass again without making the sentence true."""
+    repair = case.repair
+    assert repair is not None
+    assert _behaviour(repair.probe) == repair.holds
+    assert _behaviour(repair.probe, case.edit) == "AssertionError"
+    assert _behaviour(repair.probe, case.edit, repair) == repair.holds
+    assert _behaviour(case.edit.probe, case.edit, repair) != case.edit.holds
+
+
+@pytest.mark.parametrize("case", REPAIRED, ids=[case.id for case in REPAIRED])
+def test_only_the_repair_of_its_test_points_at_a_sentence_anchored_to_one(
+    case: Case, fixture_repo: Callable[[str], Path]
+) -> None:
+    """No view runs a test, so the edit that makes the sentence false draws nothing on its
+    doc, though it draws warnings on the doc that owns the changed code. Editing the test to
+    pass again changes what the paragraph is pinned to, and `claim-anchor/pinned-drift` then
+    asks about the paragraph."""
+    repair = case.repair
+    assert repair is not None
+    root = _seeded(fixture_repo)
+    before = _views(root)
+
+    _make(root, case.edit)
+    drawn = _since(root, before)
+    assert drawn and all(pointer.path != case.doc for pointer in drawn)
+    assert _judge(root, drawn, case.doc, case.sentence) == _seen("miss")
+
+    _make(root, repair)
+    seen = _judge(root, _since(root, before), case.doc, case.sentence)
+    assert seen == _seen("sentence", PINNED_DRIFT)
 
 
 def test_the_untouched_fixture_reports_nothing(fixture_repo: Callable[[str], Path]) -> None:

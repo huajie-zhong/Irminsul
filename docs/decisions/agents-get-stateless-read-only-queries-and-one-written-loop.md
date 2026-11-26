@@ -115,7 +115,19 @@ rate-limited and makes a run depend on the network.
   writes the file when there is none, appends the section to one without the markers, leaves one
   with them alone, replaces only the section under `--force`, and refuses unpaired markers. This
   repository's root `AGENTS.md` carries the same section, which a test compares. The
-  [agent protocol](../guides/agent-protocol.md) keeps acting on a finding and changing direction.
+  [agent protocol](../guides/agent-protocol.md) keeps tying a sentence to a test, acting on a
+  finding and changing direction.
+- **The loop advises anchoring a sentence about behaviour to its test.** Step 3 says that a
+  sentence that says what the code does is best anchored to the test that asserts it, since it
+  is then asked about when that test changes and the test fails when the code stops doing it.
+  The comment a new component doc starts with gives the same advice, and the agent protocol
+  and its scaffold give the procedure: find the test with `irminsul anchors --suggest --doc
+  <doc>`, or with `irminsul context <source file>` for a sentence that names no code, which
+  read only the test roots the configuration declares, the second for a file a doc owns, and
+  otherwise search the tests for the function's name, since `irminsul init` declares no test
+  root; change the code so the sentence is false, run the test, see it fail and restore the
+  code; paste the marker and pin it. Seeing it fail is a written step that nothing verifies. The advice ships
+  to every adopter, and the skill is unchanged, since it points at the root `AGENTS.md`.
 - **The [manifest](../AGENTS.md) is generated, with two curated sections:** a table of every doc
   that `irminsul fix` rewrites from the graph, a `Foundations` that in a scaffold holds the Three
   Laws, and a one-line `Protocol` naming where the loop lives; `agents-manifest` requires both
@@ -176,6 +188,10 @@ rate-limited and makes a run depend on the network.
 - 2026-11-26: Accepted [A sentence about behaviour is anchored to the test that asserts it](../rfcs/a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts.md):
   the loop and the agent protocol advise that anchor, and the protocol gains the step of seeing
   the test fail once.
+- 2026-11-26: That advice is implemented and stated in the Decision: step 3 of the loop and the
+  component scaffold's comment carry it, and the agent protocol and its scaffold carry the
+  procedure for tying a sentence to a test, with the search the RFC's decision 5 gives where
+  no test root is declared.
 - 2026-11-26: The packet's `named_by` is implemented as the owner amended it that day, after a
   first build that listed the sentences was measured and a review of the second: `context
   <path...>` names the docs with a sentence that names anything Irminsul resolves to a path,

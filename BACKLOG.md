@@ -464,6 +464,69 @@ hints as well, once every hint has an answer. That reverses the Scope of
 `every-warning-hint-has-an-answer`, which keeps the scaffolded default at certain findings
 alone, so it needs its own RFC.
 
+### `no-command-lists-the-changes-a-test-misses`
+
+A paragraph anchored to a test is guarded only as far as that test fails when its sentence
+becomes false. Seeing it fail once is a written step of the agent protocol
+(`docs/guides/agent-protocol.md`, "Tying a sentence to a test") that nothing verifies, and one
+failure shows one way of breaking the code. The command the RFC
+`a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts` left out (decision 2 of
+2026-11-26) would change a function in several small ways, run the tests its paragraphs are
+anchored to, and list the changes no test noticed. It runs code, so it is no check, and each
+language runs tests its own way. Recorded on 2026-11-26, when that RFC was implemented.
+
+### `init-declares-no-test-roots`
+
+`irminsul init` writes no `paths.test_roots`, and `SourceTree.test_walk`
+(`src/irminsul/source_tree.py`) walks nothing without it, so in a freshly initialized
+repository `anchors --suggest --doc <doc>` says "no test names it" and "no test file was read"
+for a function its test calls, and `context <source file>` prints `tests: -` (both run on
+2026-11-26). The agent protocol's step on finding a test now says so and sends the reader to
+search the test files. Declaring the roots is the adopter's fix, and it raises
+`test-ownership/unowned-test`, an error, for every test file no doc lists in `owns_tests`
+(`src/irminsul/checks/owned_tests.py`), so the first declaration turns a passing repository
+red. Decide whether `init` detects a test tree and declares it, and how the files in it that
+predate adoption are excepted, as the adoption record excepts source files. Found by a review
+of the RFC `a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts` on 2026-11-26.
+
+### `context-lists-no-tests-for-an-unowned-source-file`
+
+`irminsul context <source file>` for a file no doc owns answers "no owning doc found", exits 1
+and lists no test, even when a file under the declared test roots imports it (run on
+2026-11-26): `Ranker.rank` (`src/irminsul/ranked_tests.py`) ranks the tests for an owning doc
+(`src/irminsul/context.py`, where it is called once per owner), and an unowned file has none.
+The agent protocol sends a sentence that names no code to this packet for its test, and an
+undocumented file is where such a sentence is most likely. List the importing tests of an
+unowned source file in the packet as well, with the reason each is listed. Found by a review of
+the RFC `a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts` on 2026-11-26.
+
+### `suggest-hides-how-many-tests-name-a-definition`
+
+`anchors --suggest --doc <doc>` offers at most three tests for a definition, the first by path
+and line (`naming_tests` in `src/irminsul/binding.py`), and neither its plain output nor its
+JSON says how many more name it. In this repository 23 tests name `acknowledge` and 14 name
+`Finding` (counted on 2026-11-26), so three by path order says little about which assert the
+sentence, and a reader cannot tell three from three hundred. Print the count beside the three,
+and keep it in each row's JSON. Found by a review of the RFC
+`a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts` on 2026-11-26.
+
+### `suggest-json-hides-that-no-test-was-read`
+
+With no `paths.test_roots` declared, `anchors --suggest --doc <doc>` prints "no test file was
+read" in its plain output alone (`_suggest_anchors` in `src/irminsul/cli.py`); in the JSON each
+row's `tests` is `[]`, the same as for a function no test names, so an agent reading the JSON
+cannot tell the two apart. The plain output also prints "no
+test names it" under each name when it read no test at all. Found by a review on 2026-11-26.
+
+### `a-file-level-rebinding-still-names-the-definition`
+
+`anchors --suggest --doc` counts a test as naming a function when its body uses a name the
+file imported from the defining module and the test does not bind itself. A test file that
+imports `late_fee` and then rebinds it at file level, by `def late_fee`, an assignment or a
+later import of another `late_fee`, still has its tests offered for the function
+(`src/irminsul/binding.py`). Found by a review on 2026-11-26; no test of this repository does
+it.
+
 ### `decision-edit-is-confirmed-twice`
 
 The accepted RFC `decision-records-govern-what-they-decide` answers an edit of a record's

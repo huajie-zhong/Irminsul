@@ -3,7 +3,7 @@ id: a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts
 title: "A sentence about behaviour is anchored to the test that asserts it"
 status: stable
 describes: []
-rfc_state: accepted
+rfc_state: implemented
 affects:
   - anchors
   - init
@@ -25,7 +25,7 @@ about again exactly when that check changes, and the check fails when the code s
 what the sentence says. The tie already works; nothing Irminsul ships tells an agent to make
 it. This adds the advice to the loop, the scaffolds and the agent protocol, has the command
 that suggests anchors offer tests, and asks whoever adds such a tie to see the test fail
-once. Three decisions, all answered.
+once. Five decisions, all answered: two were added on 2026-11-26 after a review of the build.
 
 ## Problem
 
@@ -57,8 +57,11 @@ best tied to the test that asserts it.
 **The suggesting command offers tests.** Today it lists only the names in a doc that resolve
 to no code, with where each could be defined. Asked about one doc, it will also list each
 function or class that doc names, with the tests that name it, each as a marker ready to
-paste. For a sentence that names no code, the packet for the source file already lists the
-tests that import the file.
+paste. A test names a function when it reaches it through its file's imports; a local of
+the same spelling does not count. For a sentence that names no code, the packet for a source
+file a doc owns lists the tests that import it. Both read only the test directories the
+configuration declares; where it declares none, the reader is told to search the tests for
+the name.
 
 **See it fail once.** Whoever ties a sentence to a test changes the code so the sentence is
 false, runs the test and sees it fail, then restores the code. A test that still passes does
@@ -89,6 +92,17 @@ Answered by the owner on 2026-11-26:
    found that it offers a definition only for a name that resolves to nothing, so that
    wording would have offered a test for almost no sentence.
 
+Added by the owner on 2026-11-26, after a review of the build:
+
+4. **A test names a definition through its file's imports.** A review found that matching the
+   name anywhere in a test's body offered, on five docs of this repository, 23 of 70 tests
+   that never touch the function: a parameter, a local or a fixture spelled the same. A method
+   is still matched by its name, since the syntax tree does not say what class an object has.
+5. **Where the configuration declares no test root, the procedure says so** and sends its
+   reader to search the tests for the function's name. `irminsul init` declares none, because
+   a declared test root asks for an owner for every test file in it; reading tests without
+   that promise is left to a later RFC, with what a new repository's gate fails on.
+
 ## Design detail
 
 - **Today.** Step 3 of the loop (`src/irminsul/init/scaffolds/AGENTS.md.j2`, and the root
@@ -103,9 +117,11 @@ Answered by the owner on 2026-11-26:
   and the test fails when the code stops doing it.
 - **The component scaffold.** Its comment gains the same advice as a fourth line.
 - **The agent protocol.** `docs/guides/agent-protocol.md` and its scaffold gain a short
-  procedure for tying a sentence to a test. Find the test: `irminsul anchors --suggest --doc
-  <doc>` lists the tests that name a function the doc names, and `irminsul context <source
-  file>` the tests that import a file, for a sentence that names no code.
+  procedure for tying a sentence to a test. Find the test: once the configuration declares
+  its test roots, `irminsul anchors --suggest --doc <doc>` lists the tests that name a
+  function the doc names, and `irminsul context <source file>` the tests that import a file a
+  doc owns, for a sentence that names no code; otherwise, or when neither lists one, search
+  the tests for the function's name (decision 5).
   Change the code so the sentence is false, run the test and see it fail, and restore the
   code. Paste the marker and pin it, as an anchor to code is pinned. A test that does not
   fail is the wrong test, or the sentence has none yet.
@@ -117,7 +133,12 @@ Answered by the owner on 2026-11-26:
   one Python function or class, with up to three test functions that name it. A test
   function is a function whose name starts with `test`, in a Python file under
   `paths.test_roots` that imports the defining module, which is the reading `Ranker` in
-  `src/irminsul/ranked_tests.py` already makes for the packet. They are ordered by path and
+  `src/irminsul/ranked_tests.py` already makes for the packet. It names a top-level function
+  or class when its body uses a name the file imported from the defining module, under an
+  alias too, that the test does not bind itself, or an attribute of a name the file bound to
+  that module; it names a method when its body reads an attribute of the method's name and
+  its file imports the class or its module (decision 4). With no test root declared, the
+  listing says that no test file was read. They are ordered by path and
   line and printed as markers like the definitions. A name no test names is listed too, and
   said to have none. The JSON keeps `unbound` and its version, and under `--doc` gains a list
   `resolved`: each row holds the doc's path and line, the name, where it is defined, and its
@@ -125,7 +146,8 @@ Answered by the owner on 2026-11-26:
   does not parse is skipped, as a source file is. Without `--doc` the output is as today.
   Tests in another language are not offered yet.
 - **A sentence that names no code.** The procedure sends its reader to
-  `irminsul context <source file>`, whose packet lists the tests that import that file.
+  `irminsul context <source file>`, whose packet lists the tests that import that file when
+  the configuration declares test roots and a doc owns the file.
 - **The skill** is unchanged: it points at the root `AGENTS.md`, which holds the loop.
 - **What already works.** An anchor to a test resolves, is pinned and drifts like any other:
   `claim-anchor/pinned-drift`, a hint a re-pin answers after the paragraph is re-read.
@@ -154,12 +176,18 @@ Provenance: code
 
 `irminsul anchors --suggest --doc <doc>` SHALL list each code span of that doc that resolves
 to one Python function or class, with up to three test functions, in files under the
-configured test roots that import the defining module, whose body names that definition,
-each as an anchor marker ready to paste. Without `--doc` it SHALL list what it lists today.
+configured test roots that import the defining module, whose body names that definition
+through the file's imports, each as an anchor marker ready to paste. A name the test binds
+itself SHALL NOT count as naming the definition. Without `--doc` it SHALL list what it lists
+today.
 
 #### Scenario: A test calls the function
 - **WHEN** `irminsul anchors --suggest --doc docs/guides/lending.md` runs, the guide names `` `late_fee()` ``, `src/loans/policy.py` defines it, and `test_fee_is_capped` in `tests/test_loans.py` imports that module and calls it
 - **THEN** the output lists `late_fee` with a marker for `tests/test_loans.py#test_fee_is_capped`
+
+#### Scenario: A local of the same spelling
+- **WHEN** a test file imports `loans.policy` and a test's parameter is called `late_fee`, which its body uses, and the guide names `` `late_fee()` ``
+- **THEN** the output does not offer that test for `late_fee`
 
 #### Scenario: No test names it
 - **WHEN** no test function names the definition
@@ -179,4 +207,5 @@ each as an anchor marker ready to paste. Without `--doc` it SHALL list what it l
 
 ## Resolution
 
-Accepted by the owner on 2026-11-26, with the answers recorded under Decisions, and resolved by [Code is named in code spans and bound by anchors](../decisions/code-is-named-in-code-spans-and-bound-by-anchors.md), whose Changes item records it. [Agents get stateless read-only queries and one written loop](../decisions/agents-get-stateless-read-only-queries-and-one-written-loop.md) records its part too. Each rule joins its record's Decision with the implementation, as an edit in place.
+Accepted by the owner on 2026-11-26, with the answers recorded under Decisions, decisions 4
+and 5 added the same day, and resolved by [Code is named in code spans and bound by anchors](../decisions/code-is-named-in-code-spans-and-bound-by-anchors.md), whose Changes item records it. [Agents get stateless read-only queries and one written loop](../decisions/agents-get-stateless-read-only-queries-and-one-written-loop.md) records its part too. Each rule joins its record's Decision with the implementation, as an edit in place.
