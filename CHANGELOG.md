@@ -31,9 +31,12 @@ making a feature, a refactor and an RFC-driven change in it.
   sentence that says what the code does to the test that asserts it: the sentence is then asked
   about when that test changes, and the test fails when the code stops doing it. The comment
   `irminsul new component` writes gives the same advice, and the scaffolded agent protocol
-  gains the procedure, "Tying a sentence to a test": find the test, change the code so the
-  sentence is false and see the test fail once, then paste the marker and pin it. A root
-  `AGENTS.md` and a protocol already scaffolded keep their text until `init --force`.
+  gains the procedure, "Tying a sentence to a test": find the test, with the commands that
+  list it once `irminsul.toml` declares the test directories under `[paths]` as `test_roots`,
+  or else by searching the test files for the function's name; change the code so the
+  sentence is false and see the test fail once, then paste the marker and pin it. A newly
+  scaffolded `docs/AGENTS.md` names the procedure beside the other two. A root `AGENTS.md`
+  and a protocol already scaffolded keep their text until `init --force`.
 
 **Findings and messages.**
 - `check --diff` with a base that does not resolve, such as `origin/main` in a repository with no

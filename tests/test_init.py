@@ -476,7 +476,9 @@ def test_init_ships_the_advice_to_anchor_a_sentence_to_the_test_that_asserts_it(
     tmp_path: Path,
 ) -> None:
     """Every adopter gets it: step 3 of the loop gives the advice, and the agent protocol
-    the procedure, with the command that finds the test and the step of seeing it fail."""
+    the procedure, with the commands that find the test, the conditions under which they
+    list one, which a fresh `init` does not meet, the search that finds it otherwise, and
+    the step of seeing it fail."""
     target = tmp_path / "demo"
     (target / "src").mkdir(parents=True)
     assert _init_demo(target).exit_code == 0
@@ -491,8 +493,12 @@ def test_init_ships_the_advice_to_anchor_a_sentence_to_the_test_that_asserts_it(
     start = protocol.index("## Tying a sentence to a test")
     procedure = " ".join(protocol[start : protocol.index("## Acting on a finding")].split())
     for expected in (
+        "Once `irminsul.toml` declares the directories that hold the tests,",
+        '`test_roots = ["tests"]` under `[paths]`',
         "`irminsul anchors --suggest --doc <doc>`",
         "`irminsul context <source file>`",
+        "lists the tests that import the file, if a doc owns it.",
+        "search the test files for the function's name.",
         "run the test and see it fail, then restore the code",
         "A test that does not fail is the wrong test, or the sentence has none yet.",
         "Paste the marker and pin it",

@@ -36,9 +36,12 @@ what the sentence says. Anchored to the function instead, it is asked about on e
 to that function, a reworded docstring included, and not at all when the behaviour moves
 into a function it calls.
 
-1. **Find the test.** `irminsul anchors --suggest --doc <doc>` lists the tests that name a
-   function or class the doc names, each as a marker ready to paste. For a sentence that
-   names no code, `irminsul context <source file>` lists the tests that import the file.
+1. **Find the test.** Once `irminsul.toml` declares the directories that hold the tests,
+   such as `test_roots = ["tests"]` under `[paths]`, `irminsul anchors --suggest --doc <doc>`
+   lists the tests that name a function or class the doc names, each as a marker ready to
+   paste, and for a sentence that names no code, `irminsul context <source file>` lists the
+   tests that import the file, if a doc owns it. Otherwise, or when neither lists the test,
+   search the test files for the function's name.
 2. **See it fail once.** Change the code so the sentence is false, run the test and see it
    fail, then restore the code. A test that does not fail is the wrong test, or the
    sentence has none yet. Irminsul runs no code, so nothing verifies that this was done.

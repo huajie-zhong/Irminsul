@@ -125,8 +125,9 @@ nothing exits 2 and writes nothing, because re-pinning nothing would read as suc
 Anchors are opt-in — only paragraphs that carry a marker are checked; everything else
 stays on the coarse mtime net. Outside Python a symbol resolves by name, so a name left
 in a string or a trailing comment still resolves, and the block hash re-flags a claim for
-any edit inside the block. `--suggest` searches the configured source roots only, read
-from the graph's [source tree](docgraph.md), and a check resolves an anchor through that
+any edit inside the block. `--suggest` searches the configured source roots for
+definitions, and under `--doc` the declared test roots for the tests that name them, each
+read from the graph's [source tree](docgraph.md), and a check resolves an anchor through that
 tree's [`SourceReader`](surface.md), so a file many anchors name is read and parsed once
 per run. An anchor proves the *code* has not changed since the claim was pinned; it
 cannot prove the prose was *correct* when pinned — that judgement remains human. It
@@ -142,11 +143,11 @@ object has: a test whose file imports `Answer` and reads `finding.line` is offer
 `Answer.line`, and one that reads `load_graph(root).guidance_files` with no import of
 `DocGraph` or its module is not offered for `DocGraph.guidance_files`. A name bound
 anywhere in a test's body, a function nested in it included, counts as the test's own
-throughout it, which can miss a test and never offers one. The three listed are the first
-by path and line, which for a widely used class need not be the three that say most. Only
-Python tests under `paths.test_roots` are read, and with no test root declared the
-listing says that no test file was read. Nothing measures how much of a function its
-tests guard.
+throughout it, which can leave out a test that names the definition and never adds one
+that does not. The three listed are the first by path and line, which for a widely used
+class need not be the three that say most. Only Python tests under `paths.test_roots` are
+read, and with no test root declared the listing says that no test file was read. Nothing
+measures how much of a function its tests guard.
 
 ## Implemented requirements
 

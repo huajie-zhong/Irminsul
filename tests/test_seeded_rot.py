@@ -35,7 +35,8 @@ That a sentence is false after its edit is not taken on trust: each edit carries
 expression run against the fixture's code, and the value it gives while the sentence holds.
 
 One case's sentence is anchored to a test of the fixture and not to its code. The edit that
-makes it false changes nothing the views read, and what says so is the test, which fails.
+makes it false draws three warnings on the component doc that owns the changed function and
+none on the sentence's own doc, and what says the sentence is false is the test, which fails.
 No view runs a test, so that case carries a second edit, the one its writer must make before
 the change can merge: the test is edited to pass again, and the views are judged after both.
 The fixture's test is run the way a probe is, and this repository's own test run does not
@@ -520,15 +521,18 @@ def test_only_the_repair_of_its_test_points_at_a_sentence_anchored_to_one(
     case: Case, fixture_repo: Callable[[str], Path]
 ) -> None:
     """No view runs a test, so the edit that makes the sentence false draws nothing on its
-    doc. Editing the test to pass again changes what the paragraph is pinned to, and
-    `claim-anchor/pinned-drift` then asks about the paragraph."""
+    doc, though it draws warnings on the doc that owns the changed code. Editing the test to
+    pass again changes what the paragraph is pinned to, and `claim-anchor/pinned-drift` then
+    asks about the paragraph."""
     repair = case.repair
     assert repair is not None
     root = _seeded(fixture_repo)
     before = _views(root)
 
     _make(root, case.edit)
-    assert _judge(root, _since(root, before), case.doc, case.sentence) == _seen("miss")
+    drawn = _since(root, before)
+    assert drawn and all(pointer.path != case.doc for pointer in drawn)
+    assert _judge(root, drawn, case.doc, case.sentence) == _seen("miss")
 
     _make(root, repair)
     seen = _judge(root, _since(root, before), case.doc, case.sentence)
