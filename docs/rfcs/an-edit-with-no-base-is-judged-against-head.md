@@ -3,7 +3,7 @@ id: an-edit-with-no-base-is-judged-against-head
 title: "An edit with no base is judged against HEAD"
 status: stable
 describes: []
-rfc_state: accepted
+rfc_state: implemented
 affects:
   - context
   - checks

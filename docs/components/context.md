@@ -2,7 +2,9 @@
 id: context
 title: Agent context command
 status: stable
-summary: What governs a path — owning doc, ranked tests, active RFCs and next commands before an edit, findings after it.
+describes:
+  - src/irminsul/context.py
+  - src/irminsul/ranked_tests.py
 depends_on:
   - adoption-record
   - baseline
@@ -14,9 +16,6 @@ depends_on:
   - git
   - new-list-regen
   - user-errors
-describes:
-  - src/irminsul/context.py
-  - src/irminsul/ranked_tests.py
 owns_tests:
   - tests/test_cli_context.py
   - tests/test_context_statelessness.py
@@ -36,6 +35,9 @@ claims:
     pinned:
       src/irminsul/context.py: sha256:1623bcb557c4
       src/irminsul/git/mtime.py: sha256:c71794836a12
+summary: What governs a path — owning doc, ranked tests, active RFCs and next commands before an edit, findings after it.
+implements:
+  - an-edit-with-no-base-is-judged-against-head
 ---
 
 # Agent context command
@@ -185,3 +187,12 @@ Topic search is deterministic per-term substring matching over doc metadata, hea
 Test ranking is evidence of relation, not of coverage: nothing runs a test, and one that imports a file or changed with it may not exercise the change in hand. Only Python imports are read, so a test in another language ranks by history alone, and the history count follows no rename and skips merge commits.
 
 Content extraction does not rank relationships, estimate tokens, perform semantic search, or persist session state; those remain separate retrieval concerns.
+
+## Implemented requirements
+
+- **an-edit-with-no-base-is-judged-against-head#uncommitted-work-is-judged-against-head** — `context --after-edit` with no base given and uncommitted work in the tree SHALL judge that work as the change, with `HEAD` as its base, running the checks that judge a change. (provenance: code; [RFC](../rfcs/an-edit-with-no-base-is-judged-against-head.md))
+  <!-- anchor: src/irminsul/context.py#_change_range @sha256:f00cafabdda8 -->
+  <!-- anchor: tests/test_context_validation_states.py#test_an_uncommitted_edit_to_recorded_debt_fails_with_no_base @sha256:da6599ed4e48 -->
+- **an-edit-with-no-base-is-judged-against-head#a-finding-that-waits-for-the-commits-trailer-does-not-fail** — `context --after-edit` SHALL NOT count as a new error, and SHALL NOT fail on, a certain finding whose code declares the answer `trailer` and that is about a file with uncommitted changes. It SHALL report that finding apart from the errors the change introduced, with the trailer to write, and SHALL say how many such findings wait. `check --diff` SHALL still fail on the finding until a commit of the change carries the trailer. (provenance: code; [RFC](../rfcs/an-edit-with-no-base-is-judged-against-head.md))
+  <!-- anchor: src/irminsul/context.py#_awaiting_trailer @sha256:076a76025743 -->
+  <!-- anchor: tests/test_context_validation_states.py#test_a_finding_the_commits_trailer_answers_does_not_fail_before_the_commit @sha256:c6ab05e586ee -->
