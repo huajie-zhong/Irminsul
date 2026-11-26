@@ -136,6 +136,10 @@ making a feature, a refactor and an RFC-driven change in it.
   doc, and its suggestion re-pins only those, with `--evidence` for each. It used to name the
   latest one and suggest `--claim` alone, which also moved a pin of the claim's other evidence
   that no longer matched for a reason the finding never named.
+- `irminsul anchors --suggest` lists no code span inside an HTML comment, and `list review` reads
+  no sentence on a line inside one, as it already read none on the line that opens it. The
+  guiding comment `irminsul new component` writes shows a dotted method name as an example, which
+  `--suggest --doc` listed as an unbound name in every new component doc.
 
 **Queries.**
 - `anchors --suggest --doc <doc>` also lists each code span of that doc that resolves to one

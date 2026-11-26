@@ -103,6 +103,24 @@ def test_suggest_lists_unbound_names_with_definition_first(tmp_path: Path) -> No
     assert candidate["marker"] == "<!-- anchor: src/session.ts#refreshUserSession -->"
 
 
+def test_suggest_reads_no_name_in_the_component_scaffolds_comment(tmp_path: Path) -> None:
+    """The comment `irminsul new component` writes shows `Class.method` as an example of a
+    code span. A span inside an HTML comment is not a name the doc uses, while one quoting a
+    comment marker in prose opens nothing."""
+    write_config(tmp_path, source_roots=["src"])
+    write(tmp_path, "src/m.py", "def run():\n    return 1\n")
+    code, output = invoke(tmp_path, "new", "component", "core")
+    assert code == 0, output
+    doc = tmp_path / "docs" / "components" / "core.md"
+    assert "`Class.method`" in doc.read_text(encoding="utf-8")
+    with doc.open("a", encoding="utf-8") as handle:
+        handle.write("\nA `<!--` in a span opens nothing, so `walk_tree()` is read.\n")
+
+    report = invoke_json(tmp_path, "anchors", "--suggest", "--doc", "docs/components/core.md")
+
+    assert [row["name"] for row in report["unbound"]] == ["walk_tree"]
+
+
 def test_an_exported_name_is_resolved_not_unbound(tmp_path: Path) -> None:
     """The exports surface knows `fetchUserSession`, in call form or bare."""
     root = _repo(tmp_path, "Sessions come from `fetchUserSession()` or `fetchUserSession`.")
