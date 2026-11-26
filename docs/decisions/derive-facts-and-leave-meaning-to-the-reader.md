@@ -111,7 +111,8 @@ its change connects to.
   definition it names, a function's or class's range, a surface identity's declaring line, or a
   whole file for a path, changed after the doc's last commit, by one `git blame` per file;
   uncommitted lines count. Only marked items show unless `--all` is given, and JSON reports both
-  counts. A `context` packet lists the claims that cite its paths as evidence, not this queue.
+  counts. A `context` packet lists the claims that cite its paths as evidence and the sentences that
+  name code in them, unmarked, not this queue.
 - **`foreign` is deleted** (accepted, not yet implemented). A span that invokes this project's
   program stays `inventory-drift/unknown-mention`, certain; a bare flag no program precedes is
   `inventory-drift/unattributed-mention`, a hint an ignore comment on its line answers. This
@@ -156,3 +157,5 @@ its change connects to.
 - 2026-11-26: The re-ask of named code is implemented: `list review --changed` queues each
   sentence whose code span names code the change edited, renamed or deleted, marked
   `names-changed-code`, and the Decision states what touched means.
+- 2026-11-26: A `context` packet lists the sentences that name code in its paths, as `named_by`,
+  so the sentence on what a packet lists names them beside the claims.

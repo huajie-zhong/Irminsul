@@ -10,7 +10,7 @@ The documentation is organized into six [layers](architecture/layers.md): [found
 
 - **Code Mapping:** Every component doc in `components/` contains a `describes:` frontmatter field mapping it to source files.
 - **Stability:** Refer to the `status:` field (draft | stable | deprecated | removed) to understand the reliability of a document.
-- **Editing loop:** Start with `irminsul orient`, then run `irminsul context <path...>` before changing code or docs and `irminsul context --after-edit` afterward to inspect affected knowledge and validation. `irminsul context --topic <query>` finds the docs for a topic.
+- **Editing loop:** Start with `irminsul orient`, then run `irminsul context <path...>` before changing code or docs, which also lists the sentences that name the file's code, and `irminsul context --after-edit` afterward to inspect affected knowledge and validation. `irminsul context --topic <query>` finds the docs for a topic.
 
 ## Editing rules
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import asdict, dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -363,6 +363,35 @@ def build_review(
         items,
         key=lambda i: (not i.code_changed_after_doc, not i.references, i.path, i.line),
     )
+
+
+def sentences_naming(
+    config: IrminsulConfig, graph: DocGraph, displays: Collection[str]
+) -> list[tuple[str, int, Reference]]:
+    """(file, line, reference) for each code span that names code defined in one of
+    `displays`, in the files the queue reads, in file and line order.
+
+    The pairing is the queue's, asked before a change instead of after one: a `context`
+    packet lists these for the paths in hand, so the docs that describe a file are read
+    before it is edited. A span that names the file by its path counts, as it does here.
+    """
+    assert graph.repo_root is not None
+    repo_root = graph.repo_root
+    resolver = CodeResolver(graph.source)
+    sentences = _review_sentences(
+        config, graph, lambda path: after_text(graph.git, repo_root, None, path)
+    )
+    out: list[tuple[str, int, Reference]] = []
+    for path, rows in sentences.items():
+        for file_line, _, sentence in rows:
+            spans = dict.fromkeys(m.group(2) for m in _SPAN_RE.finditer(sentence))
+            out.extend(
+                (path, file_line, ref)
+                for span in spans
+                for ref in resolver.resolve(span)
+                if ref.defined_at in displays
+            )
+    return out
 
 
 def _sentences_naming_changed_code(

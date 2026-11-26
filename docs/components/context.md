@@ -33,7 +33,7 @@ claims:
       - src/irminsul/context.py
       - src/irminsul/git/mtime.py
     pinned:
-      src/irminsul/context.py: sha256:1623bcb557c4
+      src/irminsul/context.py: sha256:046a12a949d8
       src/irminsul/git/mtime.py: sha256:c71794836a12
 summary: What governs a path — owning doc, ranked tests, active RFCs and next commands before an edit, findings after it.
 implements:
@@ -43,7 +43,7 @@ implements:
 
 # Agent context command
 
-`irminsul context` tells an agent what governs a file before and after it edits one: the doc that owns the path, the tests that doc declares and the ones that import the file, the dependencies that doc declares, active RFCs that affect it, and the next commands to run. After the edit it says less, because an edit's packet is about the change: each owning doc with the changed files it owns, and the findings the change caused. It is a runtime lookup over the current [DocGraph](docgraph.md), not a generated artifact, and it is a starting map rather than the documentation itself: its excerpts are bounded, so read the owning doc it names before changing code.
+`irminsul context` tells an agent what governs a file before and after it edits one: the doc that owns the path, the tests that doc declares and the ones that import the file, the dependencies that doc declares, active RFCs that affect it, the sentences in any doc that name the file's code, and the next commands to run. After the edit it says less, because an edit's packet is about the change: each owning doc with the changed files it owns, and the findings the change caused. It is a runtime lookup over the current [DocGraph](docgraph.md), not a generated artifact, and it is a starting map rather than the documentation itself: its excerpts are bounded, so read the owning doc it names before changing code.
 
 The command takes exactly one input mode, and `irminsul context --help` says what each takes: `<path...>` is the packet to read before editing, `--topic` finds the docs for a concept, and `--after-edit` maps the change made and is the one mode that runs checks. That change is the one `check --diff` judges ([A change is judged from its merge base to the working tree](../decisions/a-change-is-judged-from-its-merge-base-to-the-working-tree.md)). A source file under a configured root outside the repository, such as the sibling code repository of the [private-docs layout](../guides/private-docs.md), is named by the display spelling `describes:` uses, and its filesystem path maps to that spelling. A path that is not on disk yet is answered too, because that is when an agent asks which doc a new file belongs to: `_repo_relative` gives it the spelling it would have, the owner is the doc whose `describes` glob covers it, and `ContextResult.missing_inputs` (or `UnmatchedPath.missing`, where no glob does) says the file does not exist. A path outside the repository and every configured root is refused whether or not it exists.
 <!-- anchor: src/irminsul/context.py#_repo_relative @sha256:5ce500137ae9 -->
@@ -78,6 +78,13 @@ A common word is in most bodies, so the packet bounds the matches that needed th
 
 A report's `claim_reviews` lists every claim whose `evidence` names a path in hand — a named path, or a changed one after an edit — except `follows-evidence` claims, where the code wins outright. Each carries a question that quotes the claim back at those files. It is a request to a reader, not a finding: the change reached the code a contract is written against, and only a reader can say whether the contract still holds, so it prints outside the findings, `--after-edit` exits 0 on it, and `check` never reports it. The signal is the change itself, an exact match on `evidence:`, so it does not go quiet once the doc is touched, as `claim-provenance`'s commit-time comparison can, and it reaches code the declaring doc does not own. `irminsul list review --changed` queues the same claims as `governing-claim` items.
 <!-- anchor: src/irminsul/context.py#ContextReport.claim_reviews @sha256:c7754845d0d8 -->
+
+## Sentences that name the file's code
+
+A path packet's `named_by` lists each sentence whose code span names code in a path in hand: a function, a class, a command, an option or another surface identity the file declares, or the file itself by its path. `_named_by` asks `sentences_naming`, the pairing of the [review queue](new-list-regen.md), so it reads what the queue reads, live docs, the `## Decision` of decision records and the guidance files, and it lists the owning doc's sentences beside those of a guide or a README that owns nothing. Each entry is the sentence's file and line, the span, and `names`, the path whose code it names. It is derived on every call, like the rest of the packet, and says nothing about whether a sentence is right: it is what to read before the edit, and `irminsul list review --changed` asks about the same sentences after it, for the code the edit touched. Plain output lists the first ten for each path and counts the rest, as it does an owner's tests, and the JSON carries every one, which for a file whose commands many docs name is most of the packet. A topic lookup and an edit's report carry no `named_by`, and a file no doc owns still has one.
+<!-- anchor: src/irminsul/context.py#_named_by @sha256:43c51241e972 -->
+<!-- anchor: src/irminsul/context.py#ContextReport.named_by @sha256:eadfc3e546ff -->
+<!-- anchor: src/irminsul/context.py#NamingSentence.names @sha256:206e91482a40 -->
 
 ## Active RFCs and next actions
 

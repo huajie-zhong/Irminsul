@@ -15,7 +15,7 @@ import irminsul.git.changes as changes_module
 from irminsul.cli import app
 from irminsul.git.reader import GitReader
 
-from .conftest import git, invoke, seed_repo, write, write_config, write_doc
+from .conftest import git, invoke, replace_text, seed_repo, write, write_config, write_doc
 
 runner = CliRunner()
 
@@ -283,7 +283,15 @@ def test_context_source_path_json_returns_owner_tests_and_dependencies(tmp_path:
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
-    assert set(data) == {"version", "mode", "results", "unmatched", "claim_reviews", "next_actions"}
+    assert set(data) == {
+        "version",
+        "mode",
+        "results",
+        "unmatched",
+        "claim_reviews",
+        "named_by",
+        "next_actions",
+    }
     assert data["version"] == 2
     assert data["mode"] == "path"
     assert data["unmatched"] == []
@@ -2230,3 +2238,134 @@ def test_include_still_returns_owner_content_after_an_edit(tmp_path: Path) -> No
     data = _after_edit(repo, "--base-ref", base, "--include", "owner")
 
     assert "content" in _core(data)
+
+
+_LEDGER_CLI = "src/ledger/cli.py"
+_LEDGER_CORE = "src/ledger/core.py"
+_LEDGER_USAGE = "docs/guides/usage.md"
+_LEDGER_DECISION = "docs/decisions/amounts-keep-their-order.md"
+
+
+def _ledger(fixture_repo: Callable[[str], Path]) -> Path:
+    """The `names-changed-code` fixture: docs that name a ledger's commands, options, methods
+    and one of its files in code spans, committed whole."""
+    repo = fixture_repo("names-changed-code")
+    seed_repo(repo, "the fixture as it stands", when="2024-01-01T12:00:00+00:00")
+    return repo
+
+
+def _named_by(repo: Path, *paths: str) -> list[dict[str, Any]]:
+    data = json.loads(invoke(repo, "context", *paths, "--format", "json")[1])
+    named: list[dict[str, Any]] = data["named_by"]
+    return named
+
+
+def test_a_packet_lists_the_sentences_that_name_code_in_the_file(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    """The requirement's scenario: the usage guide and the README own no code and name the
+    commands `cli.py` declares, and the packet for that file says where."""
+    repo = _ledger(fixture_repo)
+
+    named = _named_by(repo, _LEDGER_CLI)
+
+    assert named == [
+        {"path": "README.md", "line": 5, "span": "ledger list", "names": _LEDGER_CLI},
+        {"path": "README.md", "line": 7, "span": "ledger report", "names": _LEDGER_CLI},
+        {"path": _LEDGER_USAGE, "line": 11, "span": "ledger list", "names": _LEDGER_CLI},
+        {"path": _LEDGER_USAGE, "line": 13, "span": "ledger report", "names": _LEDGER_CLI},
+        {"path": _LEDGER_USAGE, "line": 15, "span": "--limit", "names": _LEDGER_CLI},
+        {"path": _LEDGER_USAGE, "line": 17, "span": "--plain", "names": _LEDGER_CLI},
+    ]
+
+
+def test_named_by_reads_a_decision_records_decision_and_a_span_that_names_the_file(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    """The record names `Ledger.add` in its Decision, on line 21, and `Ledger.remove` in its
+    Context, on line 17, which the review queue does not read either."""
+    repo = _ledger(fixture_repo)
+
+    named = _named_by(repo, _LEDGER_CORE)
+
+    assert [(entry["path"], entry["line"], entry["span"]) for entry in named] == [
+        ("docs/components/ledger.md", 16, "Ledger.add"),
+        ("docs/components/ledger.md", 18, "Ledger.remove"),
+        ("docs/components/ledger.md", 20, "Ledger.total"),
+        ("docs/components/ledger.md", 22, "parse_amount()"),
+        (_LEDGER_DECISION, 21, "Ledger.add"),
+        (_LEDGER_USAGE, 21, _LEDGER_CORE),
+    ]
+
+
+def test_named_by_says_which_path_each_sentence_names(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = _ledger(fixture_repo)
+
+    named = _named_by(repo, _LEDGER_CLI, _LEDGER_CORE)
+
+    assert [entry["names"] for entry in named] == [_LEDGER_CLI] * 6 + [_LEDGER_CORE] * 6
+    assert _named_by(repo, _LEDGER_USAGE) == []
+
+
+def test_a_file_no_doc_owns_still_lists_the_sentences_that_name_its_code(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    """The packet that says no doc owns a file is the one whose reader most needs to know
+    which docs describe it."""
+    repo = _ledger(fixture_repo)
+    replace_text(repo, "docs/components/ledger.md", "  - src/ledger/*.py", "  - src/ledger/core.py")
+
+    code, output = invoke(repo, "context", _LEDGER_CLI, "--format", "json")
+    data = json.loads(output)
+
+    assert code == 1
+    assert data["results"] == []
+    assert [item["path"] for item in data["unmatched"]] == [_LEDGER_CLI]
+    assert (_LEDGER_USAGE, 11) in [(entry["path"], entry["line"]) for entry in data["named_by"]]
+
+
+def test_the_plain_packet_caps_the_sentences_and_counts_the_rest(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    """Plain output lists the first ten for a path and counts the rest; the JSON carries all."""
+    repo = _ledger(fixture_repo)
+    guide = repo / _LEDGER_USAGE
+    more = "".join(f"\nRun `ledger list` on day {day}.\n" for day in range(1, 8))
+    guide.write_text(guide.read_text(encoding="utf-8") + more, encoding="utf-8")
+
+    code, output = invoke(repo, "context", _LEDGER_CLI)
+
+    assert code == 0, output
+    lines = output.splitlines()
+    start = lines.index(f"Sentences that name code in {_LEDGER_CLI}:")
+    assert lines[start + 1 : start + 4] == [
+        "  README.md:5  `ledger list`",
+        "  README.md:7  `ledger report`",
+        f"  {_LEDGER_USAGE}:11  `ledger list`",
+    ]
+    assert lines[start + 11] == "  … 3 more (--format json lists every one)"
+    assert not lines[start + 12].startswith("  ")
+    assert len(_named_by(repo, _LEDGER_CLI)) == 13
+
+
+def test_a_plain_packet_with_no_such_sentence_prints_no_heading(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = _ledger(fixture_repo)
+
+    code, output = invoke(repo, "context", _LEDGER_USAGE)
+
+    assert code == 0, output
+    assert "Sentences that name code" not in output
+
+
+def test_only_a_path_packet_carries_named_by(fixture_repo: Callable[[str], Path]) -> None:
+    repo = _ledger(fixture_repo)
+
+    topic = json.loads(invoke(repo, "context", "--topic", "ledger", "--format", "json")[1])
+    after = json.loads(invoke(repo, "context", "--after-edit", "--format", "json")[1])
+
+    assert "named_by" not in topic
+    assert "named_by" not in after

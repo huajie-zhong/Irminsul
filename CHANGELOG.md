@@ -172,6 +172,15 @@ making a feature, a refactor and an RFC-driven change in it.
   sentence the change itself wrote keeps its one `edited` item, which carries the marker. An
   edit inside a long command's function queues every sentence that names the command or one of
   its options.
+- `context <path...>` lists the sentences that name code in each path, under `named_by` in the
+  JSON and as "Sentences that name code in <path>" in plain output: each sentence, in a live doc,
+  a decision record's Decision or a guidance file, whose code span names a function, class,
+  command, option or other surface identity the file declares, or the file by its path. An entry
+  is the sentence's file and line, the span, and `names`, the path. A file no doc owns has the
+  list too. Plain output shows the first ten for a path and counts the rest; the JSON, and so the
+  MCP tool `context_for_path`, carries every one, which for a file whose commands many docs name
+  is most of the packet. The packet pairs every code span in the docs, so it takes longer than
+  before.
 - `irminsul refs` accepts any Markdown file in the repository as a target, so a brownfield page
   with no frontmatter can be asked what links to it before it is moved.
 - `context --after-edit` JSON is reshaped. Each result has `input`, `owner` (only its `id` and
