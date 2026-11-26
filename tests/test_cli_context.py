@@ -2104,6 +2104,32 @@ def test_context_after_edit_leaves_guidance_files_out_of_unmatched(tmp_path: Pat
     assert [item["path"] for item in json.loads(result.output)["unmatched"]] == ["src/mylib/new.py"]
 
 
+def test_context_after_edit_leaves_files_the_config_excludes_out_of_unmatched(
+    tmp_path: Path,
+) -> None:
+    """A fixture repository under `paths.source_excludes` is no source any doc owns, so
+    adding one is not a gap to answer by finding its files an owner."""
+    repo = _make_context_repo(tmp_path)
+    toml = repo / "irminsul.toml"
+    toml.write_text(
+        toml.read_text(encoding="utf-8").replace(
+            'source_roots = ["src"]',
+            'source_roots = ["src"]\nsource_excludes = ["tests/fixtures/**"]',
+        ),
+        encoding="utf-8",
+    )
+    seed_repo(repo, "initial")
+    write(repo, "tests/fixtures/repos/tiny/src/a.py", "A = 1\n")
+    write(repo, "tests/fixtures/repos/tiny/irminsul.toml", 'project_name = "tiny"\n')
+    write(repo, "src/mylib/new.py", "def new(): pass\n")
+
+    result = runner.invoke(
+        app, ["context", "--after-edit", "--format", "json", "--path", str(repo)]
+    )
+
+    assert [item["path"] for item in json.loads(result.output)["unmatched"]] == ["src/mylib/new.py"]
+
+
 def _debt_repo(tmp_path: Path) -> Path:
     repo = _make_context_repo(tmp_path)
     write(repo, "src/mylib/legacy.py", "def old(): pass\n")

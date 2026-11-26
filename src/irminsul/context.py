@@ -15,6 +15,7 @@ from irminsul.checks import Finding, finding_records
 from irminsul.checks.acknowledgement import awaits_commit, trailer_block
 from irminsul.checks.change_range import range_of
 from irminsul.checks.globs import (
+    excluded_by_config,
     external_display_for_path,
     is_configured_source_path,
     resolve_display_path,
@@ -864,7 +865,10 @@ def _pending_for_changed(
             continue
 
         governed_by = _governing_claims(graph, changed_path)
-        if changed_path in unowned_by_design and not governed_by:
+        if not governed_by and (
+            changed_path in unowned_by_design
+            or (graph.config is not None and excluded_by_config(graph.config, changed_path))
+        ):
             continue
         unmatched.append(_unmatched(graph, changed_path, ownership, governed_by))
 
