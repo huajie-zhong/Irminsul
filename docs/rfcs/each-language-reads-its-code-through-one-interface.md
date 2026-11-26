@@ -86,13 +86,11 @@ Jest, has no name an anchor can point at; it is reached through the part markers
 
 ## Cost and risk
 
-**A required dependency.** `tree-sitter` (MIT) 0.26.0, the version measured, has wheels for
-CPython 3.10 to 3.14 on Linux (glibc on x86-64 and ARM64, musl on x86-64), macOS and Windows,
-and none for musl on ARM64, PyPy or a free-threaded build. There, installing Irminsul compiles
-its C code and needs a C compiler, and that reaches adopters whose code is all Python. Each
-grammar package (MIT) ships one wheel per platform that serves every CPython but a
-free-threaded build, and `tree-sitter-typescript` has none for musl on ARM64 either. With the TypeScript, Go
-and Rust grammars it installed 6.7 MB. It is required, not an extra: an
+**A required dependency.** The tree-sitter runtime and its grammars are MIT-licensed and ship
+prebuilt wheels for CPython on Linux, macOS and Windows, but none for musl on ARM64, PyPy or a
+free-threaded build. There, installing Irminsul compiles C code and needs a C compiler, and
+that reaches adopters whose code is all Python. With the TypeScript, Go and Rust grammars it
+installed 6.7 MB. It is required, not an extra: an
 extra would let a file resolve on one machine and fail on another, which
 `checks-are-deterministic` in [enforcement](../foundation/enforcement.md) rules out, as the
 accepted `claim-evidence-names-a-part` already says.
@@ -201,6 +199,10 @@ Open, for the owner:
   Python: a profile stays data and names its reader, which is code, and `import-deps` reads every
   language that answers imports. `code-is-named-in-code-spans-and-bound-by-anchors` decides
   how a pin is hashed.
+- **Wheels.** `tree-sitter` 0.26.0 has wheels for CPython 3.10 to 3.14 on Linux (glibc on
+  x86-64 and ARM64, musl on x86-64), macOS and Windows, and none for musl on ARM64, PyPy or a
+  free-threaded build. Each grammar package ships one wheel per platform that serves every
+  CPython but a free-threaded build, and `tree-sitter-typescript` has none for musl on ARM64.
 - **Measured** on 2026-11-26 with `tree-sitter` 0.26.0, `tree-sitter-typescript` 0.23.2,
   `tree-sitter-go` 0.25.0 and `tree-sitter-rust` 0.24.2 on CPython 3.12: installed sizes 2.0,
   3.1, 0.3 and 1.3 MB; one small file per language parsed and queried in 5.9, 0.8 and 2.8 ms.
