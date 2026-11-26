@@ -61,9 +61,10 @@ A decision record's `governs:` names the code it decides, and nothing reads that
 accepted RFC `decision-records-govern-what-they-decide` makes `irminsul context <path>` name the
 governing record before an edit; it does not re-ask the record's Decision when that code
 changes. A Decision that names the code in a code span will be queued by
-`a-change-re-asks-the-sentences-that-name-its-code`. One that states the rule in plain words, as
-most do, is reached by neither, and the case `decision-governs-the-function` of
-`tests/test_seeded_rot.py` pins that. Queue a record's Decision when a change touches what the
+`a-change-re-asks-the-sentences-that-name-its-code`. One that states the rule in plain words is
+reached by neither, and the case `decision-governs-the-function` of `tests/test_seeded_rot.py`
+pins that. On 2026-11-25 every one of the 14 records named code somewhere in its Decision, and
+167 of the 339 Decision sentences named code the queue resolves (a review). Queue a record's Decision when a change touches what the
 record governs.
 
 ### `defined-means-two-things`
@@ -144,9 +145,12 @@ refuses the run as identical to `HEAD`, because `paths.test_roots` is not watche
 a file a claim cites as evidence outside those roots, such as `action.yml`, is refused the same
 way (a review, 2026-11-25). Watching the baseline and the adoption record for both was tried
 that day and withdrawn: `--delta` applies no baseline to either side, so a tree that differs
-only there compares equal and the run exits 0 having measured nothing, which the refusal exists
-to prevent. Ask the two questions apart: for `--delta`, every path a check reads, test roots and
-cited evidence included; for a change, the baseline and the adoption record as well.
+only in the baseline compares equal and the run exits 0 having measured nothing, which the
+refusal exists to prevent. The adoption record is different: with one entry removed from it,
+`irminsul check` reports `uniqueness/undocumented-file` while `check --delta` refuses the run as
+identical (a review, 2026-11-25). Ask the two questions apart: for `--delta`, every path a
+check reads, test roots, cited evidence and the adoption record included; for a change, the
+baseline as well.
 
 ### `rfc-supersedes-unchecked`
 
@@ -234,7 +238,10 @@ after the implementation, their components read as the RFC's undeclared scope
 three later pull requests: the only way through was a branch cut at the implementation's own
 landing commit, finalized there and cherry-picked forward. Let verify and finalize name
 where the implementation ends as well as where it starts, for the scope and evidence
-reports only.
+reports only. Seen again on 2026-11-26: `an-edit-with-no-base-is-judged-against-head` was
+finalized at `62d5eab`, where its work landed, after `a-topic-search-reads-doc-bodies` had
+landed on top of it. Implementing and finalizing an RFC in one pull request, the rule of the
+root `AGENTS.md` since that day, avoids it for an RFC not yet built.
 
 ### `doc-evidence-pins-the-whole-file`
 
@@ -384,6 +391,60 @@ survives a squash merge or a history reset, which a trailer does not, and the tr
 the answer of every other seal. Amend the RFC before its tasks T6 to T8 are built; accepting
 the amendment is the owner's.
 
+### `after-edit-names-plain-check-when-it-could-not-compare`
+
+When `context --after-edit` judged a range and could not compare it, as in the two-repository
+layout, its next action is the literal `irminsul check` (`src/irminsul/context.py:1782`) with
+"The repository has errors to resolve". A finding raised by a pass that judges a change is not
+in that plain run: with a check removed and committed without a trailer, the run exits 1, sends
+the reader to `irminsul check`, which prints 0 errors, while `check --diff <base>` exits 1 (a
+review, 2026-11-25). `_change_check_command` in the same file already builds the right command
+for the compared case.
+
+### `after-edit-in-a-pre-commit-hook-reads-the-commits-index`
+
+Run from a pre-commit hook, `context --after-edit` builds its scratch checkout
+(`pristine_checkout`, `src/irminsul/delta.py:250`) with git's `GIT_INDEX_FILE` still set to the
+index of the commit being made. Under `git commit -a` the commit came out empty, and under a
+plain `git commit` the checkout failed, so inherited debt failed every commit (a review on
+2026-11-25, run on main). Clear the hook's git environment before that git call.
+
+### `change-status-says-ready-before-any-work`
+
+`irminsul change status` prints "mechanically ready for: implemented" for an RFC accepted
+minutes earlier, with "0 changed path(s)" and none of its five tasks built (run on 2026-11-26 for
+`the-change-queue-asks-about-what-the-change-did-not-write`). With no base given it finds no
+blocker because it measured nothing. Say that nothing was measured, as `context --after-edit`
+says of a change it did not compare.
+
+### `body-matches-are-listed-in-path-order`
+
+Among the topic matches that needed body prose, `_pending_for_topic`
+(`src/irminsul/context.py`) orders by path once the other keys tie, so a doc under
+`docs/foundation` sorts after the architecture, component and decision docs. With more than
+eight such matches the case `a-topic-search-reads-doc-bodies` was written for, a non-goal named
+only in the foundation's prose, is among the ids left out. Which order serves a reader is a
+decision.
+
+### `a-doc-that-restates-a-linked-doc-is-not-asked-about`
+
+A sentence that links to another doc and says in its own words what that doc says is not
+queued when the linked doc changes: `docs/guides/bootstrap.md` says what the baseline keeps
+from blocking, links `docs/components/baseline.md`, and would not be asked about if that rule
+changed. `irminsul refs` lists such sentences on request: 9 prose links to `baseline`, 10 to
+`checks` on 2026-11-25. Queuing every link would bring back the length the change queue is
+losing, since most links only point, and a link that only points cannot be made false by its
+target. Add a seeded-rot case for it first, so the gap has a number.
+
+### `a-retargeted-pull-request-keeps-its-old-gate-run`
+
+`.github/workflows/ci.yml` runs on the default `pull_request` events, which do not include a
+change of base. A pull request retargeted from a stacked branch to `main` on 2026-11-25 kept
+the `dogfood` run made against its old base: `check --diff` then judged every commit `main`
+had gained as later than the branch's trailers, and reported two findings the same command
+with `main` as base did not. Only a new commit starts a run against the new base. Running the
+job when a pull request's base changes is an edit to a gate file, which a trailer answers.
+
 ### `init-writes-no-gitattributes`
 
 This repository's `.gitattributes` sets `* text=auto eol=lf`, but `init` scaffolds none
@@ -401,7 +462,10 @@ re-reads the doc after committing the code must still make an empty commit only 
 the trailer, and a later commit touching those files silently voids an earlier trailer.
 Seen three times on 2026-10-22. Let the acknowledgement name the source revision it re-read
 against, so it survives being written before or after the code and is voided only by a
-change to that code.
+change to that code. A merge shows it too: after one branch was merged into another on
+2026-11-25, each branch's trailer for `docs/components/mcp-server.md` counted the other's commit
+as later, a trailer on the merge commit was not read, and a third trailer on a commit after the
+merge was needed.
 
 ### `renamed-doc-has-no-review-base`
 
