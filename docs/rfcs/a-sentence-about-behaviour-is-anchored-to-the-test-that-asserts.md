@@ -3,7 +3,7 @@ id: a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts
 title: "A sentence about behaviour is anchored to the test that asserts it"
 status: stable
 describes: []
-rfc_state: accepted
+rfc_state: implemented
 affects:
   - anchors
   - init
