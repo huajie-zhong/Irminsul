@@ -131,11 +131,10 @@ Answered by the owner on 2026-11-26:
   `claim-anchor/pinned-drift`, a hint a re-pin answers after the paragraph is re-read.
 - **The seeded-rot suite** gains a case whose sentence is anchored to a test of its fixture.
   The fixture's test file, a placeholder today, gains that test. It imports a package only
-  the fixture has, so this repository's own test run does not collect it. The case shows two
-  things:
-  the edit that makes the sentence false makes the test fail, run as the suite's probes run
-  the fixture's code; and editing the test to pass again draws `pinned-drift` on the
-  sentence's paragraph.
+  the fixture has, so this repository's own test run is kept from collecting it, as
+  collection would fail at the import. The case shows two things: the edit that makes the
+  sentence false makes the test fail, run as the suite's probes run the fixture's code; and
+  editing the test to pass again draws `pinned-drift` on the sentence's paragraph.
 - **Governing records.** `code-is-named-in-code-spans-and-bound-by-anchors` decides anchors
   and what the suggesting command prints;
   `agents-get-stateless-read-only-queries-and-one-written-loop` decides the loop and the
