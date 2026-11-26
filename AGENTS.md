@@ -157,6 +157,13 @@ helper there rather than a private copy, never build a `DocGraph` by hand, and d
 commits with fixed instants. CI runs Linux, macOS and Windows, so paths go through
 `pathlib` and are POSIX-normalized.
 
+**RFCs.** One pull request implements an RFC and finalizes it. Accepting an RFC is the
+owner's decision each time. Finalizing has the owner's standing approval, given on 2026-11-26:
+run `irminsul change finalize` as the last commit of the pull request that completes the RFC's
+tasks, once a review by an agent that did not write the change finds no blocker. An RFC whose
+text needs a change while it is being implemented is not finished being designed: stop, bring
+the question to the owner, and do not finalize it.
+
 **Where to start reading.** [`overview.md`](docs/architecture/overview.md), then
 [`check-pipeline.md`](docs/architecture/check-pipeline.md). A check receives only the
 `DocGraph`, so ask first whether new behaviour belongs on the graph or in a check. The
