@@ -60,8 +60,8 @@ MARKER_MEANINGS: Final[dict[str, str]] = {
         "sentence if it is not this repository's code, leave it if no anchor can reach it"
     ),
     "names-changed-code": (
-        "a sentence naming a function or class this change edited, renamed or deleted; "
-        "`changed:` and `removed:` under it give the name, file and line. Re-read it against "
+        "a sentence naming a function or class this change edited, renamed or deleted; the "
+        "item gives each one's file and line and says which were removed. Re-read it against "
         "the code as it is now"
     ),
     "governing-claim": (

@@ -81,6 +81,15 @@ definition; `anchors --suggest` then offers that very anchor (re-run on 2026-10-
 rule for "this module defines that name" would let the two agree; which rule is right is a
 decision, not a refactor.
 
+### `changed-lines-read-an-added-line-as-a-file-name`
+
+`changed_line_numbers` (`src/irminsul/git/changes.py`) takes any line of git's diff that starts
+`+++ ` for the name of the next file, and a line the change added that starts `++ ` prints that
+way. With `-- a/one` replaced by `++ b/two` on line 1 of `src/a.sql` and line 3 edited too, it
+returns `{"src/a.sql": {1}, "two": {3}}`: the later hunk is filed under a path that does not
+exist, so `list review --changed` reads no change on those lines (run on 2026-11-26). A file's
+two names come between its `diff --git` line and its first hunk; read them only there.
+
 ### `narrowed-surface-is-not-a-filter`
 
 `inventory-drift` extracts a doc's surface from the files its `source` or `describes` globs
@@ -291,6 +300,19 @@ wrong function for four sentences, and a dotted span resolves by its last segmen
 (`UnmatchedPath.recorded_debt` bound to `adoption.recorded_debt`) with no `unbound-name` raised
 (dogfood, 2026-10-29). Show every candidate a name could bind to, or bind none.
 
+### `a-name-two-files-define-pairs-with-nothing`
+
+`CodeResolver.resolve` (`src/irminsul/code_references.py`) pairs a span with a function or class
+only when one definition in the source has that name, so a bare name that two definitions share
+pairs with neither, in the queue with a change and without one. `parse` is a function of
+`src/irminsul/checks/acknowledgement.py` and a method of `PythonModule` in
+`src/irminsul/inventory/base.py`. The sentence of `docs/components/checks.md:125` that says what
+`parse` reads was therefore not asked about for `parse` when the pull request `dde68e0..ffa39b4`
+changed what `parse` takes for a reason; `list review --changed` queued it only because the same
+sentence names `acknowledge`, which the pull request also touched (measured on 2026-11-26). A
+span in a doc that owns one of the defining files could pair with that file's definition; which
+definition a name means elsewhere is `review-binds-common-words`.
+
 ### `first-review-after-init-queues-the-scaffold`
 
 The first `list review --changed` after `irminsul init` in a brownfield repository queues 113
@@ -386,6 +408,17 @@ with 50 docs under `named_by`, where a first build that listed each sentence gav
 `list review --changed` on the pull request `dde68e0..ffa39b4` went from 2.3 to 3.0 seconds on
 the same machine, because it builds a second resolver for the merge base. Not measured: which
 surfaces a packet could leave unextracted without changing what a span names.
+
+### `environment-variable-counts-for-one-file`
+
+`EnvVarsExtractor.extract` (`src/irminsul/inventory/env_vars.py:68`) keeps one item for each
+variable, from the first file that reads it, so a variable two files read is reported from one
+of them. `irminsul context <path>` counts a sentence that names the variable under `named_by`
+for that file alone (`docs_naming`, `src/irminsul/listing/review.py`): with `LEDGER_DATE_FORMAT`
+read in `dates.py` and in `fees.py` of the `names-changed-code` fixture, the packet for `fees.py`
+does not count the usage guide's sentence about it (run on 2026-11-26). `irminsul surface
+env-vars` names one file for the same reason. Keep every file that reads a variable, which
+changes what the surface prints.
 
 ### `lifecycle-queue-shows-no-progress`
 

@@ -164,9 +164,13 @@ making a feature, a refactor and an RFC-driven change in it.
 - `list review --changed` also queues each sentence whose code span names a function or class
   the change edited, renamed or deleted, marked `names-changed-code`, in any live doc, decision
   record's Decision or guidance file, whether or not the change opened it: a guide that names a
-  function is asked about it when the function changes. A function or class is touched by a
-  changed line in its range, and one the change removed or renamed is found in the merge base's
-  text. A command, an option, an environment variable and a path are not paired with a change.
+  function is asked about it when the function changes. A function or class is its decorators,
+  its `def` or `class` line and its body, and it is touched when the change leaves it other
+  lines than it had at the merge base, so a deletion just below it does not touch it. One the
+  change removed or renamed is found in the merge base's text, and so is one whose name a
+  second definition took; in a file that no longer parses, each definition a sentence named is
+  listed as changed, with no line. Only Python functions and classes are paired. A command, an
+  option, an environment variable and a path are not paired with a change.
   Each item lists the name and the change's file and line, as `changed_code` in the JSON and as
   `changed:` and `removed:` lines in plain output. A sentence the change itself wrote keeps its
   one `edited` item, which carries the marker. `context --after-edit` lists none of these

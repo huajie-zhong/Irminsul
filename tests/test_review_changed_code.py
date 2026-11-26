@@ -127,6 +127,129 @@ def test_a_sentence_naming_a_function_the_change_left_alone_is_not_queued(ledger
     assert [item["sentence"] for item in _queue(ledger) if "due_day()" in item["sentence"]] == []
 
 
+def test_a_function_moved_in_its_file_with_its_lines_unchanged_is_not_asked_about(
+    ledger: Path,
+) -> None:
+    """A definition is touched when its lines are not the ones it had at the base, wherever
+    in the file they now are."""
+    function = (
+        "\n\ndef parse_amount(text: str) -> int:\n"
+        '    """The cents `text` names, such as 1250 for "12.50"."""\n'
+        "    return round(float(text) * 100)\n"
+    )
+    replace_text(ledger, CORE, function, "")
+    replace_text(ledger, CORE, "\n\nclass Ledger:", f"{function}\n\nclass Ledger:")
+
+    assert _queue(ledger) == []
+
+
+def test_deleting_the_function_below_one_does_not_touch_the_one_above(ledger: Path) -> None:
+    """git files a hunk that only deletes under the line before it, here the last line of
+    `late_fee`. The deleted lines lay in `due_day` alone, so that is the sentence asked."""
+    replace_text(
+        ledger,
+        FEES,
+        "\n\ndef due_day(entered: int) -> int:\n"
+        '    """The day a payment entered on day `entered` is due."""\n'
+        "    return entered + 30\n",
+        "",
+    )
+
+    items = _queue(ledger)
+
+    assert _named(items) == {(USAGE, "due_day()")}
+    assert _changed_code(items, USAGE, "due_day()") == {
+        "span": "due_day()",
+        "identity": "due_day",
+        "path": FEES,
+        "line": 9,
+        "removed": True,
+    }
+
+
+def test_deleting_the_last_line_of_a_function_queues_the_sentence_that_names_it(
+    ledger: Path,
+) -> None:
+    """The deleted line lay in the function's range at the base, which is where a deletion
+    is read; the line reported is the function's last where the change ends."""
+    replace_text(ledger, FEES, "    return min(days * 50, 500)\n", "")
+
+    items = _queue(ledger)
+
+    assert _named(items) == NAMES_FEE
+    assert _changed_code(items, USAGE, "late_fee()")["line"] == 5
+
+
+def test_an_edited_function_is_asked_about_though_a_second_one_took_its_name(
+    ledger: Path,
+) -> None:
+    """With a second `late_fee` in another file the span pairs with neither, so the changed
+    lines are tested against the definition the name had at the base."""
+    replace_text(ledger, FEES, *FEE_BODY)
+    with (ledger / DATES).open("a", encoding="utf-8") as file:
+        file.write('\n\ndef late_fee() -> int:\n    """Not the ledger\'s."""\n    return 0\n')
+
+    items = _queue(ledger)
+
+    assert _named(items) == NAMES_FEE
+    [item] = items
+    assert item["references"] == []
+    assert item["changed_code"] == [
+        {"span": "late_fee()", "identity": "late_fee", "path": FEES, "line": 6, "removed": False}
+    ]
+
+
+def test_a_file_that_no_longer_parses_changed_its_functions_and_removed_none(
+    ledger: Path,
+) -> None:
+    """What the file defines cannot be read where the change ends, so each definition a
+    sentence named at the base is reported as changed, with no line, as an untracked file's
+    are."""
+    replace_text(
+        ledger, FEES, "def due_day(entered: int) -> int:", "def due_day(entered: int -> int:"
+    )
+
+    items = _queue(ledger)
+
+    assert _named(items) == {(USAGE, "late_fee()"), (USAGE, "due_day()")}
+    for span, identity in (("late_fee()", "late_fee"), ("due_day()", "due_day")):
+        assert _changed_code(items, USAGE, span) == {
+            "span": span,
+            "identity": identity,
+            "path": FEES,
+            "line": None,
+            "removed": False,
+        }
+
+
+def test_a_change_to_a_decorator_alone_queues_the_sentence_that_names_its_function(
+    ledger: Path,
+) -> None:
+    """A definition is its decorators, its `def` or `class` line and its body, as an anchor
+    reads it."""
+    with (ledger / FEES).open("a", encoding="utf-8") as file:
+        file.write(
+            "\n\n@lru_cache(maxsize=1)\ndef flat_fee() -> int:\n"
+            '    """The fee charged once a month."""\n    return 500\n'
+        )
+    with (ledger / USAGE).open("a", encoding="utf-8") as file:
+        file.write("\n`flat_fee()` is charged once a month.\n")
+    commit_all(ledger, "a flat fee", when=LATER)
+    replace_text(ledger, FEES, "@lru_cache(maxsize=1)", "@lru_cache(maxsize=None)")
+
+    items = _queue(ledger)
+
+    assert _named(items) == {(USAGE, "flat_fee()")}
+    assert _changed_code(items, USAGE, "flat_fee()") == {
+        "span": "flat_fee()",
+        "identity": "flat_fee",
+        "path": FEES,
+        "line": 14,
+        "removed": False,
+    }
+    assert items[0]["references"][0]["line"] == 15
+
+
 def test_a_class_is_touched_by_a_change_to_any_line_in_its_range(ledger: Path) -> None:
     replace_text(ledger, CORE, "self.amounts: list[int] = []", "self.amounts: list[int] = [0]")
 
@@ -202,6 +325,22 @@ def test_a_name_a_second_definition_made_ambiguous_is_not_called_removed(ledger:
         )
 
     assert _named(_queue(ledger)) == NAMES_TOTAL
+
+
+def test_a_method_added_under_a_functions_name_does_not_touch_the_function(ledger: Path) -> None:
+    """`parse_amount()` pairs with nothing once a class of the same file has a method of that
+    name. The function it named at the base is told from the method by its class, and no
+    changed line is in it."""
+    with (ledger / CORE).open("a", encoding="utf-8") as file:
+        file.write(
+            "\n\nclass Drawer:\n"
+            '    """Coins, counted by hand."""\n\n'
+            "    def parse_amount(self, text: str) -> int:\n"
+            '        """Not the ledger\'s."""\n'
+            "        return 0\n"
+        )
+
+    assert _queue(ledger) == []
 
 
 def test_deleting_a_method_queues_the_sentence_that_names_it(ledger: Path) -> None:
@@ -456,6 +595,18 @@ def test_json_output_defines_the_marker_once(ledger: Path) -> None:
 
     assert report["markers"] == {MARKER: MARKER_MEANINGS[MARKER]}
     assert report["total"] == report["shown"] == 3
+
+
+def test_the_meaning_of_the_marker_is_true_of_the_json(ledger: Path) -> None:
+    """One text defines the marker for both outputs, so it names nothing only the plain
+    output prints: each name it writes as code is a key the JSON carries."""
+    replace_text(ledger, CORE, *ADD_BODY)
+
+    report = invoke_json(ledger, "list", "review", "--changed")
+
+    [item] = [item for item in report["items"] if item["path"] == COMPONENT]
+    keys = {*item, *item["changed_code"][0]}
+    assert set(re.findall(r"`([^`]+)`", report["markers"][MARKER])) <= keys
 
 
 def test_the_doc_filter_keeps_the_sentences_of_that_doc(ledger: Path) -> None:
