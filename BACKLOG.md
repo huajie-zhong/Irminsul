@@ -621,8 +621,8 @@ one after it, answered it again.
 
 ### `renamed-doc-has-no-review-base`
 
-`irminsul list review --changed` compares a doc's sentences with the same path at the
-base (`_prose_at_ref`, `src/irminsul/listing/review.py:493`). A doc the change renamed has
+`irminsul list review --written` compares a doc's sentences with the same path at the
+base (`_prose_at_ref`, `src/irminsul/listing/review.py`). A doc the change renamed has
 no base under its new path, so every sentence on a changed line is queued as `edited`: after
 a `git mv`, an unchanged sentence sharing a line with a reworded one is queued too
 (re-run on 2026-10-28). Read the base through the rename, as `renamed_paths`
@@ -630,8 +630,8 @@ a `git mv`, an unchanged sentence sharing a line with a reworded one is queued t
 
 ### `removed-sentences-queue-one-by-one`
 
-`irminsul list review --base-ref` queues one `removed-sentence` item per deleted sentence
-(`_removed_sentences`, `src/irminsul/listing/review.py:458`). A deliberate cut queues every
+`irminsul list review --written --base-ref` queues one `removed-sentence` item per deleted
+sentence (`_removed_sentences`, `src/irminsul/listing/review.py`). A deliberate cut queues every
 sentence of it: four items for a four-sentence paragraph, about 25 for one paragraph and
 213 for the trim of `checks.md` in the PR 12 lanes. The reader has no way to say where a
 cut sentence now lives, so the same cut is re-read at every run. Group removed sentences by
@@ -640,8 +640,8 @@ once. Found by the PR 12a, 12c and 12d lanes on 2026-10-28.
 
 ### `deleted-doc-queues-nothing`
 
-A doc the change deleted whole queues nothing in `list review --base-ref`: its path is not
-in `changed`, which `_removed_sentences` (`src/irminsul/listing/review.py:458`) walks, and
+A doc the change deleted whole queues nothing in `list review --written --base-ref`: its path
+is not in `changed`, which `_removed_sentences` (`src/irminsul/listing/review.py`) walks, and
 its docstring records that as the rule (0 items for a `git rm` of a doc, 2026-10-28). So
 deleting a whole doc, which removes more prose than any cut, raises no "where does this
 live now" prompt. Queue a deleted doc's sentences like any other removal, grouped by doc.

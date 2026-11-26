@@ -92,11 +92,11 @@ Answered by the owner on 2026-11-25:
 - **The rule, by marker.** `--changed` holds no `edited` and no `removed-sentence` item, and
   every other item as today. `--written` holds those two kinds, built as `--changed` builds
   them today, and nothing else.
-- **What an item of `--changed` is about.** A sentence the change left as it was. What selects
-  it may still be the change's own edit to that doc: an edit to a body selects the untouched
-  `summary:`, and an edit to `describes:` selects the previous owner's sentences. A sentence a
-  previous owner keeps about a moved file, reworded in the same change, is therefore
-  `moved-file` in one list and `edited` in the other.
+- **What an item of `--changed` is about.** Almost always a sentence the change left as it
+  was. What selects it may still be the change's own edit to that doc: an edit to a body
+  selects the untouched `summary:`, and an edit to `describes:` selects the previous owner's
+  sentences. The one exception: a sentence a previous owner keeps about a moved file,
+  reworded in the same change, is `moved-file` in one list and `edited` in the other.
 - **Flags.** `--written` names a change as `--changed` does: alone it reads the uncommitted
   work, with `--base-ref` the range from the merge base, and `--committed-only` and a missing
   base behave as they do for `--changed` in `src/irminsul/cli.py`. `--base-ref` with neither

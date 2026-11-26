@@ -42,7 +42,8 @@ making a feature, a refactor and an RFC-driven change in it.
   reviewer reads `list review --written`, and a change with no second reader has its author
   read that list once, before the pull request. A newly scaffolded `docs/AGENTS.md` names the
   procedure. A root `AGENTS.md` and a protocol already scaffolded keep their text until
-  `init --force`.
+  `init --force`; until then their step 4 says `--changed` re-reads the sentences you added,
+  which is now `--written`'s, so edit that step by hand.
 
 **Findings and messages.**
 - `check --diff` with a base that does not resolve, such as `origin/main` in a repository with no
