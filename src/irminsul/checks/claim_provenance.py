@@ -82,7 +82,7 @@ class ClaimProvenanceCheck:
             "A claim's evidence was committed after the doc was and, where the claim pins "
             "it, no longer has the pinned hash. Review whether the claim is still true and "
             "update the doc if not; if it is, `irminsul anchors --re-pin --doc <doc> "
-            "--claim <id>` pins that claim's evidence as re-read."
+            "--claim <id> --evidence <file>` pins the evidence the finding names as re-read."
         ),
     }
     classes: ClassVar[dict[str, FindingClass]] = {
@@ -94,8 +94,8 @@ class ClaimProvenanceCheck:
     }
     answers: ClassVar[dict[str, Answer]] = {
         CODE_EVIDENCE_DRIFT: Answer.pin(
-            "re-read the claim against its evidence, then run `irminsul anchors --re-pin --doc "
-            "<doc> --claim <id>`"
+            "re-read the claim against the evidence it names, then run `irminsul anchors "
+            "--re-pin --doc <doc> --claim <id> --evidence <file>`"
         ),
     }
 
@@ -282,9 +282,7 @@ class ClaimProvenanceCheck:
         doc_when: _dt.datetime | None = None
         out: list[Finding] = []
         for claim in node.frontmatter.claims:
-            latest_path: str | None = None
-            latest_time: _dt.datetime | None = None
-            latest_pinned = False
+            changed: list[tuple[str, _dt.datetime, bool]] = []
             for evidence in claim.evidence:
                 evidence_abs = resolved.get(evidence)
                 if evidence_abs is None:
@@ -298,11 +296,8 @@ class ClaimProvenanceCheck:
                 evidence_time = last_commit_time_any_repo(graph.git, evidence_abs, graph.repo_root)
                 if evidence_time is None or evidence_time.when is None:
                     continue
-                if latest_time is None or evidence_time.when > latest_time:
-                    latest_time = evidence_time.when
-                    latest_path = evidence
-                    latest_pinned = pin is not None
-            if latest_time is None:
+                changed.append((evidence, evidence_time.when, pin is not None))
+            if not changed:
                 continue
             if not doc_read:
                 doc_read = True
@@ -310,29 +305,40 @@ class ClaimProvenanceCheck:
                     graph.git, graph.repo_root / node.path, graph.repo_root
                 )
                 doc_when = doc_time.when if doc_time is not None else None
-            if doc_when is None or latest_time <= doc_when:
+            if doc_when is None:
                 continue
-            since = " and since it was pinned" if latest_pinned else ""
-            out.append(
-                Finding(
-                    check=self.name,
-                    code=CODE_EVIDENCE_DRIFT,
-                    severity=Severity.warning,
-                    message=(
-                        f"claim '{claim.id}' cites evidence changed after the doc{since}: "
-                        f"'{latest_path}'"
-                    ),
-                    path=node.path,
-                    doc_id=node.id,
-                    suggestion=(
-                        "Review the claim and update the doc if the evidence changed its "
-                        "truth; if it still holds, record that with "
-                        f"`irminsul anchors --re-pin --doc {node.path.as_posix()} "
-                        f"--claim {claim.id}`"
-                    ),
-                )
-            )
+            drifted = [(path, pinned) for path, when, pinned in changed if when > doc_when]
+            if drifted:
+                out.append(self._drift_finding(node, claim.id, drifted))
         return out
+
+    def _drift_finding(
+        self, node: DocNode, claim_id: str, drifted: list[tuple[str, bool]]
+    ) -> Finding:
+        """One finding for a claim, naming every evidence file that drifted, and a re-pin
+        narrowed to those files: a pin of the claim's other evidence that no longer matches
+        is not what the reader was asked to re-read."""
+        since = ""
+        if all(pinned for _, pinned in drifted):
+            since = (
+                " and since it was pinned" if len(drifted) == 1 else " and since they were pinned"
+            )
+        named = ", ".join(f"'{path}'" for path, _ in drifted)
+        evidence = "".join(f" --evidence {path}" for path, _ in drifted)
+        return Finding(
+            check=self.name,
+            code=CODE_EVIDENCE_DRIFT,
+            severity=Severity.warning,
+            message=f"claim '{claim_id}' cites evidence changed after the doc{since}: {named}",
+            path=node.path,
+            doc_id=node.id,
+            suggestion=(
+                "Review the claim against the evidence named and update the doc if it changed "
+                "the claim's truth; if it still holds, record that with "
+                f"`irminsul anchors --re-pin --doc {node.path.as_posix()} "
+                f"--claim {claim_id}{evidence}`"
+            ),
+        )
 
     def _is_rfc_evidence(self, graph: DocGraph, path: Path) -> bool:
         assert graph.config is not None

@@ -132,6 +132,10 @@ making a feature, a refactor and an RFC-driven change in it.
   whether its text names a case, a success or a failure, that no scenario shows. It used to ask
   whether a negative or failure scenario was missing, which a requirement whose one scenario is the
   refusal could only answer by ignoring it.
+- `claim-provenance/evidence-drift` names every evidence file of the claim that changed after the
+  doc, and its suggestion re-pins only those, with `--evidence` for each. It used to name the
+  latest one and suggest `--claim` alone, which also moved a pin of the claim's other evidence
+  that no longer matched for a reason the finding never named.
 
 **Queries.**
 - `anchors --suggest --doc <doc>` also lists each code span of that doc that resolves to one
