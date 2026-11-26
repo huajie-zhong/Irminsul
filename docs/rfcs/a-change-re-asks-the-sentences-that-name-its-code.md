@@ -3,7 +3,7 @@ id: a-change-re-asks-the-sentences-that-name-its-code
 title: "A change re-asks the sentences that name its code"
 status: stable
 describes: []
-rfc_state: accepted
+rfc_state: implemented
 affects:
   - new-list-regen
   - context

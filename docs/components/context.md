@@ -39,6 +39,7 @@ summary: What governs a path — owning doc, ranked tests, active RFCs and next 
 implements:
   - an-edit-with-no-base-is-judged-against-head
   - a-topic-search-reads-doc-bodies
+  - a-change-re-asks-the-sentences-that-name-its-code
 ---
 
 # Agent context command
@@ -210,3 +211,10 @@ Content extraction does not rank relationships, estimate tokens, perform semanti
 - **a-topic-search-reads-doc-bodies#matches-that-need-a-body-are-bounded** — `context --topic` SHALL list every match that does not need body prose, then at most eight matches that do, and SHALL report how many more needed it and their ids, in the plain output and in the JSON. (provenance: code; [RFC](../rfcs/a-topic-search-reads-doc-bodies.md))
   <!-- anchor: src/irminsul/context.py#_bound_topic_matches @sha256:60d7090f8ddc -->
   <!-- anchor: tests/test_cli_context.py#test_context_topic_caps_only_the_matches_that_need_the_body @sha256:04ba8d67e9b5 -->
+- **a-change-re-asks-the-sentences-that-name-its-code#packet-names-docs-naming-a-file** — `irminsul context <path>` SHALL list, under `named_by`, each live doc, decision record and guidance file with a sentence whose code span names anything Irminsul resolves to code in that path, other than the path itself, with the number of such sentences, the eight docs with the most in the plain output with a count of the rest, and every doc in the JSON. An option SHALL count only when its sentence names the command that declares it, or one command alone declares it. (provenance: code; [RFC](../rfcs/a-change-re-asks-the-sentences-that-name-its-code.md))
+  <!-- anchor: src/irminsul/context.py#_named_by @sha256:ff78dc561dc4 -->
+  <!-- anchor: src/irminsul/listing/review.py#docs_naming @sha256:a2f504682ca3 -->
+  <!-- anchor: tests/test_cli_context.py#test_a_packet_names_the_docs_that_name_code_in_the_file @sha256:ff7117d60505 -->
+  <!-- anchor: tests/test_cli_context.py#test_named_by_counts_a_typescript_export @sha256:1ef8ec6045fc -->
+  <!-- anchor: tests/test_cli_context.py#test_the_plain_packet_lists_eight_docs_and_counts_the_rest @sha256:f78856282a79 -->
+  <!-- anchor: tests/test_cli_context.py#test_an_option_two_commands_declare_counts_only_beside_its_command @sha256:31f54dc7e6eb -->

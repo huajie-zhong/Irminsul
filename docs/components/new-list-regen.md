@@ -35,6 +35,7 @@ owns_tests:
 summary: "`new`, `list`, and `fix` commands, and the agent manifest `fix` rewrites."
 implements:
   - an-rfc-has-an-owners-part-and-an-agents-part
+  - a-change-re-asks-the-sentences-that-name-its-code
 inventory:
   - kind: cli
     source: src/irminsul/cli.py
@@ -98,3 +99,12 @@ A check that judges the manifest's prose reads it through `without_generated_reg
   <!-- anchor: src/irminsul/cli.py#new_rfc @sha256:aced4229a0cc -->
   <!-- anchor: tests/test_cli_new.py#test_a_new_rfc_is_written_in_two_parts @sha256:7fea3564fc4f -->
   <!-- anchor: tests/test_cli_new.py#test_a_new_small_rfc_is_written_in_two_parts @sha256:8ff92cc63c01 -->
+- **a-change-re-asks-the-sentences-that-name-its-code#change-queues-sentences-naming-its-code** — With a change, `list review` SHALL queue each sentence the change did not write, in a live doc, a decision record's Decision or a guidance file, whose code span names a function or class that the change edited, renamed or deleted, marked `names-changed-code`, and SHALL put that marker on the `edited` item of a sentence the change wrote that names one. A function or class is edited when its lines, its decorators included, differ between the merge base and where the change ends. It SHALL NOT queue a sentence for naming a command, an option, an environment variable or a path that the change touched. Functions and classes are those of Python source files. (provenance: code; [RFC](../rfcs/a-change-re-asks-the-sentences-that-name-its-code.md))
+  <!-- anchor: src/irminsul/listing/review.py#_sentences_naming_changed_code @sha256:0c4129753f51 -->
+  <!-- anchor: src/irminsul/listing/changed_code.py#ChangePairing.touched @sha256:d52e6b1c4925 -->
+  <!-- anchor: tests/test_review_changed_code.py#test_renaming_a_method_queues_the_sentence_that_names_the_old_name @sha256:1518bcce2c55 -->
+  <!-- anchor: tests/test_review_changed_code.py#test_a_function_whose_body_changed_queues_the_guide_that_names_it @sha256:d907b712f141 -->
+  <!-- anchor: tests/test_review_changed_code.py#test_a_sentence_naming_a_function_the_change_left_alone_is_not_queued @sha256:bf6fe45d167c -->
+  <!-- anchor: tests/test_review_changed_code.py#test_deleting_the_function_below_one_does_not_touch_the_one_above @sha256:40021132186f -->
+  <!-- anchor: tests/test_review_changed_code.py#test_a_command_whose_function_changed_queues_no_sentence_that_names_it @sha256:d239d1d4297f -->
+  <!-- anchor: tests/test_review_changed_code.py#test_a_file_that_is_named_and_edited_queues_no_sentence_that_names_it @sha256:9e98fda5ed20 -->
