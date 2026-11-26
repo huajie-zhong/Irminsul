@@ -527,6 +527,18 @@ later import of another `late_fee`, still has its tests offered for the function
 (`src/irminsul/binding.py`). Found by a review on 2026-11-26; no test of this repository does
 it.
 
+### `a-stale-pin-is-silent-while-its-doc-is-newer`
+
+`claim-provenance/evidence-drift` reads a pin that no longer matches its evidence as no pin and
+falls back to comparing commit times (`_evidence_drift` in
+`src/irminsul/checks/claim_provenance.py`), so a stale pin goes unreported while the doc's
+last commit is no older than the evidence's. On 2026-11-26 a merge resolved a conflict over
+`cli.py` pins in `docs/architecture/overview.md` and `docs/foundation/enforcement.md` by
+taking main's, which no longer matched the merged `cli.py`; the merge commit touched both
+docs, so the branch's gates passed. Squashed onto main, the commit touched `cli.py` and not
+the docs, and three warnings appeared on main. A stale pin reported as drift whatever the
+commit times would catch it on the branch, and reports more than today, so it is a decision.
+
 ### `decision-edit-is-confirmed-twice`
 
 The accepted RFC `decision-records-govern-what-they-decide` answers an edit of a record's
