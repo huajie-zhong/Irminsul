@@ -430,8 +430,8 @@ and keep it in each row's JSON. Found by a review of the RFC
 
 With no `paths.test_roots` declared, `anchors --suggest --doc <doc>` prints "no test file was
 read" in its plain output alone (`_suggest_anchors` in `src/irminsul/cli.py`); in the JSON each
-row's `tests` is `[]`, the same as for a function no test names, so an agent reading the JSON,
-or the MCP tool that returns it, cannot tell the two apart. The plain output also prints "no
+row's `tests` is `[]`, the same as for a function no test names, so an agent reading the JSON
+cannot tell the two apart. The plain output also prints "no
 test names it" under each name when it read no test at all. Found by a review on 2026-11-26.
 
 ### `a-file-level-rebinding-still-names-the-definition`
