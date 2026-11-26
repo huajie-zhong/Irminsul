@@ -234,18 +234,39 @@ class CodeResolver:
             if best is not None:
                 refs.append(self._ref(span, kind, items[best]))
         if not refs and _SYMBOL_RE.match(text):
-            dotted = text.removesuffix("()").split(".")
-            qualified = ".".join(dotted[-2:])
-            name = dotted[-1]
-            found = self._symbols.get(qualified) if len(dotted) > 1 else None
-            if not found:
-                found = self._symbols.get(name)
-            if found and len(found) == 1:
+            key = self._symbol_key(text)
+            found = self._symbols[key] if key is not None else []
+            if key is not None and len(found) == 1:
                 display, line, end = found[0]
-                refs.append(Reference(span, "symbol", name, display, line, end))
+                refs.append(Reference(span, "symbol", key.rsplit(".", 1)[-1], display, line, end))
         if not refs and (text in self._abs_by_display or self._repo_file(text) is not None):
             refs.append(Reference(span, "path", text, text, None))
         return refs
+
+    def _symbol_key(self, text: str) -> str | None:
+        """The index name a symbol span is looked up under: `Class.name` when the span is
+        dotted and a class has that member, else the bare name when anything has it."""
+        dotted = text.removesuffix("()").split(".")
+        qualified = ".".join(dotted[-2:])
+        if len(dotted) > 1 and self._symbols.get(qualified):
+            return qualified
+        return dotted[-1] if self._symbols.get(dotted[-1]) else None
+
+    def named_as(self, ref: Reference) -> str:
+        """What tells the code `ref` names from other code of its kind: its identity, or for
+        a function or class the index name its span was looked up under, so that
+        `Ledger.remove` and a `remove` it falls back to are two names."""
+        if ref.kind != "symbol":
+            return ref.identity
+        return self._symbol_key(self.strip_program(ref.span)[0]) or ref.identity
+
+    def has(self, kind: str, name: str, display: str) -> bool:
+        """Whether `display` still declares the surface identity, or defines the function or
+        class, that `named_as` calls `name`."""
+        if kind == "symbol":
+            return any(where[0] == display for where in self._symbols.get(name, ()))
+        item = self.surfaces.get(kind, {}).get(name)
+        return item is not None and item.display == display
 
     def _repo_file(self, text: str) -> Path | None:
         """A repository file named by its repo-relative path, inside a source root or not."""

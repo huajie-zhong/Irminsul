@@ -135,6 +135,40 @@ def test_renaming_a_method_queues_the_sentence_that_names_the_old_name(ledger: P
     ]
 
 
+def test_a_renamed_method_is_not_hidden_by_a_method_of_the_same_name_beside_it(
+    ledger: Path,
+) -> None:
+    """With `Drawer.remove` in the same file, the span `Ledger.remove` pairs with it once
+    `Ledger.remove` is gone. That is another definition, so the one the sentence named was
+    still removed."""
+    with (ledger / CORE).open("a", encoding="utf-8") as file:
+        file.write(
+            "\n\nclass Drawer:\n"
+            '    """Coins, counted by hand."""\n\n'
+            "    def remove(self, coins: int) -> None:\n"
+            '        """Take `coins` out."""\n'
+        )
+    commit_all(ledger, "a drawer", when=LATER)
+    replace_text(ledger, CORE, "def remove(self, index", "def delete(self, index")
+
+    items = _queue(ledger)
+
+    assert _named(items) == {(COMPONENT, "Ledger.remove"), (USAGE, CORE)}
+    assert _changed_code(items, COMPONENT, "Ledger.remove")["removed"] is True
+
+
+def test_a_name_a_second_definition_made_ambiguous_is_not_called_removed(ledger: Path) -> None:
+    """`parse_amount()` pairs with nothing once two functions have that name, and the one it
+    named is still in its file, untouched, so the change removed nothing."""
+    replace_text(ledger, CORE, *TOTAL_BODY)
+    with (ledger / CLI).open("a", encoding="utf-8") as file:
+        file.write(
+            '\n\ndef parse_amount(text: str) -> int:\n    """Not the ledger\'s."""\n    return 0\n'
+        )
+
+    assert _named(_queue(ledger)) == {(COMPONENT, "Ledger.total"), (USAGE, CORE)}
+
+
 def test_deleting_a_method_queues_the_sentence_that_names_it(ledger: Path) -> None:
     replace_text(ledger, CORE, REMOVE_METHOD, "")
 

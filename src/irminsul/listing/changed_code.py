@@ -119,9 +119,11 @@ class ChangePairing:
     """Which of the code a span names the change touched.
 
     Code the after side still has is touched when a changed line falls in the lines
-    `CodeResolver.declared_lines` gives it. Code the span named at the base and names no
-    longer, in a file the change edited, renamed or deleted, was removed or renamed by the
-    change; a file git says was only renamed keeps what it defines.
+    `CodeResolver.declared_lines` gives it. Code the span named at the base, in a file the
+    change edited, renamed or deleted, was removed or renamed by the change when the span no
+    longer names it and that file no longer has it; a file git says was only renamed keeps
+    what it defines. A span that pairs with other code now, or with none because a second
+    definition took its name, did not lose code that is still where it was.
     """
 
     def __init__(
@@ -144,14 +146,16 @@ class ChangePairing:
         self._at_head: frozenset[str] | None = None
         self._dirty: frozenset[str] = frozenset()
         self.after = resolver
+        after_tree = self._live
         if committed_only:
             self._dirty = self._uncommitted()
             self._at_head = self._tracked("HEAD")
             if self._dirty and self._at_head is not None:
-                self.after = CodeResolver(
-                    SourceAtCommit(self._live, self._git, "HEAD", self._at_head, self._dirty),
-                    tracked=self._at_head,
+                after_tree = SourceAtCommit(
+                    self._live, self._git, "HEAD", self._at_head, self._dirty
                 )
+                self.after = CodeResolver(after_tree, tracked=self._at_head)
+        self._after_source = frozenset(display for _, display in after_tree.files)
         self._memo: dict[str, list[ChangedCode]] = {}
 
     def _uncommitted(self) -> frozenset[str]:
@@ -180,9 +184,8 @@ class ChangePairing:
         tracked = self._tracked(self._base_ref)
         if tracked is None:
             return None
-        walked = {display for _, display in self._live.files}
         if not any(
-            (path in self._changed and path in walked) or not self._on_after_side(path)
+            (path in self._changed and path in self._after_source) or not self._on_after_side(path)
             for path in tracked
         ):
             return None
@@ -212,12 +215,15 @@ class ChangePairing:
                 out.append(ChangedCode(span, ref.kind, ref.identity, ref.defined_at, line))
         before = self._before
         if before is not None:
-            held = {(ref.kind, ref.identity, ref.defined_at) for ref in now}
+            held = {(ref.kind, self.after.named_as(ref), ref.defined_at) for ref in now}
             for ref in before.resolve(span):
                 was_in = ref.defined_at
                 if was_in not in self._changed and self._on_after_side(was_in):
                     continue
-                if (ref.kind, ref.identity, self._renamed.get(was_in, was_in)) in held:
+                name, now_in = before.named_as(ref), self._renamed.get(was_in, was_in)
+                if (ref.kind, name, now_in) in held:
+                    continue
+                if ref.kind != "path" and self.after.has(ref.kind, name, now_in):
                     continue
                 out.append(
                     ChangedCode(span, ref.kind, ref.identity, was_in, ref.line, removed=True)
