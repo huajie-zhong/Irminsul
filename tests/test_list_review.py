@@ -123,6 +123,25 @@ def test_drafts_fences_and_sentences_naming_no_code_are_left_out(tmp_path: Path)
     assert all(item["path"] == "docs/components/pipeline.md" for item in _items(tmp_path))
 
 
+def test_a_comment_over_several_lines_holds_no_sentence(tmp_path: Path) -> None:
+    """A scaffold's guiding comment is not prose, on its first line or after it; a comment
+    marker quoted in a code span opens nothing, so the sentences after it are still read."""
+    body = (
+        "<!-- Tie each sentence to code:\n"
+        "     - name it in a code span: `find_config()` binds a function. -->\n\n"
+        "Write `<!--` to open a comment; `find_config()` exits 1 when no config exists.\n"
+    )
+    _repo(tmp_path)
+    write(tmp_path, "docs/components/pipeline.md", _doc("pipeline", body))
+
+    assert [(item["line"], item["sentence"]) for item in _items(tmp_path)] == [
+        (
+            13,
+            "Write `<!--` to open a comment; `find_config()` exits 1 when no config exists.",
+        )
+    ]
+
+
 def test_doc_filter_and_cli_exit_code(tmp_path: Path) -> None:
     root = _repo(tmp_path)
     assert _items(root, "docs/components/draft.md") == []

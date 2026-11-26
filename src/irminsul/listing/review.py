@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Final, Literal
 import typer
 
 from irminsul.checks.change_range import after_text
-from irminsul.checks.code_spans import is_live_doc
+from irminsul.checks.code_spans import CommentTracker, is_live_doc
 from irminsul.code_references import CodeResolver, Reference
 from irminsul.config import IrminsulConfig, docs_root_prefix, in_layer
 from irminsul.docgraph import (
@@ -158,6 +158,8 @@ def _text_sentences(text_body: str) -> list[tuple[int, int, str]]:
     """(first line, last line, sentence) for each sentence of prose in `text_body`.
 
     A table row is one sentence, and a fenced block, a heading and a comment line hold none.
+    A comment line is one that opens with `<!--` or begins inside a comment an earlier line
+    opened, so a scaffold's guiding comment over several lines is not read as prose.
     """
     out: list[tuple[int, int, str]] = []
     block: list[tuple[int, str]] = []
@@ -183,8 +185,12 @@ def _text_sentences(text_body: str) -> list[tuple[int, int, str]]:
         block.clear()
 
     fence = FenceTracker()
+    comments = CommentTracker()
     for lineno, line in enumerate(text_body.splitlines(), start=1):
-        if fence.consume(line):
+        if not comments.inside and fence.consume(line):
+            flush()
+            continue
+        if comments.read(line)[0]:
             flush()
             continue
         if line.lstrip().startswith("|"):

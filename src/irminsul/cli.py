@@ -1715,7 +1715,7 @@ def _suggest_anchors(
             continue
         bound = bound_names(node.body)
         seen: set[str] = set()
-        for span in code_spans(node.body):
+        for span in code_spans(node.body, skip_comments=True):
             for name in unbound_names([span.text], resolver, bound):
                 if name in seen:
                     continue
