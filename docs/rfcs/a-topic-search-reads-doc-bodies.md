@@ -3,7 +3,7 @@ id: a-topic-search-reads-doc-bodies
 title: "A topic search reads doc bodies"
 status: stable
 describes: []
-rfc_state: accepted
+rfc_state: implemented
 affects:
   - context
   - docgraph
