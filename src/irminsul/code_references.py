@@ -9,7 +9,7 @@ from __future__ import annotations
 import ast
 import re
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
 from irminsul.checks.code_spans import mention_regex
@@ -20,6 +20,7 @@ from irminsul.inventory.base import SourceReader
 from irminsul.inventory.cli_options import command_options
 from irminsul.inventory.programs import program_names
 from irminsul.languages import LANGUAGE_REGISTRY
+from irminsul.languages.python import PYTHON_PROFILE
 
 if TYPE_CHECKING:
     from irminsul.git.reader import GitReader
@@ -44,8 +45,14 @@ class Reference:
 
 
 class CodeResolver:
-    def __init__(self, tree: SourceTree) -> None:
+    def __init__(self, tree: SourceTree, *, tracked: frozenset[str] | None = None) -> None:
+        """Pair names with the code `tree` holds.
+
+        `tracked` is given for a tree that is one commit's: the repository paths that commit
+        holds, which then say whether a span names a file, where the disk otherwise does.
+        """
         repo_root, config = tree.repo_root, tree.config
+        self._tracked = tracked
         self.builtins: frozenset[str] = frozenset().union(
             *(LANGUAGE_REGISTRY[name].builtins for name in config.languages.enabled)
         )
@@ -56,6 +63,7 @@ class CodeResolver:
         self._command_blocks: dict[str, str] | None = None
         self._command_flags: dict[str, frozenset[str]] | None = None
         self._source_tokens: set[str] | None = None
+        self._functions: dict[str, list[tuple[int, int]]] = {}
         self.surfaces: dict[str, dict[str, SurfaceItem]] = {}
         self.mentions: dict[str, list[re.Pattern[str]]] = {}
         self.command_kinds: set[str] = set()
@@ -244,6 +252,8 @@ class CodeResolver:
         if not text or text.startswith(("/", "..")) or any(c in text for c in " *?<>|\"'"):
             return None
         candidate = self._repo_root / text
+        if self._tracked is not None:
+            return candidate if text in self._tracked else None
         try:
             return candidate if candidate.is_file() else None
         except OSError:
@@ -252,6 +262,50 @@ class CodeResolver:
     @staticmethod
     def _ref(span: str, kind: str, item: SurfaceItem) -> Reference:
         return Reference(span, kind, item.identity, item.display or "", item.line, item.line)
+
+    def in_repository(self, display: str) -> bool:
+        """Whether `display` is spelled from the repository root, as a change's paths are. A
+        walked file in a source root outside the repository is spelled from that root."""
+        path = self._abs_by_display.get(display)
+        return path is None or path == self._repo_root.resolve() / display
+
+    def declared_lines(self, ref: Reference) -> tuple[int | None, int | None]:
+        """The first and last line whose change is a change to what `ref` names, or
+        `(None, None)` when that is its whole file.
+
+        A function or class is its own range and a path its file. A surface identity is its
+        declaring line, or the innermost Python function that holds that line, decorators
+        included, because a command's options and body are what the command is. An identity
+        whose extractor gives no line is its file.
+        """
+        if ref.kind == "path" or ref.line is None:
+            return None, None
+        if ref.kind == "symbol":
+            return ref.line, ref.line_end or ref.line
+        holding = (ref.line, ref.line)
+        # An outer function comes before the ones inside it, so the last one that holds the
+        # line is the innermost.
+        for first, last in self._function_lines(ref.defined_at):
+            if first <= ref.line <= last:
+                holding = (first, last)
+        return holding
+
+    def _function_lines(self, display: str) -> list[tuple[int, int]]:
+        """The first and last line of each function a Python source file defines, at any
+        depth and decorators included, in `ast.walk` order; none for any other file."""
+        if display not in self._functions:
+            abs_path = self._abs_by_display.get(display)
+            python = PurePosixPath(display).suffix in PYTHON_PROFILE.suffixes
+            module = self._reader.module(abs_path) if abs_path is not None and python else None
+            self._functions[display] = [
+                (
+                    min([node.lineno, *(d.lineno for d in node.decorator_list)]),
+                    node.end_lineno or node.lineno,
+                )
+                for node in (module.nodes if module is not None else ())
+                if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+            ]
+        return self._functions[display]
 
     def changed_after(
         self, git: GitReader, doc_abs: Path, references: list[Reference], lines: LineTimes

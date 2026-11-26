@@ -92,10 +92,21 @@ its change connects to.
   loop says so.
 - **`list review` routes semantic checking and never decides truth.** It reads live docs, the
   `## Decision` of decision records, and the guidance files. With a change, given by `--changed`
-  or `--base-ref`, it queues each sentence the change added, reworded or deleted, each claim
+  or `--base-ref`, it queues each sentence the change added, reworded or deleted, each sentence
+  whose code span names code the change touched, each claim
   other than a report whose evidence it touched, each sentence an old owner keeps about a file moved to another doc,
   and each `summary:` left behind a rewritten body. Without one it queues sentences that name
   code. An item's markers name the fact that selected it, and the output defines each once.
+- **A change re-asks the sentences that name its code.** In every file the queue reads, the
+  change's own or not, a sentence whose code span names code the change edited, renamed or
+  deleted is queued, marked `names-changed-code`, with the code and the change's file and line.
+  What a span names is what freshness says it names. A function or class is touched when the
+  change alters a line in its range; a command, an option, an environment variable or any other
+  surface identity when its declaring line, or the function that declares it, is altered or
+  removed; a file when the change edits, renames or deletes it. Code the change removed or
+  renamed is found in the merge base's text, and the rest where the change ends, the working
+  tree or `HEAD`. A sentence the change itself wrote keeps its one item and carries the marker
+  on it. Whether a queued sentence still holds is meaning, so none of this is a finding.
 - **Freshness marks what to read.** Without a change, an item is marked only when a line of the
   definition it names, a function's or class's range, a surface identity's declaring line, or a
   whole file for a path, changed after the doc's last commit, by one `git blame` per file;
@@ -142,3 +153,6 @@ its change connects to.
 - 2026-11-25: Accepted [The change queue asks about what the change did not write](../rfcs/the-change-queue-asks-about-what-the-change-did-not-write.md):
   `list review --changed` drops the sentences a change wrote or deleted, and `list review --written`
   lists them for the change's reviewer.
+- 2026-11-26: The re-ask of named code is implemented: `list review --changed` queues each
+  sentence whose code span names code the change edited, renamed or deleted, marked
+  `names-changed-code`, and the Decision states what touched means.

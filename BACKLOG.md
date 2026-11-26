@@ -60,8 +60,8 @@ rules, per section and per changed definition, were considered and deferred by
 A decision record's `governs:` names the code it decides, and nothing reads that list yet. The
 accepted RFC `decision-records-govern-what-they-decide` makes `irminsul context <path>` name the
 governing record before an edit; it does not re-ask the record's Decision when that code
-changes. A Decision that names the code in a code span will be queued by
-`a-change-re-asks-the-sentences-that-name-its-code`. One that states the rule in plain words is
+changes. A Decision that names the code in a code span is queued by `list review --changed`
+when the change touches that code, marked `names-changed-code`. One that states the rule in plain words is
 reached by neither, and the case `decision-governs-the-function` of `tests/test_seeded_rot.py`
 pins that. On 2026-11-25 every one of the 14 records named code somewhere in its Decision, and
 167 of the 339 Decision sentences named code the queue resolves (a review). Queue a record's Decision when a change touches what the
@@ -321,26 +321,42 @@ about 70 of them the agent's own new sentences, with the claims whose evidence c
 doc nobody edited mixed in (2026-10-29). Group the plain output by marker, the items the change
 did not write first.
 
-### `changed-queue-reads-doc-edits-not-code-edits`
+### `named-code-queue-is-mostly-command-names`
 
-`list review --changed` reads sentences only from the docs the change touched
-(`src/irminsul/listing/review.py:292`). Beside those it holds the claims that cite a changed
-file as evidence, stale summaries, and moved or removed sentences. A change to code that no
-claim cites queues nothing: commit `460c44c`, which changed `review.py` and its test, prints
-"0 items", which reads as "nothing to re-read". Run with today's code on 2026-11-25 over the
-three pull requests merged on 2026-10-30 and 2026-10-31 (heads `89772e4`, `dde68e0`, `ffa39b4`)
-and two single commits, the queue held 189 items: 99 sentences the change itself wrote, 29
-summaries of docs whose body changed, 20 claims whose evidence file changed in a part they do
-not rest on, 19 removed sentences, 8 with a wrong reference, and 14 worth the re-read. A few
-of the 19 were list items a deletion had only renumbered, which are no longer queued. Eight sentences those pull requests made false and did not edit were in no queue. The
-accepted RFC `a-change-re-asks-the-sentences-that-name-its-code` queues the ones that name
-changed code; four of the eight name no code, which is
-`connected-doc-hides-unconnected-sections`. Until it lands, say in the output that changed
-source is not read. The owner's direction on 2026-11-25 is that this queue asks only about what
-the change did not write and may have made stale, and leaves the sentences the change wrote to
-its reviewer; a draft RFC, `the-change-queue-asks-about-what-the-change-did-not-write`, on the
-branch `rfc/change-queue-asks-what-the-change-did-not-write` and not on main, proposes it. These counts replace the ones in
-`queue-is-unranked`, measured before the fixes of 2026-10-31.
+Since 2026-11-26 `list review --changed` queues each sentence whose code span names code the
+change touched, marked `names-changed-code` (`_sentences_naming_changed_code`,
+`src/irminsul/listing/review.py`), so a change to code that no claim cites is no longer silent
+where a doc names that code. Run that day over four past ranges of this repository, the queue
+went from 0 to 0 items for commit `460c44c`, from 26 to 29 for commit `9759e15`, from 48 to 214
+for the pull request `dde68e0..ffa39b4` and from 108 to 179 for `ffa39b4..55ab870`. Of the 166
+new items of the pull request, 154 come from three hunks inside the functions of `check`,
+`context` and `fix`: the Decision of `derive-facts-and-leave-meaning-to-the-reader` says a
+command or an option is touched when the function that declares it is altered, so the two lines
+the pull request added to `check` queue the 61 sentences that name `check` and those that name
+any of its options. Of ten of the 166 taken at even steps, none was about what the change
+altered, one named the option whose help the change reworded, and two named another command's
+option of the same name (`--confirm`, `--base-ref`), because an option's identity is not scoped
+by its command (`review-binds-common-words`). The three that name a changed function
+(`acknowledge`, `trailer_for`, `create_server`) were worth the re-read. A file named in a code
+span is asked about on any edit to it, so the sentences that name `CHANGELOG.md` and
+`BACKLOG.md` are in the queue of nearly every change. `460c44c` still prints "0 items", because
+no sentence names the functions it changed in a code span, which is
+`connected-doc-hides-unconnected-sections`. Counting a command as touched by its signature and
+decorators alone, or scoping an option to its command, would shorten the list; each changes
+what that Decision says, so it is the owner's call.
+
+The measurement of 2026-11-25 that the entries beside this one cite: run with that day's code
+over the three pull requests merged on 2026-10-30 and 2026-10-31 (heads `89772e4`, `dde68e0`,
+`ffa39b4`) and two single commits, the queue held 189 items: 99 sentences the change itself
+wrote, 29 summaries of docs whose body changed, 20 claims whose evidence file changed in a part
+they do not rest on, 19 removed sentences, 8 with a wrong reference, and 14 worth the re-read. A
+few of the 19 were list items a deletion had only renumbered, which are no longer queued. Eight
+sentences those pull requests made false and did not edit were in no queue; four of the eight
+name no code, which is `connected-doc-hides-unconnected-sections`. The owner's direction on
+2026-11-25 is that this queue asks only about what the change did not write and may have made
+stale, and leaves the sentences the change wrote to its reviewer; the accepted RFC
+`the-change-queue-asks-about-what-the-change-did-not-write` carries it out. These counts replace
+the ones in `queue-is-unranked`, measured before the fixes of 2026-10-31.
 
 ### `stale-summary-asks-after-any-body-edit`
 

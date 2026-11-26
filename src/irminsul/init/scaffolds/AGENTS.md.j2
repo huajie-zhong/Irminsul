@@ -26,10 +26,11 @@ Work every change in this order. `irminsul orient` lists the commands; each take
 4. After editing, run `irminsul context --after-edit` for the findings your change
    introduced, and `irminsul list review --changed` to re-read each sentence you added
    or changed against the code it names. Both also queue the claims whose evidence you
-   touched, in docs you may never have opened: read the doc and the decisions it links,
-   and answer the question asked. The review queue is a reading list: fix a sentence
-   that is wrong, and leave one you re-read and found right. Only a finding needs a
-   recorded answer. On a branch with committed work, give both `--base-ref origin/<base>`.
+   touched, and the review queue the sentences anywhere that name code you changed, in
+   docs you may never have opened: read the doc and the decisions it links, and answer
+   the question asked. The review queue is a reading list: fix a sentence that is wrong,
+   and leave one you re-read and found right. Only a finding needs a recorded answer. On
+   a branch with committed work, give both `--base-ref origin/<base>`.
 5. Run `irminsul fix` for the deterministic remediations of mechanical findings.
 6. Before committing, run `irminsul check` and the tests your change touches; it must
    exit 0.

@@ -1,8 +1,9 @@
 """`irminsul list review` — sentences to re-read, each paired with the code it names.
 
 Items are selected by facts alone, and each label names the fact: a line the change edited
-or deleted, a claim whose evidence it touched, a file it moved to another doc, a summary it
-left behind, or, across the whole tree, a sentence that names code. What a sentence means
+or deleted, code it touched that a sentence names, a claim whose evidence it touched, a file
+it moved to another doc, a summary it left behind, or, across the whole tree, a sentence that
+names code. What a sentence means
 is the reader's to judge, so no list of words decides what is shown. The output explains
 each label it shows from `MARKER_MEANINGS`, the one place a label's meaning is written.
 """
@@ -39,6 +40,7 @@ from irminsul.git.mtime import git_root_for
 
 if TYPE_CHECKING:
     from irminsul.git.reader import GitReader
+    from irminsul.listing.changed_code import ChangedCode, ChangePairing
 
 REVIEW_VERSION = 1
 
@@ -56,6 +58,11 @@ MARKER_MEANINGS: Final[dict[str, str]] = {
     "unbound-name": (
         f"a code name nothing resolves and no anchor binds; {UNBOUND_ADVICE}, reword the "
         "sentence if it is not this repository's code, leave it if no anchor can reach it"
+    ),
+    "names-changed-code": (
+        "a sentence naming code this change edited, renamed or deleted; `changed:` and "
+        "`removed:` under it give the code, file and line. Re-read it against the code as it "
+        "is now"
     ),
     "governing-claim": (
         "a claim whose evidence this change touched. Under governs-evidence ask whether the "
@@ -106,6 +113,8 @@ class ReviewItem:
     unbound: list[str] = field(default_factory=list)
     was: str | None = None
     """The sentence an edit replaced, so a reader sees both texts."""
+    changed_code: list[ChangedCode] = field(default_factory=list)
+    """The code the sentence names that the change touched, and where."""
 
 
 def shipped_draft_evidence(
@@ -262,7 +271,8 @@ def build_review(
     """The sentences to re-read, each with the code it names.
 
     With `changed`, every sentence on a changed line that its doc did not already say at
-    `base_ref` is kept as `edited`, with every sentence the change deleted, each claim whose
+    `base_ref` is kept as `edited`, with every sentence the change deleted, each sentence, in
+    any file the queue reads, whose code span names code the change touched, each claim whose
     evidence it touched, the sentences an old owner still has about a file it moved, and a
     summary its body edit left behind. A sentence that replaced one in place is one edit,
     which carries the sentence it replaced as `was`, so the deletion is not queued twice.
@@ -274,6 +284,7 @@ def build_review(
     The prose is read from the working tree, or from `HEAD` under `committed_only`.
     """
     from irminsul.binding import bound_names, unbound_names
+    from irminsul.listing.changed_code import ChangePairing
 
     head = "HEAD" if committed_only else None
 
@@ -288,7 +299,9 @@ def build_review(
     uncommitted: dict[str, bool] = {}
     revisions: dict[str, _Revision] = {}
     queued: dict[str, set[int]] = {}
-    for path, rows in _review_sentences(config, graph, read).items():
+    written: dict[tuple[str, int], ReviewItem] = {}
+    sentences = _review_sentences(config, graph, read)
+    for path, rows in sentences.items():
         if changed is not None and path not in changed:
             continue
         revision: _Revision | None = None
@@ -338,7 +351,10 @@ def build_review(
             items.append(item)
             if revision is not None:
                 queued.setdefault(path, set()).add(position)
+                written[path, position] = item
     if changed is not None:
+        pairing = ChangePairing(graph, resolver, changed, base_ref, committed_only=committed_only)
+        items.extend(_sentences_naming_changed_code(sentences, pairing, written))
         items.extend(_stale_summaries(graph, changed, read))
         items.extend(_governing_claims_over_changed_code(graph, changed, read))
         items.extend(_moved_file_sentences(graph, changed, base_ref, read))
@@ -349,15 +365,57 @@ def build_review(
     )
 
 
+def _sentences_naming_changed_code(
+    sentences: dict[str, list[tuple[int, int, str]]],
+    pairing: ChangePairing,
+    written: dict[tuple[str, int], ReviewItem],
+) -> list[ReviewItem]:
+    """The sentences whose code span names code the change edited, renamed or deleted.
+
+    Every file the queue reads is asked, whether the change touched it or not, because the
+    doc that names a function is often one nobody opened: a guide that owns no code, or the
+    README. Each such sentence is an item marked `names-changed-code`. A sentence the change
+    itself wrote is already queued as `edited`, in `written` by file and position, and takes
+    the marker on that item instead of a second one, so these items are about sentences the
+    change left as they were. Nothing here says a sentence is wrong: the fact is that the
+    code under its name changed.
+    """
+    out: list[ReviewItem] = []
+    for path, rows in sentences.items():
+        for position, (file_line, _, sentence) in enumerate(rows):
+            spans = [m.group(2) for m in _SPAN_RE.finditer(sentence)]
+            touched = list(dict.fromkeys(code for span in spans for code in pairing.touched(span)))
+            if not touched:
+                continue
+            own = written.get((path, position))
+            if own is not None:
+                own.markers.append("names-changed-code")
+                own.changed_code = touched
+                continue
+            references = [ref for span in spans for ref in pairing.after.resolve(span)]
+            references.extend(pairing.after.resolve_prose(_SPAN_RE.sub(" ", sentence)))
+            out.append(
+                ReviewItem(
+                    path=path,
+                    line=file_line,
+                    sentence=sentence,
+                    markers=["names-changed-code"],
+                    references=references,
+                    changed_code=touched,
+                )
+            )
+    return out
+
+
 def _governing_claims_over_changed_code(
     graph: DocGraph, changed: ChangedLines, read: Callable[[str], str | None]
 ) -> list[ReviewItem]:
     """`governs-evidence` claims whose evidence this change touched.
 
-    The rest of this queue is reached from a changed doc line. These are reached from
-    changed *code*, which is the only way a contract whose document nobody opened gets
-    re-read: the queue would otherwise be empty for exactly the change that most needs
-    a reader.
+    Like the sentences that name changed code, these are reached from changed *code* and
+    not from a changed doc line. For a contract that names no code in a code span it is the
+    only way its document gets re-read when nobody opened it, which is exactly the change
+    that most needs a reader.
     """
     from irminsul.context import claim_reviews_for_paths
 
@@ -790,6 +848,13 @@ def list_review(
             typer.echo(f"    `{ref['span']}` -> {ref['kind']} {ref['identity']} ({where})")
         for name in item.get("unbound", []):
             typer.echo(f"    `{name}` -> unbound; {UNBOUND_ADVICE}")
+        for code in item["changed_code"]:
+            named = f"{code['kind']} {code['identity']}"
+            where = code["path"] if code["line"] is None else f"{code['path']}:{code['line']}"
+            if code["removed"]:
+                typer.echo(f"    removed: {named}, at {where} before this change")
+            else:
+                typer.echo(f"    changed: {named} at {where}")
     if not items:
         typer.echo("(none)")
         return

@@ -161,6 +161,17 @@ making a feature, a refactor and an RFC-driven change in it.
 - `list review` no longer splits the marker of a numbered list item, such as `1.`, into a sentence
   of its own, and without `--changed` it lists every code-naming sentence of a doc no commit holds
   yet, instead of reporting that none changed since the doc was last committed.
+- `list review --changed` also queues each sentence whose code span names code the change edited,
+  renamed or deleted, marked `names-changed-code`, in any live doc, decision record's Decision or
+  guidance file, whether or not the change opened it: a guide that names a command is asked
+  about it when the command's function changes. A function or class is touched by a changed
+  line in its range, a command, option or other surface identity by one on its declaring line or
+  in the function that declares it, and a file by any edit. A name the change removed or renamed
+  is found in the merge base's text. Each item lists the code and the change's file and line,
+  as `changed_code` in the JSON and as `changed:` and `removed:` lines in plain output. A
+  sentence the change itself wrote keeps its one `edited` item, which carries the marker. An
+  edit inside a long command's function queues every sentence that names the command or one of
+  its options.
 - `irminsul refs` accepts any Markdown file in the repository as a target, so a brownfield page
   with no frontmatter can be asked what links to it before it is moved.
 - `context --after-edit` JSON is reshaped. Each result has `input`, `owner` (only its `id` and

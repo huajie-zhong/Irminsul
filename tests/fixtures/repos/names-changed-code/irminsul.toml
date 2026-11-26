@@ -1,0 +1,9 @@
+project_name = "names-changed-code-fixture"
+
+[paths]
+docs_root = "docs"
+source_roots = ["src"]
+extra_docs = ["README.md"]
+
+[frameworks]
+command_names = ["ledger"]
