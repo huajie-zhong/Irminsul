@@ -367,6 +367,32 @@ were summaries the edit could not have affected: "CLI entry point." for
 record says "a rewritten body", and one changed line is not that. Print them as one group that
 closes the plain output, or decide what "rewritten" means; the second is a decision.
 
+### `named-by-is-most-of-the-packet`
+
+`irminsul context src/irminsul/cli.py --format json` went from 25 KB to 112 KB on 2026-11-26,
+when the packet gained `named_by` (`_named_by`, `src/irminsul/context.py`): 553 entries, for 318
+lines of 50 files, and an MCP caller of `context_for_path` gets the same answer. The call went
+from 1.2 to about 2 seconds, because the packet now pairs every code span in the docs, and
+`list review --changed` from 1.9 to 2.4 on a pull request, because it pairs them at the merge
+base too. Plain output lists ten sentences for a path and counts the rest. The Decision of
+`agents-get-stateless-read-only-queries-and-one-written-loop` says the JSON carries every one,
+where a topic search bounds its JSON so that the MCP answer is bounded too. Bounding this list
+the same way, with the count and a command that lists the rest, changes that Decision, so it is
+the owner's call.
+
+### `help-and-tool-description-leave-out-the-named-code-lists`
+
+The help of `list review --changed` (`src/irminsul/cli.py`) says the queue of a change holds
+"edited and deleted sentences in the working tree vs HEAD, and the claims, moved files and
+summaries it touched", and the description of the MCP tool `context_for_path`
+(`src/irminsul/mcp_server.py`) says a packet holds each file's "owning doc, source claims,
+tests, dependencies, active RFCs, claims to read, and excerpts". Since 2026-11-26 the first
+leaves out the sentences that name changed code and the second the sentences that name a
+path's code. The RFC that added both, `a-change-re-asks-the-sentences-that-name-its-code`,
+declares `affects: new-list-regen, context, init`, so the change that implemented it left
+`cli.py` and `mcp_server.py` alone: an edit to either under that RFC is `unreconciled-scope`.
+Add the two phrases in a small fix, or name `cli` and `mcp-server` in the RFC's `affects`.
+
 ### `lifecycle-queue-shows-no-progress`
 
 `irminsul list lifecycle --queue` prints one line per accepted RFC, each ending "accepted RFC
