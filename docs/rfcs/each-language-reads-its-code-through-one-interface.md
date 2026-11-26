@@ -19,11 +19,11 @@ weight: large
 ## Summary
 
 A feature that needs to know what a file defines, where a definition starts and ends, what a
-file imports, or which names a function body refers to asks Python's own parser today, in
-six places. So each feature built that way reaches Python alone: binding a code span to a
+file imports, which names a function body refers to, or which functions are tests asks
+Python's own parser today, in five modules. So each feature built that way reaches Python alone: binding a code span to a
 function, the review queue that re-asks a sentence when its function changes, the tests a
 packet lists, the tests `anchors --suggest` offers, and `import-deps`. This proposes one
-interface that asks those four questions of any language. Python answers through its parser
+interface that asks those five questions of any language. Python answers through its parser
 as today; TypeScript, Go and Rust answer through tree-sitter, the route
 `claim-evidence-names-a-part` already records. A feature asks the interface and reaches
 every language that answers, and adding a language is a profile, a grammar package and a
@@ -34,8 +34,8 @@ file of queries. The owner put it on the roadmap on 2026-11-26; six decisions ar
 A TypeScript project adopts Irminsul. Its guide says "`lateFee()` caps the fine at 5
 dollars", and that function lives in one file of the project. A change edits its body. In a
 Python project the same change queues the guide's sentence for a re-read; here the queue
-holds nothing, the packet for the file lists no test, and the command that suggests anchors
-offers none. The adopter is told nothing is wrong.
+holds nothing, the packet for the file lists no test that imports it, and the command that
+suggests anchors offers none. The adopter is told nothing is wrong.
 
 Each feature added on 2026-11-26 was built on Python and had to say so: the [RFC](../GLOSSARY.md#rfc) that re-asks
 sentences naming changed code pairs Python's functions alone (its decision 6), and the RFC on
@@ -49,11 +49,12 @@ variables also lives outside the profile, in `src/irminsul/inventory/env_vars.py
 
 ## How it works
 
-**One interface, four questions.** For a file, a language answers: the definitions in it
+**One interface, five questions.** For a file, a language answers: the definitions in it
 (each function, class or type and each method, with its name, the type that holds it, and its
-first and last line, decorators and attributes included); the repository files it imports;
-the names a definition's body refers to; and a definition's canonical text, which a pin
-hashes so that a comment or a reformat does not move it.
+first and last line, decorators and attributes included); the repository files it imports and
+the names each import binds; the names a definition's body refers to; a definition's canonical
+text, which a pin hashes so that a comment or a reformat does not move it; and which of its
+definitions are tests, by the language's own convention.
 
 **Python keeps its parser.** Its answers come from `ast` as today, so no Python pin of any
 adopter moves.
@@ -65,10 +66,10 @@ read a TypeScript function, class, method and arrow function, a Go type, functio
 and a Rust struct, impl block and function, each with its first and last line, and each
 file's imports, from about five lines of query per language.
 
-**Features ask the interface.** The six places that call Python's parser call the interface,
-and nothing in a check names a language. So the queue, the packet's tests, the suggested
-tests and `import-deps` reach TypeScript, Go and Rust when this lands, with no change to
-those features.
+**Features ask the interface.** The five modules that call Python's parser for these
+questions call the interface instead, once, and nothing in a check names a language. So the
+queue, the packet's tests, the suggested tests and `import-deps` reach TypeScript, Go and Rust
+when this lands.
 
 **Adding a language** is a profile, a grammar package and a query file, with a fixture that
 tests the queries. The environment variable pattern moves into the profile, so a language's
@@ -78,20 +79,27 @@ facts are in one place.
 extractors for Typer, FastAPI and an MCP server, rules for the rest. An import is resolved to
 a repository file where the language says so plainly (a relative path, a module under a
 source root, a Go package under the module path, a Rust `crate::` path); a bundler's path
-aliases, a build tag and a macro are not followed, and each language says where it stops.
+aliases, a build tag and a macro are not followed, and each language says where it stops. A
+test written as a call with a string for its name, such as `test("caps the fee", ...)` in
+Jest, has no name an anchor can point at; it is reached through the part markers of
+`claim-evidence-names-a-part`, or not at all.
 
 ## Cost and risk
 
-**A required dependency.** `tree-sitter` (MIT; its current release has wheels for Linux,
-macOS and Windows on CPython 3.11 to 3.14) and one grammar package per language (MIT; one
-wheel per platform for every CPython). With
-the TypeScript, Go and Rust grammars it installed 6.7 MB. It is required, not an extra: an
+**A required dependency.** `tree-sitter` (MIT) 0.26.0, the version measured, has wheels for
+CPython 3.10 to 3.14 on Linux (glibc on x86-64 and ARM64, musl on x86-64), macOS and Windows,
+and none for musl on ARM64, PyPy or a free-threaded build. There, installing Irminsul compiles
+its C code and needs a C compiler, and that reaches adopters whose code is all Python. Each
+grammar package (MIT) ships one wheel per platform for every CPython. With the TypeScript, Go
+and Rust grammars it installed 6.7 MB. It is required, not an extra: an
 extra would let a file resolve on one machine and fail on another, which
 `checks-are-deterministic` in [enforcement](../foundation/enforcement.md) rules out, as the
 accepted `claim-evidence-names-a-part` already says.
 
-**A grammar's release can rename a node** and break a query. Each grammar is pinned below its
-next minor version, and each language's queries are tested against a fixture of its code.
+**A grammar's release can rename a node** and break a query, and under decision 4(a) it can
+move every pin of its language. Each grammar is pinned to one exact version, so two machines
+cannot disagree, and each language's queries are tested against a fixture of its code. A
+grammar upgrade is a release of Irminsul whose notes say which pins move.
 
 **Every non-Python anchor's pin moves once** if its hash changes from text to syntax tree
 (decision 4), and each is answered by one re-pin after its paragraph is re-read.
@@ -108,15 +116,23 @@ Open, for the owner:
    dependency, but it misses nested and multi-line definitions and each language is written
    again from nothing. (c) Each language's own tool, such as `tsc` or `go/ast`: the most
    exact, but CI and every agent's machine would need that toolchain, and each starts slowly.
+   The cost of (a) is a compiled dependency for every adopter, Python-only ones included,
+   built from source where no wheel exists.
 2. **Python stays on its own parser.** Recommended: moving it to tree-sitter would move every
-   Python pin of every adopter and buy nothing.
+   Python pin of every adopter. What it would buy: `ast` parses only the syntax of the Python
+   running Irminsul, so a project written for a newer Python can hold files that do not parse,
+   and a grammar does not depend on the running Python.
 3. **The first languages.** The three with profiles, TypeScript, Go and Rust. The TypeScript
    profile lists JavaScript's suffixes, so this also decides whether those files are read
    through the TypeScript grammar or the JavaScript one; recommended is to measure both on
-   real JavaScript before choosing.
+   real JavaScript before choosing. A `.tsx` file needs the grammar's TSX dialect, which ships
+   in the same package; the TypeScript dialect reports an error on JSX.
 4. **How a non-Python pin is hashed.** (a) The definition's syntax tree without comments, as
-   a Python pin is: every existing non-Python pin moves once. Recommended. (b) The text as
-   today: a comment edit keeps asking about the paragraph.
+   a Python pin is: every existing non-Python pin moves once, and may move again when a grammar
+   is upgraded, which is why grammars are pinned exactly. Recommended. (b) The definition's
+   text, whitespace collapsed, as today, but found by the reader rather than by a keyword
+   guess: a comment edit keeps asking about the paragraph, and a grammar upgrade moves
+   nothing.
 5. **Whether an adopter can add a language without a release.** (a) In this repository only,
    at first. Recommended. (b) A package registers a language through an entry point, which a
    later RFC would design.
@@ -133,7 +149,8 @@ Open, for the owner:
   |---|---|---|
   | What does this file define, on which lines? | `CodeResolver._symbol_index`, `src/irminsul/code_references.py` | Python |
   | Which text of a definition does a pin hash? | `resolve`, `src/irminsul/anchors.py`: the syntax tree for Python; for any other file, the lines from a definition keyword, whitespace collapsed | Python by tree, others by text |
-  | What does this file import? | `Ranker._importers`, `src/irminsul/ranked_tests.py`; `IMPORT_LANGUAGE`, `src/irminsul/checks/dependency_check.py` | Python |
+  | What does this file import? | `imported_paths` and `IMPORT_LANGUAGE`, `src/irminsul/checks/dependency_check.py`, which `Ranker.importers` in `src/irminsul/ranked_tests.py` also calls | Python |
+  | Which functions are tests? | the tests `anchors --suggest --doc` offers, `src/irminsul/binding.py`: a name that starts with `test` | Python |
   | Which names does a function body refer to? | the tests `anchors --suggest --doc` offers, `src/irminsul/binding.py` | Python |
   | Which commands, routes, tools and exports does a file declare? | `src/irminsul/inventory/`: Typer, FastAPI and MCP by syntax tree; TypeScript exports, Click, argparse, Flask, cobra, clap, commander and Express by rule | all four |
   | Which environment variables does a file read? | `src/irminsul/inventory/env_vars.py`, one pattern per language | all four |
@@ -142,18 +159,24 @@ Open, for the owner:
 
   | Feature | Python | TypeScript | Go | Rust |
   |---|---|---|---|---|
-  | A code span is paired with the function or class it names, and its lines | yes | no | no | no |
+  | A code span is paired with the function or class it names, and its lines | yes | an exported one, its first line only | no | no |
   | The review queue re-asks a sentence naming a changed function | yes | no | no | no |
   | `context <file>` lists the tests that import the file | yes | no | no | no |
   | `anchors --suggest --doc` offers the tests that name a function | yes | no | no | no |
   | `import-deps` checks `depends_on` against imports | yes | no | no | no |
   | An anchor's pin ignores a comment edit | yes | no | no | no |
 
-- **The interface.** One reader per language, registered beside its profile, answering the
-  four questions for a file's text, so a revision read from git is answered the same way.
-  Python's reader wraps today's code; the others share one tree-sitter reader that loads the
-  language's grammar and query file. A file that does not parse answers no definitions and
-  says so, as a Python file does today.
+- **The interface.** One reader per language, answering the five questions for a file's
+  text, so a revision read from git is answered the same way. The profile names its reader,
+  as `claim-evidence-names-a-part` lets it name a finder; the reader is code and stays out of
+  the profile's data. Python's reader wraps today's code; the others share one tree-sitter
+  reader that loads the language's grammar and query file. A Rust attribute such as
+  `#[derive]` is a sibling of the item it annotates in the grammar, so the reader joins the
+  attributes above a definition to its lines, as Python's decorators are. A file that does
+  not parse answers no definitions and says so, as a Python file does today.
+- **Tests, by convention.** Python: a function whose name starts with `test`. Go: a function
+  named `Test...` in a `_test.go` file. Rust: a function under `#[test]`. TypeScript: a test
+  is a call, not a definition, so only a named function a test file defines can be offered.
 - **The query file**, for TypeScript, as the probe used it:
 
   ```
@@ -227,7 +250,7 @@ check.
 ## Tasks
 
 - `T1` Add the interface, with Python's answers from its parser and no change in behaviour. (req: definitions-in-every-supported-language)
-- `T2` Move the six places that call Python's parser onto the interface. (req: features-read-code-through-the-interface)
+- `T2` Move the five modules that call Python's parser for these questions onto the interface: `code_references.py`, `anchors.py`, `binding.py`, `ranked_tests.py` and `checks/dependency_check.py`. (req: features-read-code-through-the-interface)
 - `T3` Add tree-sitter as a required dependency, with readers and query files for TypeScript, Go and Rust and a fixture each. (req: definitions-in-every-supported-language)
 - `T4` Hash a non-Python pin from its syntax tree, if decision 4 says so, and say how an adopter answers the moved pins. (component: anchors)
 - `T5` Move the environment variable pattern into the profile, and say in the languages doc how a language is added. (req: a-language-is-added-in-one-place)
