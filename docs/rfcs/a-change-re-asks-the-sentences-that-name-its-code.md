@@ -66,8 +66,8 @@ to the test that asserts it.
 **Before an edit, the packet names docs, not sentences.** For each file it lists the docs
 that name code in it, each with how many sentences do, so Agent B would have been told that
 the usage guide speaks of the command before changing it. It counts every name Irminsul
-resolves to the file, in any language, since a line per doc stays short however many kinds it
-counts.
+resolves to code in the file, in any language, since a line per doc stays short however many
+kinds it counts. A sentence that names the file itself is not counted.
 
 It stays a reading list. Nothing new blocks a gate; a sentence that is still right needs no
 answer.
@@ -109,11 +109,11 @@ to 8 the same day.
 6. **The queue pairs Python's functions and classes alone, and says so.** Only Python code is
    read into functions and classes with their lines; a review found a TypeScript function's
    edit and a class's deletion queued nothing. Other languages wait for a later RFC that reads
-   every language's definitions through one interface, which the owner put on the roadmap; the
-   loop's wording names Python until then.
-7. **The packet counts every name Irminsul resolves to the path**, not five kinds: an export,
-   an MCP tool, an HTTP route and a name a surface rule declares count as a function or a
-   command does. A review found a TypeScript file named in two sentences given an empty
+   every language's definitions through one interface, which the owner asked for on
+   2026-11-26 and which is drafted; the loop's wording names Python until then.
+7. **The packet counts every name Irminsul resolves to code in the path**, not five kinds: an
+   export, an MCP tool and a name a surface rule declares count as a function or a command
+   does. A span that names the path itself does not count. A review found a TypeScript file named in two sentences given an empty
    `named_by`, which reads as no doc naming it.
 8. **A function or class is touched when its own lines differ** between the merge base and
    where the change ends, its decorators included. First written as a changed line of the diff
@@ -145,10 +145,12 @@ to 8 the same day.
 - **Where.** `list review --changed` and `--base-ref` alone. `context --after-edit` does not
   list these sentences.
 - **Packet (decision 7).** `context <path>` gains `named_by`: each live doc, decision record or
-  guidance file with a sentence whose code span names anything Irminsul resolves to that path,
-  and the number of such sentences. That is a Python function or class, a command, an option,
-  an environment variable, or any other surface identity the configured extractors and rules
-  give the path, such as a TypeScript export, an MCP tool or an HTTP route. A decision record
+  guidance file with a sentence whose code span names anything Irminsul resolves to code in
+  that path, and the number of such sentences. That is a Python function or class, a command,
+  an option, an environment variable, or any other surface identity the configured extractors
+  and rules give the path and a code span can name, such as a TypeScript export, an MCP tool,
+  or a route whose rule declares how a doc mentions it. A span naming the path itself is not
+  counted. A decision record
   is read by its `## Decision` alone, as the queue reads it. Plain output lists the eight docs
   with the most sentences and counts the rest; JSON lists every doc. The sentences of one doc
   are what `list review --doc <doc> --all` lists.
@@ -262,8 +264,8 @@ ID: packet-names-docs-naming-a-file
 Provenance: code
 
 `irminsul context <path>` SHALL list, under `named_by`, each live doc, decision record and
-guidance file with a sentence whose code span names anything Irminsul resolves to that path,
-with the number of such sentences, the eight docs with the most in the plain output with a
+guidance file with a sentence whose code span names anything Irminsul resolves to code in
+that path, other than the path itself, with the number of such sentences, the eight docs with the most in the plain output with a
 count of the rest, and every doc in the JSON. An option SHALL count only when its sentence
 names the command that declares it, or one command alone declares it.
 
@@ -287,7 +289,7 @@ names the command that declares it, or one command alone declares it.
 
 - `T1` Compare each Python function or class a code span names, decorators included, at the merge base and where the change ends. (req: change-queues-sentences-naming-its-code)
 - `T2` Queue the paired sentences with the `names-changed-code` marker, and mark the `edited` item of a sentence the change wrote. (req: change-queues-sentences-naming-its-code)
-- `T3` Add `named_by` to the packet, by doc with a count, counting every name resolved to the path. (req: packet-names-docs-naming-a-file)
+- `T3` Add `named_by` to the packet, by doc with a count, counting every name resolved to code in the path. (req: packet-names-docs-naming-a-file)
 - `T4` Say it in step 4 of the root `AGENTS.md` and its template. (component: init)
 - `T5` State the rules in the two governing records with dated Changes items. (component: context)
 - `T6` Say what each command lists in the help of `list review` and `context` and in the MCP tool's description. (component: cli)
