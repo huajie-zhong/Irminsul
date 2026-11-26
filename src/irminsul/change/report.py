@@ -326,7 +326,8 @@ def build_change_report(
                     ReviewClue(
                         question=(
                             f"requirement '{req.req_id or req.title}' has a single "
-                            "scenario; is a negative or failure scenario missing?"
+                            "scenario; does its text name a case, a success or a failure, "
+                            "that no scenario shows?"
                         ),
                         evidence=(node.path.as_posix(),),
                     )

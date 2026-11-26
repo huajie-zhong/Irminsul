@@ -128,6 +128,10 @@ making a feature, a refactor and an RFC-driven change in it.
 - `irminsul fix` no longer lists each held fix in plain output. It prints one line that counts
   them and names `--dry-run --confirm`, which lists them. The `change` commands never hold a fix,
   so `change transition` and `change finalize` print no held list.
+- The clue `change verify` and `change finalize` give for a requirement with a single scenario asks
+  whether its text names a case, a success or a failure, that no scenario shows. It used to ask
+  whether a negative or failure scenario was missing, which a requirement whose one scenario is the
+  refusal could only answer by ignoring it.
 
 **Queries.**
 - `anchors --suggest --doc <doc>` also lists each code span of that doc that resolves to one

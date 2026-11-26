@@ -288,15 +288,32 @@ def test_report_accepted_without_requirements_blocks(repo: Path) -> None:
     assert any(b.code == "missing-requirements" for b in report.blockers)
 
 
-def test_report_single_scenario_clue(repo: Path) -> None:
+_SINGLE_SCENARIO_CLUE = (
+    "requirement 'password-reset' has a single scenario; does its text name a case, a success "
+    "or a failure, that no scenario shows?"
+)
+
+
+@pytest.mark.parametrize(
+    "dropped",
+    ["#### Scenario: Unknown address", "#### Scenario: Known address"],
+    ids=["the-success-is-left", "the-failure-is-left"],
+)
+def test_a_single_scenario_is_asked_about_the_case_it_does_not_show(
+    repo: Path, dropped: str
+) -> None:
+    """The one scenario left may be the failure case, so the question presumes neither."""
     seed_repo(repo, "init")
     path = repo / "docs" / "rfcs" / "0004-draft-ready.md"
     text = path.read_text(encoding="utf-8")
-    marker = "#### Scenario: Unknown address"
-    path.write_text(text.split(marker)[0], encoding="utf-8")
+    head, tail = text.split(dropped)
+    kept = tail.split("#### Scenario:", 1)
+    path.write_text(head + ("#### Scenario:" + kept[1] if len(kept) > 1 else ""), encoding="utf-8")
 
     report = build_change_report(repo, load(find_config(repo)), "0004-draft-ready", env={})
-    assert any("failure scenario" in clue.question for clue in report.semantic_review)
+    assert report.requirements is not None
+    assert [item.scenarios for item in report.requirements.items] == [1]
+    assert _SINGLE_SCENARIO_CLUE in [clue.question for clue in report.semantic_review]
 
 
 def test_report_task_evidence(repo: Path) -> None:
