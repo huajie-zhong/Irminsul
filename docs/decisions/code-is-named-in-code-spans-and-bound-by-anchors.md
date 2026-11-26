@@ -147,6 +147,8 @@ paragraphs, which trains a reader to re-pin without reading.
 - **Offer mentions beside a definition.** Rejected: a mention is the wrong place to bind.
 - **A check that asks every sentence about behaviour for a test.** Rejected: no check knows
   which sentences state behaviour.
+- **Formal verification of a function against its sentences.** Rejected: writing the
+  specification is the cost, and a test is the specification this project has.
 - **A command that breaks the code and reports which changes the tests miss, now.** Left to
   the backlog: it runs code, so it is no check, and each language runs tests its own way.
 - **Flag a span as certain, or keep a check's own markers.** Rejected: an example names files

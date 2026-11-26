@@ -23,8 +23,10 @@ Split from {% for doc in split_from %}{% if not loop.first %}, {% endif %}[{{ do
      - or declare a claim in the frontmatter and put `claim:<id>` in a comment after the
        sentence;
      - best, anchor a sentence that says what the code does to the test that asserts it, so
-       the test fails when the code stops doing it: `irminsul anchors --suggest --doc <doc>`
-       lists the tests that name each function this doc names. -->
+       the test fails when the code stops doing it: once `irminsul.toml` declares the test
+       directories, such as `test_roots = ["tests"]` under `[paths]`,
+       `irminsul anchors --suggest --doc <doc>` lists the tests that name each function this
+       doc names; otherwise search the test files for the function's name. -->
 {% if surface %}
 ## Surface
 

@@ -410,9 +410,12 @@ def test_a_new_component_says_what_to_write_and_how_to_tie_it_to_code(tmp_path: 
         "irminsul anchors --suggest",
         "claim:",
         "to the test that asserts it",
+        "once `irminsul.toml` declares the test directories",
+        '`test_roots = ["tests"]` under `[paths]`',
         "irminsul anchors --suggest --doc <doc>",
+        "search the test files for the function's name",
     ):
-        assert expected in guidance
+        assert expected in " ".join(guidance.split())
 
 
 def test_the_guidance_in_a_new_component_raises_no_finding_of_its_own(tmp_path: Path) -> None:

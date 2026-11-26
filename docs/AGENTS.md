@@ -114,5 +114,5 @@ The Three Laws of Maintenance and the principles behind them are in
 
 ## Protocol
 
-The edit loop is in the root [`AGENTS.md`](../AGENTS.md); acting on a finding and changing
-direction are in [`guides/agent-protocol.md`](guides/agent-protocol.md).
+The edit loop is in the root [`AGENTS.md`](../AGENTS.md); tying a sentence to a test, acting
+on a finding and changing direction are in [`guides/agent-protocol.md`](guides/agent-protocol.md).
