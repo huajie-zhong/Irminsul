@@ -33,7 +33,7 @@ claims:
       - src/irminsul/context.py
       - src/irminsul/git/mtime.py
     pinned:
-      src/irminsul/context.py: sha256:d5292b147176
+      src/irminsul/context.py: sha256:024401b94890
       src/irminsul/git/mtime.py: sha256:c71794836a12
 summary: What governs a path — owning doc, ranked tests, active RFCs and next commands before an edit, findings after it.
 implements:

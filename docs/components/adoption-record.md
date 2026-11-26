@@ -41,7 +41,7 @@ claims:
       - src/irminsul/checks/diff_integrity.py
     pinned:
       src/irminsul/adoption.py: sha256:172d868df4d6
-      src/irminsul/checks/diff_integrity.py: sha256:190f2511cbbb
+      src/irminsul/checks/diff_integrity.py: sha256:bf5584c42285
   - id: adoption-exception-does-not-return
     state: implemented
     kind: invariant
@@ -50,7 +50,7 @@ claims:
     evidence:
       - src/irminsul/checks/diff_integrity.py
     pinned:
-      src/irminsul/checks/diff_integrity.py: sha256:190f2511cbbb
+      src/irminsul/checks/diff_integrity.py: sha256:bf5584c42285
   - id: cross-repo-debt-is-pinned
     state: implemented
     kind: invariant
@@ -72,7 +72,7 @@ claims:
     evidence:
       - src/irminsul/checks/diff_integrity.py
     pinned:
-      src/irminsul/checks/diff_integrity.py: sha256:190f2511cbbb
+      src/irminsul/checks/diff_integrity.py: sha256:bf5584c42285
   - id: record-validity-is-asked-on-every-path
     state: implemented
     kind: invariant
@@ -84,7 +84,7 @@ claims:
       - src/irminsul/mcp_server.py
     pinned:
       src/irminsul/checks/pipeline.py: sha256:b54acfc1df14
-      src/irminsul/context.py: sha256:d5292b147176
+      src/irminsul/context.py: sha256:024401b94890
       src/irminsul/mcp_server.py: sha256:a96dc80bc158
 ---
 
