@@ -146,6 +146,16 @@ doc's claims, or stop pinning evidence that nothing reads. The accepted RFC
 `claim-evidence-names-a-part` judges every layer, as its last step. Until then, a read-only way to list the pins that no longer match would
 let an agent see them without `--re-pin --all` rewriting them.
 
+Two branches that each re-pin the same claim's evidence conflict on the pin line when merged,
+since each writes the hash of its own version of the file, and taking either side leaves a pin
+that matches neither version once the code merges; the merge commit touches the doc, so the
+fallback above keeps `evidence-drift` silent (a dogfood agent, 2026-11-26). The one right
+resolution is a re-pin after re-reading the merged file, and nothing says the pin needs one:
+`irminsul anchors` without `--re-pin` reports anchor findings alone, `--re-pin` has no dry run,
+and `evidence-drift` skips a component claim. Listing every claim pin that no longer matches its
+file in `irminsul anchors`, or a dry run of `--re-pin`, changes a command's output or its
+flags, so it is the owner's call.
+
 ### `same-tree-test-answers-two-questions`
 
 `base_is_the_working_tree` (`src/irminsul/delta.py`) decides both whether `check --delta` would
@@ -341,6 +351,41 @@ third-party name in a code span, such as `date.fromisoformat` or `monkeypatch.se
 `unbound-name` with "bind it with an anchor", though nothing in the repository can define it
 (dogfood feature lane). Treat a dotted name whose head is importable from the standard library or
 a declared dependency as bound outside the repository.
+
+### `a-mention-pattern-hides-its-kinds-bare-identities`
+
+`CodeResolver.resolve` (`src/irminsul/code_references.py`) matches a configured surface kind by
+exactly its identity only when the kind has no mention pattern: a kind with one is matched by
+its pattern alone (`if kind in self.mentions: continue`), though the method's docstring says
+any other configured kind is found by exactly its identity. This repository's
+`[[surface.rules]]` entry for `config-keys` gives a `mention_pattern` that reads the last
+segments of a dotted key, so `paths.docs_root` resolves while a bare `mention_pattern` or
+`require_tests`, which `irminsul surface config-keys` lists, resolves to nothing:
+`list review --written` marks a sentence naming one `unbound-name`, and `anchors --suggest`
+lists it with the field of that name as a candidate (both run on 2026-11-26, after a dogfood
+agent reported the first). Matching the bare identity as well changes what `code-references`,
+the review queue and `context`'s `named_by` resolve, which the Decision of
+`surface-rules-and-language-profiles-are-data` decides ("A kind resolves to its mention
+pattern"), so it is the owner's call; a mention pattern that matched every bare key would read
+every lowercase word of a doc as one. `defined-means-two-things` is the same symptom for a
+module-level assignment.
+
+### `co-change-asks-a-doc-that-states-no-rule-for-the-change`
+
+`co-change/unreflected-change` warns on a component doc whenever source it describes changes and
+the doc does not (`run_co_change`, `src/irminsul/checks/co_change.py`), whatever the change
+was. Adding one option to a command in `src/irminsul/cli.py` warns on `docs/components/cli.md`,
+which states no rule per option and sends a reader to `--help` for what a command takes, so the
+only honest answer is a trailer that says so (a dogfood agent, 2026-11-26). On main that day, 14
+commits carry a `co-change` trailer for `docs/components/cli.md` and 9 for
+`docs/components/mcp-server.md`, most of them saying that the doc states nothing about what the
+change touched, often a help string; a reader who writes that a fourteenth time is learning to
+sign without reading. Asking only a doc that names, anchors or
+claims what changed would change what the check reports and what the Decision of
+`a-change-is-judged-from-its-merge-base-to-the-working-tree` says it asks for; the owner
+deferred tightening `co-change` on 2026-11-26 until another change is measured.
+`connected-doc-hides-unconnected-sections` is the opposite gap: one edit anywhere in the doc
+answers the warning.
 
 ### `queue-is-unranked`
 
@@ -637,6 +682,15 @@ sentence of it: four items for a four-sentence paragraph, about 25 for one parag
 cut sentence now lives, so the same cut is re-read at every run. Group removed sentences by
 paragraph, pair a reworded sentence with its replacement, and let a reader name the home
 once. Found by the PR 12a, 12c and 12d lanes on 2026-10-28.
+
+The pairing has since landed, by position: within a run the change rewrote, the first new
+sentence pairs with the first old one the file no longer has, and
+`docs/components/new-list-regen.md` accepts that a sentence inserted before a rewrite takes the
+`was` of the sentence the rewrite replaced, because a similarity threshold would guess. A
+dogfood agent met it on 2026-11-26, and a scratch repository shows it: with "A lock is taken
+first." inserted before "The store writes rows in order." was reworded, `--written` gave the
+inserted sentence that `was` and the reworded one none. Pairing by similarity is the rejected
+alternative that doc records, so changing it is the owner's call.
 
 ### `deleted-doc-queues-nothing`
 
