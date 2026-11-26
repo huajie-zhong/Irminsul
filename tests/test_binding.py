@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from typer.testing import CliRunner
 
@@ -14,7 +15,7 @@ from irminsul.cli import app
 from irminsul.config import load
 from irminsul.source_tree import SourceTree
 
-from .conftest import run_check, seed_repo, write_config
+from .conftest import invoke, invoke_json, run_check, seed_repo, write, write_config, write_doc
 
 runner = CliRunner()
 
@@ -376,3 +377,234 @@ def test_the_builtins_are_those_of_the_enabled_languages(tmp_path: Path) -> None
     write_config(root, source_roots=["src"], extra='[languages]\nenabled = ["typescript"]\n')
 
     assert _unbound_names(root) == ["IndexError", "dict.get", "len"]
+
+
+POLICY = '''\
+"""Loan rules."""
+
+
+def due_day(start_day: int, days: int = 14) -> int:
+    return start_day + days
+
+
+def late_fee(days_late: int) -> int:
+    return min(max(days_late, 0) * 25, 500)
+'''
+
+LOAN_TESTS = """\
+from loans.policy import late_fee
+
+
+def test_fee_is_capped() -> None:
+    assert late_fee(100) == 500
+"""
+
+FEE_MARKER = "<!-- anchor: tests/test_loans.py#test_fee_is_capped -->"
+GUIDE = "docs/guides/lending.md"
+
+
+def _lending_repo(
+    root: Path,
+    files: dict[str, str],
+    *,
+    guide: str = "The fine `late_fee()` charges stops growing at 5 dollars.",
+    test_roots: bool = True,
+) -> Path:
+    """A guide whose body starts on line 10 and names code of `src/loans/policy.py`, with
+    `files` written beside them and `tests` declared as the test root."""
+    extra = 'test_roots = ["tests"]\n' if test_roots else ""
+    write_config(root, source_roots=["src"], extra=extra)
+    write(root, "src/loans/policy.py", POLICY)
+    write_doc(root, GUIDE, doc_id="lending", body=f"{guide}\n")
+    for rel, text in files.items():
+        write(root, rel, text)
+    return root
+
+
+def _resolved(root: Path) -> dict[str, dict[str, Any]]:
+    """The `resolved` rows `anchors --suggest --doc` gives for the guide, by name."""
+    report = invoke_json(root, "anchors", "--suggest", "--doc", GUIDE)
+    return {row["name"]: row for row in report["resolved"]}
+
+
+def test_suggest_offers_the_test_that_calls_a_function_the_doc_names(tmp_path: Path) -> None:
+    root = _lending_repo(tmp_path, {"tests/test_loans.py": LOAN_TESTS})
+
+    code, plain = invoke(root, "anchors", "--suggest", "--doc", GUIDE)
+
+    assert code == 0, plain
+    assert plain.splitlines() == [
+        f"{GUIDE}:10 `late_fee`, defined at src/loans/policy.py:8",
+        f"  tests/test_loans.py:4 (test)  {FEE_MARKER}",
+        "0 unbound code name(s), 1 function or class name(s), 1 named by a test",
+    ]
+    assert invoke_json(root, "anchors", "--suggest", "--doc", GUIDE) == {
+        "version": 1,
+        "unbound": [],
+        "resolved": [
+            {
+                "path": GUIDE,
+                "line": 10,
+                "name": "late_fee",
+                "definition": {"path": "src/loans/policy.py", "line": 8},
+                "tests": [
+                    {
+                        "path": "tests/test_loans.py",
+                        "line": 4,
+                        "symbol": "test_fee_is_capped",
+                        "marker": FEE_MARKER,
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def test_the_marker_suggest_offers_for_a_test_resolves(tmp_path: Path) -> None:
+    """A test in a class is offered under the dotted path an anchor accepts, and one inside
+    a function, which no anchor reaches, is not offered."""
+    root = _lending_repo(
+        tmp_path,
+        {
+            "tests/test_loans.py": "from loans.policy import late_fee\n\n\n"
+            "class TestFees:\n"
+            "    def test_cap(self) -> None:\n"
+            "        assert late_fee(100) == 500\n\n\n"
+            "def build():\n"
+            "    def test_inner() -> None:\n"
+            "        assert late_fee(1) == 25\n\n"
+            "    return test_inner\n"
+        },
+    )
+
+    [offered] = _resolved(root)["late_fee"]["tests"]
+
+    assert offered["marker"] == "<!-- anchor: tests/test_loans.py#TestFees.test_cap -->"
+    [anchor] = parse_anchors(offered["marker"])
+    assert resolve(root, anchor).status == "ok"
+
+
+def test_suggest_says_so_when_no_test_names_the_definition(tmp_path: Path) -> None:
+    """Three near misses, none a test function that names `late_fee`: a test that imports
+    the module and names another of its functions, a function that names it and is no test,
+    and a test that names it in a file that does not import its module."""
+    root = _lending_repo(
+        tmp_path,
+        {
+            "tests/test_loans.py": "from loans.policy import due_day, late_fee\n\n\n"
+            "def test_a_loan_runs_two_weeks() -> None:\n"
+            "    assert due_day(0) == 14\n\n\n"
+            "def fee_of_a_week() -> int:\n"
+            "    return late_fee(7)\n",
+            "tests/test_other.py": "def test_a_name_alone(late_fee) -> None:\n"
+            "    assert late_fee(100) == 500\n",
+        },
+    )
+
+    code, plain = invoke(root, "anchors", "--suggest", "--doc", GUIDE)
+
+    assert code == 0, plain
+    assert plain.splitlines() == [
+        f"{GUIDE}:10 `late_fee`, defined at src/loans/policy.py:8",
+        "  no test names it",
+        "0 unbound code name(s), 1 function or class name(s), 0 named by a test",
+    ]
+    assert _resolved(root)["late_fee"]["tests"] == []
+
+
+def test_suggest_without_a_doc_lists_unbound_names_and_no_test(tmp_path: Path) -> None:
+    root = _lending_repo(
+        tmp_path,
+        {"tests/test_loans.py": LOAN_TESTS, "src/loans/desk.ts": "function renewLoan() {}\n"},
+        guide="The fine `late_fee()` charges is capped, and `renewLoan()` renews a loan.",
+    )
+    unbound = [
+        f"{GUIDE}:10 `renewLoan`",
+        "  src/loans/desk.ts:1 (definition)  <!-- anchor: src/loans/desk.ts#renewLoan -->",
+    ]
+
+    code, plain = invoke(root, "anchors", "--suggest")
+
+    assert code == 0, plain
+    assert plain.splitlines() == [*unbound, "1 unbound code name(s)"]
+    report = invoke_json(root, "anchors", "--suggest")
+    assert set(report) == {"version", "unbound"}
+    assert [row["name"] for row in report["unbound"]] == ["renewLoan"]
+
+    with_doc = invoke(root, "anchors", "--suggest", "--doc", GUIDE)[1]
+    assert with_doc.splitlines() == [
+        *unbound,
+        f"{GUIDE}:10 `late_fee`, defined at src/loans/policy.py:8",
+        f"  tests/test_loans.py:4 (test)  {FEE_MARKER}",
+        "1 unbound code name(s), 1 function or class name(s), 1 named by a test",
+    ]
+
+
+def test_suggest_offers_at_most_three_tests_by_path_and_line(tmp_path: Path) -> None:
+    def naming(*names: str) -> str:
+        functions = "".join(
+            f"\n\ndef {name}() -> None:\n    assert policy.late_fee(100) == 500\n" for name in names
+        )
+        return f"from loans import policy\n{functions}"
+
+    root = _lending_repo(
+        tmp_path,
+        {
+            "tests/test_b.py": naming("test_third", "test_never_offered"),
+            "tests/test_a.py": naming("test_second"),
+            "tests/sub/test_c.py": naming("test_first"),
+        },
+    )
+
+    tests = _resolved(root)["late_fee"]["tests"]
+
+    assert [(test["path"], test["line"], test["symbol"]) for test in tests] == [
+        ("tests/sub/test_c.py", 4, "test_first"),
+        ("tests/test_a.py", 4, "test_second"),
+        ("tests/test_b.py", 4, "test_third"),
+    ]
+
+
+def test_suggest_skips_a_test_file_that_does_not_parse(tmp_path: Path) -> None:
+    root = _lending_repo(
+        tmp_path,
+        {
+            "tests/test_broken.py": LOAN_TESTS + "\n\ndef test_unfinished(:\n",
+            "tests/test_loans.py": LOAN_TESTS,
+        },
+    )
+
+    assert [test["path"] for test in _resolved(root)["late_fee"]["tests"]] == [
+        "tests/test_loans.py"
+    ]
+
+
+def test_suggest_lists_a_definition_once_and_only_a_span_that_resolves_to_one(
+    tmp_path: Path,
+) -> None:
+    """A second span naming the same function adds no row, a name two functions share
+    resolves to neither, and a line of a fenced block is an example, not a code span."""
+    root = _lending_repo(
+        tmp_path,
+        {
+            "tests/test_loans.py": LOAN_TESTS,
+            "src/loans/desk.py": "def renew():\n    return 1\n",
+            "src/loans/shelf.py": "def renew():\n    return 2\n",
+        },
+        guide="`late_fee()` caps the fine, and `renew()` renews.\n\n"
+        "`policy.late_fee` is the same function.\n\n```\ndue_day\n```",
+    )
+
+    assert list(_resolved(root)) == ["late_fee"]
+
+
+def test_suggest_says_when_no_test_root_is_declared(tmp_path: Path) -> None:
+    root = _lending_repo(tmp_path, {"tests/test_loans.py": LOAN_TESTS}, test_roots=False)
+
+    plain = invoke(root, "anchors", "--suggest", "--doc", GUIDE)[1]
+
+    assert plain.splitlines()[1:] == [
+        "  no test names it",
+        "no test file was read: `paths.test_roots` declares no test root",
+        "0 unbound code name(s), 1 function or class name(s), 0 named by a test",
+    ]

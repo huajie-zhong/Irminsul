@@ -77,7 +77,7 @@ file is curated and survives it.
 
 | ID | Doc | Summary |
 |----|-----|---------|
-| `agent-protocol` | [Agent lifecycle protocol](guides/agent-protocol.md) | How an agent acts on a finding and changes the project's direction; the edit loop every change follows is in the root AGENTS.md. |
+| `agent-protocol` | [Agent lifecycle protocol](guides/agent-protocol.md) | How an agent ties a sentence to a test, acts on a finding and changes the project's direction; the edit loop every change follows is in the root AGENTS.md. |
 | `bootstrap` | [Bootstrapping Checklist](guides/bootstrap.md) | Adopting Irminsul, and the order of the first steps on an existing codebase. |
 | `guides` | [Guides](guides/INDEX.md) | How-tos, operating procedures, and the docs about this doc system. |
 | `private-docs` | [Private docs for a public code repo](guides/private-docs.md) | Keeping the docs tree private beside an open-source code repo. |

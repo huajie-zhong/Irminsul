@@ -55,8 +55,8 @@ A doc path is its own owner, and a test file reaches every doc that lists it in 
 
 ## Which tests a source file gets
 
-A flat list of an owner's tests buries the one that exercises the file in hand, so for a source path the packet adds every test in `paths.test_roots` that imports the file, whichever doc owns it, and `Ranker.rank` orders them by evidence: tests that import the file, then tests by how many commits changed both, then the rest alphabetically. `ContextResult.test_reasons` keeps why each is named. An import is a direct import of the module, so a test that reaches it through a package re-export is not an importer.
-<!-- anchor: src/irminsul/ranked_tests.py#Ranker.rank @sha256:252d7b905161 -->
+A flat list of an owner's tests buries the one that exercises the file in hand, so for a source path the packet adds every test in `paths.test_roots` that imports the file, whichever doc owns it, and `Ranker.rank` orders them by evidence: tests that import the file, then tests by how many commits changed both, then the rest alphabetically. `ContextResult.test_reasons` keeps why each is named. An import is a direct import of the module, so a test that reaches it through a package re-export is not an importer. `Ranker.importers` is that reading on its own, and [`irminsul anchors --suggest --doc`](anchors.md#offering-the-test-that-asserts-a-sentence) asks it which test files to search for the tests that name a function, so the packet and the suggestion agree on which tests import a file.
+<!-- anchor: src/irminsul/ranked_tests.py#Ranker.rank @sha256:80ecdd726c83 -->
 <!-- anchor: src/irminsul/context.py#ContextResult.test_reasons @sha256:d4d118e24f76 -->
 
 ## What a topic search reads

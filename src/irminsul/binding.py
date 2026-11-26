@@ -5,6 +5,11 @@ no surface extractor, symbol index, or repository path resolves such a name, and
 anchor in the doc binds it, the name is unbound. Deciding which file the doc meant is a
 judgment, so this module only finds unbound names and ranks the files that contain them;
 an agent chooses one and writes the anchor.
+
+A name that does resolve, to one Python function or class, can be bound to more than its
+definition: a sentence that says what the code does is best anchored to the test that
+asserts it. So this module also finds the test functions that name such a definition. Which
+of them asserts the sentence is again a judgment, made by seeing the test fail.
 """
 
 from __future__ import annotations
@@ -12,6 +17,7 @@ from __future__ import annotations
 import ast
 import re
 import sys
+from collections.abc import Collection, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -24,9 +30,11 @@ from irminsul.anchors import (
     python_definitions,
     resolve,
 )
-from irminsul.code_references import CodeResolver
+from irminsul.code_references import CodeResolver, Reference
+from irminsul.ranked_tests import Ranker
 
 if TYPE_CHECKING:
+    from irminsul.docgraph import DocGraph
     from irminsul.source_tree import SourceTree
 
 _NAME_RE = re.compile(r"^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*(?:\(\))?$")
@@ -194,3 +202,89 @@ def suggest(repo_root: Path, sources: Sources, name: str) -> Suggestions:
     chosen = definitions or ([] if unreachable else mentions)
     chosen.sort(key=lambda c: (c.path, c.line))
     return Suggestions(chosen[:_SUGGESTION_LIMIT], unreachable[:_SUGGESTION_LIMIT])
+
+
+@dataclass(frozen=True)
+class CandidateTest:
+    """A test function an anchor can name."""
+
+    path: str
+    line: int
+    symbol: str
+    """The dotted path from the module to the function, such as `TestFees.test_cap`."""
+
+    @property
+    def marker(self) -> str:
+        return f"<!-- anchor: {self.path}#{self.symbol} -->"
+
+
+def named_definition(span: str, resolver: CodeResolver) -> Reference | None:
+    """The one Python function or class a code span resolves to, or None.
+
+    A span a surface resolves, such as a command or an option, names that surface and not
+    a definition, and a name two definitions share resolves to neither.
+    """
+    return next((ref for ref in resolver.resolve(span) if ref.kind == "symbol"), None)
+
+
+def _test_functions(
+    body: list[ast.stmt], scope: tuple[str, ...] = ()
+) -> Iterator[tuple[str, ast.FunctionDef | ast.AsyncFunctionDef]]:
+    """Each function whose name starts with `test`, with the dotted path an anchor names it
+    by: one at the top level of `body` or in a class there, at any depth of classes. One
+    inside a function or a block is left out, as no anchor reaches it."""
+    for node in body:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            if node.name.startswith("test"):
+                yield ".".join([*scope, node.name]), node
+        elif isinstance(node, ast.ClassDef):
+            yield from _test_functions(node.body, (*scope, node.name))
+
+
+def _body_names(function: ast.FunctionDef | ast.AsyncFunctionDef) -> frozenset[str]:
+    """Every identifier the body uses: a bare name, or the last part of a dotted one."""
+    out: set[str] = set()
+    for statement in function.body:
+        for node in ast.walk(statement):
+            if isinstance(node, ast.Name):
+                out.add(node.id)
+            elif isinstance(node, ast.Attribute):
+                out.add(node.attr)
+    return frozenset(out)
+
+
+def naming_tests(
+    graph: DocGraph, definitions: Collection[tuple[str, str]]
+) -> dict[tuple[str, str], list[CandidateTest]]:
+    """The test functions that name each of `definitions`, at most three, by path and line.
+
+    A definition is a source file's display path and the name of a Python function or class
+    in it. A test function is a function whose name starts with `test`, in a Python file
+    under `paths.test_roots` that imports the defining module, which is the reading
+    `Ranker.importers` makes for the context packet. It names the definition when its body
+    uses that name as an identifier, bare or as the last part of a dotted one. That is a
+    reading of the syntax tree and runs nothing: a test that reaches the code through a
+    helper, a fixture or a command line is not found, and one that uses the same name on
+    another object is. A test file that does not parse is skipped.
+    """
+    importers = Ranker(graph).importers(sorted({path for path, _ in definitions}))
+    test_files = {display: path for path, display in graph.source.test_walk.files}
+    functions: dict[str, list[tuple[CandidateTest, frozenset[str]]]] = {}
+    out: dict[tuple[str, str], list[CandidateTest]] = {}
+    for path, name in definitions:
+        found: list[CandidateTest] = []
+        for display in importers[path]:
+            if display not in functions:
+                module = graph.source.module(test_files[display])
+                functions[display] = (
+                    []
+                    if module is None
+                    else [
+                        (CandidateTest(display, node.lineno, symbol), _body_names(node))
+                        for symbol, node in _test_functions(module.tree.body)
+                    ]
+                )
+            found.extend(test for test, names in functions[display] if name in names)
+        found.sort(key=lambda test: (test.path, test.line))
+        out[path, name] = found[:_SUGGESTION_LIMIT]
+    return out

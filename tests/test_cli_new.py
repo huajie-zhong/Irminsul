@@ -409,6 +409,8 @@ def test_a_new_component_says_what_to_write_and_how_to_tie_it_to_code(tmp_path: 
         "Class.method",
         "irminsul anchors --suggest",
         "claim:",
+        "to the test that asserts it",
+        "irminsul anchors --suggest --doc <doc>",
     ):
         assert expected in guidance
 

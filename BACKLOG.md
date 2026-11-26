@@ -380,6 +380,17 @@ hints as well, once every hint has an answer. That reverses the Scope of
 `every-warning-hint-has-an-answer`, which keeps the scaffolded default at certain findings
 alone, so it needs its own RFC.
 
+### `no-command-lists-the-changes-a-test-misses`
+
+A paragraph anchored to a test is guarded only as far as that test fails when its sentence
+becomes false. Seeing it fail once is a written step of the agent protocol
+(`docs/guides/agent-protocol.md`, "Tying a sentence to a test") that nothing verifies, and one
+failure shows one way of breaking the code. The command the RFC
+`a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts` left out (decision 2 of
+2026-11-26) would change a function in several small ways, run the tests its paragraphs are
+anchored to, and list the changes no test noticed. It runs code, so it is no check, and each
+language runs tests its own way. Recorded on 2026-11-26, when that RFC was implemented.
+
 ### `decision-edit-is-confirmed-twice`
 
 The accepted RFC `decision-records-govern-what-they-decide` answers an edit of a record's

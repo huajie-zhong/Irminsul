@@ -27,6 +27,13 @@ making a feature, a refactor and an RFC-driven change in it.
 - The agent protocol `irminsul init` scaffolds lists the four answers a finding code can declare,
   and says to take the one `irminsul explain` names, in place of its two steps for an ignore
   comment and for a finding with no line.
+- The loop `irminsul init` writes into the root `AGENTS.md` advises, in step 3, anchoring a
+  sentence that says what the code does to the test that asserts it: the sentence is then asked
+  about when that test changes, and the test fails when the code stops doing it. The comment
+  `irminsul new component` writes gives the same advice, and the scaffolded agent protocol
+  gains the procedure, "Tying a sentence to a test": find the test, change the code so the
+  sentence is false and see the test fail once, then paste the marker and pin it. A root
+  `AGENTS.md` and a protocol already scaffolded keep their text until `init --force`.
 
 **Findings and messages.**
 - `check --diff` with a base that does not resolve, such as `origin/main` in a repository with no
@@ -113,6 +120,15 @@ making a feature, a refactor and an RFC-driven change in it.
   so `change transition` and `change finalize` print no held list.
 
 **Queries.**
+- `anchors --suggest --doc <doc>` also lists each code span of that doc that resolves to one
+  Python function or class, with where it is defined and up to three test functions that name
+  it, each as an anchor marker ready to paste: a function whose name starts with `test`, in a
+  Python file under `paths.test_roots` that imports the defining module, whose body names the
+  definition. A name no test names is listed and said to have none, the closing line counts
+  these names apart from the unbound ones, and the JSON gains a list `resolved` beside
+  `unbound`, each row with the doc's `path` and `line`, the `name`, its `definition` and its
+  `tests`. With no test root declared it says that no test file was read. Without `--doc` the
+  output is unchanged.
 - `context <path>` for a file the adoption record excepts says, before the edit, that a change
   editing it must give it an owning doc in the same change, or `check --diff` fails with
   `diff-integrity/adoption-debt-touched` (`recorded_debt` on the unmatched entry in JSON).

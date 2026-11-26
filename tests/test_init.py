@@ -472,6 +472,58 @@ def test_init_writes_the_root_agents_md_with_its_loop_between_markers(tmp_path: 
     assert "## What a finding tells you" in block
 
 
+def test_init_ships_the_advice_to_anchor_a_sentence_to_the_test_that_asserts_it(
+    tmp_path: Path,
+) -> None:
+    """Every adopter gets it: step 3 of the loop gives the advice, and the agent protocol
+    the procedure, with the command that finds the test and the step of seeing it fail."""
+    target = tmp_path / "demo"
+    (target / "src").mkdir(parents=True)
+    assert _init_demo(target).exit_code == 0
+
+    loop = " ".join(_block((target / "AGENTS.md").read_text(encoding="utf-8")).split())
+    step = loop[loop.index("3. Make the change") : loop.index("4. After editing")]
+    assert "best anchored to the test that asserts it" in step
+    assert "the test fails when the code stops doing it" in step
+    assert "how to tie a sentence to a test" in loop
+
+    protocol = (target / "docs" / "guides" / "agent-protocol.md").read_text(encoding="utf-8")
+    start = protocol.index("## Tying a sentence to a test")
+    procedure = " ".join(protocol[start : protocol.index("## Acting on a finding")].split())
+    for expected in (
+        "`irminsul anchors --suggest --doc <doc>`",
+        "`irminsul context <source file>`",
+        "run the test and see it fail, then restore the code",
+        "A test that does not fail is the wrong test, or the sentence has none yet.",
+        "Paste the marker and pin it",
+    ):
+        assert expected in procedure
+
+
+def test_this_repositorys_protocol_carries_the_procedure_its_scaffold_ships() -> None:
+    """The scaffold is a shorter copy of this repository's own protocol, so the three numbered
+    steps, which the two share word for word, are compared: an edit to one that leaves the
+    other behind fails here."""
+    from irminsul.init.command import render_scaffold
+
+    def steps(text: str) -> list[str]:
+        start = text.index("## Tying a sentence to a test")
+        section = text[start : text.index("## Acting on a finding")]
+        numbered = re.findall(r"^\d\. .*?(?=^\d\. |^\S|\Z)", section, re.M | re.S)
+        return [" ".join(step.split()) for step in numbered]
+
+    ours = (
+        Path(__file__).resolve().parents[1] / "docs" / "guides" / "agent-protocol.md"
+    ).read_text(encoding="utf-8")
+    scaffold = render_scaffold("docs/guides/agent-protocol.md.j2", {})
+    assert steps(ours) == steps(scaffold)
+    assert [step.split("**")[1] for step in steps(ours)] == [
+        "Find the test.",
+        "See it fail once.",
+        "Paste the marker and pin it,",
+    ]
+
+
 def test_init_appends_its_section_to_a_root_agents_md_without_markers(tmp_path: Path) -> None:
     target = tmp_path / "demo"
     (target / "src").mkdir(parents=True)
