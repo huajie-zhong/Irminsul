@@ -1185,7 +1185,13 @@ def test_json_review_carries_the_meaning_of_each_marker_it_shows(tmp_path: Path)
     assert result.exit_code == 0, result.output
     report = json.loads(result.output)
     shown = {name.split(":")[0] for item in report["items"] for name in item["markers"]}
-    assert shown == {"edited", "removed-sentence", "governing-claim", "evidence"}
+    assert shown == {
+        "edited",
+        "names-changed-code",
+        "removed-sentence",
+        "governing-claim",
+        "evidence",
+    }
     assert report["markers"] == {name: MARKER_MEANINGS[name] for name in sorted(shown)}
 
 
@@ -1206,6 +1212,7 @@ def test_every_marker_meaning_is_short() -> None:
         "names-code",
         "edited",
         "unbound-name",
+        "names-changed-code",
         "governing-claim",
         "evidence",
         "stale-summary",

@@ -22,7 +22,7 @@ owns_tests:
 <!-- anchor: src/irminsul/refs.py#RefHit.doc_id @sha256:867a78b4f4aa -->
 <!-- anchor: src/irminsul/refs.py#DocRefsReport.target @sha256:17a246bd40b9 -->
 
-It answers for docs and guidance files only: a code name has no backlink index, so the docs that mention one are found by searching the tree, and a path's owning doc and governing claims by `irminsul context <path>` ([Agents get stateless read-only queries and one written loop](../decisions/agents-get-stateless-read-only-queries-and-one-written-loop.md)).
+It answers for docs and guidance files only: a code name has no backlink command of its own, so the docs that name code in a file are named, with that file's owning doc and governing claims, by `irminsul context <path>`, and a name no file in hand defines is found by searching the tree ([Agents get stateless read-only queries and one written loop](../decisions/agents-get-stateless-read-only-queries-and-one-written-loop.md)).
 
 ## Scope & Limitations
 

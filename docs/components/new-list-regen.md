@@ -16,7 +16,9 @@ depends_on:
   - docgraph
   - file-writing
   - frontmatter
+  - git
   - languages
+  - surface
   - user-errors
 owns_tests:
   - tests/test_cli_fix.py
@@ -29,9 +31,11 @@ owns_tests:
   - tests/test_fix_rfc_follow_through.py
   - tests/test_fix_rfc_required_updates.py
   - tests/test_list_review.py
+  - tests/test_review_changed_code.py
 summary: "`new`, `list`, and `fix` commands, and the agent manifest `fix` rewrites."
 implements:
   - an-rfc-has-an-owners-part-and-an-agents-part
+  - a-change-re-asks-the-sentences-that-name-its-code
 inventory:
   - kind: cli
     source: src/irminsul/cli.py
@@ -59,6 +63,10 @@ The semantic half of doc–code consistency, as a queue rather than findings. Ea
 <!-- anchor: src/irminsul/listing/review.py#ReviewItem.code_changed_after_doc @sha256:40f2c7be880b -->
 
 `--changed` and `--base-ref` ask what a change asks a reader to re-read. Every sentence on a changed line whose prose its doc did not already say at the base is an item, whatever it says, because a sentence the reader has not read is the reason to look and a changed line is not: one sentence added to a long paragraph queues that sentence, and a rewrapped paragraph queues none. A deleted sentence is queued, never reported as a finding, because whether the deletion was right is a judgment: the code it described may be gone too. A sentence changed in place is one `edited` item that shows the sentence it replaced as `was`, not an edit and a deletion: the old and new sentences pair in order within the run the change replaced, and a sentence that only moved is queued by neither. In a Markdown file an ordered list item that only took a new number is queued by neither as well, when the change left the file with more or fewer ordered items: its words are the base's, and the number says where it sits. A number that changed while the file kept as many ordered items stays an edit, because the number may be what the line says. Both sides are read as the queue reads a doc, so a decision record is compared by its `## Decision` alone: a sentence moved into it is `edited`, one moved out of it is `removed-sentence`, and one deleted from its Context is neither. The `governing-claim` entries are the claims [context](context.md) reports for the touched files, so the two surfaces name the same set.
+
+A change also queues each sentence, in any file the queue reads, whose code span names a Python function or class the change touched, marked `names-changed-code`, so a guide or a README that owns no code is asked about a function when the function changes. `ChangePairing` pairs each span as the queue does without a change, through `CodeResolver`, on both sides of the change, and keeps only a span that names a Python function or class: a command, an option, an environment variable, any other surface identity and a path are paired with no change, because too many sentences name them for too many reasons ([Derive facts and leave meaning to the reader](../decisions/derive-facts-and-leave-meaning-to-the-reader.md)). The pairing reads Python functions and classes alone, so a name of another language's code pairs with nothing. A span that names a function the code also declares as a surface identity, such as an MCP tool, names that identity and is not paired. A definition's lines are its decorator lines, its `def` or `class` line and its body, as an [anchor](anchors.md) reads one, which `CodeResolver.definitions` gives. It is touched when the lines it has where the change ends, the working tree, or `HEAD` under `--committed-only`, are not the lines it had at the base. So an added or altered line counts where the change puts it and a deleted one where it lay, and deleting the function below one does not touch it, though git's diff files a deletion under the line before it, which may be the last line of the definition above. A definition moved in its file with its lines unchanged is not touched. `SourceAtCommit` reads the merge base through the [git helpers](git.md), a file the change left alone from the working tree's snapshot and the rest from the commit, and the [surface](surface.md) extractors run over it as they do over the working tree, so a span that named a command there is not read as a function, which is why this component depends on `git` and `surface`. The definition a span named there is followed into the file as the change leaves it, under the path a rename git reports gave it, and it is told from another of the same name by its class. So a function is still asked about once a second definition has taken its name and the span pairs with neither, and a method renamed beside a method of that name in another class is still removed. When the file no longer defines it, the change removed or renamed it, unless the file no longer parses: what it defines cannot be read then, and each definition a sentence named is listed as changed, with no line. Each item lists what was touched as `changed_code`: the span, the bare name, the file, and the first line of the definition that differs, or for a removed one the line that defined it at the base. A sentence the change itself wrote keeps its one `edited` item and takes the marker on it, so an item marked `names-changed-code` alone is about a sentence the change left as it was. Code spans alone are paired, not the identities plain prose names, and `context --after-edit` lists none of these sentences. The pairing is as loose as it is without a change: a bare name pairs with the one function or class of that name wherever it is defined and with nothing when it has two definitions, in two files or in one, such as a property and its setter, a class is touched by a change to any line of its methods, and a function by one to a function nested in it.
+<!-- anchor: src/irminsul/listing/review.py#ReviewItem.changed_code @sha256:22030bae5ecf -->
+<!-- anchor: src/irminsul/listing/review.py#_sentences_naming_changed_code @sha256:0c4129753f51 -->
 
 The queue says what it compared with, in the header and as `base` in the JSON: `HEAD` when no `--base-ref` is given, which cannot see commits the branch already holds, else the merge base of that ref and `HEAD`. Without a base, when `unread_commits_note` finds `origin/HEAD`'s target, `origin/main` or `origin/master` lacking commits that `HEAD` holds, a `note` names that ref and the `--base-ref` that covers them.
 
@@ -91,3 +99,12 @@ A check that judges the manifest's prose reads it through `without_generated_reg
   <!-- anchor: src/irminsul/cli.py#new_rfc @sha256:aced4229a0cc -->
   <!-- anchor: tests/test_cli_new.py#test_a_new_rfc_is_written_in_two_parts @sha256:7fea3564fc4f -->
   <!-- anchor: tests/test_cli_new.py#test_a_new_small_rfc_is_written_in_two_parts @sha256:8ff92cc63c01 -->
+- **a-change-re-asks-the-sentences-that-name-its-code#change-queues-sentences-naming-its-code** — With a change, `list review` SHALL queue each sentence the change did not write, in a live doc, a decision record's Decision or a guidance file, whose code span names a function or class that the change edited, renamed or deleted, marked `names-changed-code`, and SHALL put that marker on the `edited` item of a sentence the change wrote that names one. A function or class is edited when its lines, its decorators included, differ between the merge base and where the change ends. It SHALL NOT queue a sentence for naming a command, an option, an environment variable or a path that the change touched. Functions and classes are those of Python source files. (provenance: code; [RFC](../rfcs/a-change-re-asks-the-sentences-that-name-its-code.md))
+  <!-- anchor: src/irminsul/listing/review.py#_sentences_naming_changed_code @sha256:0c4129753f51 -->
+  <!-- anchor: src/irminsul/listing/changed_code.py#ChangePairing.touched @sha256:d52e6b1c4925 -->
+  <!-- anchor: tests/test_review_changed_code.py#test_renaming_a_method_queues_the_sentence_that_names_the_old_name @sha256:1518bcce2c55 -->
+  <!-- anchor: tests/test_review_changed_code.py#test_a_function_whose_body_changed_queues_the_guide_that_names_it @sha256:d907b712f141 -->
+  <!-- anchor: tests/test_review_changed_code.py#test_a_sentence_naming_a_function_the_change_left_alone_is_not_queued @sha256:bf6fe45d167c -->
+  <!-- anchor: tests/test_review_changed_code.py#test_deleting_the_function_below_one_does_not_touch_the_one_above @sha256:40021132186f -->
+  <!-- anchor: tests/test_review_changed_code.py#test_a_command_whose_function_changed_queues_no_sentence_that_names_it @sha256:d239d1d4297f -->
+  <!-- anchor: tests/test_review_changed_code.py#test_a_file_that_is_named_and_edited_queues_no_sentence_that_names_it @sha256:9e98fda5ed20 -->

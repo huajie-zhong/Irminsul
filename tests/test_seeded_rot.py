@@ -75,11 +75,13 @@ PINNED_DRIFT = "claim-anchor/pinned-drift"
 EVIDENCE_DRIFT = "claim-provenance/evidence-drift"
 #: The review-queue marker of a claim whose evidence the change touched.
 GOVERNING_CLAIM = "governing-claim"
+#: The review-queue marker of a sentence whose code span names code the change touched.
+NAMES_CHANGED_CODE = "names-changed-code"
 #: The claim questions `context --after-edit` asks, which are not findings and carry no code.
 CLAIM_REVIEWS = "claim_reviews"
 
-#: What is expected to close a gap: an accepted RFC under `docs/rfcs/`, or a `BACKLOG.md` entry.
-RFC_NAMES_CODE = "RFC a-change-re-asks-the-sentences-that-name-its-code"
+#: What is expected to close a gap: a `BACKLOG.md` entry, or an accepted RFC under `docs/rfcs/`
+#: written as `RFC <slug>`.
 BACKLOG_NO_CODE = "BACKLOG.md connected-doc-hides-unconnected-sections"
 BACKLOG_GOVERNS = "BACKLOG.md governed-code-does-not-re-ask-its-record"
 
@@ -204,9 +206,8 @@ CASES = (
         "`can_renew()` allows a loan two renewals and refuses a third.",
         RENEWALS,
         "S names the changed function in a code span, in the doc that owns the file",
-        "doc",
-        (CO_CHANGE, MTIME_DRIFT),
-        closes=RFC_NAMES_CODE,
+        "sentence",
+        (NAMES_CHANGED_CODE,),
     ),
     Case(
         "owner-names-no-code",
@@ -234,8 +235,8 @@ CASES = (
         "Lend a book with `check_out()`, which returns a loan whose renewal count starts at zero.",
         CHECK_OUT,
         "S names the changed function in a code span, in a guide that owns nothing",
-        "miss",
-        closes=RFC_NAMES_CODE,
+        "sentence",
+        (NAMES_CHANGED_CODE,),
     ),
     Case(
         "guide-names-no-code",
@@ -252,8 +253,8 @@ CASES = (
         "`late_fee()` stops at 5 dollars, however late the book comes back.",
         CAP,
         "S names the changed function in a code span, in a README under `paths.extra_docs`",
-        "miss",
-        closes=RFC_NAMES_CODE,
+        "sentence",
+        (NAMES_CHANGED_CODE,),
     ),
     Case(
         "readme-restates-a-default",

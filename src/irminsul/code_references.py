@@ -10,7 +10,7 @@ import ast
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from irminsul.checks.code_spans import mention_regex
 from irminsul.git.blame import LineTimes
@@ -31,6 +31,18 @@ _TOKEN_EDGE = "A-Za-z0-9_-"
 _FLAG_RE = re.compile(r"(?<![\w-])--[a-z0-9][a-z0-9-]*(?![\w-])")
 _IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _SYMBOL_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*(?:\(\))?$")
+
+
+class _Definition(NamedTuple):
+    """A Python function or class: its file, its `def` or `class` line, the last line of its
+    body, `first`, its first decorator line, or `line` when it has none, and `qualified`,
+    its name with its class before it when it is a method."""
+
+    display: str
+    line: int
+    end: int
+    first: int
+    qualified: str
 
 
 @dataclass(frozen=True)
@@ -55,6 +67,7 @@ class CodeResolver:
         self._abs_by_display = {display: abs_path for abs_path, display in files}
         self._command_blocks: dict[str, str] | None = None
         self._command_flags: dict[str, frozenset[str]] | None = None
+        self._sole_option_files: dict[str, str] | None = None
         self._source_tokens: set[str] | None = None
         self.surfaces: dict[str, dict[str, SurfaceItem]] = {}
         self.mentions: dict[str, list[re.Pattern[str]]] = {}
@@ -100,9 +113,9 @@ class CodeResolver:
     @staticmethod
     def _symbol_index(
         files: list[tuple[Path, str]], reader: SourceReader
-    ) -> dict[str, list[tuple[str, int, int]]]:
+    ) -> dict[str, list[_Definition]]:
         """Python definitions by bare name and by `Class.name`."""
-        index: dict[str, list[tuple[str, int, int]]] = {}
+        index: dict[str, list[_Definition]] = {}
         for module, display in reader.python_modules(files):
             tree = module.tree
             scopes: list[tuple[str, list[ast.stmt]]] = [("", tree.body)] + [
@@ -111,7 +124,13 @@ class CodeResolver:
             for prefix, scope in scopes:
                 for node in scope:
                     if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
-                        where = (display, node.lineno, node.end_lineno or node.lineno)
+                        where = _Definition(
+                            display,
+                            node.lineno,
+                            node.end_lineno or node.lineno,
+                            min([node.lineno, *(d.lineno for d in node.decorator_list)]),
+                            f"{prefix}{node.name}",
+                        )
                         index.setdefault(node.name, []).append(where)
                         if prefix:
                             index.setdefault(f"{prefix}{node.name}", []).append(where)
@@ -171,6 +190,31 @@ class CodeResolver:
             self._command_flags = flags
         return self._command_flags
 
+    def sole_option_files(self) -> dict[str, str]:
+        """The file of its command, for each long option that one command alone declares.
+
+        Option identities are not scoped by command, so `--confirm` is one identity however
+        many commands declare it, reported from one of their files. An option several
+        commands declare, or none that `command_flags` reads, is left out.
+        """
+        if self._sole_option_files is None:
+            declaring: dict[str, list[str]] = {}
+            for command, flags in self.command_flags().items():
+                for flag in flags:
+                    declaring.setdefault(flag, []).append(command)
+            files: dict[str, str] = {}
+            for flag, commands in declaring.items():
+                items = [
+                    self.surfaces[kind][command]
+                    for kind in self.command_kinds
+                    for command in commands
+                    if command in self.surfaces.get(kind, {})
+                ]
+                if len(items) == 1 and items[0].display:
+                    files[flag] = items[0].display
+            self._sole_option_files = files
+        return self._sole_option_files
+
     def _declared_options(self, item: SurfaceItem) -> frozenset[str] | None:
         if item.display is None or item.line is None:
             return None
@@ -226,18 +270,51 @@ class CodeResolver:
             if best is not None:
                 refs.append(self._ref(span, kind, items[best]))
         if not refs and _SYMBOL_RE.match(text):
-            dotted = text.removesuffix("()").split(".")
-            qualified = ".".join(dotted[-2:])
-            name = dotted[-1]
-            found = self._symbols.get(qualified) if len(dotted) > 1 else None
-            if not found:
-                found = self._symbols.get(name)
-            if found and len(found) == 1:
-                display, line, end = found[0]
-                refs.append(Reference(span, "symbol", name, display, line, end))
+            key = self._symbol_key(text)
+            found = self._symbols[key] if key is not None else []
+            if key is not None and len(found) == 1:
+                where = found[0]
+                name = key.rsplit(".", 1)[-1]
+                refs.append(Reference(span, "symbol", name, where.display, where.line, where.end))
         if not refs and (text in self._abs_by_display or self._repo_file(text) is not None):
             refs.append(Reference(span, "path", text, text, None))
         return refs
+
+    def _symbol_key(self, text: str) -> str | None:
+        """The index name a symbol span is looked up under: `Class.name` when the span is
+        dotted and a class has that member, else the bare name when anything has it."""
+        dotted = text.removesuffix("()").split(".")
+        qualified = ".".join(dotted[-2:])
+        if len(dotted) > 1 and self._symbols.get(qualified):
+            return qualified
+        return dotted[-1] if self._symbols.get(dotted[-1]) else None
+
+    def named_as(self, ref: Reference) -> str:
+        """The name that tells the function or class `ref` names from every other in its
+        file: `Class.name` for a method, however its span wrote it, so that `Ledger.remove`
+        and the `Drawer.remove` a bare `remove` may pair with are two names."""
+        key = self._symbol_key(self.strip_program(ref.span)[0])
+        found = self._symbols[key] if key is not None else []
+        return found[0].qualified if len(found) == 1 else ref.identity
+
+    def definitions(self, name: str, display: str) -> list[tuple[int, list[str]]]:
+        """Each function or class `display` defines under the name `named_as` gives, as the
+        number of its first line and its lines: its decorator lines, its `def` or `class`
+        line and its body, which is how an anchor reads a definition. None when the file
+        defines no such name."""
+        path = self._abs_by_display.get(display)
+        lines = ((self._reader.text(path) if path is not None else None) or "").splitlines()
+        return [
+            (where.first, lines[where.first - 1 : where.end])
+            for where in self._symbols.get(name, ())
+            if where.display == display and where.qualified == name
+        ]
+
+    def unparsed(self, display: str) -> bool:
+        """Whether the walked file `display` cannot be read as Python, so that what it
+        defines is unknown and not gone."""
+        path = self._abs_by_display.get(display)
+        return path is not None and self._reader.module(path) is None
 
     def _repo_file(self, text: str) -> Path | None:
         """A repository file named by its repo-relative path, inside a source root or not."""
@@ -252,6 +329,12 @@ class CodeResolver:
     @staticmethod
     def _ref(span: str, kind: str, item: SurfaceItem) -> Reference:
         return Reference(span, kind, item.identity, item.display or "", item.line, item.line)
+
+    def in_repository(self, display: str) -> bool:
+        """Whether the walked file `display` is spelled from the repository root, as a
+        change's paths are. One in a source root outside the repository is spelled from that
+        root."""
+        return self._abs_by_display.get(display) == self._repo_root.resolve() / display
 
     def changed_after(
         self, git: GitReader, doc_abs: Path, references: list[Reference], lines: LineTimes

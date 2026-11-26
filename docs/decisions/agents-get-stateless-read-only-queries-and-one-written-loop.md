@@ -73,6 +73,16 @@ rate-limited and makes a run depend on the network.
   owners, tests, dependencies, active RFCs, claims and bounded excerpts and run no checks;
   `context --after-edit` alone runs them, maps changed paths to owners, and says what the
   change introduced.
+- **A path packet names the docs that name the file's code.** `context <path...>` lists, under
+  `named_by`, each live doc, decision record and guidance file with a sentence whose code span
+  names anything Irminsul resolves to a path in hand, with the number of such sentences, whether
+  or not a doc owns that path: a Python function or class, a command, an option, an environment
+  variable, or any other surface identity the configured extractors and rules give the path,
+  such as a TypeScript export or an MCP tool. A span that names the path itself does not
+  count. A decision record is read by its `## Decision` alone. An option counts only when its sentence names the command that declares it, or one
+  command alone declares it. The pairing is the review queue's and is derived on every call.
+  Plain output lists the eight docs with the most sentences for a path with the count of the
+  rest, and the JSON lists every doc.
 - **A topic search reads doc bodies.** `context --topic` returns a doc when every word of the
   query is in its id, title, path, `describes`, tests, tags, `summary`, headings or body
   prose, matched as case-folded substrings and not as meaning. A doc that matches only
@@ -182,3 +192,8 @@ rate-limited and makes a run depend on the network.
   component scaffold's comment carry it, and the agent protocol and its scaffold carry the
   procedure for tying a sentence to a test, with the search the RFC's decision 5 gives where
   no test root is declared.
+- 2026-11-26: The packet's `named_by` is implemented as the owner amended it that day, after a
+  first build that listed the sentences was measured and a review of the second: `context
+  <path...>` names the docs with a sentence that names anything Irminsul resolves to a path,
+  each with the number of its sentences that do, the eight with the most in plain output and
+  every doc in the JSON.
