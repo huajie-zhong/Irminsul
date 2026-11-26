@@ -41,9 +41,9 @@ if TYPE_CHECKING:
 class ChangedCode:
     """A function or class a sentence names that the change touched, and where.
 
-    `identity` is its bare name. `path` and `line` are the change's: the first changed line
-    in its range, or the line that defined it at the base when the change removed or renamed
-    it, which `removed` says. One in a file every line of which is new has no line, and
+    `identity` is its bare name. `path` and `line` are the change's: the first line of the
+    definition that differs from the lines it had at the base, or the line that defined it at
+    the base when the change removed or renamed it, which `removed` says. One in a file every line of which is new has no line, and
     neither has one in a file that no longer parses, where its lines cannot be read.
     """
 

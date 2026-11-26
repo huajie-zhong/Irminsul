@@ -75,12 +75,14 @@ rate-limited and makes a run depend on the network.
   change introduced.
 - **A path packet names the docs that name the file's code.** `context <path...>` lists, under
   `named_by`, each live doc, decision record and guidance file with a sentence whose code span
-  names a function, class, command, option or environment variable of a path in hand, with the
-  number of such sentences, whether or not a doc owns that path. A decision record is read by
-  its `## Decision` alone. An option counts only when its sentence names the command that
-  declares it, or one command alone declares it. The pairing is the review queue's and is
-  derived on every call. Plain output lists the eight docs with the most sentences for a path
-  with the count of the rest, and the JSON lists every doc.
+  names anything Irminsul resolves to a path in hand, with the number of such sentences, whether
+  or not a doc owns that path: a Python function or class, a command, an option, an environment
+  variable, or any other surface identity the configured extractors and rules give the path,
+  such as a TypeScript export or an MCP tool. A decision record is read by its `## Decision`
+  alone. An option counts only when its sentence names the command that declares it, or one
+  command alone declares it. The pairing is the review queue's and is derived on every call.
+  Plain output lists the eight docs with the most sentences for a path with the count of the
+  rest, and the JSON lists every doc.
 - **A topic search reads doc bodies.** `context --topic` returns a doc when every word of the
   query is in its id, title, path, `describes`, tests, tags, `summary`, headings or body
   prose, matched as case-folded substrings and not as meaning. A doc that matches only
@@ -175,6 +177,7 @@ rate-limited and makes a run depend on the network.
   the loop and the agent protocol advise that anchor, and the protocol gains the step of seeing
   the test fail once.
 - 2026-11-26: The packet's `named_by` is implemented as the owner amended it that day, after a
-  first build that listed the sentences was measured: `context <path...>` names the docs that
-  name code in a path, each with the number of its sentences that do, the eight with the most
-  in plain output and every doc in the JSON.
+  first build that listed the sentences was measured and a review of the second: `context
+  <path...>` names the docs with a sentence that names anything Irminsul resolves to a path,
+  each with the number of its sentences that do, the eight with the most in plain output and
+  every doc in the JSON.

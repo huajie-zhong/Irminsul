@@ -2308,11 +2308,12 @@ def test_named_by_reads_a_decision_records_decision_and_counts_no_sentence_for_t
     ]
 
 
-def test_named_by_counts_a_function_and_an_environment_variable_and_no_tool(
+def test_named_by_counts_a_function_an_environment_variable_and_an_mcp_tool(
     fixture_repo: Callable[[str], Path],
 ) -> None:
-    """The usage guide names `late_fee()` and `due_day()`, the variable `dates.py` reads, and a
-    tool `server.py` declares, which is none of the names the packet counts."""
+    """The usage guide names `late_fee()` and `due_day()`, the variable `dates.py` reads, and
+    `ledger_total`, a tool `server.py` declares. A tool is a name Irminsul resolves to its
+    file, so it counts as a function or a command does."""
     repo = _ledger(fixture_repo)
 
     assert _named_by(repo, "src/ledger/fees.py") == [
@@ -2321,7 +2322,36 @@ def test_named_by_counts_a_function_and_an_environment_variable_and_no_tool(
     assert _named_by(repo, "src/ledger/dates.py") == [
         {"path": _LEDGER_USAGE, "sentences": 1, "names": "src/ledger/dates.py"}
     ]
-    assert _named_by(repo, "src/ledger/server.py") == []
+    assert _named_by(repo, "src/ledger/server.py") == [
+        {"path": _LEDGER_USAGE, "sentences": 1, "names": "src/ledger/server.py"}
+    ]
+
+
+def test_named_by_counts_a_typescript_export(tmp_path: Path) -> None:
+    """The requirement's TypeScript scenario: `src/fees.ts` exports `lateFee`, which no Python
+    code defines, and a guide names it in two sentences. An export is a surface identity the
+    configured extractors give the file, so the packet holds the guide with a count of 2."""
+    repo = tmp_path / "shop"
+    write_config(repo, source_roots=["src"])
+    write(
+        repo,
+        "src/fees.ts",
+        "export function lateFee(days: number): number {\n  return Math.min(days * 50, 500);\n}\n",
+    )
+    write_doc(
+        repo,
+        "docs/guides/fees.md",
+        doc_id="fees",
+        body=(
+            "`lateFee` charges fifty cents for each day a payment is late.\n\n"
+            "A shop calls `lateFee` once for each payment.\n"
+        ),
+    )
+    seed_repo(repo, "a shop's fees", when="2024-01-01T12:00:00+00:00")
+
+    assert _named_by(repo, "src/fees.ts") == [
+        {"path": "docs/guides/fees.md", "sentences": 2, "names": "src/fees.ts"}
+    ]
 
 
 def test_named_by_says_which_path_each_doc_names(

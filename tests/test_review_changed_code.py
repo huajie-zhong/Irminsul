@@ -144,8 +144,9 @@ def test_a_function_moved_in_its_file_with_its_lines_unchanged_is_not_asked_abou
 
 
 def test_deleting_the_function_below_one_does_not_touch_the_one_above(ledger: Path) -> None:
-    """git files a hunk that only deletes under the line before it, here the last line of
-    `late_fee`. The deleted lines lay in `due_day` alone, so that is the sentence asked."""
+    """The requirement's scenario "The function below is deleted": git files a hunk that only
+    deletes under the line before it, here the last line of `late_fee`. The deleted lines lay
+    in `due_day` alone, so that is the sentence asked, and the one naming `late_fee()` is not."""
     replace_text(
         ledger,
         FEES,
@@ -615,14 +616,14 @@ def test_the_doc_filter_keeps_the_sentences_of_that_doc(ledger: Path) -> None:
     assert _named(_queue(ledger, "--doc", COMPONENT)) == {(COMPONENT, "Ledger.add")}
 
 
-def test_the_help_of_changed_names_the_sentences_that_name_a_function_or_class() -> None:
+def test_the_help_of_changed_names_the_sentences_that_name_a_python_function_or_class() -> None:
     result = CliRunner().invoke(app, ["list", "review", "--help"], terminal_width=160)
 
     assert result.exit_code == 0, result.output
     # Rich may colour and wrap the help whatever width is asked for, as it does in CI.
     plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
     text = " ".join(re.sub(r"[│╭╮╰╯─]", " ", plain).split())
-    assert "the sentences in any doc that name a function or class it touched" in text
+    assert "the sentences in any doc that name a Python function or class it touched" in text
 
 
 def test_the_edit_report_of_context_lists_none_of_these_sentences(ledger: Path) -> None:

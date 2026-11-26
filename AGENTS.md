@@ -26,8 +26,8 @@ Work every change in this order. `irminsul orient` lists the commands; each take
 4. After editing, run `irminsul context --after-edit` for the findings your change
    introduced, and `irminsul list review --changed` to re-read each sentence you added
    or changed against the code it names. Both also queue the claims whose evidence you
-   touched, and the review queue the sentences anywhere that name a function or class
-   you changed, in docs you may never have opened: read the doc and the decisions it
+   touched, and the review queue the sentences anywhere that name a Python function or
+   class you changed, in docs you may never have opened: read the doc and the decisions it
    links, and answer the question asked. The review queue is a reading list: fix a
    sentence that is wrong, and leave one you re-read and found right. Only a finding
    needs a recorded answer. On a branch with committed work, give both

@@ -161,10 +161,10 @@ making a feature, a refactor and an RFC-driven change in it.
 - `list review` no longer splits the marker of a numbered list item, such as `1.`, into a sentence
   of its own, and without `--changed` it lists every code-naming sentence of a doc no commit holds
   yet, instead of reporting that none changed since the doc was last committed.
-- `list review --changed` also queues each sentence whose code span names a function or class
-  the change edited, renamed or deleted, marked `names-changed-code`, in any live doc, decision
-  record's Decision or guidance file, whether or not the change opened it: a guide that names a
-  function is asked about it when the function changes. A function or class is its decorators,
+- `list review --changed` also queues each sentence whose code span names a Python function or
+  class the change edited, renamed or deleted, marked `names-changed-code`, in any live doc,
+  decision record's Decision or guidance file, whether or not the change opened it: a guide that
+  names a function is asked about it when the function changes. A function or class is its decorators,
   its `def` or `class` line and its body, and it is touched when the change leaves it other
   lines than it had at the merge base, so a deletion just below it does not touch it. One the
   change removed or renamed is found in the merge base's text, and so is one whose name a
@@ -177,8 +177,10 @@ making a feature, a refactor and an RFC-driven change in it.
   sentences, and the help of `list review --changed` names them.
 - `context <path...>` names the docs that name code in each path, under `named_by` in the JSON
   and as "Docs that name code in <path>" in plain output: each live doc, decision record, read by
-  its Decision alone, and guidance file with a sentence whose code span names a function, class,
-  command, option or environment variable of the path, with the number of such sentences. An
+  its Decision alone, and guidance file with a sentence whose code span names anything Irminsul
+  resolves to the path, with the number of such sentences: a Python function or class, a
+  command, an option, an environment variable, or any other surface identity the configured
+  extractors and rules give the path, such as a TypeScript export or an MCP tool. An
   option counts only when its sentence names the command that declares it, or one command alone
   declares it. An entry is the doc's path, `sentences`, the count, and `names`, the path. A file
   no doc owns has the list too. Plain output shows the eight docs with the most sentences for a

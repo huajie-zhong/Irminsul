@@ -2285,8 +2285,8 @@ def list_review(
         typer.Option(
             "--changed",
             help="What a change asks to re-read: edited and deleted sentences in the working "
-            "tree vs HEAD, the sentences in any doc that name a function or class it touched, "
-            "and the claims, moved files and summaries it touched.",
+            "tree vs HEAD, the sentences in any doc that name a Python function or class it "
+            "touched, and the claims, moved files and summaries it touched.",
         ),
     ] = False,
     base_ref: Annotated[

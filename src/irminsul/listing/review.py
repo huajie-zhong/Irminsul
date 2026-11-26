@@ -60,9 +60,9 @@ MARKER_MEANINGS: Final[dict[str, str]] = {
         "sentence if it is not this repository's code, leave it if no anchor can reach it"
     ),
     "names-changed-code": (
-        "a sentence naming a function or class this change edited, renamed or deleted; the "
-        "item gives each one's file and line and says which were removed. Re-read it against "
-        "the code as it is now"
+        "a sentence naming a Python function or class this change edited, renamed or deleted; "
+        "the item gives each one's file and line and says which were removed. Re-read it "
+        "against the current code"
     ),
     "governing-claim": (
         "a claim whose evidence this change touched. Under governs-evidence ask whether the "
@@ -372,23 +372,23 @@ def docs_naming(
     """How many sentences of each file the queue reads name code in each of `displays`, by
     (named path, file).
 
-    A sentence counts for a path when one of its code spans names a function, a class, a
-    command or an environment variable that path defines, as the queue pairs spans. An
-    option counts for the file of its command, and only when one command alone declares
-    it: several commands declare `--confirm`, and a sentence about one is not about the
-    others' files. A sentence that names the option's command counts through the command. A
-    span that names the file by its path, or any other surface identity, does not count.
+    A sentence counts for a path when one of its code spans names anything the queue's
+    pairing resolves to that path: a Python function or class, a command, an environment
+    variable, or any other surface identity the configured extractors and rules declare
+    there, such as a TypeScript export or an MCP tool. An option counts for the file of its
+    command, and only when one command alone declares it: several commands declare
+    `--confirm`, and a sentence about one is not about the others' files. A sentence that
+    names the option's command counts through the command. A span that names the file by
+    its path does not count.
 
     A `context` packet asks this before a change, so the docs that speak of a file are read
     before it is edited.
     """
     from irminsul.inventory.cli_options import CliOptionsExtractor
-    from irminsul.inventory.env_vars import EnvVarsExtractor
 
     assert graph.repo_root is not None
     repo_root = graph.repo_root
     resolver = CodeResolver(graph.source)
-    defining = {"symbol", EnvVarsExtractor.kind, *resolver.command_kinds}
     option_files = resolver.sole_option_files()
     sentences = _review_sentences(
         config, graph, lambda path: after_text(graph.git, repo_root, None, path)
@@ -399,10 +399,11 @@ def docs_naming(
             named: set[str] = set()
             for span in dict.fromkeys(m.group(2) for m in _SPAN_RE.finditer(sentence)):
                 for ref in resolver.resolve(span):
-                    if ref.kind in defining:
+                    if ref.kind == CliOptionsExtractor.kind:
+                        if ref.identity in option_files:
+                            named.add(option_files[ref.identity])
+                    elif ref.kind != "path" and ref.defined_at:
                         named.add(ref.defined_at)
-                    elif ref.kind == CliOptionsExtractor.kind and ref.identity in option_files:
-                        named.add(option_files[ref.identity])
             for display in named.intersection(displays):
                 counts[display, path] = counts.get((display, path), 0) + 1
     return counts

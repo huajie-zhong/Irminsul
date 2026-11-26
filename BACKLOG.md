@@ -346,8 +346,8 @@ did not write first.
 
 ### `change-queue-asks-through-functions-and-classes-alone`
 
-Since 2026-11-26 `list review --changed` queues each sentence whose code span names a function
-or class the change touched, marked `names-changed-code` (`_sentences_naming_changed_code`,
+Since 2026-11-26 `list review --changed` queues each sentence whose code span names a Python
+function or class the change touched, marked `names-changed-code` (`_sentences_naming_changed_code`,
 `src/irminsul/listing/review.py`), and pairs nothing else with a change (`ChangePairing`,
 `src/irminsul/listing/changed_code.py`). That is the owner's decision of that day in the RFC
 `a-change-re-asks-the-sentences-that-name-its-code`, taken after a first build that paired every
@@ -361,10 +361,10 @@ write. Two were worth the re-read: the sentences of `docs/components/checks.md` 
 `docs/components/mcp-server.md:46`, which says what `create_server` records when it runs and was
 queued by three of the four changes, each time because the change reworded the description of
 a tool: every MCP tool is a function nested in `create_server` (`src/irminsul/mcp_server.py`),
-so an edit to any of them is a changed line in that function's range. Counting a function as
-touched only by the lines outside the functions nested in it would drop those three; it changes
-what "its range" means in the Decision of `derive-facts-and-leave-meaning-to-the-reader`, so it
-is the owner's call.
+so an edit to any of them changes that function's own lines, which is how the Decision of
+`derive-facts-and-leave-meaning-to-the-reader` judges touched. Counting a function as touched
+only by its lines outside the functions nested in it would drop those three; it changes what a
+function's own lines are in that Decision, so it is the owner's call.
 
 What the rule leaves out on purpose: a sentence that names only a command, an option, an
 environment variable or a file is not asked about when the behaviour behind the name changes,
@@ -407,7 +407,23 @@ long; building the resolver is 0.9 of the added 1.1 seconds. The JSON went from 
 with 50 docs under `named_by`, where a first build that listed each sentence gave 112 KB.
 `list review --changed` on the pull request `dde68e0..ffa39b4` went from 2.3 to 3.0 seconds on
 the same machine, because it builds a second resolver for the merge base. Not measured: which
-surfaces a packet could leave unextracted without changing what a span names.
+surfaces a packet could leave unextracted without changing what a span names. Counting every
+name Irminsul resolves to the path, as the owner decided later that day, left the packet for
+`cli.py` at 50 docs and took `mcp_server.py` from 1 doc to 27 and `frontmatter.py` from 1 to 27,
+through the MCP tools and the frontmatter fields their sentences name.
+
+### `http-route-resolves-from-no-code-span`
+
+`CodeResolver.resolve` (`src/irminsul/code_references.py`) finds an identity of a kind with no
+mention pattern only when the span is identifier-shaped, and an HTTP route's identity, such as
+`GET /items` from the `fastapi` pack, has a space and a slash. So a sentence that names
+`` `GET /items` `` resolves to nothing: `irminsul context` does not count it under `named_by`
+for the file that declares the route, though the RFC
+`a-change-re-asks-the-sentences-that-name-its-code` names an HTTP route among what the packet
+counts. With a `[[surface.rules]]` entry for kind `http` that gives a `mention_pattern`, the
+same sentence counts (both run on 2026-11-26 in a scratch FastAPI project). A built-in mention
+pattern for `http` would make it count everywhere, and would also make `code-references` and
+the review queue read routes; that changes what a code span names, so it is a decision.
 
 ### `environment-variable-counts-for-one-file`
 
