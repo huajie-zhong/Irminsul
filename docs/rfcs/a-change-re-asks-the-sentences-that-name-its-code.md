@@ -131,7 +131,8 @@ to 8 the same day.
 - **Touched (decision 8).** A Python function or class is touched when its lines, the
   decorator lines above its `def` or `class` included as an anchor reads them, differ between
   the merge base and where the change ends: the working tree, or `HEAD` under
-  `--committed-only`. A definition moved unchanged within its file is not touched. One the
+  `--committed-only`. A definition moved unchanged within its file is not touched; one moved
+  to another file is removed from the old file and changed in the new one. One the
   change removed or renamed is found in the merge base's text, so a sentence naming
   `Ledger.remove` is queued by the rename that removes it. A file that no longer parses has
   each of its base definitions touched, with no line, as an untracked file's are. Nothing else
@@ -152,8 +153,8 @@ to 8 the same day.
   or a route whose rule declares how a doc mentions it. A span naming the path itself is not
   counted. A decision record
   is read by its `## Decision` alone, as the queue reads it. Plain output lists the eight docs
-  with the most sentences and counts the rest; JSON lists every doc. The sentences of one doc
-  are what `list review --doc <doc> --all` lists.
+  with the most sentences and counts the rest; JSON lists every doc. `list review --doc <doc>
+  --all` lists every sentence of one doc that names code, the counted ones among them.
 - **Options (decision 5).** In `named_by`, a span that holds an option counts for a file when
   the span or its sentence also names the command that declares it there, or when no other
   command declares an option of that name.

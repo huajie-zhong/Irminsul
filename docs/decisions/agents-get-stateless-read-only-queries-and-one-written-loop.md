@@ -78,8 +78,8 @@ rate-limited and makes a run depend on the network.
   names anything Irminsul resolves to a path in hand, with the number of such sentences, whether
   or not a doc owns that path: a Python function or class, a command, an option, an environment
   variable, or any other surface identity the configured extractors and rules give the path,
-  such as a TypeScript export or an MCP tool. A decision record is read by its `## Decision`
-  alone. An option counts only when its sentence names the command that declares it, or one
+  such as a TypeScript export or an MCP tool. A span that names the path itself does not
+  count. A decision record is read by its `## Decision` alone. An option counts only when its sentence names the command that declares it, or one
   command alone declares it. The pairing is the review queue's and is derived on every call.
   Plain output lists the eight docs with the most sentences for a path with the count of the
   rest, and the JSON lists every doc.

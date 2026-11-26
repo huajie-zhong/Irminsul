@@ -356,8 +356,9 @@ that day with the rule as it stands over the same four ranges, the queue went fr
 for commit `460c44c`, from 26 to 27 for commit `9759e15`, from 48 to 51 for the pull request and
 from 108 to 109 for `ffa39b4..55ab870`; 0, 6, 4 and 12 of them carry the marker, 17 of those 22
 on a sentence the change itself wrote. Five items are about a sentence the change did not
-write. Two were worth the re-read: the sentences of `docs/components/checks.md` that name
-`trailer_for` and `acknowledge`, queued by the pull request. The other three are one sentence,
+write. One was worth the re-read: the sentence of `docs/components/checks.md` that names
+`trailer_for`, queued by the pull request, which had also put that trailer in the JSON the
+sentence leaves out; the one beside it, naming `acknowledge`, was still true. The other three are one sentence,
 `docs/components/mcp-server.md:46`, which says what `create_server` records when it runs and was
 queued by three of the four changes, each time because the change reworded the description of
 a tool: every MCP tool is a function nested in `create_server` (`src/irminsul/mcp_server.py`),
@@ -418,9 +419,7 @@ through the MCP tools and the frontmatter fields their sentences name.
 mention pattern only when the span is identifier-shaped, and an HTTP route's identity, such as
 `GET /items` from the `fastapi` pack, has a space and a slash. So a sentence that names
 `` `GET /items` `` resolves to nothing: `irminsul context` does not count it under `named_by`
-for the file that declares the route, though the RFC
-`a-change-re-asks-the-sentences-that-name-its-code` names an HTTP route among what the packet
-counts. With a `[[surface.rules]]` entry for kind `http` that gives a `mention_pattern`, the
+for the file that declares the route. With a `[[surface.rules]]` entry for kind `http` that gives a `mention_pattern`, the
 same sentence counts (both run on 2026-11-26 in a scratch FastAPI project). A built-in mention
 pattern for `http` would make it count everywhere, and would also make `code-references` and
 the review queue read routes; that changes what a code span names, so it is a decision.
