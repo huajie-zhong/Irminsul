@@ -73,12 +73,14 @@ rate-limited and makes a run depend on the network.
   owners, tests, dependencies, active RFCs, claims and bounded excerpts and run no checks;
   `context --after-edit` alone runs them, maps changed paths to owners, and says what the
   change introduced.
-- **A path packet lists the sentences that name the file's code.** `context <path...>` lists,
-  under `named_by`, each sentence in a live doc, a decision record's Decision or a guidance file
-  whose code span names code in a path in hand, as the sentence's file and line and the span,
-  whether or not a doc owns that path. The pairing is the review queue's and is derived on every
-  call. Plain output lists the first ten for a path with the count of the rest, and the JSON
-  carries every one.
+- **A path packet names the docs that name the file's code.** `context <path...>` lists, under
+  `named_by`, each live doc, decision record and guidance file with a sentence whose code span
+  names a function, class, command, option or environment variable of a path in hand, with the
+  number of such sentences, whether or not a doc owns that path. A decision record is read by
+  its `## Decision` alone. An option counts only when its sentence names the command that
+  declares it, or one command alone declares it. The pairing is the review queue's and is
+  derived on every call. Plain output lists the eight docs with the most sentences for a path
+  with the count of the rest, and the JSON lists every doc.
 - **A topic search reads doc bodies.** `context --topic` returns a doc when every word of the
   query is in its id, title, path, `describes`, tests, tags, `summary`, headings or body
   prose, matched as case-folded substrings and not as meaning. A doc that matches only
@@ -169,5 +171,7 @@ rate-limited and makes a run depend on the network.
 - 2026-11-25: Accepted [The change queue asks about what the change did not write](../rfcs/the-change-queue-asks-about-what-the-change-did-not-write.md):
   the author's loop asks for the queue alone, and the agent protocol gains a reviewer's step for
   the written list.
-- 2026-11-26: The packet's list of naming sentences is implemented: `context <path...>` carries
-  `named_by`, the first ten for a path in plain output and every one in the JSON.
+- 2026-11-26: The packet's `named_by` is implemented as the owner amended it that day, after a
+  first build that listed the sentences was measured: `context <path...>` names the docs that
+  name code in a path, each with the number of its sentences that do, the eight with the most
+  in plain output and every doc in the JSON.

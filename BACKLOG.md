@@ -60,12 +60,13 @@ rules, per section and per changed definition, were considered and deferred by
 A decision record's `governs:` names the code it decides, and nothing reads that list yet. The
 accepted RFC `decision-records-govern-what-they-decide` makes `irminsul context <path>` name the
 governing record before an edit; it does not re-ask the record's Decision when that code
-changes. A Decision that names the code in a code span is queued by `list review --changed`
-when the change touches that code, marked `names-changed-code`. One that states the rule in plain words is
-reached by neither, and the case `decision-governs-the-function` of `tests/test_seeded_rot.py`
-pins that. On 2026-11-25 every one of the 14 records named code somewhere in its Decision, and
-167 of the 339 Decision sentences named code the queue resolves (a review). Queue a record's Decision when a change touches what the
-record governs.
+changes. A Decision that names a function or class in a code span is queued by
+`list review --changed` when the change touches it, marked `names-changed-code`. One that names
+only a command, an option or a file, or states the rule in plain words, is reached by neither,
+and the case `decision-governs-the-function` of `tests/test_seeded_rot.py` pins the last. On
+2026-11-25 every one of the 14 records named code somewhere in its Decision, and 167 of the 339
+Decision sentences named code the queue resolves (a review). Queue a record's Decision when a
+change touches what the record governs.
 
 ### `defined-means-two-things`
 
@@ -321,29 +322,34 @@ about 70 of them the agent's own new sentences, with the claims whose evidence c
 doc nobody edited mixed in (2026-10-29). Group the plain output by marker, the items the change
 did not write first.
 
-### `named-code-queue-is-mostly-command-names`
+### `change-queue-asks-through-functions-and-classes-alone`
 
-Since 2026-11-26 `list review --changed` queues each sentence whose code span names code the
-change touched, marked `names-changed-code` (`_sentences_naming_changed_code`,
-`src/irminsul/listing/review.py`), so a change to code that no claim cites is no longer silent
-where a doc names that code. Run that day over four past ranges of this repository, the queue
-went from 0 to 0 items for commit `460c44c`, from 26 to 29 for commit `9759e15`, from 48 to 214
-for the pull request `dde68e0..ffa39b4` and from 108 to 179 for `ffa39b4..55ab870`. Of the 166
-new items of the pull request, 154 come from three hunks inside the functions of `check`,
-`context` and `fix`: the Decision of `derive-facts-and-leave-meaning-to-the-reader` says a
-command or an option is touched when the function that declares it is altered, so the two lines
-the pull request added to `check` queue the 61 sentences that name `check` and those that name
-any of its options. Of ten of the 166 taken at even steps, none was about what the change
-altered, one named the option whose help the change reworded, and two named another command's
-option of the same name (`--confirm`, `--base-ref`), because an option's identity is not scoped
-by its command (`review-binds-common-words`). The three that name a changed function
-(`acknowledge`, `trailer_for`, `create_server`) were worth the re-read. A file named in a code
-span is asked about on any edit to it, so the sentences that name `CHANGELOG.md` and
-`BACKLOG.md` are in the queue of nearly every change. `460c44c` still prints "0 items", because
-no sentence names the functions it changed in a code span, which is
-`connected-doc-hides-unconnected-sections`. Counting a command as touched by its signature and
-decorators alone, or scoping an option to its command, would shorten the list; each changes
-what that Decision says, so it is the owner's call.
+Since 2026-11-26 `list review --changed` queues each sentence whose code span names a function
+or class the change touched, marked `names-changed-code` (`_sentences_naming_changed_code`,
+`src/irminsul/listing/review.py`), and pairs nothing else with a change (`ChangePairing`,
+`src/irminsul/listing/changed_code.py`). That is the owner's decision of that day in the RFC
+`a-change-re-asks-the-sentences-that-name-its-code`, taken after a first build that paired every
+kind of name took the queue of the pull request `dde68e0..ffa39b4` from 48 items to 214. Run
+that day with the rule as it stands over the same four ranges, the queue went from 0 to 0 items
+for commit `460c44c`, from 26 to 27 for commit `9759e15`, from 48 to 51 for the pull request and
+from 108 to 109 for `ffa39b4..55ab870`; 0, 6, 4 and 12 of them carry the marker, 17 of those 22
+on a sentence the change itself wrote. Five items are about a sentence the change did not
+write. Two were worth the re-read: the sentences of `docs/components/checks.md` that name
+`trailer_for` and `acknowledge`, queued by the pull request. The other three are one sentence,
+`docs/components/mcp-server.md:46`, which says what `create_server` records when it runs and was
+queued by three of the four changes, each time because the change reworded the description of
+a tool: every MCP tool is a function nested in `create_server` (`src/irminsul/mcp_server.py`),
+so an edit to any of them is a changed line in that function's range. Counting a function as
+touched only by the lines outside the functions nested in it would drop those three; it changes
+what "its range" means in the Decision of `derive-facts-and-leave-meaning-to-the-reader`, so it
+is the owner's call.
+
+What the rule leaves out on purpose: a sentence that names only a command, an option, an
+environment variable or a file is not asked about when the behaviour behind the name changes,
+unless its doc owns the code or anchors the test that asserts it. The RFC leaves open pairing a
+sentence with the part of a file it names, once `claim-evidence-names-a-part` gives the finders.
+`460c44c` still prints "0 items", because no sentence names the functions it changed in a code
+span, which is `connected-doc-hides-unconnected-sections`.
 
 The measurement of 2026-11-25 that the entries beside this one cite: run with that day's code
 over the three pull requests merged on 2026-10-30 and 2026-10-31 (heads `89772e4`, `dde68e0`,
@@ -367,31 +373,19 @@ were summaries the edit could not have affected: "CLI entry point." for
 record says "a rewritten body", and one changed line is not that. Print them as one group that
 closes the plain output, or decide what "rewritten" means; the second is a decision.
 
-### `named-by-is-most-of-the-packet`
+### `path-packet-pairs-every-code-span`
 
-`irminsul context src/irminsul/cli.py --format json` went from 25 KB to 112 KB on 2026-11-26,
-when the packet gained `named_by` (`_named_by`, `src/irminsul/context.py`): 553 entries, for 318
-lines of 50 files, and an MCP caller of `context_for_path` gets the same answer. The call went
-from 1.2 to about 2 seconds, because the packet now pairs every code span in the docs, and
-`list review --changed` from 1.9 to 2.4 on a pull request, because it pairs them at the merge
-base too. Plain output lists ten sentences for a path and counts the rest. The Decision of
-`agents-get-stateless-read-only-queries-and-one-written-loop` says the JSON carries every one,
-where a topic search bounds its JSON so that the MCP answer is bounded too. Bounding this list
-the same way, with the count and a command that lists the rest, changes that Decision, so it is
-the owner's call.
-
-### `help-and-tool-description-leave-out-the-named-code-lists`
-
-The help of `list review --changed` (`src/irminsul/cli.py`) says the queue of a change holds
-"edited and deleted sentences in the working tree vs HEAD, and the claims, moved files and
-summaries it touched", and the description of the MCP tool `context_for_path`
-(`src/irminsul/mcp_server.py`) says a packet holds each file's "owning doc, source claims,
-tests, dependencies, active RFCs, claims to read, and excerpts". Since 2026-11-26 the first
-leaves out the sentences that name changed code and the second the sentences that name a
-path's code. The RFC that added both, `a-change-re-asks-the-sentences-that-name-its-code`,
-declares `affects: new-list-regen, context, init`, so the change that implemented it left
-`cli.py` and `mcp_server.py` alone: an edit to either under that RFC is `unreconciled-scope`.
-Add the two phrases in a small fix, or name `cli` and `mcp-server` in the RFC's `affects`.
+Since 2026-11-26 `irminsul context <path>` names the docs that name code in the path
+(`_named_by`, `src/irminsul/context.py`). To count their sentences, `docs_naming`
+(`src/irminsul/listing/review.py`) builds a `CodeResolver`, which extracts every surface and
+indexes every function and class of the source, and pairs every code span in the docs, whatever
+the path. `irminsul context src/irminsul/cli.py --format json` went from 2.2 to 2.8 seconds that
+day, the median of five runs on one machine, and an MCP caller of `context_for_path` waits as
+long; about two thirds of the added time is building the resolver. The JSON went from 26 to
+32 KB, with 50 docs under `named_by`, where a first build that listed each sentence gave 112 KB.
+`list review --changed` on the pull request `dde68e0..ffa39b4` went from 3.1 to 3.8 seconds on
+the same machine, because it builds a second resolver for the merge base. Not measured: which
+surfaces a packet could leave unextracted without changing what a span names.
 
 ### `lifecycle-queue-shows-no-progress`
 

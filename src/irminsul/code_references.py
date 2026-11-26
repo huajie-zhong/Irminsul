@@ -9,7 +9,7 @@ from __future__ import annotations
 import ast
 import re
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from irminsul.checks.code_spans import mention_regex
@@ -20,7 +20,6 @@ from irminsul.inventory.base import SourceReader
 from irminsul.inventory.cli_options import command_options
 from irminsul.inventory.programs import program_names
 from irminsul.languages import LANGUAGE_REGISTRY
-from irminsul.languages.python import PYTHON_PROFILE
 
 if TYPE_CHECKING:
     from irminsul.git.reader import GitReader
@@ -45,14 +44,8 @@ class Reference:
 
 
 class CodeResolver:
-    def __init__(self, tree: SourceTree, *, tracked: frozenset[str] | None = None) -> None:
-        """Pair names with the code `tree` holds.
-
-        `tracked` is given for a tree that is one commit's: the repository paths that commit
-        holds, which then say whether a span names a file, where the disk otherwise does.
-        """
+    def __init__(self, tree: SourceTree) -> None:
         repo_root, config = tree.repo_root, tree.config
-        self._tracked = tracked
         self.builtins: frozenset[str] = frozenset().union(
             *(LANGUAGE_REGISTRY[name].builtins for name in config.languages.enabled)
         )
@@ -62,8 +55,8 @@ class CodeResolver:
         self._abs_by_display = {display: abs_path for abs_path, display in files}
         self._command_blocks: dict[str, str] | None = None
         self._command_flags: dict[str, frozenset[str]] | None = None
+        self._sole_option_files: dict[str, str] | None = None
         self._source_tokens: set[str] | None = None
-        self._functions: dict[str, list[tuple[int, int]]] = {}
         self.surfaces: dict[str, dict[str, SurfaceItem]] = {}
         self.mentions: dict[str, list[re.Pattern[str]]] = {}
         self.command_kinds: set[str] = set()
@@ -179,6 +172,31 @@ class CodeResolver:
             self._command_flags = flags
         return self._command_flags
 
+    def sole_option_files(self) -> dict[str, str]:
+        """The file of its command, for each long option that one command alone declares.
+
+        Option identities are not scoped by command, so `--confirm` is one identity however
+        many commands declare it, reported from one of their files. An option several
+        commands declare, or none that `command_flags` reads, is left out.
+        """
+        if self._sole_option_files is None:
+            declaring: dict[str, list[str]] = {}
+            for command, flags in self.command_flags().items():
+                for flag in flags:
+                    declaring.setdefault(flag, []).append(command)
+            files: dict[str, str] = {}
+            for flag, commands in declaring.items():
+                items = [
+                    self.surfaces[kind][command]
+                    for kind in self.command_kinds
+                    for command in commands
+                    if command in self.surfaces.get(kind, {})
+                ]
+                if len(items) == 1 and items[0].display:
+                    files[flag] = items[0].display
+            self._sole_option_files = files
+        return self._sole_option_files
+
     def _declared_options(self, item: SurfaceItem) -> frozenset[str] | None:
         if item.display is None or item.line is None:
             return None
@@ -253,28 +271,19 @@ class CodeResolver:
         return dotted[-1] if self._symbols.get(dotted[-1]) else None
 
     def named_as(self, ref: Reference) -> str:
-        """What tells the code `ref` names from other code of its kind: its identity, or for
-        a function or class the index name its span was looked up under, so that
-        `Ledger.remove` and a `remove` it falls back to are two names."""
-        if ref.kind != "symbol":
-            return ref.identity
+        """The index name the span of a function or class reference was looked up under, so
+        that `Ledger.remove` and a `remove` it falls back to are two names."""
         return self._symbol_key(self.strip_program(ref.span)[0]) or ref.identity
 
-    def has(self, kind: str, name: str, display: str) -> bool:
-        """Whether `display` still declares the surface identity, or defines the function or
-        class, that `named_as` calls `name`."""
-        if kind == "symbol":
-            return any(where[0] == display for where in self._symbols.get(name, ()))
-        item = self.surfaces.get(kind, {}).get(name)
-        return item is not None and item.display == display
+    def defines(self, name: str, display: str) -> bool:
+        """Whether `display` defines the function or class that `named_as` calls `name`."""
+        return any(where[0] == display for where in self._symbols.get(name, ()))
 
     def _repo_file(self, text: str) -> Path | None:
         """A repository file named by its repo-relative path, inside a source root or not."""
         if not text or text.startswith(("/", "..")) or any(c in text for c in " *?<>|\"'"):
             return None
         candidate = self._repo_root / text
-        if self._tracked is not None:
-            return candidate if text in self._tracked else None
         try:
             return candidate if candidate.is_file() else None
         except OSError:
@@ -285,48 +294,10 @@ class CodeResolver:
         return Reference(span, kind, item.identity, item.display or "", item.line, item.line)
 
     def in_repository(self, display: str) -> bool:
-        """Whether `display` is spelled from the repository root, as a change's paths are. A
-        walked file in a source root outside the repository is spelled from that root."""
-        path = self._abs_by_display.get(display)
-        return path is None or path == self._repo_root.resolve() / display
-
-    def declared_lines(self, ref: Reference) -> tuple[int | None, int | None]:
-        """The first and last line whose change is a change to what `ref` names, or
-        `(None, None)` when that is its whole file.
-
-        A function or class is its own range and a path its file. A surface identity is its
-        declaring line, or the innermost Python function that holds that line, decorators
-        included, because a command's options and body are what the command is. An identity
-        whose extractor gives no line is its file.
-        """
-        if ref.kind == "path" or ref.line is None:
-            return None, None
-        if ref.kind == "symbol":
-            return ref.line, ref.line_end or ref.line
-        holding = (ref.line, ref.line)
-        # An outer function comes before the ones inside it, so the last one that holds the
-        # line is the innermost.
-        for first, last in self._function_lines(ref.defined_at):
-            if first <= ref.line <= last:
-                holding = (first, last)
-        return holding
-
-    def _function_lines(self, display: str) -> list[tuple[int, int]]:
-        """The first and last line of each function a Python source file defines, at any
-        depth and decorators included, in `ast.walk` order; none for any other file."""
-        if display not in self._functions:
-            abs_path = self._abs_by_display.get(display)
-            python = PurePosixPath(display).suffix in PYTHON_PROFILE.suffixes
-            module = self._reader.module(abs_path) if abs_path is not None and python else None
-            self._functions[display] = [
-                (
-                    min([node.lineno, *(d.lineno for d in node.decorator_list)]),
-                    node.end_lineno or node.lineno,
-                )
-                for node in (module.nodes if module is not None else ())
-                if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
-            ]
-        return self._functions[display]
+        """Whether the walked file `display` is spelled from the repository root, as a
+        change's paths are. One in a source root outside the repository is spelled from that
+        root."""
+        return self._abs_by_display.get(display) == self._repo_root.resolve() / display
 
     def changed_after(
         self, git: GitReader, doc_abs: Path, references: list[Reference], lines: LineTimes

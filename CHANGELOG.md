@@ -161,26 +161,26 @@ making a feature, a refactor and an RFC-driven change in it.
 - `list review` no longer splits the marker of a numbered list item, such as `1.`, into a sentence
   of its own, and without `--changed` it lists every code-naming sentence of a doc no commit holds
   yet, instead of reporting that none changed since the doc was last committed.
-- `list review --changed` also queues each sentence whose code span names code the change edited,
-  renamed or deleted, marked `names-changed-code`, in any live doc, decision record's Decision or
-  guidance file, whether or not the change opened it: a guide that names a command is asked
-  about it when the command's function changes. A function or class is touched by a changed
-  line in its range, a command, option or other surface identity by one on its declaring line or
-  in the function that declares it, and a file by any edit. A name the change removed or renamed
-  is found in the merge base's text. Each item lists the code and the change's file and line,
-  as `changed_code` in the JSON and as `changed:` and `removed:` lines in plain output. A
-  sentence the change itself wrote keeps its one `edited` item, which carries the marker. An
-  edit inside a long command's function queues every sentence that names the command or one of
-  its options.
-- `context <path...>` lists the sentences that name code in each path, under `named_by` in the
-  JSON and as "Sentences that name code in <path>" in plain output: each sentence, in a live doc,
-  a decision record's Decision or a guidance file, whose code span names a function, class,
-  command, option or other surface identity the file declares, or the file by its path. An entry
-  is the sentence's file and line, the span, and `names`, the path. A file no doc owns has the
-  list too. Plain output shows the first ten for a path and counts the rest; the JSON, and so the
-  MCP tool `context_for_path`, carries every one, which for a file whose commands many docs name
-  is most of the packet. The packet pairs every code span in the docs, so it takes longer than
-  before.
+- `list review --changed` also queues each sentence whose code span names a function or class
+  the change edited, renamed or deleted, marked `names-changed-code`, in any live doc, decision
+  record's Decision or guidance file, whether or not the change opened it: a guide that names a
+  function is asked about it when the function changes. A function or class is touched by a
+  changed line in its range, and one the change removed or renamed is found in the merge base's
+  text. A command, an option, an environment variable and a path are not paired with a change.
+  Each item lists the name and the change's file and line, as `changed_code` in the JSON and as
+  `changed:` and `removed:` lines in plain output. A sentence the change itself wrote keeps its
+  one `edited` item, which carries the marker. `context --after-edit` lists none of these
+  sentences, and the help of `list review --changed` names them.
+- `context <path...>` names the docs that name code in each path, under `named_by` in the JSON
+  and as "Docs that name code in <path>" in plain output: each live doc, decision record, read by
+  its Decision alone, and guidance file with a sentence whose code span names a function, class,
+  command, option or environment variable of the path, with the number of such sentences. An
+  option counts only when its sentence names the command that declares it, or one command alone
+  declares it. An entry is the doc's path, `sentences`, the count, and `names`, the path. A file
+  no doc owns has the list too. Plain output shows the eight docs with the most sentences for a
+  path and counts the rest; the JSON, and so the MCP tool `context_for_path`, lists every doc.
+  The help of `context` and the tool's description say so. The packet pairs every code span in
+  the docs, so it takes longer than before.
 - `irminsul refs` accepts any Markdown file in the repository as a target, so a brownfield page
   with no frontmatter can be asked what links to it before it is moved.
 - `context --after-edit` JSON is reshaped. Each result has `input`, `owner` (only its `id` and

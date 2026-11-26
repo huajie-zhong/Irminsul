@@ -1,9 +1,9 @@
 """`irminsul list review` — sentences to re-read, each paired with the code it names.
 
 Items are selected by facts alone, and each label names the fact: a line the change edited
-or deleted, code it touched that a sentence names, a claim whose evidence it touched, a file
-it moved to another doc, a summary it left behind, or, across the whole tree, a sentence that
-names code. What a sentence means
+or deleted, a function or class it touched that a sentence names, a claim whose evidence it
+touched, a file it moved to another doc, a summary it left behind, or, across the whole
+tree, a sentence that names code. What a sentence means
 is the reader's to judge, so no list of words decides what is shown. The output explains
 each label it shows from `MARKER_MEANINGS`, the one place a label's meaning is written.
 """
@@ -60,9 +60,9 @@ MARKER_MEANINGS: Final[dict[str, str]] = {
         "sentence if it is not this repository's code, leave it if no anchor can reach it"
     ),
     "names-changed-code": (
-        "a sentence naming code this change edited, renamed or deleted; `changed:` and "
-        "`removed:` under it give the code, file and line. Re-read it against the code as it "
-        "is now"
+        "a sentence naming a function or class this change edited, renamed or deleted; "
+        "`changed:` and `removed:` under it give the name, file and line. Re-read it against "
+        "the code as it is now"
     ),
     "governing-claim": (
         "a claim whose evidence this change touched. Under governs-evidence ask whether the "
@@ -114,7 +114,7 @@ class ReviewItem:
     was: str | None = None
     """The sentence an edit replaced, so a reader sees both texts."""
     changed_code: list[ChangedCode] = field(default_factory=list)
-    """The code the sentence names that the change touched, and where."""
+    """The functions and classes the sentence names that the change touched, and where."""
 
 
 def shipped_draft_evidence(
@@ -272,9 +272,10 @@ def build_review(
 
     With `changed`, every sentence on a changed line that its doc did not already say at
     `base_ref` is kept as `edited`, with every sentence the change deleted, each sentence, in
-    any file the queue reads, whose code span names code the change touched, each claim whose
-    evidence it touched, the sentences an old owner still has about a file it moved, and a
-    summary its body edit left behind. A sentence that replaced one in place is one edit,
+    any file the queue reads, whose code span names a function or class the change touched,
+    each claim whose evidence it touched, the sentences an old owner still has about a file
+    it moved, and a summary its body edit left behind. A sentence that replaced one in place
+    is one edit,
     which carries the sentence it replaced as `was`, so the deletion is not queued twice.
     A doc the change added has no base, so all its sentences are `edited`. An edited
     sentence naming code that nothing resolves and no anchor in its doc binds lists those
@@ -365,33 +366,46 @@ def build_review(
     )
 
 
-def sentences_naming(
+def docs_naming(
     config: IrminsulConfig, graph: DocGraph, displays: Collection[str]
-) -> list[tuple[str, int, Reference]]:
-    """(file, line, reference) for each code span that names code defined in one of
-    `displays`, in the files the queue reads, in file and line order.
+) -> dict[tuple[str, str], int]:
+    """How many sentences of each file the queue reads name code in each of `displays`, by
+    (named path, file).
 
-    The pairing is the queue's, asked before a change instead of after one: a `context`
-    packet lists these for the paths in hand, so the docs that describe a file are read
-    before it is edited. A span that names the file by its path counts, as it does here.
+    A sentence counts for a path when one of its code spans names a function, a class, a
+    command or an environment variable that path defines, as the queue pairs spans. An
+    option counts for the file of its command, and only when one command alone declares
+    it: several commands declare `--confirm`, and a sentence about one is not about the
+    others' files. A sentence that names the option's command counts through the command. A
+    span that names the file by its path, or any other surface identity, does not count.
+
+    A `context` packet asks this before a change, so the docs that speak of a file are read
+    before it is edited.
     """
+    from irminsul.inventory.cli_options import CliOptionsExtractor
+    from irminsul.inventory.env_vars import EnvVarsExtractor
+
     assert graph.repo_root is not None
     repo_root = graph.repo_root
     resolver = CodeResolver(graph.source)
+    defining = {"symbol", EnvVarsExtractor.kind, *resolver.command_kinds}
+    option_files = resolver.sole_option_files()
     sentences = _review_sentences(
         config, graph, lambda path: after_text(graph.git, repo_root, None, path)
     )
-    out: list[tuple[str, int, Reference]] = []
+    counts: dict[tuple[str, str], int] = {}
     for path, rows in sentences.items():
-        for file_line, _, sentence in rows:
-            spans = dict.fromkeys(m.group(2) for m in _SPAN_RE.finditer(sentence))
-            out.extend(
-                (path, file_line, ref)
-                for span in spans
-                for ref in resolver.resolve(span)
-                if ref.defined_at in displays
-            )
-    return out
+        for _, _, sentence in rows:
+            named: set[str] = set()
+            for span in dict.fromkeys(m.group(2) for m in _SPAN_RE.finditer(sentence)):
+                for ref in resolver.resolve(span):
+                    if ref.kind in defining:
+                        named.add(ref.defined_at)
+                    elif ref.kind == CliOptionsExtractor.kind and ref.identity in option_files:
+                        named.add(option_files[ref.identity])
+            for display in named.intersection(displays):
+                counts[display, path] = counts.get((display, path), 0) + 1
+    return counts
 
 
 def _sentences_naming_changed_code(
@@ -399,14 +413,17 @@ def _sentences_naming_changed_code(
     pairing: ChangePairing,
     written: dict[tuple[str, int], ReviewItem],
 ) -> list[ReviewItem]:
-    """The sentences whose code span names code the change edited, renamed or deleted.
+    """The sentences whose code span names a function or class the change edited, renamed
+    or deleted.
 
     Every file the queue reads is asked, whether the change touched it or not, because the
     doc that names a function is often one nobody opened: a guide that owns no code, or the
     README. Each such sentence is an item marked `names-changed-code`. A sentence the change
     itself wrote is already queued as `edited`, in `written` by file and position, and takes
     the marker on that item instead of a second one, so these items are about sentences the
-    change left as they were. Nothing here says a sentence is wrong: the fact is that the
+    change left as they were. A sentence that names a command, an option, an environment
+    variable or a path the change touched is not asked about: `ChangePairing` pairs nothing
+    but a function or class. Nothing here says a sentence is wrong: the fact is that the
     code under its name changed.
     """
     out: list[ReviewItem] = []
@@ -441,10 +458,10 @@ def _governing_claims_over_changed_code(
 ) -> list[ReviewItem]:
     """`governs-evidence` claims whose evidence this change touched.
 
-    Like the sentences that name changed code, these are reached from changed *code* and
-    not from a changed doc line. For a contract that names no code in a code span it is the
-    only way its document gets re-read when nobody opened it, which is exactly the change
-    that most needs a reader.
+    Like the sentences that name a changed function or class, these are reached from
+    changed *code* and not from a changed doc line. For a contract that names no function or
+    class in a code span it is the only way its document gets re-read when nobody opened it,
+    which is exactly the change that most needs a reader.
     """
     from irminsul.context import claim_reviews_for_paths
 
@@ -878,12 +895,11 @@ def list_review(
         for name in item.get("unbound", []):
             typer.echo(f"    `{name}` -> unbound; {UNBOUND_ADVICE}")
         for code in item["changed_code"]:
-            named = f"{code['kind']} {code['identity']}"
             where = code["path"] if code["line"] is None else f"{code['path']}:{code['line']}"
             if code["removed"]:
-                typer.echo(f"    removed: {named}, at {where} before this change")
+                typer.echo(f"    removed: `{code['span']}`, at {where} before this change")
             else:
-                typer.echo(f"    changed: {named} at {where}")
+                typer.echo(f"    changed: `{code['span']}` at {where}")
     if not items:
         typer.echo("(none)")
         return

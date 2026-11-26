@@ -25,3 +25,12 @@ def report(
     """Print the total."""
     total = Ledger().total()
     typer.echo(total if plain else f"total: {total}")
+
+
+@app.command()
+def close(
+    confirm: Annotated[bool, typer.Option("--confirm")] = False,
+) -> None:
+    """Close the day, after asking unless `confirm` is set."""
+    if confirm or typer.confirm("Close the day?"):
+        typer.echo("closed")

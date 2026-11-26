@@ -10,19 +10,19 @@ describes: []
 
 `ledger list` prints every amount, oldest first.
 
-`ledger report` prints the total of every amount.
-
-Pass `--limit` to print only the newest amounts.
-
-Pass `--plain` for the bare number.
+Run `ledger list` again after a sale to see it entered.
 
 Set `LEDGER_DATE_FORMAT` to change how a day is printed.
 
 `src/ledger/core.py` holds the ledger itself.
 
-An agent calls `ledger_total` for the sum.
+`late_fee()` charges fifty cents for each day a payment is late.
 
-An agent calls `ledger_count` for how many amounts there are.
+`due_day()` gives a payment thirty days.
+
+An agent calls `ledger_total` for the sum.
 
 A shop enters each sale as it happens, and the [ledger component](../components/ledger.md)
 says what keeps the sales in order.
+
+[The ledger's options](options.md) lists what the commands take.

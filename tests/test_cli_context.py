@@ -1393,6 +1393,16 @@ def test_context_after_edit_help_says_what_waits_for_the_commits_trailer() -> No
     assert "until a commit carries the trailer" in text
 
 
+def test_context_help_says_a_path_packet_names_the_docs_that_name_code_in_each_path() -> None:
+    result = runner.invoke(app, ["context", "--help"], terminal_width=160)
+
+    assert result.exit_code == 0, result.output
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+    text = " ".join(re.sub(r"[│╭╮╰╯─]", " ", plain).split())
+    assert "the docs that name code in each path" in text
+    assert "how many sentences of each do" in text
+
+
 _UNREFLECTED = "co-change/unreflected-change"
 
 
@@ -2241,14 +2251,18 @@ def test_include_still_returns_owner_content_after_an_edit(tmp_path: Path) -> No
 
 
 _LEDGER_CLI = "src/ledger/cli.py"
+_LEDGER_ADMIN = "src/ledger/admin.py"
 _LEDGER_CORE = "src/ledger/core.py"
 _LEDGER_USAGE = "docs/guides/usage.md"
+_LEDGER_OPTIONS = "docs/guides/options.md"
+_LEDGER_COMPONENT = "docs/components/ledger.md"
 _LEDGER_DECISION = "docs/decisions/amounts-keep-their-order.md"
 
 
 def _ledger(fixture_repo: Callable[[str], Path]) -> Path:
-    """The `names-changed-code` fixture: docs that name a ledger's commands, options, methods
-    and one of its files in code spans, committed whole."""
+    """The `names-changed-code` fixture: docs that name a ledger's class, functions, commands,
+    options, environment variable, one of its tools and two of its files in code spans,
+    committed whole."""
     repo = fixture_repo("names-changed-code")
     seed_repo(repo, "the fixture as it stands", when="2024-01-01T12:00:00+00:00")
     return repo
@@ -2260,62 +2274,114 @@ def _named_by(repo: Path, *paths: str) -> list[dict[str, Any]]:
     return named
 
 
-def test_a_packet_lists_the_sentences_that_name_code_in_the_file(
+def test_a_packet_names_the_docs_that_name_code_in_the_file(
     fixture_repo: Callable[[str], Path],
 ) -> None:
-    """The requirement's scenario: the usage guide and the README own no code and name the
-    commands `cli.py` declares, and the packet for that file says where."""
+    """The requirement's first scenario: the usage guide owns no code and names `ledger list`
+    in two sentences, and the packet for the file that declares the command says so. The docs
+    are ordered by how many sentences each has, then by path."""
     repo = _ledger(fixture_repo)
 
     named = _named_by(repo, _LEDGER_CLI)
 
     assert named == [
-        {"path": "README.md", "line": 5, "span": "ledger list", "names": _LEDGER_CLI},
-        {"path": "README.md", "line": 7, "span": "ledger report", "names": _LEDGER_CLI},
-        {"path": _LEDGER_USAGE, "line": 11, "span": "ledger list", "names": _LEDGER_CLI},
-        {"path": _LEDGER_USAGE, "line": 13, "span": "ledger report", "names": _LEDGER_CLI},
-        {"path": _LEDGER_USAGE, "line": 15, "span": "--limit", "names": _LEDGER_CLI},
-        {"path": _LEDGER_USAGE, "line": 17, "span": "--plain", "names": _LEDGER_CLI},
+        {"path": _LEDGER_OPTIONS, "sentences": 3, "names": _LEDGER_CLI},
+        {"path": "README.md", "sentences": 2, "names": _LEDGER_CLI},
+        {"path": _LEDGER_USAGE, "sentences": 2, "names": _LEDGER_CLI},
     ]
 
 
-def test_named_by_reads_a_decision_records_decision_and_a_span_that_names_the_file(
+def test_named_by_reads_a_decision_records_decision_and_counts_no_sentence_for_the_files_path(
     fixture_repo: Callable[[str], Path],
 ) -> None:
-    """The record names `Ledger.add` in its Decision, on line 21, and `Ledger.remove` in its
-    Context, on line 17, which the review queue does not read either."""
+    """The record names `Ledger.add` in its Decision, and `Ledger.remove` and `Ledger.total`
+    outside it, where the review queue does not read either. The usage guide names
+    `src/ledger/core.py` by its path and no function or class in it, so it is not listed."""
     repo = _ledger(fixture_repo)
 
     named = _named_by(repo, _LEDGER_CORE)
 
-    assert [(entry["path"], entry["line"], entry["span"]) for entry in named] == [
-        ("docs/components/ledger.md", 16, "Ledger.add"),
-        ("docs/components/ledger.md", 18, "Ledger.remove"),
-        ("docs/components/ledger.md", 20, "Ledger.total"),
-        ("docs/components/ledger.md", 22, "parse_amount()"),
-        (_LEDGER_DECISION, 21, "Ledger.add"),
-        (_LEDGER_USAGE, 21, _LEDGER_CORE),
+    assert [(entry["path"], entry["sentences"]) for entry in named] == [
+        (_LEDGER_COMPONENT, 4),
+        ("README.md", 1),
+        (_LEDGER_DECISION, 1),
     ]
 
 
-def test_named_by_says_which_path_each_sentence_names(
+def test_named_by_counts_a_function_and_an_environment_variable_and_no_tool(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    """The usage guide names `late_fee()` and `due_day()`, the variable `dates.py` reads, and a
+    tool `server.py` declares, which is none of the names the packet counts."""
+    repo = _ledger(fixture_repo)
+
+    assert _named_by(repo, "src/ledger/fees.py") == [
+        {"path": _LEDGER_USAGE, "sentences": 2, "names": "src/ledger/fees.py"}
+    ]
+    assert _named_by(repo, "src/ledger/dates.py") == [
+        {"path": _LEDGER_USAGE, "sentences": 1, "names": "src/ledger/dates.py"}
+    ]
+    assert _named_by(repo, "src/ledger/server.py") == []
+
+
+def test_named_by_says_which_path_each_doc_names(
     fixture_repo: Callable[[str], Path],
 ) -> None:
     repo = _ledger(fixture_repo)
 
     named = _named_by(repo, _LEDGER_CLI, _LEDGER_CORE)
 
-    assert [entry["names"] for entry in named] == [_LEDGER_CLI] * 6 + [_LEDGER_CORE] * 6
+    assert [entry["names"] for entry in named] == [_LEDGER_CLI] * 3 + [_LEDGER_CORE] * 3
     assert _named_by(repo, _LEDGER_USAGE) == []
 
 
-def test_a_file_no_doc_owns_still_lists_the_sentences_that_name_its_code(
+def test_an_option_two_commands_declare_counts_only_beside_its_command(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    """The requirement's third scenario. `close` in `cli.py` and `reset` in `admin.py` both
+    declare `--confirm`. The options guide names it alone in one sentence, which counts for
+    neither file, beside `ledger close` in a second, which counts for `cli.py` through the
+    command, and inside `ledger reset --confirm` in a third, which counts for `admin.py`.
+    `--limit` and `--plain` are each one command's, so their two sentences count for `cli.py`."""
+    repo = _ledger(fixture_repo)
+
+    assert _named_by(repo, _LEDGER_ADMIN) == [
+        {"path": _LEDGER_OPTIONS, "sentences": 1, "names": _LEDGER_ADMIN}
+    ]
+    assert _named_by(repo, _LEDGER_CLI)[0] == {
+        "path": _LEDGER_OPTIONS,
+        "sentences": 3,
+        "names": _LEDGER_CLI,
+    }
+
+
+def test_an_option_one_command_alone_declares_counts_without_its_command(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    """Once `close` takes `--yes` instead, `reset` alone declares `--confirm`, so each of the
+    three sentences that hold the option counts for `admin.py`, and the one that names it
+    beside `ledger close` still counts for `cli.py`, through the command."""
+    repo = _ledger(fixture_repo)
+    replace_text(
+        repo,
+        _LEDGER_CLI,
+        'confirm: Annotated[bool, typer.Option("--confirm")]',
+        'confirm: Annotated[bool, typer.Option("--yes")]',
+    )
+
+    assert _named_by(repo, _LEDGER_ADMIN) == [
+        {"path": _LEDGER_OPTIONS, "sentences": 3, "names": _LEDGER_ADMIN}
+    ]
+    assert _named_by(repo, _LEDGER_CLI)[0]["sentences"] == 3
+
+
+def test_a_file_no_doc_owns_still_names_the_docs_that_name_its_code(
     fixture_repo: Callable[[str], Path],
 ) -> None:
     """The packet that says no doc owns a file is the one whose reader most needs to know
     which docs describe it."""
     repo = _ledger(fixture_repo)
-    replace_text(repo, "docs/components/ledger.md", "  - src/ledger/*.py", "  - src/ledger/core.py")
+    replace_text(repo, _LEDGER_COMPONENT, "  - src/ledger/*.py", "  - src/ledger/core.py")
 
     code, output = invoke(repo, "context", _LEDGER_CLI, "--format", "json")
     data = json.loads(output)
@@ -2323,34 +2389,72 @@ def test_a_file_no_doc_owns_still_lists_the_sentences_that_name_its_code(
     assert code == 1
     assert data["results"] == []
     assert [item["path"] for item in data["unmatched"]] == [_LEDGER_CLI]
-    assert (_LEDGER_USAGE, 11) in [(entry["path"], entry["line"]) for entry in data["named_by"]]
+    assert {"path": _LEDGER_USAGE, "sentences": 2, "names": _LEDGER_CLI} in data["named_by"]
 
 
-def test_the_plain_packet_caps_the_sentences_and_counts_the_rest(
+def test_the_plain_packet_lists_eight_docs_and_counts_the_rest(
     fixture_repo: Callable[[str], Path],
 ) -> None:
-    """Plain output lists the first ten for a path and counts the rest; the JSON carries all."""
+    """The requirement's second scenario: eleven docs name code in the path, the three of the
+    fixture and eight guides written here, where guide N names the command in N sentences."""
     repo = _ledger(fixture_repo)
-    guide = repo / _LEDGER_USAGE
-    more = "".join(f"\nRun `ledger list` on day {day}.\n" for day in range(1, 8))
-    guide.write_text(guide.read_text(encoding="utf-8") + more, encoding="utf-8")
+    for guide in range(1, 9):
+        write_doc(
+            repo,
+            f"docs/guides/day-{guide}.md",
+            doc_id=f"day-{guide}",
+            body="".join(f"Run `ledger list` at hour {hour}.\n\n" for hour in range(guide)),
+        )
 
     code, output = invoke(repo, "context", _LEDGER_CLI)
 
     assert code == 0, output
     lines = output.splitlines()
-    start = lines.index(f"Sentences that name code in {_LEDGER_CLI}:")
-    assert lines[start + 1 : start + 4] == [
-        "  README.md:5  `ledger list`",
-        "  README.md:7  `ledger report`",
-        f"  {_LEDGER_USAGE}:11  `ledger list`",
+    start = lines.index(f"Docs that name code in {_LEDGER_CLI}:")
+    assert lines[start + 1 : start + 11] == [
+        "  docs/guides/day-8.md: 8 sentences",
+        "  docs/guides/day-7.md: 7 sentences",
+        "  docs/guides/day-6.md: 6 sentences",
+        "  docs/guides/day-5.md: 5 sentences",
+        "  docs/guides/day-4.md: 4 sentences",
+        "  docs/guides/day-3.md: 3 sentences",
+        f"  {_LEDGER_OPTIONS}: 3 sentences",
+        "  README.md: 2 sentences",
+        "  … 3 more docs (--format json lists every doc)",
+        "  irminsul list review --doc <doc> --all lists the sentences of one doc",
     ]
-    assert lines[start + 11] == "  … 3 more (--format json lists every one)"
-    assert not lines[start + 12].startswith("  ")
-    assert len(_named_by(repo, _LEDGER_CLI)) == 13
+    assert not lines[start + 11].startswith("  ")
+    named = _named_by(repo, _LEDGER_CLI)
+    assert len(named) == 11
+    assert named[-1] == {"path": "docs/guides/day-1.md", "sentences": 1, "names": _LEDGER_CLI}
 
 
-def test_a_plain_packet_with_no_such_sentence_prints_no_heading(
+def test_the_plain_packet_names_the_command_that_lists_a_docs_sentences_once(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    repo = _ledger(fixture_repo)
+
+    code, output = invoke(repo, "context", _LEDGER_CLI, _LEDGER_CORE)
+
+    assert code == 0, output
+    lines = output.splitlines()
+    core = lines.index(f"Docs that name code in {_LEDGER_CORE}:")
+    assert lines[lines.index(f"Docs that name code in {_LEDGER_CLI}:") + 1 : core] == [
+        f"  {_LEDGER_OPTIONS}: 3 sentences",
+        "  README.md: 2 sentences",
+        f"  {_LEDGER_USAGE}: 2 sentences",
+        "",
+    ]
+    assert lines[core + 1 : core + 5] == [
+        f"  {_LEDGER_COMPONENT}: 4 sentences",
+        "  README.md: 1 sentence",
+        f"  {_LEDGER_DECISION}: 1 sentence",
+        "  irminsul list review --doc <doc> --all lists the sentences of one doc",
+    ]
+    assert output.count("lists the sentences of one doc") == 1
+
+
+def test_a_plain_packet_with_no_such_doc_prints_no_heading(
     fixture_repo: Callable[[str], Path],
 ) -> None:
     repo = _ledger(fixture_repo)
@@ -2358,7 +2462,7 @@ def test_a_plain_packet_with_no_such_sentence_prints_no_heading(
     code, output = invoke(repo, "context", _LEDGER_USAGE)
 
     assert code == 0, output
-    assert "Sentences that name code" not in output
+    assert "Docs that name code" not in output
 
 
 def test_only_a_path_packet_carries_named_by(fixture_repo: Callable[[str], Path]) -> None:

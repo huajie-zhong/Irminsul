@@ -93,26 +93,29 @@ its change connects to.
 - **`list review` routes semantic checking and never decides truth.** It reads live docs, the
   `## Decision` of decision records, and the guidance files. With a change, given by `--changed`
   or `--base-ref`, it queues each sentence the change added, reworded or deleted, each sentence
-  whose code span names code the change touched, each claim
+  whose code span names a function or class the change touched, each claim
   other than a report whose evidence it touched, each sentence an old owner keeps about a file moved to another doc,
   and each `summary:` left behind a rewritten body. Without one it queues sentences that name
   code. An item's markers name the fact that selected it, and the output defines each once.
 - **A change re-asks the sentences that name its code.** In every file the queue reads, the
-  change's own or not, a sentence whose code span names code the change edited, renamed or
-  deleted is queued, marked `names-changed-code`, with the code and the change's file and line.
-  What a span names is what freshness says it names. A function or class is touched when the
-  change alters a line in its range; a command, an option, an environment variable or any other
-  surface identity when its declaring line, or the function that declares it, is altered or
-  removed; a file when the change edits, renames or deletes it. Code the change removed or
-  renamed is found in the merge base's text, and the rest where the change ends, the working
-  tree or `HEAD`. A sentence the change itself wrote keeps its one item and carries the marker
-  on it. Whether a queued sentence still holds is meaning, so none of this is a finding.
+  change's own or not, a sentence whose code span names a function or class the change edited,
+  renamed or deleted is queued, marked `names-changed-code`, with the name and the change's file
+  and line. What a span names is what freshness says it names. A function or class is touched
+  when the change alters a line in its range; one the change removed or renamed is found in the
+  merge base's text, and the rest where the change ends, the working tree or `HEAD`. Nothing
+  else a span can name is paired with a change: not a command, an option, an environment
+  variable or a path, which too many sentences name for too many reasons. What already answers
+  for those stays: `code-references` reports a command or option the code no longer has, and
+  `inventory-drift` a doc's list that misses one the code gained. A sentence the change itself
+  wrote keeps its one item and carries the marker on it. `list review` alone lists these
+  sentences, and `context --after-edit` none of them. Whether a queued sentence still holds is
+  meaning, so none of this is a finding.
 - **Freshness marks what to read.** Without a change, an item is marked only when a line of the
   definition it names, a function's or class's range, a surface identity's declaring line, or a
   whole file for a path, changed after the doc's last commit, by one `git blame` per file;
   uncommitted lines count. Only marked items show unless `--all` is given, and JSON reports both
-  counts. A `context` packet lists the claims that cite its paths as evidence and the sentences that
-  name code in them, unmarked, not this queue.
+  counts. A `context` packet lists the claims that cite its paths as evidence and the docs that
+  name code in them, each with a count of its sentences, not this queue.
 - **`foreign` is deleted** (accepted, not yet implemented). A span that invokes this project's
   program stays `inventory-drift/unknown-mention`, certain; a bare flag no program precedes is
   `inventory-drift/unattributed-mention`, a hint an ignore comment on its line answers. This
@@ -154,8 +157,10 @@ its change connects to.
 - 2026-11-25: Accepted [The change queue asks about what the change did not write](../rfcs/the-change-queue-asks-about-what-the-change-did-not-write.md):
   `list review --changed` drops the sentences a change wrote or deleted, and `list review --written`
   lists them for the change's reviewer.
-- 2026-11-26: The re-ask of named code is implemented: `list review --changed` queues each
-  sentence whose code span names code the change edited, renamed or deleted, marked
-  `names-changed-code`, and the Decision states what touched means.
-- 2026-11-26: A `context` packet lists the sentences that name code in its paths, as `named_by`,
-  so the sentence on what a packet lists names them beside the claims.
+- 2026-11-26: The re-ask of named code is implemented as the owner amended it that day, after
+  a first build that paired every kind of name was measured: `list review --changed` queues each
+  sentence whose code span names a function or class the change edited, renamed or deleted,
+  marked `names-changed-code`, and pairs no command, option, environment variable or path with
+  a change.
+- 2026-11-26: A `context` packet names the docs that name code in its paths, as `named_by`, so
+  the sentence on what a packet lists names them beside the claims.

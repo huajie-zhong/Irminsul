@@ -1,11 +1,13 @@
-"""The code a change touched, as the sentences that name it are asked.
+"""The functions and classes a change touched, as the sentences that name them are asked.
 
 A change runs from a base commit to the working tree, or to `HEAD` when only commits are
-judged. A code span is paired with the code it names on both sides: on the after side, where
-the change's line numbers are counted, to see whether a changed line falls in what the span
-names, and at the base, to find what the span named there and names no longer. Both pairings
-are `CodeResolver`'s, so what a sentence names here is what the review queue says it names
-without a change.
+judged. A code span is paired with the function or class it names on both sides: on the
+after side, where the change's line numbers are counted, to see whether a changed line falls
+in its range, and at the base, to find what the span named there and names no longer. Both
+pairings are `CodeResolver`'s, so what a sentence names here is what the review queue says
+it names without a change. Nothing else a span can name is paired with a change: a command,
+an option, an environment variable, any other surface identity and a path are each named by
+too many sentences, for too many reasons, for an edit to ask about them all.
 """
 
 from __future__ import annotations
@@ -36,15 +38,14 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class ChangedCode:
-    """Code a sentence names that the change touched, and where.
+    """A function or class a sentence names that the change touched, and where.
 
-    `path` and `line` are the change's: the first changed line in what the span names, or
-    the line that defined it at the base when the change removed or renamed it, which
-    `removed` says. A file, and code in a file every line of which is new, has no line.
+    `identity` is its bare name. `path` and `line` are the change's: the first changed line
+    in its range, or the line that defined it at the base when the change removed or renamed
+    it, which `removed` says. One in a file every line of which is new has no line.
     """
 
     span: str
-    kind: str
     identity: str
     path: str
     line: int | None
@@ -116,14 +117,14 @@ class SourceAtCommit(SourceTree):
 
 
 class ChangePairing:
-    """Which of the code a span names the change touched.
+    """Which function or class a span names the change touched.
 
-    Code the after side still has is touched when a changed line falls in the lines
-    `CodeResolver.declared_lines` gives it. Code the span named at the base, in a file the
-    change edited, renamed or deleted, was removed or renamed by the change when the span no
-    longer names it and that file no longer has it; a file git says was only renamed keeps
-    what it defines. A span that pairs with other code now, or with none because a second
-    definition took its name, did not lose code that is still where it was.
+    One the after side still has is touched when a changed line falls in its range. One the
+    span named at the base, in a file the change edited, renamed or deleted, was removed or
+    renamed by the change when that file no longer defines it; a file git says was only
+    renamed keeps what it defines. A span that pairs with another definition now, or with
+    none because a second definition took its name, did not lose one that is still where it
+    was.
     """
 
     def __init__(
@@ -154,8 +155,7 @@ class ChangePairing:
                 after_tree = SourceAtCommit(
                     self._live, self._git, "HEAD", self._at_head, self._dirty
                 )
-                self.after = CodeResolver(after_tree, tracked=self._at_head)
-        self._after_source = frozenset(display for _, display in after_tree.files)
+                self.after = CodeResolver(after_tree)
         self._memo: dict[str, list[ChangedCode]] = {}
 
     def _uncommitted(self) -> frozenset[str]:
@@ -178,20 +178,20 @@ class ChangePairing:
 
     @cached_property
     def _before(self) -> CodeResolver | None:
-        """The pairing at the base, or None when the change cannot have removed anything a
-        span names: the base cannot be read, or the change edited no source file the base
-        holds and every file the base holds is still there."""
+        """The pairing at the base, or None when the change cannot have removed a function
+        or class: the base cannot be read, or the change edited no source file the base
+        holds and every source file the base holds is still there."""
         tracked = self._tracked(self._base_ref)
         if tracked is None:
             return None
-        if not any(
-            (path in self._changed and path in self._after_source) or not self._on_after_side(path)
-            for path in tracked
-        ):
-            return None
         differs = frozenset(self._changed) | self._dirty
         tree = SourceAtCommit(self._live, self._git, self._base_ref, tracked, differs)
-        return CodeResolver(tree, tracked=tracked)
+        if not any(
+            display in self._changed or not self._on_after_side(display)
+            for display in tracked.intersection(display for _, display in tree.files)
+        ):
+            return None
+        return CodeResolver(tree)
 
     @cached_property
     def _renamed(self) -> dict[str, str]:
@@ -201,45 +201,44 @@ class ChangePairing:
             return {}
 
     def touched(self, span: str) -> list[ChangedCode]:
-        """The code `span` names that the change edited, renamed or deleted."""
+        """The function or class `span` names that the change edited, renamed or deleted."""
         if span not in self._memo:
             self._memo[span] = self._touched(span)
         return self._memo[span]
 
     def _touched(self, span: str) -> list[ChangedCode]:
-        now = self.after.resolve(span)
         out: list[ChangedCode] = []
-        for ref in now:
+        for ref in _definitions(self.after, span):
             edited, line = self._edited_at(ref)
             if edited:
-                out.append(ChangedCode(span, ref.kind, ref.identity, ref.defined_at, line))
+                out.append(ChangedCode(span, ref.identity, ref.defined_at, line))
         before = self._before
         if before is not None:
-            held = {(ref.kind, self.after.named_as(ref), ref.defined_at) for ref in now}
-            for ref in before.resolve(span):
+            for ref in _definitions(before, span):
                 was_in = ref.defined_at
                 if was_in not in self._changed and self._on_after_side(was_in):
                     continue
-                name, now_in = before.named_as(ref), self._renamed.get(was_in, was_in)
-                if (ref.kind, name, now_in) in held:
-                    continue
-                if ref.kind != "path" and self.after.has(ref.kind, name, now_in):
-                    continue
-                out.append(
-                    ChangedCode(span, ref.kind, ref.identity, was_in, ref.line, removed=True)
-                )
-        return list(dict.fromkeys(out))
+                now_in = self._renamed.get(was_in, was_in)
+                if not self.after.defines(before.named_as(ref), now_in):
+                    out.append(ChangedCode(span, ref.identity, was_in, ref.line, removed=True))
+        return out
 
     def _edited_at(self, ref: Reference) -> tuple[bool, int | None]:
-        """Whether a changed line falls in what `ref` names, and the first one that does."""
+        """Whether a changed line falls in the range of the function or class `ref` names,
+        and the first one that does."""
         display = ref.defined_at
         if display not in self._changed or not self.after.in_repository(display):
             return False, None
         lines = self._changed[display]
         if lines is None:
             return True, None
-        first, last = self.after.declared_lines(ref)
-        if first is None or last is None:
-            return True, min(lines, default=None)
-        inside = [line for line in lines if first <= line <= last]
+        assert ref.line is not None
+        last = ref.line_end or ref.line
+        inside = [line for line in lines if ref.line <= line <= last]
         return bool(inside), min(inside, default=None)
+
+
+def _definitions(resolver: CodeResolver, span: str) -> list[Reference]:
+    """The function or class `span` names, as `resolver` pairs it: none when the span names
+    a surface identity or a path instead."""
+    return [ref for ref in resolver.resolve(span) if ref.kind == "symbol"]
