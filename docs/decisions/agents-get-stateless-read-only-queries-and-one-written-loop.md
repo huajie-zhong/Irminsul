@@ -163,3 +163,6 @@ rate-limited and makes a run depend on the network.
 - 2026-11-25: Accepted [The change queue asks about what the change did not write](../rfcs/the-change-queue-asks-about-what-the-change-did-not-write.md):
   the author's loop asks for the queue alone, and the agent protocol gains a reviewer's step for
   the written list.
+- 2026-11-26: Accepted [A sentence about behaviour is anchored to the test that asserts it](../rfcs/a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts.md):
+  the loop and the agent protocol advise that anchor, and the protocol gains the step of seeing
+  the test fail once.

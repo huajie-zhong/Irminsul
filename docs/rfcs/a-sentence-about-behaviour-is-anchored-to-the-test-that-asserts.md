@@ -1,14 +1,16 @@
 ---
 id: a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts
 title: "A sentence about behaviour is anchored to the test that asserts it"
-status: draft
-summary: "The loop, the scaffolds and the agent protocol advise anchoring a sentence that says what code does to the test that asserts it, `anchors --suggest` offers those tests, and whoever adds such an anchor sees the test fail once."
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: accepted
 affects:
   - anchors
   - init
   - new-list-regen
+resolved_by: docs/decisions/code-is-named-in-code-spans-and-bound-by-anchors.md
+summary: "The loop, the scaffolds and the agent protocol advise anchoring a sentence that says what code does to the test that asserts it, `anchors --suggest` offers those tests, and whoever adds such an anchor sees the test fail once."
+required_updates: []
 weight: large
 ---
 
@@ -145,3 +147,7 @@ module and whose body names that definition, each as an anchor marker ready to p
 - `T3` Add the procedure for tying a sentence to a test to the agent protocol and its scaffold. (component: init)
 - `T4` Add the seeded-rot case of a sentence anchored to a test. (component: anchors)
 - `T5` State the rules in the two governing records with dated Changes items, and record the command left out in the backlog. (component: anchors)
+
+## Resolution
+
+Accepted by the owner on 2026-11-26, with the answers recorded under Decisions, and resolved by [Code is named in code spans and bound by anchors](../decisions/code-is-named-in-code-spans-and-bound-by-anchors.md), whose Changes item records it. [Agents get stateless read-only queries and one written loop](../decisions/agents-get-stateless-read-only-queries-and-one-written-loop.md) records its part too. Each rule joins its record's Decision with the implementation, as an edit in place.
