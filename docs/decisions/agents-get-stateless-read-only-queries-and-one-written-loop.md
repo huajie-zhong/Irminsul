@@ -73,6 +73,16 @@ rate-limited and makes a run depend on the network.
   owners, tests, dependencies, active RFCs, claims and bounded excerpts and run no checks;
   `context --after-edit` alone runs them, maps changed paths to owners, and says what the
   change introduced.
+- **A path packet names the docs that name the file's code.** `context <path...>` lists, under
+  `named_by`, each live doc, decision record and guidance file with a sentence whose code span
+  names anything Irminsul resolves to a path in hand, with the number of such sentences, whether
+  or not a doc owns that path: a Python function or class, a command, an option, an environment
+  variable, or any other surface identity the configured extractors and rules give the path,
+  such as a TypeScript export or an MCP tool. A span that names the path itself does not
+  count. A decision record is read by its `## Decision` alone. An option counts only when its sentence names the command that declares it, or one
+  command alone declares it. The pairing is the review queue's and is derived on every call.
+  Plain output lists the eight docs with the most sentences for a path with the count of the
+  rest, and the JSON lists every doc.
 - **A topic search reads doc bodies.** `context --topic` returns a doc when every word of the
   query is in its id, title, path, `describes`, tests, tags, `summary`, headings or body
   prose, matched as case-folded substrings and not as meaning. A doc that matches only
@@ -105,7 +115,19 @@ rate-limited and makes a run depend on the network.
   writes the file when there is none, appends the section to one without the markers, leaves one
   with them alone, replaces only the section under `--force`, and refuses unpaired markers. This
   repository's root `AGENTS.md` carries the same section, which a test compares. The
-  [agent protocol](../guides/agent-protocol.md) keeps acting on a finding and changing direction.
+  [agent protocol](../guides/agent-protocol.md) keeps tying a sentence to a test, acting on a
+  finding and changing direction.
+- **The loop advises anchoring a sentence about behaviour to its test.** Step 3 says that a
+  sentence that says what the code does is best anchored to the test that asserts it, since it
+  is then asked about when that test changes and the test fails when the code stops doing it.
+  The comment a new component doc starts with gives the same advice, and the agent protocol
+  and its scaffold give the procedure: find the test with `irminsul anchors --suggest --doc
+  <doc>`, or with `irminsul context <source file>` for a sentence that names no code, which
+  read only the test roots the configuration declares, the second for a file a doc owns, and
+  otherwise search the tests for the function's name, since `irminsul init` declares no test
+  root; change the code so the sentence is false, run the test, see it fail and restore the
+  code; paste the marker and pin it. Seeing it fail is a written step that nothing verifies. The advice ships
+  to every adopter, and the skill is unchanged, since it points at the root `AGENTS.md`.
 - **The [manifest](../AGENTS.md) is generated, with two curated sections:** a table of every doc
   that `irminsul fix` rewrites from the graph, a `Foundations` that in a scaffold holds the Three
   Laws, and a one-line `Protocol` naming where the loop lives; `agents-manifest` requires both
@@ -166,3 +188,12 @@ rate-limited and makes a run depend on the network.
 - 2026-11-26: Accepted [A sentence about behaviour is anchored to the test that asserts it](../rfcs/a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts.md):
   the loop and the agent protocol advise that anchor, and the protocol gains the step of seeing
   the test fail once.
+- 2026-11-26: That advice is implemented and stated in the Decision: step 3 of the loop and the
+  component scaffold's comment carry it, and the agent protocol and its scaffold carry the
+  procedure for tying a sentence to a test, with the search the RFC's decision 5 gives where
+  no test root is declared.
+- 2026-11-26: The packet's `named_by` is implemented as the owner amended it that day, after a
+  first build that listed the sentences was measured and a review of the second: `context
+  <path...>` names the docs with a sentence that names anything Irminsul resolves to a path,
+  each with the number of its sentences that do, the eight with the most in plain output and
+  every doc in the JSON.

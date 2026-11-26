@@ -27,6 +27,16 @@ making a feature, a refactor and an RFC-driven change in it.
 - The agent protocol `irminsul init` scaffolds lists the four answers a finding code can declare,
   and says to take the one `irminsul explain` names, in place of its two steps for an ignore
   comment and for a finding with no line.
+- The loop `irminsul init` writes into the root `AGENTS.md` advises, in step 3, anchoring a
+  sentence that says what the code does to the test that asserts it: the sentence is then asked
+  about when that test changes, and the test fails when the code stops doing it. The comment
+  `irminsul new component` writes gives the same advice, and the scaffolded agent protocol
+  gains the procedure, "Tying a sentence to a test": find the test, with the commands that
+  list it once `irminsul.toml` declares the test directories under `[paths]` as `test_roots`,
+  or else by searching the test files for the function's name; change the code so the
+  sentence is false and see the test fail once, then paste the marker and pin it. A newly
+  scaffolded `docs/AGENTS.md` names the procedure beside the other two. A root `AGENTS.md`
+  and a protocol already scaffolded keep their text until `init --force`.
 
 **Findings and messages.**
 - `check --diff` with a base that does not resolve, such as `origin/main` in a repository with no
@@ -113,6 +123,18 @@ making a feature, a refactor and an RFC-driven change in it.
   so `change transition` and `change finalize` print no held list.
 
 **Queries.**
+- `anchors --suggest --doc <doc>` also lists each code span of that doc that resolves to one
+  Python function or class, once for each definition, with where it is defined and up to three
+  test functions that name it, each as an anchor marker ready to paste: a function whose name
+  starts with `test`, in a Python file under `paths.test_roots` that imports the defining
+  module, whose body refers to the definition through an import of that module. A parameter, a
+  fixture or a local variable spelled like the definition does not count, and a method counts
+  as an attribute of its name in a test whose imports reach its class or its module. A name no
+  test names is listed and said to have none, the closing line counts
+  these names apart from the unbound ones, and the JSON gains a list `resolved` beside
+  `unbound`, each row with the doc's `path` and `line`, the `name`, its `definition` and its
+  `tests`. With no test root declared it says that no test file was read. Without `--doc` the
+  output is unchanged.
 - `context <path>` for a file the adoption record excepts says, before the edit, that a change
   editing it must give it an owning doc in the same change, or `check --diff` fails with
   `diff-integrity/adoption-debt-touched` (`recorded_debt` on the unmatched entry in JSON).
@@ -161,6 +183,32 @@ making a feature, a refactor and an RFC-driven change in it.
 - `list review` no longer splits the marker of a numbered list item, such as `1.`, into a sentence
   of its own, and without `--changed` it lists every code-naming sentence of a doc no commit holds
   yet, instead of reporting that none changed since the doc was last committed.
+- `list review --changed` also queues each sentence whose code span names a Python function or
+  class the change edited, renamed or deleted, marked `names-changed-code`, in any live doc,
+  decision record's Decision or guidance file, whether or not the change opened it: a guide that
+  names a function is asked about it when the function changes. A function or class is its decorators,
+  its `def` or `class` line and its body, and it is touched when the change leaves it other
+  lines than it had at the merge base, so a deletion just below it does not touch it. One the
+  change removed or renamed is found in the merge base's text, and so is one whose name a
+  second definition took; in a file that no longer parses, each definition a sentence named is
+  listed as changed, with no line. Only Python functions and classes are paired. A command, an
+  option, an environment variable and a path are not paired with a change.
+  Each item lists the name and the change's file and line, as `changed_code` in the JSON and as
+  `changed:` and `removed:` lines in plain output. A sentence the change itself wrote keeps its
+  one `edited` item, which carries the marker. `context --after-edit` lists none of these
+  sentences, and the help of `list review --changed` names them.
+- `context <path...>` names the docs that name code in each path, under `named_by` in the JSON
+  and as "Docs that name code in <path>" in plain output: each live doc, decision record, read by
+  its Decision alone, and guidance file with a sentence whose code span names anything Irminsul
+  resolves to the path, with the number of such sentences: a Python function or class, a
+  command, an option, an environment variable, or any other surface identity the configured
+  extractors and rules give the path, such as a TypeScript export or an MCP tool. An
+  option counts only when its sentence names the command that declares it, or one command alone
+  declares it. An entry is the doc's path, `sentences`, the count, and `names`, the path. A file
+  no doc owns has the list too. Plain output shows the eight docs with the most sentences for a
+  path and counts the rest; the JSON, and so the MCP tool `context_for_path`, lists every doc.
+  The help of `context` and the tool's description say so. The packet pairs every code span in
+  the docs, so it takes longer than before.
 - `irminsul refs` accepts any Markdown file in the repository as a target, so a brownfield page
   with no frontmatter can be asked what links to it before it is moved.
 - `context --after-edit` JSON is reshaped. Each result has `input`, `owner` (only its `id` and

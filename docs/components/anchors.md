@@ -2,19 +2,22 @@
 id: anchors
 title: Anchored prose claims
 status: stable
-summary: Anchored prose claims pinned to code.
 describes:
   - src/irminsul/anchors.py
   - src/irminsul/binding.py
 depends_on:
+  - checks
+  - context
   - docgraph
   - frontmatter
   - surface
 owns_tests:
   - tests/test_binding.py
   - tests/test_cli_anchors.py
+summary: Anchored prose claims pinned to code.
 implements:
   - acknowledge-a-reviewed-co-change-or-evidence-drift
+  - a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts
 ---
 
 # Anchored prose claims
@@ -59,6 +62,44 @@ writes nothing: the agent picks the file. A Python definition inside a function 
 block, which no anchor can name, is listed as such rather than dropped, so a name the
 code defines is never answered with "no source file contains it".
 
+## Offering the test that asserts a sentence
+
+A sentence that says what code does is best anchored to the test that asserts it: it is
+asked about when that test changes, and the test fails when the code stops doing what the
+sentence says, where an anchor to the function is asked about on every edit to it
+([Code is named in code spans and bound by anchors](../decisions/code-is-named-in-code-spans-and-bound-by-anchors.md)).
+A test function is a definition in a file, so an anchor names it, pins it and drifts with
+it like any other. To find one, `irminsul anchors --suggest --doc <doc>` also lists each
+code span of that doc that resolves to one Python function or class, once for each
+definition, so two methods of one name in one file are two rows, with where it is
+defined and up to three test functions that name it, ordered by path and line, each as a
+marker to paste. `naming_tests` reads a test function as one whose name starts with
+`test`, at the top level of a file or in a class there, in a Python file under
+`paths.test_roots` that imports the defining module, which is the reading
+`Ranker.importers` makes for the [context packet](context.md#which-tests-a-source-file-gets).
+It names the definition when its body refers to it through an import of that module, in
+the file or in the test's own body, each import read by `imported_paths` as the
+[import checks](checks.md) read it (`_names`): a function or class at the top level of its
+module by a name imported from it, under an alias too, that the test does not bind itself
+as a parameter, a fixture or a local variable, or as an attribute of a name bound to the
+module itself; a method by an attribute of its name, in a test whose imports reach its
+class or its module. A name no test names is listed and said to have none, the closing
+line counts these names apart from the unbound ones, and the JSON gains a list `resolved`
+beside `unbound`. Without `--doc` the command lists the unbound names alone.
+<!-- anchor: tests/test_binding.py#test_suggest_offers_the_test_that_calls_a_function_the_doc_names @sha256:94b5c37f7a7b -->
+<!-- anchor: tests/test_binding.py#test_suggest_offers_at_most_three_tests_by_path_and_line @sha256:5b74b5ae3195 -->
+<!-- anchor: tests/test_binding.py#test_suggest_says_so_when_no_test_names_the_definition @sha256:a96352d4b56f -->
+<!-- anchor: tests/test_binding.py#test_suggest_without_a_doc_lists_unbound_names_and_no_test @sha256:d85d40281025 -->
+<!-- anchor: tests/test_binding.py#test_suggest_lists_two_methods_of_one_name_in_one_file @sha256:80050085aed1 -->
+<!-- anchor: tests/test_binding.py#test_a_test_names_a_definition_through_an_import_of_its_module @sha256:a6e3bf78495a -->
+<!-- anchor: tests/test_binding.py#test_a_name_the_test_binds_itself_does_not_name_the_definition @sha256:ad1bee32b830 -->
+<!-- anchor: tests/test_binding.py#test_a_method_is_named_by_a_test_whose_file_imports_its_class @sha256:3b01720c19d0 -->
+
+The command runs nothing, so an offered test is one that names the function, not one
+known to assert the sentence. Whoever pastes its marker first changes the code so the
+sentence is false and sees that test fail, the second step of
+[tying a sentence to a test](../guides/agent-protocol.md#tying-a-sentence-to-a-test).
+
 ## Re-pinning is an acknowledgement
 
 The pin is a deliberate acknowledgement, not an automatic one: refreshing it with
@@ -85,8 +126,9 @@ nothing exits 2 and writes nothing, because re-pinning nothing would read as suc
 Anchors are opt-in — only paragraphs that carry a marker are checked; everything else
 stays on the coarse mtime net. Outside Python a symbol resolves by name, so a name left
 in a string or a trailing comment still resolves, and the block hash re-flags a claim for
-any edit inside the block. `--suggest` searches the configured source roots only, read
-from the graph's [source tree](docgraph.md), and a check resolves an anchor through that
+any edit inside the block. `--suggest` searches the configured source roots for
+definitions, and under `--doc` the declared test roots for the tests that name them, each
+read from the graph's [source tree](docgraph.md), and a check resolves an anchor through that
 tree's [`SourceReader`](surface.md), so a file many anchors name is read and parsed once
 per run. An anchor proves the *code* has not changed since the claim was pinned; it
 cannot prove the prose was *correct* when pinned — that judgement remains human. It
@@ -95,7 +137,26 @@ a second function the same paragraph describes, and a behaviour changed through 
 anchor names is not seen. Anchoring each name a paragraph depends on is the answer;
 nothing derives that set.
 
+The tests `--suggest --doc` offers are found in the syntax tree, and nothing is run. A
+test that reaches the function through a helper, a fixture or the command line is not
+offered. A method is still found by name, since the tree does not say what class an
+object has: a test whose file imports `Answer` and reads `finding.line` is offered for
+`Answer.line`, and one that reads `load_graph(root).guidance_files` with no import of
+`DocGraph` or its module is not offered for `DocGraph.guidance_files`. A name bound
+anywhere in a test's body, a function nested in it included, counts as the test's own
+throughout it, which can leave out a test that names the definition and never adds one
+that does not. The three listed are the first by path and line, which for a widely used
+class need not be the three that say most. Only Python tests under `paths.test_roots` are
+read, and with no test root declared the listing says that no test file was read. Nothing
+measures how much of a function its tests guard.
+
 ## Implemented requirements
 
 - **acknowledge-a-reviewed-co-change-or-evidence-drift#re-pin-writes-claim-pins** — `irminsul anchors --re-pin --doc <doc>` SHALL write the current normalized hash of every evidence file of every claim in that doc, and SHALL drop a pin on a path the claim no longer cites. (provenance: code; [RFC](../rfcs/acknowledge-a-reviewed-co-change-or-evidence-drift.md))
   <!-- anchor: src/irminsul/anchors.py#repin_claims @sha256:b7fbcd86889c -->
+- **a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts#suggest-offers-the-tests-of-a-definition** — `irminsul anchors --suggest --doc <doc>` SHALL list each code span of that doc that resolves to one Python function or class, with up to three test functions, in files under the configured test roots that import the defining module, whose body names that definition through the file's imports, each as an anchor marker ready to paste. A name the test binds itself SHALL NOT count as naming the definition. Without `--doc` it SHALL list what it lists today. (provenance: code; [RFC](../rfcs/a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts.md))
+  <!-- anchor: src/irminsul/binding.py#naming_tests @sha256:ba5b26e133c5 -->
+  <!-- anchor: tests/test_binding.py#test_suggest_offers_the_test_that_calls_a_function_the_doc_names @sha256:94b5c37f7a7b -->
+  <!-- anchor: tests/test_binding.py#test_a_name_the_test_binds_itself_does_not_name_the_definition @sha256:ad1bee32b830 -->
+  <!-- anchor: tests/test_binding.py#test_suggest_says_so_when_no_test_names_the_definition @sha256:a96352d4b56f -->
+  <!-- anchor: tests/test_binding.py#test_suggest_without_a_doc_lists_unbound_names_and_no_test @sha256:d85d40281025 -->

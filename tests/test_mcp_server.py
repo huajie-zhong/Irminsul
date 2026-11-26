@@ -347,6 +347,18 @@ def test_context_for_path_tool_says_tests_are_ranked_with_reasons() -> None:
     assert "test_reasons" in (tools["context_for_path"].description or "")
 
 
+def test_context_for_path_tool_says_it_names_the_docs_that_name_code_in_each_path() -> None:
+    pytest.importorskip("mcp")
+    import asyncio
+
+    server = mcp_server.create_server(_GOOD_FIXTURE)
+    tools = {tool.name: tool for tool in asyncio.run(server.list_tools())}
+    description = tools["context_for_path"].description or ""
+
+    assert "under `named_by` the docs that name code in each path" in description
+    assert "how many of its sentences do" in description
+
+
 def test_context_after_edit_tool_names_the_run_that_lists_a_changes_errors() -> None:
     """Plain `irminsul check` makes none of the passes that judge a change, so a description
     that sends a caller there for the errors sends it to a run that may list none."""

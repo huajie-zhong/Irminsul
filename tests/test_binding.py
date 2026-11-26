@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
+import pytest
 from typer.testing import CliRunner
 
 from irminsul.anchors import Anchor, parse_anchors, resolve
@@ -14,7 +16,7 @@ from irminsul.cli import app
 from irminsul.config import load
 from irminsul.source_tree import SourceTree
 
-from .conftest import run_check, seed_repo, write_config
+from .conftest import invoke, invoke_json, run_check, seed_repo, write, write_config, write_doc
 
 runner = CliRunner()
 
@@ -376,3 +378,366 @@ def test_the_builtins_are_those_of_the_enabled_languages(tmp_path: Path) -> None
     write_config(root, source_roots=["src"], extra='[languages]\nenabled = ["typescript"]\n')
 
     assert _unbound_names(root) == ["IndexError", "dict.get", "len"]
+
+
+POLICY = '''\
+"""Loan rules."""
+
+
+def due_day(start_day: int, days: int = 14) -> int:
+    return start_day + days
+
+
+def late_fee(days_late: int) -> int:
+    return min(max(days_late, 0) * 25, 500)
+'''
+
+LOAN_TESTS = """\
+from loans.policy import late_fee
+
+
+def test_fee_is_capped() -> None:
+    assert late_fee(100) == 500
+"""
+
+FEE_MARKER = "<!-- anchor: tests/test_loans.py#test_fee_is_capped -->"
+GUIDE = "docs/guides/lending.md"
+
+
+def _lending_repo(
+    root: Path,
+    files: dict[str, str],
+    *,
+    guide: str = "The fine `late_fee()` charges stops growing at 5 dollars.",
+    test_roots: bool = True,
+) -> Path:
+    """A guide whose body starts on line 10 and names code of `src/loans/policy.py`, with
+    `files` written beside them and `tests` declared as the test root."""
+    extra = 'test_roots = ["tests"]\n' if test_roots else ""
+    write_config(root, source_roots=["src"], extra=extra)
+    write(root, "src/loans/policy.py", POLICY)
+    write_doc(root, GUIDE, doc_id="lending", body=f"{guide}\n")
+    for rel, text in files.items():
+        write(root, rel, text)
+    return root
+
+
+def _resolved(root: Path) -> dict[str, dict[str, Any]]:
+    """The `resolved` rows `anchors --suggest --doc` gives for the guide, by name."""
+    report = invoke_json(root, "anchors", "--suggest", "--doc", GUIDE)
+    return {row["name"]: row for row in report["resolved"]}
+
+
+def test_suggest_offers_the_test_that_calls_a_function_the_doc_names(tmp_path: Path) -> None:
+    root = _lending_repo(tmp_path, {"tests/test_loans.py": LOAN_TESTS})
+
+    code, plain = invoke(root, "anchors", "--suggest", "--doc", GUIDE)
+
+    assert code == 0, plain
+    assert plain.splitlines() == [
+        f"{GUIDE}:10 `late_fee`, defined at src/loans/policy.py:8",
+        f"  tests/test_loans.py:4 (test)  {FEE_MARKER}",
+        "0 unbound code name(s), 1 function or class name(s), 1 named by a test",
+    ]
+    assert invoke_json(root, "anchors", "--suggest", "--doc", GUIDE) == {
+        "version": 1,
+        "unbound": [],
+        "resolved": [
+            {
+                "path": GUIDE,
+                "line": 10,
+                "name": "late_fee",
+                "definition": {"path": "src/loans/policy.py", "line": 8},
+                "tests": [
+                    {
+                        "path": "tests/test_loans.py",
+                        "line": 4,
+                        "symbol": "test_fee_is_capped",
+                        "marker": FEE_MARKER,
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def test_the_marker_suggest_offers_for_a_test_resolves(tmp_path: Path) -> None:
+    """A test in a class is offered under the dotted path an anchor accepts, and one inside
+    a function, which no anchor reaches, is not offered."""
+    root = _lending_repo(
+        tmp_path,
+        {
+            "tests/test_loans.py": "from loans.policy import late_fee\n\n\n"
+            "class TestFees:\n"
+            "    def test_cap(self) -> None:\n"
+            "        assert late_fee(100) == 500\n\n\n"
+            "def build():\n"
+            "    def test_inner() -> None:\n"
+            "        assert late_fee(1) == 25\n\n"
+            "    return test_inner\n"
+        },
+    )
+
+    [offered] = _resolved(root)["late_fee"]["tests"]
+
+    assert offered["marker"] == "<!-- anchor: tests/test_loans.py#TestFees.test_cap -->"
+    [anchor] = parse_anchors(offered["marker"])
+    assert resolve(root, anchor).status == "ok"
+
+
+def test_suggest_says_so_when_no_test_names_the_definition(tmp_path: Path) -> None:
+    """Three near misses, none a test function that names `late_fee`: a test that imports
+    the module and names another of its functions, a function that names it and is no test,
+    and a test that names it in a file that does not import its module."""
+    root = _lending_repo(
+        tmp_path,
+        {
+            "tests/test_loans.py": "from loans.policy import due_day, late_fee\n\n\n"
+            "def test_a_loan_runs_two_weeks() -> None:\n"
+            "    assert due_day(0) == 14\n\n\n"
+            "def fee_of_a_week() -> int:\n"
+            "    return late_fee(7)\n",
+            "tests/test_other.py": "def test_a_name_alone(late_fee) -> None:\n"
+            "    assert late_fee(100) == 500\n",
+        },
+    )
+
+    code, plain = invoke(root, "anchors", "--suggest", "--doc", GUIDE)
+
+    assert code == 0, plain
+    assert plain.splitlines() == [
+        f"{GUIDE}:10 `late_fee`, defined at src/loans/policy.py:8",
+        "  no test names it",
+        "0 unbound code name(s), 1 function or class name(s), 0 named by a test",
+    ]
+    assert _resolved(root)["late_fee"]["tests"] == []
+
+
+def test_suggest_without_a_doc_lists_unbound_names_and_no_test(tmp_path: Path) -> None:
+    root = _lending_repo(
+        tmp_path,
+        {"tests/test_loans.py": LOAN_TESTS, "src/loans/desk.ts": "function renewLoan() {}\n"},
+        guide="The fine `late_fee()` charges is capped, and `renewLoan()` renews a loan.",
+    )
+    unbound = [
+        f"{GUIDE}:10 `renewLoan`",
+        "  src/loans/desk.ts:1 (definition)  <!-- anchor: src/loans/desk.ts#renewLoan -->",
+    ]
+
+    code, plain = invoke(root, "anchors", "--suggest")
+
+    assert code == 0, plain
+    assert plain.splitlines() == [*unbound, "1 unbound code name(s)"]
+    report = invoke_json(root, "anchors", "--suggest")
+    assert set(report) == {"version", "unbound"}
+    assert [row["name"] for row in report["unbound"]] == ["renewLoan"]
+
+    with_doc = invoke(root, "anchors", "--suggest", "--doc", GUIDE)[1]
+    assert with_doc.splitlines() == [
+        *unbound,
+        f"{GUIDE}:10 `late_fee`, defined at src/loans/policy.py:8",
+        f"  tests/test_loans.py:4 (test)  {FEE_MARKER}",
+        "1 unbound code name(s), 1 function or class name(s), 1 named by a test",
+    ]
+
+
+def test_suggest_offers_at_most_three_tests_by_path_and_line(tmp_path: Path) -> None:
+    """Five tests name `late_fee`. The three offered are the first by path and then by line,
+    which neither the order of their lines alone nor its reverse gives: the one on the
+    lowest line, in `tests/test_d.py`, is not offered."""
+
+    def naming(*names: str, padding: int = 0) -> str:
+        functions = "".join(
+            f"\n\ndef {name}() -> None:\n    assert policy.late_fee(100) == 500\n" for name in names
+        )
+        return "from loans import policy\n" + "\n" * padding + functions
+
+    root = _lending_repo(
+        tmp_path,
+        {
+            "tests/test_d.py": naming("test_lowest_line_never_offered"),
+            "tests/test_b.py": naming("test_third", "test_after_the_third", padding=6),
+            "tests/test_a.py": naming("test_first", "test_second", padding=3),
+        },
+    )
+
+    tests = _resolved(root)["late_fee"]["tests"]
+
+    assert [(test["path"], test["line"], test["symbol"]) for test in tests] == [
+        ("tests/test_a.py", 7, "test_first"),
+        ("tests/test_a.py", 11, "test_second"),
+        ("tests/test_b.py", 10, "test_third"),
+    ]
+
+
+def test_suggest_skips_a_test_file_that_does_not_parse(tmp_path: Path) -> None:
+    root = _lending_repo(
+        tmp_path,
+        {
+            "tests/test_broken.py": LOAN_TESTS + "\n\ndef test_unfinished(:\n",
+            "tests/test_loans.py": LOAN_TESTS,
+        },
+    )
+
+    assert [test["path"] for test in _resolved(root)["late_fee"]["tests"]] == [
+        "tests/test_loans.py"
+    ]
+
+
+def test_suggest_lists_a_definition_once_and_only_a_span_that_resolves_to_one(
+    tmp_path: Path,
+) -> None:
+    """A second span naming the same function adds no row, a name two functions share
+    resolves to neither, and a line of a fenced block is an example, not a code span."""
+    root = _lending_repo(
+        tmp_path,
+        {
+            "tests/test_loans.py": LOAN_TESTS,
+            "src/loans/desk.py": "def renew():\n    return 1\n",
+            "src/loans/shelf.py": "def renew():\n    return 2\n",
+        },
+        guide="`late_fee()` caps the fine, and `renew()` renews.\n\n"
+        "`policy.late_fee` is the same function.\n\n```\ndue_day\n```",
+    )
+
+    assert list(_resolved(root)) == ["late_fee"]
+
+
+def test_suggest_says_when_no_test_root_is_declared(tmp_path: Path) -> None:
+    root = _lending_repo(tmp_path, {"tests/test_loans.py": LOAN_TESTS}, test_roots=False)
+
+    plain = invoke(root, "anchors", "--suggest", "--doc", GUIDE)[1]
+
+    assert plain.splitlines()[1:] == [
+        "  no test names it",
+        "no test file was read: `paths.test_roots` declares no test root",
+        "0 unbound code name(s), 1 function or class name(s), 0 named by a test",
+    ]
+
+
+ROOMS = """\
+class Desk:
+    def run(self) -> int:
+        return 1
+
+
+class Shelf:
+    def run(self) -> int:
+        return 2
+"""
+ROOMS_GUIDE = "`Desk.run` opens the desk, and `Shelf.run` opens the shelf."
+
+
+def _rooms_repo(root: Path, tests: str) -> Path:
+    """The lending repository, with two classes of one file that each define `run`, named
+    by the guide, and `tests` as `tests/test_rooms.py`."""
+    return _lending_repo(
+        root,
+        {"src/loans/rooms.py": ROOMS, "tests/test_rooms.py": tests},
+        guide=ROOMS_GUIDE,
+    )
+
+
+def test_suggest_lists_two_methods_of_one_name_in_one_file(tmp_path: Path) -> None:
+    root = _rooms_repo(
+        tmp_path,
+        "from loans import rooms\n\n\n"
+        "def test_both_run() -> None:\n"
+        "    assert rooms.Desk().run() + rooms.Shelf().run() == 3\n",
+    )
+    marker = "<!-- anchor: tests/test_rooms.py#test_both_run -->"
+
+    code, plain = invoke(root, "anchors", "--suggest", "--doc", GUIDE)
+
+    assert code == 0, plain
+    assert plain.splitlines() == [
+        f"{GUIDE}:10 `Desk.run`, defined at src/loans/rooms.py:2",
+        f"  tests/test_rooms.py:4 (test)  {marker}",
+        f"{GUIDE}:10 `Shelf.run`, defined at src/loans/rooms.py:7",
+        f"  tests/test_rooms.py:4 (test)  {marker}",
+        "0 unbound code name(s), 2 function or class name(s), 2 named by a test",
+    ]
+    report = invoke_json(root, "anchors", "--suggest", "--doc", GUIDE)
+    assert [(row["name"], row["definition"]) for row in report["resolved"]] == [
+        ("Desk.run", {"path": "src/loans/rooms.py", "line": 2}),
+        ("Shelf.run", {"path": "src/loans/rooms.py", "line": 7}),
+    ]
+
+
+def test_a_method_is_named_by_a_test_whose_file_imports_its_class(tmp_path: Path) -> None:
+    """A test that imports `Shelf` and reads `.run` names `Shelf.run`, and not `Desk.run`,
+    whose class its file does not import."""
+    root = _rooms_repo(
+        tmp_path,
+        "from loans.rooms import Shelf\n\n\n"
+        "def test_the_shelf_runs() -> None:\n"
+        "    assert Shelf().run() == 2\n",
+    )
+
+    resolved = _resolved(root)
+
+    assert resolved["Desk.run"]["tests"] == []
+    assert [test["symbol"] for test in resolved["Shelf.run"]["tests"]] == ["test_the_shelf_runs"]
+
+
+#: Test files that import `loans.policy` and refer to `late_fee` through that import.
+NAMING_FILES = {
+    "a name imported from the module": "from loans.policy import late_fee\n\n\n"
+    "def test_it() -> None:\n    assert late_fee(100) == 500\n",
+    "an alias": "from loans.policy import late_fee as fee\n\n\n"
+    "def test_it() -> None:\n    assert fee(100) == 500\n",
+    "every name of the module": "from loans.policy import *\n\n\n"
+    "def test_it() -> None:\n    assert late_fee(100) == 500\n",
+    "an attribute of the module imported from its package": "from loans import policy\n\n\n"
+    "def test_it() -> None:\n    assert policy.late_fee(100) == 500\n",
+    "an attribute of the module by its dotted name": "import loans.policy\n\n\n"
+    "def test_it() -> None:\n    assert loans.policy.late_fee(100) == 500\n",
+    "an attribute of the module under an alias": "import loans.policy as rules\n\n\n"
+    "def test_it() -> None:\n    assert rules.late_fee(100) == 500\n",
+    "an import in the test's own body": "def test_it() -> None:\n"
+    "    from loans.policy import late_fee\n\n    assert late_fee(100) == 500\n",
+}
+
+#: Test files that import `loans.policy` and whose test spells `late_fee` without
+#: referring to the function: each of its own bindings is a value of the test's.
+SPELLING_FILES = {
+    "a parameter or fixture": "from loans.policy import late_fee\n\n\n"
+    "def test_it(late_fee: int) -> None:\n    assert late_fee == 3\n",
+    "a local variable": "from loans.policy import due_day, late_fee\n\n\n"
+    "def test_it() -> None:\n    late_fee = due_day(0)\n    assert late_fee == 14\n",
+    "a loop variable": "from loans.policy import due_day, late_fee\n\n\n"
+    "def test_it() -> None:\n    for late_fee in (1, 2):\n"
+    "        assert due_day(late_fee) > late_fee\n",
+    "an attribute of another object": "from loans.policy import due_day\n\n\n"
+    "def test_it(record: object) -> None:\n"
+    "    assert due_day(record.late_fee) > 0\n",
+    "a name imported from another module": "from fees import late_fee\n"
+    "from loans.policy import due_day\n\n\n"
+    "def test_it() -> None:\n    assert late_fee(due_day(0)) > 0\n",
+    "a name its own body imports from another module": "from loans.policy import late_fee\n\n\n"
+    "def test_it() -> None:\n    from fees import late_fee\n\n"
+    "    assert late_fee(100) == 500\n",
+    "the module's name rebound by a parameter": "from loans import policy\n\n\n"
+    "def test_it(policy: object) -> None:\n    assert policy.late_fee(100) == 500\n",
+    "the rest of a mapping pattern": "from loans.policy import late_fee\n\n\n"
+    "def test_it() -> None:\n    match {'a': 1}:\n        case {**late_fee}:\n"
+    "            assert late_fee == {'a': 1}\n",
+}
+
+
+@pytest.mark.parametrize("test_file", list(NAMING_FILES.values()), ids=list(NAMING_FILES))
+def test_a_test_names_a_definition_through_an_import_of_its_module(
+    tmp_path: Path, test_file: str
+) -> None:
+    root = _lending_repo(tmp_path, {"tests/test_loans.py": test_file})
+
+    assert [test["symbol"] for test in _resolved(root)["late_fee"]["tests"]] == ["test_it"]
+
+
+@pytest.mark.parametrize("test_file", list(SPELLING_FILES.values()), ids=list(SPELLING_FILES))
+def test_a_name_the_test_binds_itself_does_not_name_the_definition(
+    tmp_path: Path, test_file: str
+) -> None:
+    root = _lending_repo(tmp_path, {"tests/test_loans.py": test_file})
+
+    assert _resolved(root)["late_fee"]["tests"] == []

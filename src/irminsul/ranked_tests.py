@@ -11,6 +11,10 @@ ordered by evidence, strongest first:
 
 Nothing here runs a test or says one passes: a reason says why a path is listed, not that
 it covers the change.
+
+`irminsul anchors --suggest --doc` asks `Ranker.importers` the first question alone, for the
+file that defines a name a doc cites, so the packet and the suggestion agree on which tests
+import a file.
 """
 
 from __future__ import annotations
@@ -66,7 +70,7 @@ class Ranker:
         if not subjects:
             return Ranking(tests=list(declared), reasons={})
 
-        importers = self._importers(subjects)
+        importers = self.importers(subjects)
         candidates = list(
             dict.fromkeys(
                 [
@@ -108,8 +112,13 @@ class Ranker:
             and not governed_as_test(path, config)
         ]
 
-    def _importers(self, subjects: Sequence[str]) -> dict[str, list[str]]:
-        """Each subject's importing tests, by the display path the test walk gives them."""
+    def importers(self, subjects: Sequence[str]) -> dict[str, list[str]]:
+        """Each subject's importing tests, by the display path the test walk gives them.
+
+        A subject is a source file by its display path, and an importing test is a Python
+        file under the declared test roots that imports the subject's module directly. A
+        test file that does not parse is skipped.
+        """
         graph = self._graph
         config = graph.config
         assert config is not None and graph.repo_root is not None

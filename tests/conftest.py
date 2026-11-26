@@ -43,6 +43,11 @@ for _variable in (
 
 FIXTURE_REPOS_DIR = Path(__file__).parent / "fixtures" / "repos"
 
+# A fixture's test that imports the fixture's own package, which exists only inside the
+# fixture, so collecting it here would fail at the import. `test_seeded_rot.py` runs it
+# against the fixture's code instead.
+collect_ignore = ["fixtures/repos/seeded-rot/tests/test_loans.py"]
+
 _GIT_IDENTITY = (
     "-c",
     "user.name=T",

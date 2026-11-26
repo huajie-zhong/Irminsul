@@ -77,7 +77,7 @@ file is curated and survives it.
 
 | ID | Doc | Summary |
 |----|-----|---------|
-| `agent-protocol` | [Agent lifecycle protocol](guides/agent-protocol.md) | How an agent acts on a finding and changes the project's direction; the edit loop every change follows is in the root AGENTS.md. |
+| `agent-protocol` | [Agent lifecycle protocol](guides/agent-protocol.md) | How an agent ties a sentence to a test, acts on a finding and changes the project's direction; the edit loop every change follows is in the root AGENTS.md. |
 | `bootstrap` | [Bootstrapping Checklist](guides/bootstrap.md) | Adopting Irminsul, and the order of the first steps on an existing codebase. |
 | `guides` | [Guides](guides/INDEX.md) | How-tos, operating procedures, and the docs about this doc system. |
 | `private-docs` | [Private docs for a public code repo](guides/private-docs.md) | Keeping the docs tree private beside an open-source code repo. |
@@ -88,7 +88,7 @@ file is curated and survives it.
 
 | ID | Doc | Summary |
 |----|-----|---------|
-| `a-change-re-asks-the-sentences-that-name-its-code` | [A change re-asks the sentences that name its code](rfcs/a-change-re-asks-the-sentences-that-name-its-code.md) | When a change edits code, the review queue asks again about every sentence that names that code in a code span, and `context <path>` lists those sentences before the edit, so an agent finds the docs a change makes stale without searching for them. |
+| `a-change-re-asks-the-sentences-that-name-its-code` | [A change re-asks the sentences that name its code](rfcs/a-change-re-asks-the-sentences-that-name-its-code.md) | When a change edits a Python function or class, the review queue asks again about every sentence that names it in a code span, and `context <path>` names the docs that name code in a file before the edit, so an agent finds the docs a change makes stale without searching for them. |
 | `a-change-to-the-foundation-asks-for-the-owners-sign-off` | [A change to the foundation asks for the owner's sign-off](rfcs/a-change-to-the-foundation-asks-for-the-owners-sign-off.md) | A pull request that edits the body of a foundation doc gets a hint that a commit trailer answers, so a principle or non-goal is never changed in passing by a feature branch. |
 | `a-gate-file-is-sealed-not-scored` | [A gate file is sealed, not scored](rfcs/a-gate-file-is-sealed-not-scored.md) | A changed workflow or action file that mentions irminsul is a certain finding until a decision record names it, replacing gate-strength scoring and the emulation of GitHub path filters. |
 | `a-history-file-is-checked-for-its-links` | [A history file is checked for its links](rfcs/a-history-file-is-checked-for-its-links.md) | A file that records history, such as a changelog, is named under `paths.history_docs` and checked for its links alone, so folding a decision record or an RFC no longer breaks a changelog link unseen. |
@@ -115,5 +115,5 @@ The Three Laws of Maintenance and the principles behind them are in
 
 ## Protocol
 
-The edit loop is in the root [`AGENTS.md`](../AGENTS.md); acting on a finding and changing
-direction are in [`guides/agent-protocol.md`](guides/agent-protocol.md).
+The edit loop is in the root [`AGENTS.md`](../AGENTS.md); tying a sentence to a test, acting
+on a finding and changing direction are in [`guides/agent-protocol.md`](guides/agent-protocol.md).
