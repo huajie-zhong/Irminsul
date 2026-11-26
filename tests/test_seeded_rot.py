@@ -559,7 +559,8 @@ def test_a_one_word_edit_elsewhere_in_the_owning_doc_clears_the_warning(
     `connected-doc-hides-unconnected-sections`: `co-change` asks for any edit to the owning
     doc, so one word changed in another section answers it, and `mtime-drift` with it, while
     the sentence the code made false stays as it was. The gate then passes, and the review
-    queue holds only the writer's own edit: the reworded sentence and the doc's summary."""
+    queue holds only the doc's summary, which the writer's edit may have made stale: the
+    reworded sentence is the writer's own, which `list review --written` lists."""
     case = next(case for case in CASES if case.id == "owner-names-no-code")
     root = _seeded(fixture_repo)
     before = _views(root)
@@ -570,7 +571,7 @@ def test_a_one_word_edit_elsewhere_in_the_owning_doc_clears_the_warning(
     replace_text(root, case.doc, "keeps no record", "holds no record")
 
     left = _since(root, before)
-    assert _judge(root, left, case.doc, case.sentence) == _seen("doc", "edited", "stale-summary")
+    assert _judge(root, left, case.doc, case.sentence) == _seen("doc", "stale-summary")
     assert {pointer.view for pointer in left} == {"review"}
     assert invoke(root, "check", "--diff", "HEAD", "--fail-on", "hint,time")[0] == 0
 

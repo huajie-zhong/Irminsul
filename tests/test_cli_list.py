@@ -1,4 +1,5 @@
-"""Tests for `irminsul list undocumented`, `list lifecycle` and `list review`'s base flag."""
+"""Tests for `irminsul list undocumented`, `list lifecycle` and the flags of `list review`
+that name a change."""
 
 from __future__ import annotations
 
@@ -6,13 +7,14 @@ import datetime as _dt
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from irminsul.checks.base import Finding, Severity
 from irminsul.cli import app
 from irminsul.listing.command import _to_queue_item
 
-from .conftest import commit_all, git, git_init, seed_repo, write, write_config
+from .conftest import cli_output, commit_all, git, git_init, seed_repo, write, write_config
 
 runner = CliRunner()
 
@@ -187,9 +189,13 @@ def test_lifecycle_queue_prioritizes_missing_state() -> None:
 
 
 def _repo_with_one_edited_sentence(tmp_path: Path) -> tuple[Path, str]:
+    """A committed note that gained one sentence after `base`, its summary left as it was."""
     root = tmp_path / "r"
     write_config(root)
-    head = "---\nid: note\ntitle: Note\nstatus: stable\ndescribes: []\n---\n\n# Note\n\n"
+    head = (
+        "---\nid: note\ntitle: Note\nstatus: stable\ndescribes: []\n"
+        "summary: A note.\n---\n\n# Note\n\n"
+    )
     write(root, "docs/components/note.md", head + "Nothing here yet.\n")
     base = seed_repo(root, "seed", when=_dt.datetime(2024, 1, 1, tzinfo=_dt.UTC))
     write(root, "docs/components/note.md", head + "Nothing here yet.\n\nThe note was edited.\n")
@@ -201,13 +207,70 @@ def test_list_review_takes_the_base_ref_flag_the_other_commands_take(tmp_path: P
     root, base = _repo_with_one_edited_sentence(tmp_path)
 
     result = runner.invoke(
-        app, ["list", "review", "--base-ref", base, "--format", "json", "--path", str(root)]
+        app,
+        [
+            "list",
+            "review",
+            "--written",
+            "--base-ref",
+            base,
+            "--format",
+            "json",
+            "--path",
+            str(root),
+        ],
     )
 
     assert result.exit_code == 0, result.output
     assert [item["sentence"] for item in json.loads(result.output)["items"]] == [
         "The note was edited."
     ]
+
+
+def test_base_ref_alone_prints_the_list_changed_prints(tmp_path: Path) -> None:
+    """`--base-ref` with neither list's flag keeps meaning `--changed`: the summary the edit
+    left behind, and not the sentence it wrote."""
+    root, base = _repo_with_one_edited_sentence(tmp_path)
+
+    alone = runner.invoke(
+        app, ["list", "review", "--base-ref", base, "--format", "json", "--path", str(root)]
+    )
+    changed = runner.invoke(
+        app,
+        [
+            "list",
+            "review",
+            "--changed",
+            "--base-ref",
+            base,
+            "--format",
+            "json",
+            "--path",
+            str(root),
+        ],
+    )
+
+    assert alone.exit_code == changed.exit_code == 0, alone.output
+    assert alone.stdout == changed.stdout
+    report = json.loads(alone.stdout)
+    assert report["list"] == "changed"
+    assert [(i["sentence"], i["markers"]) for i in report["items"]] == [
+        ("A note.", ["stale-summary"])
+    ]
+
+
+def test_changed_and_written_together_exit_2_and_name_both_flags(tmp_path: Path) -> None:
+    """Scenario `Both flags`: one list per run, so the pair is refused and no queue printed."""
+    root, base = _repo_with_one_edited_sentence(tmp_path)
+
+    result = runner.invoke(
+        app, ["list", "review", "--changed", "--written", "--base-ref", base, "--path", str(root)]
+    )
+
+    assert result.exit_code == 2
+    output = cli_output(result)
+    assert "--changed" in output and "--written" in output
+    assert "The note was edited." not in output and "A note." not in output
 
 
 def test_list_review_no_longer_takes_the_shorter_base_flag(tmp_path: Path) -> None:
@@ -249,13 +312,14 @@ def _review(root: Path, *flags: str) -> list[dict[str, object]]:
 def test_list_review_reads_the_ref_at_the_merge_base_not_its_moved_tip(tmp_path: Path) -> None:
     root = _branch_after_the_base_moved(tmp_path)
 
-    items = _review(root, "--base-ref", "main")
+    items = _review(root, "--written", "--base-ref", "main")
 
     assert [(i["sentence"], i["markers"]) for i in items] == [("The feature sentence.", ["edited"])]
 
 
+@pytest.mark.parametrize("flag", ["--changed", "--written"])
 def test_list_review_changed_committed_only_without_a_base_ref_runs_no_git(
-    tmp_path: Path,
+    tmp_path: Path, flag: str
 ) -> None:
     root = tmp_path / "plain"
     write_config(root)
@@ -263,16 +327,7 @@ def test_list_review_changed_committed_only_without_a_base_ref_runs_no_git(
 
     result = runner.invoke(
         app,
-        [
-            "list",
-            "review",
-            "--changed",
-            "--committed-only",
-            "--format",
-            "json",
-            "--path",
-            str(root),
-        ],
+        ["list", "review", flag, "--committed-only", "--format", "json", "--path", str(root)],
     )
 
     assert result.exit_code == 0, result.output
@@ -284,13 +339,13 @@ def test_list_review_judges_uncommitted_work_unless_committed_only(tmp_path: Pat
     committed = (root / _NOTE).read_text(encoding="utf-8")
     write(root, _NOTE, committed + "\nAn unsaved thought.\n")
 
-    assert [i["sentence"] for i in _review(root, "--base-ref", "main")] == [
+    assert [i["sentence"] for i in _review(root, "--written", "--base-ref", "main")] == [
         "The feature sentence.",
         "An unsaved thought.",
     ]
-    assert [i["sentence"] for i in _review(root, "--base-ref", "main", "--committed-only")] == [
-        "The feature sentence."
-    ]
+    assert [
+        i["sentence"] for i in _review(root, "--written", "--base-ref", "main", "--committed-only")
+    ] == ["The feature sentence."]
 
 
 def test_list_review_committed_only_reads_the_documents_at_head(tmp_path: Path) -> None:
@@ -298,14 +353,17 @@ def test_list_review_committed_only_reads_the_documents_at_head(tmp_path: Path) 
     committed = (root / _NOTE).read_text(encoding="utf-8")
     write(root, _NOTE, committed.replace("# Note\n\n", "# Note\n\nAn unsaved opener.\n\n"))
 
-    assert [i["sentence"] for i in _review(root, "--base-ref", "main", "--committed-only")] == [
-        "The feature sentence."
+    assert [
+        i["sentence"] for i in _review(root, "--written", "--base-ref", "main", "--committed-only")
+    ] == ["The feature sentence."]
+    assert "An unsaved opener." in [
+        i["sentence"] for i in _review(root, "--written", "--base-ref", "main")
     ]
-    assert "An unsaved opener." in [i["sentence"] for i in _review(root, "--base-ref", "main")]
 
 
+@pytest.mark.parametrize("flag", ["--changed", "--written"])
 def test_list_review_changed_committed_only_without_a_base_ref_judges_no_change(
-    tmp_path: Path,
+    tmp_path: Path, flag: str
 ) -> None:
     root = _branch_after_the_base_moved(tmp_path)
     committed = (root / _NOTE).read_text(encoding="utf-8")
@@ -313,19 +371,10 @@ def test_list_review_changed_committed_only_without_a_base_ref_judges_no_change(
 
     result = runner.invoke(
         app,
-        [
-            "list",
-            "review",
-            "--changed",
-            "--committed-only",
-            "--format",
-            "json",
-            "--path",
-            str(root),
-        ],
+        ["list", "review", flag, "--committed-only", "--format", "json", "--path", str(root)],
     )
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.stdout)["items"] == []
     assert "nothing uncommitted is read" in result.stderr
-    assert [i["sentence"] for i in _review(root, "--changed")] == ["An unsaved thought."]
+    assert [i["sentence"] for i in _review(root, "--written")] == ["An unsaved thought."]

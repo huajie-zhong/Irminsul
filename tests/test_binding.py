@@ -126,7 +126,7 @@ def test_an_anchor_binds_the_name(tmp_path: Path) -> None:
     assert json.loads(result.output)["unbound"] == []
 
 
-def test_review_lists_unbound_names_on_changed_lines(tmp_path: Path) -> None:
+def test_the_written_list_names_the_unbound_names_of_a_written_sentence(tmp_path: Path) -> None:
     root = _repo(tmp_path, "Nothing yet.")
     seed_repo(root, "i")
     doc = root / "docs" / "components" / "auth.md"
@@ -136,7 +136,7 @@ def test_review_lists_unbound_names_on_changed_lines(tmp_path: Path) -> None:
     )
 
     result = runner.invoke(
-        app, ["list", "review", "--changed", "--format", "json", "--path", str(root)]
+        app, ["list", "review", "--written", "--format", "json", "--path", str(root)]
     )
 
     assert result.exit_code == 0, result.output
@@ -158,7 +158,7 @@ def test_the_unbound_advice_is_one_text_shared_by_the_name_line_and_the_legend(
         encoding="utf-8",
     )
 
-    result = runner.invoke(app, ["list", "review", "--changed", "--path", str(root)])
+    result = runner.invoke(app, ["list", "review", "--written", "--path", str(root)])
 
     assert result.exit_code == 0, result.output
     name_line = next(line for line in result.output.splitlines() if "`refreshUserSession`" in line)
@@ -365,7 +365,7 @@ def test_the_review_queue_does_not_flag_a_language_builtin_as_unbound(tmp_path: 
     doc.write_text(doc.read_text(encoding="utf-8") + f"\n{_BUILTIN_SENTENCE}\n", encoding="utf-8")
 
     result = runner.invoke(
-        app, ["list", "review", "--changed", "--format", "json", "--path", str(root)]
+        app, ["list", "review", "--written", "--format", "json", "--path", str(root)]
     )
 
     [item] = json.loads(result.output)["items"]

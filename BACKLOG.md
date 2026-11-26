@@ -76,7 +76,7 @@ names a definition, and its symbol index (`_symbol_index`,
 and one class deep. Anchors resolve a name through `_find_symbol`
 (`src/irminsul/anchors.py:117`), which also accepts an assignment. With `MAX_SIZE = 5` in
 `src/m.py`, `<!-- anchor: src/m.py#MAX_SIZE -->` resolves, while a span `MAX_SIZE` resolves
-to nothing, is listed as `unbound` by `list review --changed`, and is never paired with its
+to nothing, is listed as `unbound` by `list review --written`, and is never paired with its
 definition; `anchors --suggest` then offers that very anchor (re-run on 2026-10-28). One
 rule for "this module defines that name" would let the two agree; which rule is right is a
 decision, not a refactor.
@@ -184,9 +184,9 @@ removal is judged rather than vanishing. Found by the PR 9h lane on 2026-10-27.
 
 ### `unbound-name-marks-values`
 
-`irminsul list review --changed` marks an edited sentence `unbound-name` when a code span
-names nothing the resolver binds (`unbound_names`, `src/irminsul/binding.py:128`, called at
-`src/irminsul/listing/review.py:323`). A span holding a value or a builtin, such as
+`irminsul list review --written` marks an edited sentence `unbound-name` when a code span
+names nothing the resolver binds (`unbound_names`, `src/irminsul/binding.py:140`, called at
+`src/irminsul/listing/review.py:347`). A span holding a value or a builtin, such as
 `not_run`, `ValueError` or `IRMINSUL_BASE_REF`, is marked though no symbol could ever bind
 it. The marker legend now says to reword a name that is not this repository's code or to
 leave it when no anchor can reach it, and `anchors --suggest` says "no source file defines
@@ -319,12 +319,13 @@ definition a name means elsewhere is `review-binds-common-words`.
 
 ### `first-review-after-init-queues-the-scaffold`
 
-The first `list review --changed` after `irminsul init` in a brownfield repository queues 113
-sentences, most of them the managed `AGENTS.md` block and the scaffolded guides, which equal
-their templates; the one wrong sentence in the existing docs sat at the bottom (dogfood
-adoption, 2026-10-29). The `derive-facts` Decision queues "each sentence the change added", so
-the queue keeps them; the plain output could fold text equal to an `init` template into one line
-per file, with JSON unchanged.
+The first review after `irminsul init` in a brownfield repository listed 113 sentences, most of
+them the managed `AGENTS.md` block and the scaffolded guides, which equal their templates; the
+one wrong sentence in the existing docs sat at the bottom (dogfood adoption, 2026-10-29). Those
+were `list review --changed` then; since 2026-11-26 they are `edited` items of
+`list review --written`, which the `derive-facts` Decision has list each sentence the change
+added, so the list keeps them. The plain output could fold text equal to an `init` template into
+one line per file, with JSON unchanged.
 
 ### `review-items-carry-no-excerpt`
 
@@ -620,8 +621,8 @@ one after it, answered it again.
 
 ### `renamed-doc-has-no-review-base`
 
-`irminsul list review --changed` compares a doc's sentences with the same path at the
-base (`_prose_at_ref`, `src/irminsul/listing/review.py:493`). A doc the change renamed has
+`irminsul list review --written` compares a doc's sentences with the same path at the
+base (`_prose_at_ref`, `src/irminsul/listing/review.py`). A doc the change renamed has
 no base under its new path, so every sentence on a changed line is queued as `edited`: after
 a `git mv`, an unchanged sentence sharing a line with a reworded one is queued too
 (re-run on 2026-10-28). Read the base through the rename, as `renamed_paths`
@@ -629,8 +630,8 @@ a `git mv`, an unchanged sentence sharing a line with a reworded one is queued t
 
 ### `removed-sentences-queue-one-by-one`
 
-`irminsul list review --base-ref` queues one `removed-sentence` item per deleted sentence
-(`_removed_sentences`, `src/irminsul/listing/review.py:458`). A deliberate cut queues every
+`irminsul list review --written --base-ref` queues one `removed-sentence` item per deleted
+sentence (`_removed_sentences`, `src/irminsul/listing/review.py`). A deliberate cut queues every
 sentence of it: four items for a four-sentence paragraph, about 25 for one paragraph and
 213 for the trim of `checks.md` in the PR 12 lanes. The reader has no way to say where a
 cut sentence now lives, so the same cut is re-read at every run. Group removed sentences by
@@ -639,8 +640,8 @@ once. Found by the PR 12a, 12c and 12d lanes on 2026-10-28.
 
 ### `deleted-doc-queues-nothing`
 
-A doc the change deleted whole queues nothing in `list review --base-ref`: its path is not
-in `changed`, which `_removed_sentences` (`src/irminsul/listing/review.py:458`) walks, and
+A doc the change deleted whole queues nothing in `list review --written --base-ref`: its path
+is not in `changed`, which `_removed_sentences` (`src/irminsul/listing/review.py`) walks, and
 its docstring records that as the rule (0 items for a `git rm` of a doc, 2026-10-28). So
 deleting a whole doc, which removes more prose than any cut, raises no "where does this
 live now" prompt. Queue a deleted doc's sentences like any other removal, grouped by doc.

@@ -27,7 +27,7 @@ retires:
       - reality/history-narration
       - reality/unrecorded-decision
       - forbid_speculation
-    guidance: Plans belong in an RFC and history in a decision record; `irminsul list review --changed` hands every edited sentence to the reader.
+    guidance: Plans belong in an RFC and history in a decision record; `irminsul list review --written` hands every edited sentence to whoever reviews the change.
   - id: glossary-redefinition
     kind: concept
     matches:
@@ -91,12 +91,16 @@ its change connects to.
   in a code span, anchors its paragraph, or rests on a claim with evidence; the root `AGENTS.md`
   loop says so.
 - **`list review` routes semantic checking and never decides truth.** It reads live docs, the
-  `## Decision` of decision records, and the guidance files. With a change, given by `--changed`
-  or `--base-ref`, it queues each sentence the change added, reworded or deleted, each sentence
-  whose code span names a Python function or class the change touched, each claim
-  other than a report whose evidence it touched, each sentence an old owner keeps about a file moved to another doc,
-  and each `summary:` left behind a rewritten body. Without one it queues sentences that name
-  code. An item's markers name the fact that selected it, and the output defines each once.
+  `## Decision` of decision records, and the guidance files. A change has two lists, one per
+  run. `--changed`, which `--base-ref` alone also means, queues what the change left as it was
+  and may have made stale: each sentence whose code span names a Python function or class the
+  change touched, each claim other than a report whose evidence it touched, each sentence an
+  old owner keeps about a file moved to another doc, and each `summary:` left behind a
+  rewritten body. `--written` lists what the change wrote, for whoever reviews it: each
+  sentence it added, reworded or deleted, and nothing else. Both name a change alike, the
+  uncommitted work alone or the range from the merge base with `--base-ref`, and the two
+  together exit 2. Without a change it queues sentences that name code. An item's markers name
+  the fact that selected it, and the output defines each once.
 - **A change re-asks the sentences that name its code.** In every file the queue reads, the
   change's own or not, a sentence whose code span names a Python function or class the change
   edited, renamed or deleted is queued, marked `names-changed-code`, with the name and the
@@ -108,9 +112,10 @@ its change connects to.
   sentences name for too many reasons. What already answers for those stays: `code-references`
   reports a command or option the code no longer has, and `inventory-drift` a doc's list that
   misses one the code gained. Nor is a function or class of another language, since only Python
-  code is read into definitions with their lines. A sentence the change itself wrote keeps its
-  one item and carries the marker on it. `list review` alone lists these
-  sentences, and `context --after-edit` none of them. Whether a queued sentence still holds is
+  code is read into definitions with their lines. A sentence the change did not write is queued
+  in `--changed` under the marker, and one the change itself wrote carries the marker on its one
+  `edited` item in `--written`. `list review` alone lists these sentences, and
+  `context --after-edit` none of them. Whether a queued sentence still holds is
   meaning, so none of this is a finding.
 - **Freshness marks what to read.** Without a change, an item is marked only when a line of the
   definition it names, a function's or class's range, a surface identity's declaring line, or a
@@ -142,8 +147,9 @@ its change connects to.
 ## Consequences
 
 - Surfaces cannot drift in committed form.
-- Enforcement prose without evidence does not warn; it reaches a reader when edited, and a
-  sentence that must stay true is declared as a claim. Deleting a section queues each sentence.
+- Enforcement prose without evidence does not warn; it reaches the change's reviewer when
+  edited, and a sentence that must stay true is declared as a claim. Deleting a section lists
+  each sentence under `--written`.
 - **Known limitation.** A doc is re-asked only through what it owns through `describes`, its
   claims, its anchors and the code it names. One connection makes a doc look tied to code while
   its other sections rot unseen, and a sentence about code it neither names nor anchors is never
@@ -167,3 +173,9 @@ its change connects to.
   variable, path or other language's definition with a change; a `context` packet names the
   docs that name code in its paths, so the sentence on what a packet lists names them beside the
   claims.
+- 2026-11-26: The split of a change's queue is implemented: `list review --changed` and
+  `--base-ref` alone queue what the change left as it was and may have made stale, `list
+  review --written` lists the sentences it added, reworded or deleted, the two together exit 2,
+  and the JSON of each names its list. A sentence the change wrote carries
+  `names-changed-code` on its `edited` item in `--written`, and the retired concept's guidance
+  and the Consequences name `--written`.

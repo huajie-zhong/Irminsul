@@ -3,7 +3,7 @@ id: the-change-queue-asks-about-what-the-change-did-not-write
 title: "The change queue asks about what the change did not write"
 status: stable
 describes: []
-rfc_state: accepted
+rfc_state: implemented
 affects:
   - new-list-regen
   - cli
@@ -83,19 +83,20 @@ Answered by the owner on 2026-11-25:
 
 ## Design detail
 
-- **Today.** With a change, `build_review` in `src/irminsul/listing/review.py` returns five
+- **Today.** With a change, `build_review` in `src/irminsul/listing/review.py` returns six
   kinds of item: `edited`, for each sentence on a changed line that the base did not have,
   with `unbound-name` where a name in it binds to nothing; `removed-sentence`;
   `governing-claim`, for each claim other than a report whose evidence the change touched;
-  `stale-summary`; and `moved-file`.
+  `stale-summary`; `moved-file`; and, since the RFC that re-asks named code landed,
+  `names-changed-code`.
 - **The rule, by marker.** `--changed` holds no `edited` and no `removed-sentence` item, and
   every other item as today. `--written` holds those two kinds, built as `--changed` builds
   them today, and nothing else.
-- **What an item of `--changed` is about.** A sentence the change left as it was. What selects
-  it may still be the change's own edit to that doc: an edit to a body selects the untouched
-  `summary:`, and an edit to `describes:` selects the previous owner's sentences. A sentence a
-  previous owner keeps about a moved file, reworded in the same change, is therefore
-  `moved-file` in one list and `edited` in the other.
+- **What an item of `--changed` is about.** Almost always a sentence the change left as it
+  was. What selects it may still be the change's own edit to that doc: an edit to a body
+  selects the untouched `summary:`, and an edit to `describes:` selects the previous owner's
+  sentences. The one exception: a sentence a previous owner keeps about a moved file,
+  reworded in the same change, is `moved-file` in one list and `edited` in the other.
 - **Flags.** `--written` names a change as `--changed` does: alone it reads the uncommitted
   work, with `--base-ref` the range from the merge base, and `--committed-only` and a missing
   base behave as they do for `--changed` in `src/irminsul/cli.py`. `--base-ref` with neither
@@ -123,7 +124,7 @@ Answered by the owner on 2026-11-25:
   - `code-is-named-in-code-spans-and-bound-by-anchors`: an unbound name is marked "under
     `list review --changed`".
   - `agents-get-stateless-read-only-queries-and-one-written-loop`, which governs the loop's
-    template: decision 3 adds a procedure to the two the protocol carries.
+    template: decision 3 adds a procedure to the three the protocol carries.
 - **Docs that state it.** `docs/components/new-list-regen.md`, `docs/components/anchors.md`,
   the style guide's sentence on a removed sentence, the README's command table, and the help
   of `list review`.

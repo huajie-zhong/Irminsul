@@ -3,7 +3,7 @@ id: agent-protocol
 title: Agent lifecycle protocol
 status: stable
 describes: []
-summary: How an agent ties a sentence to a test, acts on a finding and changes the project's direction; the edit loop every change follows is in the root AGENTS.md.
+summary: How an agent ties a sentence to a test, acts on a finding, reviews a change and changes the project's direction; the edit loop every change follows is in the root AGENTS.md.
 inventory:
   - kind: cli
     source: src/irminsul/cli.py
@@ -15,6 +15,7 @@ inventory:
       - new adr
       - new rfc
       - list lifecycle
+      - list review
       - change status
       - change verify
       - change transition
@@ -24,9 +25,9 @@ inventory:
 # Agent lifecycle protocol
 
 The root [`AGENTS.md`](../../AGENTS.md) carries the edit loop every change follows and
-what a finding does and does not tell you. This guide carries the three procedures that
-loop points to: tying a sentence to a test, acting on a finding, and changing the
-project's direction.
+what a finding does and does not tell you. This guide carries the four procedures that
+loop points to: tying a sentence to a test, acting on a finding, reviewing a change, and
+changing the project's direction.
 
 ## Tying a sentence to a test
 
@@ -86,6 +87,23 @@ Then, in order:
    the next real mismatch too.
 5. **What it described is genuinely gone** — remove the claim *and* the code in the same
    change. That is the one case where removal costs nothing.
+
+## Reviewing a change
+
+The review queue of the loop asks the author what a change may have made stale, and leaves
+out the sentences the change wrote, which the author has just read. Whoever reviews the
+change reads those.
+
+1. **List what the change wrote.** `irminsul list review --written --base-ref origin/<base>`
+   lists each sentence the change added or reworded, beside the sentence it replaced, and
+   each sentence it deleted. In a sentence it added or reworded, a name that binds to no
+   code is marked `unbound-name`, and one that names a Python function or class the change
+   touched is marked `names-changed-code`; a deleted sentence carries neither.
+2. **Read each against the code it names,** not against what the change says it does.
+   Correct a sentence that is wrong. A deletion is right when what the sentence described
+   is gone, or when it only repeated a query, a file or another doc.
+3. **A change with no second reader** has its author read that list once, before opening
+   the pull request, and not after every edit.
 
 ## Changing direction
 

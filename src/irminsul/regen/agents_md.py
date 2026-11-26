@@ -92,8 +92,8 @@ def _protocol_section(config: IrminsulConfig) -> list[str]:
         "## Protocol",
         "",
         "The edit loop is in the root `AGENTS.md`; tying a sentence to a test, acting on a "
-        f"finding and changing direction are in [`{guides}/agent-protocol.md`]"
-        f"({guides}/agent-protocol.md).",
+        f"finding, reviewing a change and changing direction are in "
+        f"[`{guides}/agent-protocol.md`]({guides}/agent-protocol.md).",
     ]
 
 

@@ -37,6 +37,13 @@ making a feature, a refactor and an RFC-driven change in it.
   sentence is false and see the test fail once, then paste the marker and pin it. A newly
   scaffolded `docs/AGENTS.md` names the procedure beside the other two. A root `AGENTS.md`
   and a protocol already scaffolded keep their text until `init --force`.
+- Step 4 of that loop says that `list review --changed` lists the sentences a change may have
+  made stale and did not write, and the scaffolded agent protocol gains "Reviewing a change": a
+  reviewer reads `list review --written`, and a change with no second reader has its author
+  read that list once, before the pull request. A newly scaffolded `docs/AGENTS.md` names the
+  procedure. A root `AGENTS.md` and a protocol already scaffolded keep their text until
+  `init --force`; until then their step 4 says `--changed` re-reads the sentences you added,
+  which is now `--written`'s, so edit that step by hand.
 
 **Findings and messages.**
 - `check --diff` with a base that does not resolve, such as `origin/main` in a repository with no
@@ -235,6 +242,14 @@ making a feature, a refactor and an RFC-driven change in it.
   of a change used to come back without those sentences and say nothing; with the fourth, the
   lines between two nearby edits read as changed. A rename below the git root is read whatever
   `diff.relative` says.
+- `list review --changed` lists only what a change left as it was and may have made stale: the
+  sentences that name a Python function or class it touched, the claims whose evidence it
+  touched, an old owner's sentences about a file it moved, and a summary a body edit left
+  behind. The sentences the change added, reworded or deleted move to `list review --written`,
+  for whoever reviews the change, built as before with their `was`, `unbound-name` and
+  `names-changed-code`. `--written` names a change as `--changed` does, `--base-ref` alone still
+  means `--changed`, and the two flags together exit 2. The JSON of each holds `list`, `changed`
+  or `written`.
 - The JSON of `change status` and `change verify` reports the RFC's changed source and tests once,
   not per task. Each task has `id`, `text`, `req` and `component`; the changed files are in
   `evidence`, and one `semantic_review` clue says what to check. `evidence_measured` is a top-level
@@ -256,6 +271,9 @@ making a feature, a refactor and an RFC-driven change in it.
 - The three co-change trailer codes are gone from JSON; see the retirement above.
 - The change report and the context report are version 2 in their JSON (`version`). A consumer
   that read version 1 should check the shapes listed above before it relies on a field.
+- The review queue's JSON is version 2 too, from `list review` and the MCP tool `list_docs`
+  alike. A script that read the `edited` and `removed-sentence` items of `list review --changed`
+  reads them from `list review --written`.
 - An adopter's managed `AGENTS.md` block keeps its old text, so an adopter changes one sentence in
   it by hand: `without a decision record that names the baseline` becomes
   ``without an `Irminsul-Reviewed` trailer that names the baseline``.
