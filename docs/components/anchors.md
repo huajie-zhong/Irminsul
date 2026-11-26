@@ -55,7 +55,7 @@ judgment ([Code is named in code spans and bound by anchors](../decisions/code-i
 A code name that no surface, symbol index, or repository path resolves, and no anchor in
 the doc binds, is unbound, unless an enabled language defines it itself, as Python does
 `IndexError` (the profile's `builtins`): that name is the language's, not this repository's,
-and is never listed. `irminsul list review --changed` shows a changed sentence's
+and is never listed. `irminsul list review --written` shows a written sentence's
 unbound names, and `irminsul anchors --suggest` lists every one in live docs, or in one
 doc with `--doc`, with the places an anchor could point and the marker to paste. It
 writes nothing: the agent picks the file. A Python definition inside a function or a

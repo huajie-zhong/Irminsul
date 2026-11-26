@@ -84,8 +84,8 @@ foundation and architecture layers.
   the claim id excuses a claim's rewording or removal; one naming the doc's path excuses a
   weakened inventory entry. A removed anchor or inventory entry has no excuse: restore it, declare
   it elsewhere, or remove its code.
-- **Deleted prose is queued, not blocked:** `list review --changed` lists it as
-  `removed-sentence`.
+- **Deleted prose is queued, not blocked:** `list review --written` lists it as
+  `removed-sentence`, for whoever reviews the change.
 - **The mechanism is derived, never declared, and protection follows relation, not layer.**
 - **A trailer answers a removed anchor, a removed inventory entry and a claim downgrade**
   (accepted, not yet implemented). A removed anchor whose symbol still resolves, named
@@ -141,3 +141,6 @@ foundation and architecture layers.
   implements.
 - 2026-11-25: Accepted [The change queue asks about what the change did not write](../rfcs/the-change-queue-asks-about-what-the-change-did-not-write.md):
   deleted prose is queued under `list review --written`.
+- 2026-11-26: That is implemented and stated in the Decision: a deleted sentence is a
+  `removed-sentence` item of `list review --written`, and `list review --changed` no longer
+  lists it.

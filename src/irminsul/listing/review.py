@@ -1,11 +1,13 @@
 """`irminsul list review` — sentences to re-read, each paired with the code it names.
 
-Items are selected by facts alone, and each label names the fact: a line the change edited
-or deleted, a function or class it touched that a sentence names, a claim whose evidence it
-touched, a file it moved to another doc, a summary it left behind, or, across the whole
-tree, a sentence that names code. What a sentence means
-is the reader's to judge, so no list of words decides what is shown. The output explains
-each label it shows from `MARKER_MEANINGS`, the one place a label's meaning is written.
+Items are selected by facts alone, and each label names the fact: a function or class the
+change touched that a sentence names, a claim whose evidence it touched, a file it moved to
+another doc, a summary it left behind, a line it edited or deleted, or, across the whole
+tree, a sentence that names code. The sentences a change wrote or deleted are a list of
+their own, `--written`, so `--changed` asks only about what the change left as it was.
+What a sentence means is the reader's to judge, so no list of words decides what is shown.
+The output explains each label it shows from `MARKER_MEANINGS`, the one place a label's
+meaning is written.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ from collections.abc import Callable, Collection
 from dataclasses import asdict, dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, Literal
 
 import typer
 
@@ -42,7 +44,10 @@ if TYPE_CHECKING:
     from irminsul.git.reader import GitReader
     from irminsul.listing.changed_code import ChangedCode, ChangePairing
 
-REVIEW_VERSION = 1
+REVIEW_VERSION = 2
+
+ReviewList = Literal["changed", "written"]
+"""The two lists of one change: what it may have made stale, and what it wrote or deleted."""
 
 UNBOUND_ADVICE: Final = "bind it with an anchor (irminsul anchors --suggest)"
 
@@ -267,20 +272,26 @@ def build_review(
     base_ref: str = "HEAD",
     *,
     committed_only: bool = False,
+    listed: ReviewList = "changed",
 ) -> list[ReviewItem]:
     """The sentences to re-read, each with the code it names.
 
-    With `changed`, every sentence on a changed line that its doc did not already say at
-    `base_ref` is kept as `edited`, with every sentence the change deleted, each sentence, in
-    any file the queue reads, whose code span names a function or class the change touched,
+    With `changed`, a change has two lists, and `listed` picks one. `"changed"` holds the
+    sentences the change left as they were and may have made stale: each sentence, in any
+    file the queue reads, whose code span names a function or class the change touched,
     each claim whose evidence it touched, the sentences an old owner still has about a file
-    it moved, and a summary its body edit left behind. A sentence that replaced one in place
-    is one edit,
-    which carries the sentence it replaced as `was`, so the deletion is not queued twice.
-    A doc the change added has no base, so all its sentences are `edited`. An edited
-    sentence naming code that nothing resolves and no anchor in its doc binds lists those
-    names as `unbound`, so the writer binds them. Without `changed`, every sentence that
-    names code is kept as `names-code`, and marked when that code changed after the doc.
+    it moved, and a summary its body edit left behind. `"written"` holds what the change
+    wrote, for whoever reviews it: every sentence on a changed line that its doc did not
+    already say at `base_ref`, kept as `edited`, and every sentence the change deleted. A
+    sentence that replaced one in place is one edit, which carries the sentence it replaced
+    as `was`, so the deletion is not queued twice. A doc the change added has no base, so
+    all its sentences are `edited`. An edited sentence naming code that nothing resolves
+    and no anchor in its doc binds lists those names as `unbound`, so the writer binds them,
+    and one naming a function or class the change touched carries `names-changed-code`
+    there. The written sentences are found for `"changed"` too, so that a sentence the
+    change wrote is not asked about again as one it left. Without `changed`, every sentence
+    that names code is kept as `names-code`, and marked when that code changed after the
+    doc, and `listed` is not read.
 
     The prose is read from the working tree, or from `HEAD` under `committed_only`.
     """
@@ -355,11 +366,16 @@ def build_review(
                 written[path, position] = item
     if changed is not None:
         pairing = ChangePairing(graph, resolver, changed, base_ref, committed_only=committed_only)
-        items.extend(_sentences_naming_changed_code(sentences, pairing, written))
-        items.extend(_stale_summaries(graph, changed, read))
-        items.extend(_governing_claims_over_changed_code(graph, changed, read))
-        items.extend(_moved_file_sentences(graph, changed, base_ref, read))
-        items.extend(_removed_sentences(revisions, queued))
+        named = _sentences_naming_changed_code(sentences, pairing, written)
+        if listed == "written":
+            items.extend(_removed_sentences(revisions, queued))
+        else:
+            items = [
+                *named,
+                *_stale_summaries(graph, changed, read),
+                *_governing_claims_over_changed_code(graph, changed, read),
+                *_moved_file_sentences(graph, changed, base_ref, read),
+            ]
     return sorted(
         items,
         key=lambda i: (not i.code_changed_after_doc, not i.references, i.path, i.line),
@@ -787,16 +803,20 @@ def review_to_json(
     show_all: bool = False,
     compared_with: str | None = None,
     note: str | None = None,
+    listed: ReviewList | None = None,
 ) -> str:
-    """The queue as JSON. A queue of one change also says what it compared with, and the
-    `note` that a base other than the one it used would read more."""
+    """The queue as JSON. A queue of one change also says which of its two lists it is,
+    as `list`, what it compared with, and the `note` that a base other than the one it used
+    would read more."""
     shown = (
         items
         if show_all
         else [item for item in items if item.code_changed_after_doc or "edited" in item.markers]
     )
-    payload: dict[str, object] = {
-        "version": REVIEW_VERSION,
+    payload: dict[str, object] = {"version": REVIEW_VERSION}
+    if listed is not None:
+        payload["list"] = listed
+    payload |= {
         "total": len(items),
         "shown": len(shown),
         "items": [asdict(item) for item in shown],
@@ -826,9 +846,13 @@ def review_json(
     committed_only: bool = False,
     compared_with: str | None = None,
     note: str | None = None,
+    listed: ReviewList = "changed",
 ) -> str:
+    """The queue as JSON; with `changed`, the one of the change's two lists `listed` names."""
     graph = build_graph(repo_root, config, committed_only=committed_only)
-    items = build_review(repo_root, config, graph, changed, base_ref, committed_only=committed_only)
+    items = build_review(
+        repo_root, config, graph, changed, base_ref, committed_only=committed_only, listed=listed
+    )
     if changed is not None:
         show_all = True
     if doc is not None:
@@ -836,7 +860,13 @@ def review_json(
         if wanted is None:
             raise UnknownDocError(f"--doc: no doc with id or path {doc}")
         items = [item for item in items if item.path == wanted]
-    return review_to_json(items, show_all=show_all, compared_with=compared_with, note=note)
+    return review_to_json(
+        items,
+        show_all=show_all,
+        compared_with=compared_with,
+        note=note,
+        listed=None if changed is None else listed,
+    )
 
 
 def list_review(
@@ -851,6 +881,7 @@ def list_review(
     committed_only: bool = False,
     compared_with: str | None = None,
     note: str | None = None,
+    listed: ReviewList = "changed",
 ) -> None:
     report = review_json(
         repo_root,
@@ -862,6 +893,7 @@ def list_review(
         committed_only=committed_only,
         compared_with=compared_with,
         note=note,
+        listed=listed,
     )
     if fmt == "json":
         typer.echo(report)
@@ -871,7 +903,15 @@ def list_review(
     if changed is not None:
         base = data.get("base", "HEAD")
         against = "HEAD" if base == "HEAD" else f"the merge base of {base} and HEAD"
-        typer.echo(f"{data['shown']} items this change asks to re-read (compared with {against})")
+        if listed == "written":
+            typer.echo(
+                f"{data['shown']} sentences this change wrote or deleted, for whoever reviews "
+                f"it (compared with {against})"
+            )
+        else:
+            typer.echo(
+                f"{data['shown']} items this change asks to re-read (compared with {against})"
+            )
         if data.get("note"):
             typer.echo(f"note: {data['note']}")
     elif not show_all:

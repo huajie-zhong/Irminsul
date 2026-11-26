@@ -62,8 +62,8 @@ def ledger(fixture_repo: Callable[[str], Path]) -> Path:
     return root
 
 
-def _queue(root: Path, *args: str) -> list[dict[str, Any]]:
-    items: list[dict[str, Any]] = invoke_json(root, "list", "review", "--changed", *args)["items"]
+def _queue(root: Path, *args: str, flag: str = "--changed") -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = invoke_json(root, "list", "review", flag, *args)["items"]
     return items
 
 
@@ -457,19 +457,22 @@ def test_a_line_deleted_from_a_function_queues_the_sentences_that_name_it(ledger
 
 
 def test_a_sentence_the_change_wrote_keeps_one_item_and_carries_the_marker(ledger: Path) -> None:
-    """How this meets the accepted RFC on the written sentences: `names-changed-code` items
-    are about sentences the change did not write, and a sentence it did write stays its one
-    `edited` item, which the marker joins."""
+    """How this meets the RFC on the written sentences: a sentence the change did not write
+    is queued in `--changed` under the marker, and one it did write stays its one `edited`
+    item in `--written`, which the marker joins, and is not in `--changed` at all."""
     replace_text(ledger, CORE, *ADD_BODY)
     replace_text(ledger, COMPONENT, "after every amount already", "before every amount already")
 
-    items = _queue(ledger)
+    written = _queue(ledger, flag="--written")
+    queue = _queue(ledger)
 
-    about_add = [i for i in items if i["path"] == COMPONENT and "Ledger.add" in i["sentence"]]
+    about_add = [i for i in written if i["path"] == COMPONENT and "Ledger.add" in i["sentence"]]
     assert [item["markers"] for item in about_add] == [["edited", MARKER]]
     assert about_add[0]["was"] == "`Ledger.add` enters an amount after every amount already there."
     assert [code["line"] for code in about_add[0]["changed_code"]] == [12]
-    assert _named(items) == NAMES_ADD
+    assert _named(written) == {(COMPONENT, "Ledger.add")}
+    assert _named(queue) == NAMES_ADD - {(COMPONENT, "Ledger.add")}
+    assert not [item for item in queue if "edited" in item["markers"]]
 
 
 def test_a_sentence_on_a_changed_line_that_the_base_already_said_is_not_the_changes_own(
@@ -542,13 +545,12 @@ def test_a_committed_rename_is_read_from_the_merge_base(ledger: Path) -> None:
 def test_a_change_to_docs_alone_queues_no_sentence_for_naming_code(ledger: Path) -> None:
     replace_text(ledger, USAGE, "oldest first", "newest last")
 
-    items = _queue(ledger)
+    queue = _queue(ledger)
+    written = _queue(ledger, flag="--written")
 
-    assert [item["markers"] for item in items if item["path"] == USAGE] == [
-        ["edited"],
-        ["stale-summary"],
-    ]
-    assert _named(items) == set()
+    assert [item["markers"] for item in queue if item["path"] == USAGE] == [["stale-summary"]]
+    assert [item["markers"] for item in written if item["path"] == USAGE] == [["edited"]]
+    assert _named(queue) == _named(written) == set()
 
 
 def test_without_a_change_no_item_carries_the_marker(ledger: Path) -> None:

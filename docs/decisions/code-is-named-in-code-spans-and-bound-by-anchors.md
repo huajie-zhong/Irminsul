@@ -88,7 +88,7 @@ paragraphs, which trains a reader to re-pin without reading.
   `--claim`, `--evidence` or `--anchor`, writes a claim's `pinned` map of evidence path to
   normalized hash. A pin on a path the claim no longer cites is dropped by the next re-pin.
   `irminsul fix` never re-pins.
-- **Unbound names are queued, not failed.** Under `list review --changed`, a span in an edited
+- **Unbound names are queued, not failed.** Under `list review --written`, a span in an edited
   sentence that names code distinctively, as `name()` or a dotted, snake_case or camelCase
   identifier, which nothing resolves and no anchor in the doc binds, is marked `unbound-name`.
 - **Suggestions name only what an anchor can reach.** `irminsul anchors --suggest` lists each
@@ -222,3 +222,6 @@ paragraphs, which trains a reader to re-pin without reading.
   tests `anchors --suggest --doc` offers, a test naming a definition through its file's
   imports as the RFC's decision 4 has it. A command that changes a function in several ways
   and lists the changes no anchored test noticed is left to the backlog.
+- 2026-11-26: The written list is implemented and stated in the Decision: an unbound name is
+  marked on the `edited` item of `list review --written`, since `list review --changed` no
+  longer lists the sentences a change wrote.

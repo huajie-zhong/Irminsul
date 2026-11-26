@@ -530,6 +530,31 @@ def test_this_repositorys_protocol_carries_the_procedure_its_scaffold_ships() ->
     ]
 
 
+def test_the_protocol_has_a_reviewers_step_that_names_the_written_list() -> None:
+    """The written list is a reviewer's: the protocol and its scaffold name it in one
+    procedure, word for word, and say that a change with no second reader has its author
+    read it once, before the pull request."""
+    from irminsul.init.command import render_scaffold
+
+    def steps(text: str) -> list[str]:
+        start = text.index("## Reviewing a change")
+        section = text[start : text.index("## Changing direction")]
+        numbered = re.findall(r"^\d\. .*?(?=^\d\. |^\S|\Z)", section, re.M | re.S)
+        return [" ".join(step.split()) for step in numbered]
+
+    ours = (
+        Path(__file__).resolve().parents[1] / "docs" / "guides" / "agent-protocol.md"
+    ).read_text(encoding="utf-8")
+    scaffold = render_scaffold("docs/guides/agent-protocol.md.j2", {})
+    assert steps(ours) == steps(scaffold)
+    review = " ".join(steps(ours))
+    assert "`irminsul list review --written --base-ref origin/<base>`" in review
+    assert (
+        "A change with no second reader** has its author read that list once, before opening "
+        "the pull request, and not after every edit." in review
+    )
+
+
 def test_init_appends_its_section_to_a_root_agents_md_without_markers(tmp_path: Path) -> None:
     target = tmp_path / "demo"
     (target / "src").mkdir(parents=True)
@@ -1009,10 +1034,25 @@ def test_the_loop_says_the_review_queue_lists_the_sentences_that_name_a_changed_
     step = " ".join(rendered[start : rendered.index("\n5. ", start)].split())
 
     assert "`irminsul list review --changed`" in step
-    assert (
-        "the review queue the sentences anywhere that name a Python function or class you changed"
-        in step
+    assert "those anywhere that name a Python function or class you changed" in step
+
+
+def test_the_loop_names_what_the_change_may_have_made_stale_and_not_what_it_wrote() -> None:
+    """The author's loop asks for the queue alone: step 4 names the sentences the change may
+    have made stale and did not write, and not `--written`, which a reviewer reads."""
+    from irminsul.init.command import _ACTION_REPOSITORY, render_scaffold
+
+    rendered = render_scaffold(
+        "AGENTS.md.j2", {"project_name": "demo", "action_repository": _ACTION_REPOSITORY}
     )
+    start = rendered.index("\n4. After editing")
+    step = " ".join(rendered[start : rendered.index("\n5. ", start)].split())
+    loop = " ".join(_block(rendered).split())
+
+    assert "the sentences it may have made stale and did not write" in step
+    assert "the summary of a doc whose body you edited" in step
+    assert "--written" not in loop
+    assert "how to review a change, your own when no one else will" in loop
 
 
 def test_init_force_overwrites_existing_files(tmp_path: Path) -> None:

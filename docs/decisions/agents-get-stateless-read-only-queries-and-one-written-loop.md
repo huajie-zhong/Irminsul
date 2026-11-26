@@ -116,7 +116,14 @@ rate-limited and makes a run depend on the network.
   with them alone, replaces only the section under `--force`, and refuses unpaired markers. This
   repository's root `AGENTS.md` carries the same section, which a test compares. The
   [agent protocol](../guides/agent-protocol.md) keeps tying a sentence to a test, acting on a
-  finding and changing direction.
+  finding, reviewing a change and changing direction.
+- **The author's loop asks for the queue alone, and a reviewer reads what the change wrote.**
+  Step 4 names `list review --changed`, for the sentences the change may have made stale and
+  did not write, and never `--written`, since the author has just read what it wrote. The
+  agent protocol and its scaffold carry the reviewer's step, which names `list review
+  --written`, and say that a change with no second reader has its author read that list once,
+  before opening the pull request, and not after every edit. The loop's pointer to the
+  protocol names reviewing a change, the author's own when no one else will.
 - **The loop advises anchoring a sentence about behaviour to its test.** Step 3 says that a
   sentence that says what the code does is best anchored to the test that asserts it, since it
   is then asked about when that test changes and the test fails when the code stops doing it.
@@ -197,3 +204,8 @@ rate-limited and makes a run depend on the network.
   <path...>` names the docs with a sentence that names anything Irminsul resolves to a path,
   each with the number of its sentences that do, the eight with the most in plain output and
   every doc in the JSON.
+- 2026-11-26: The written list is implemented and stated in the Decision: step 4 of the loop
+  names what a change may have made stale, the agent protocol and its scaffold gain the
+  reviewer's step that names `list review --written`, with the rule for a change with no
+  second reader, and the protocol carries four procedures, which the manifest's `Protocol`
+  line names.

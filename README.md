@@ -54,7 +54,7 @@ The loop: orient, locate the owning docs, edit code and docs in the same commit,
 | `irminsul context --topic <q>` | The docs that cover a topic, before you know which file to open |
 | `irminsul refs <doc-id>` | The docs that depend on or link to a doc |
 | `irminsul surface {cli,cli-options,http,exports,env-vars,mcp}` | Derive a code surface from source on demand — never written to disk, so it cannot drift |
-| `irminsul list {undocumented,lifecycle,review,baseline}` | Source files no doc claims, unfinished RFC work, doc sentences to re-check against changed code, and the findings a baseline hides |
+| `irminsul list {undocumented,lifecycle,review,baseline}` | Source files no doc claims, unfinished RFC work, doc sentences to re-check against changed code, and the findings a baseline hides. `review --changed` lists what a change may have made stale, and `review --written` the sentences it wrote, for its reviewer |
 | `irminsul check --format json` | Machine-readable findings, each with its class, plus the exit code CI enforces; `--only <check>` runs one check, such as `orphans` |
 | `irminsul fix` | Apply deterministic remediations for mechanical findings |
 

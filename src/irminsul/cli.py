@@ -2347,16 +2347,27 @@ def list_review(
         bool,
         typer.Option(
             "--changed",
-            help="What a change asks to re-read: edited and deleted sentences in the working "
-            "tree vs HEAD, the sentences in any doc that name a Python function or class it "
-            "touched, and the claims, moved files and summaries it touched.",
+            help="What a change may have made stale, in the working tree vs HEAD: the "
+            "sentences in any doc that name a Python function or class it touched, and the "
+            "claims, moved files and summaries it touched. The sentences it wrote are "
+            "--written's.",
+        ),
+    ] = False,
+    written: Annotated[
+        bool,
+        typer.Option(
+            "--written",
+            help="The sentences a change added, reworded or deleted, for whoever reviews it, "
+            "each reworded one beside the sentence it replaced. It names the change as "
+            "--changed does; the two are one list each, so a run takes one of them.",
         ),
     ] = False,
     base_ref: Annotated[
         str | None,
         typer.Option(
             "--base-ref",
-            help="As --changed, for the changes since the merge base of this git ref and HEAD.",
+            help="With --changed or --written, or alone as --changed, for the changes since "
+            "the merge base of this git ref and HEAD.",
         ),
     ] = None,
     committed_only: CommittedOnlyOpt = False,
@@ -2368,23 +2379,29 @@ def list_review(
     from irminsul.listing.review import list_review as _list_review
     from irminsul.listing.review import unread_commits_note
 
+    if changed and written:
+        raise UserError(
+            "--changed and --written are the two lists of one change, and a run prints one: "
+            "pass one of them"
+        )
     repo_root, config = _load_repo(path)
 
     git = GitReader()
     changed_lines = None
     since: str | None = None
     note: str | None = None
+    names_change = changed or written
     if base_ref is not None:
         since = merge_base(git, repo_root, base_ref, "HEAD") or base_ref
         changed_lines = changed_line_numbers(git, repo_root, since, committed_only=committed_only)
-    elif changed and committed_only:
+    elif names_change and committed_only:
         typer.echo(
             "--committed-only without --base-ref ends the change where it starts, so no "
             "change is judged and nothing uncommitted is read",
             err=True,
         )
         changed_lines = {}
-    elif changed:
+    elif names_change:
         changed_lines = changed_line_numbers(git, repo_root)
         note = unread_commits_note(git, repo_root)
     _list_review(
@@ -2398,6 +2415,7 @@ def list_review(
         committed_only=committed_only,
         compared_with=(base_ref or "HEAD") if changed_lines is not None else None,
         note=note,
+        listed="written" if written else "changed",
     )
 
 

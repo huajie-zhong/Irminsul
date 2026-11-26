@@ -77,6 +77,21 @@ def _items(root: Path, doc: str | None = None, *, show_all: bool = True) -> list
     return json.loads(report)["items"]
 
 
+def _written_report(root: Path) -> dict:
+    """The written list of the uncommitted change at `root`: the sentences it added,
+    reworded or deleted, as `list review --written` reports them."""
+    changed = changed_line_numbers(GitReader(), root)
+    return json.loads(
+        review_json(root, load(root / "irminsul.toml"), changed=changed, listed="written")
+    )
+
+
+def _changed_queue(root: Path) -> dict:
+    """The queue of the uncommitted change at `root`, as `list review --changed` reports it."""
+    changed = changed_line_numbers(GitReader(), root)
+    return json.loads(review_json(root, load(root / "irminsul.toml"), changed=changed))
+
+
 def test_sentences_naming_code_are_queued_with_resolved_code(tmp_path: Path) -> None:
     items = _items(_repo(tmp_path))
     doc_lines = (tmp_path / "docs/components/pipeline.md").read_text(encoding="utf-8").splitlines()
@@ -124,7 +139,9 @@ def test_doc_filter_and_cli_exit_code(tmp_path: Path) -> None:
     assert "0 of 2 sentences naming code" in result.output
 
     result = runner.invoke(app, ["list", "review", "--format", "json", "--path", str(root)])
-    assert json.loads(result.output)["version"] == 1
+    report = json.loads(result.output)
+    assert report["version"] == 2
+    assert "list" not in report
 
 
 def test_doc_filter_takes_an_id_and_refuses_an_unknown_doc(tmp_path: Path) -> None:
@@ -238,7 +255,7 @@ def test_uncommitted_lines_count_as_changed(tmp_path: Path) -> None:
 def test_review_is_available_over_mcp(tmp_path: Path) -> None:
     root = _repo(tmp_path)
     data = json.loads(mcp_server.list_docs_json(root, load(root / "irminsul.toml"), "review"))
-    assert (data["version"], data["total"], data["shown"]) == (1, 2, 0)
+    assert (data["version"], data["total"], data["shown"]) == (2, 2, 0)
 
 
 def test_draft_naming_only_live_identities_is_queued_as_possibly_shipped(tmp_path: Path) -> None:
@@ -398,7 +415,6 @@ def test_table_rows_are_reviewed(tmp_path: Path) -> None:
 def test_every_new_sentence_is_queued_whatever_it_says(tmp_path: Path) -> None:
     """A new sentence is the reason to look, so no word in it decides whether it is
     shown: both wordings of one claim are queued, and the untouched sentences are not."""
-    from irminsul.git.changes import changed_line_numbers
 
     root = _repo(tmp_path)
     _commit_all_in_the_past(root)
@@ -409,17 +425,78 @@ def test_every_new_sentence_is_queued_whatever_it_says(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    changed = changed_line_numbers(GitReader(), root)
-    report = json.loads(review_json(root, load(root / "irminsul.toml"), changed=changed))
+    report = _written_report(root)
     assert [(i["sentence"], i["markers"]) for i in report["items"]] == [
         ("The cache is always rebuilt.", ["edited"]),
         ("The cache is rebuilt per run.", ["edited"]),
     ]
     assert report["shown"] == report["total"] == 2
 
-    result = runner.invoke(app, ["list", "review", "--changed", "--path", str(root)])
+    result = runner.invoke(app, ["list", "review", "--written", "--path", str(root)])
     assert result.exit_code == 0, result.output
-    assert "2 items this change asks to re-read" in result.output
+    assert "2 sentences this change wrote or deleted, for whoever reviews it" in result.output
+
+
+def _reword_one_sentence(root: Path) -> None:
+    """Commit the pipeline doc, now with a summary, then reword one sentence of its body."""
+    doc = root / "docs/components/pipeline.md"
+    doc.write_text(
+        _doc("pipeline", DOC_BODY, extra="summary: How the pipeline runs.\n"), encoding="utf-8"
+    )
+    _commit_all_in_the_past(root)
+    doc.write_text(
+        doc.read_text(encoding="utf-8").replace("names no code at all", "names no code"),
+        encoding="utf-8",
+    )
+
+
+def test_a_reworded_sentence_queues_its_docs_summary_and_no_edit(tmp_path: Path) -> None:
+    """Scenario `A reworded sentence`: the sentence is the change's own, so the queue holds
+    what the rewording may have made stale, the summary, and not the sentence."""
+    root = _repo(tmp_path)
+    _reword_one_sentence(root)
+
+    report = _changed_queue(root)
+
+    assert report["list"] == "changed"
+    assert [(i["sentence"], i["markers"]) for i in report["items"]] == [
+        ("How the pipeline runs.", ["stale-summary"])
+    ]
+
+
+def test_a_reworded_sentence_under_the_flag_is_one_edit_beside_the_one_it_replaced(
+    tmp_path: Path,
+) -> None:
+    """Scenario `A reworded sentence under the flag`."""
+    root = _repo(tmp_path)
+    _reword_one_sentence(root)
+
+    report = _written_report(root)
+
+    assert report["list"] == "written"
+    assert [(i["sentence"], i["markers"], i["was"]) for i in report["items"]] == [
+        ("This sentence names no code.", ["edited"], "This sentence names no code at all.")
+    ]
+
+
+def test_a_deleted_sentence_under_the_flag_is_a_removed_sentence(tmp_path: Path) -> None:
+    """Scenario `A deleted sentence under the flag`, and the queue of the same change holds
+    no removal."""
+    root = _repo(tmp_path)
+    _commit_all_in_the_past(root)
+    doc = root / "docs/components/pipeline.md"
+    doc.write_text(
+        doc.read_text(encoding="utf-8").replace("This sentence names no code at all.\n", ""),
+        encoding="utf-8",
+    )
+
+    written = _written_report(root)["items"]
+    queue = _changed_queue(root)["items"]
+
+    assert [(i["sentence"], i["markers"]) for i in written] == [
+        ("This sentence names no code at all.", ["removed-sentence"])
+    ]
+    assert not [i for i in queue if i["markers"][0] in ("edited", "removed-sentence")]
 
 
 def test_a_body_edit_that_leaves_the_summary_lists_the_summary(tmp_path: Path) -> None:
@@ -461,7 +538,6 @@ def test_review_changed_works_before_the_first_commit(tmp_path: Path) -> None:
 
 def test_a_deleted_claim_is_queued_rather_than_vanishing(tmp_path: Path) -> None:
     """Gutting a doc used to empty the queue along with the doc."""
-    from irminsul.git.changes import changed_line_numbers
 
     root = _repo(tmp_path)
     _commit_all_in_the_past(root)
@@ -474,11 +550,7 @@ def test_a_deleted_claim_is_queued_rather_than_vanishing(tmp_path: Path) -> None
     ]
     doc.write_text("\n".join(kept) + "\n", encoding="utf-8")
 
-    report = json.loads(
-        review_json(
-            root, load(root / "irminsul.toml"), changed=changed_line_numbers(GitReader(), root)
-        )
-    )
+    report = _written_report(root)
     removed = [i for i in report["items"] if "removed-sentence" in i["markers"]]
     assert removed, "deleting the claims removed them from the review queue too"
     assert all(i["path"] == "docs/components/pipeline.md" for i in removed)
@@ -493,11 +565,7 @@ def test_every_deleted_sentence_is_queued_whatever_it_says(tmp_path: Path) -> No
     text = doc.read_text(encoding="utf-8")
     doc.write_text(text.replace("This sentence names no code at all.\n", ""), encoding="utf-8")
 
-    report = json.loads(
-        review_json(
-            root, load(root / "irminsul.toml"), changed=changed_line_numbers(GitReader(), root)
-        )
-    )
+    report = _written_report(root)
     assert [(i["sentence"], i["markers"]) for i in report["items"]] == [
         ("This sentence names no code at all.", ["removed-sentence"])
     ]
@@ -518,26 +586,17 @@ def test_a_deletion_from_a_file_the_queue_does_not_read_is_not_queued(tmp_path: 
     rfc_text = rfc.read_text(encoding="utf-8")
     rfc.write_text(rfc_text.replace("The idea says something.\n", ""), encoding="utf-8")
 
-    report = json.loads(
-        review_json(
-            root, load(root / "irminsul.toml"), changed=changed_line_numbers(GitReader(), root)
-        )
-    )
+    report = _written_report(root)
     assert report["items"] == []
 
 
 def test_an_untouched_doc_reports_no_removed_sentences(tmp_path: Path) -> None:
-    from irminsul.git.changes import changed_line_numbers
 
     root = _repo(tmp_path)
     _commit_all_in_the_past(root)
     (root / "src" / "extra.py").write_text("def extra(): pass\n", encoding="utf-8")
 
-    report = json.loads(
-        review_json(
-            root, load(root / "irminsul.toml"), changed=changed_line_numbers(GitReader(), root)
-        )
-    )
+    report = _written_report(root)
     assert not [i for i in report["items"] if "removed-sentence" in i["markers"]]
 
 
@@ -561,11 +620,7 @@ def _review_file_edit(root: Path, rel: str, before: str, after: str) -> list[dic
     write(root, rel, before)
     _commit_all_in_the_past(root)
     write(root, rel, after)
-    report = json.loads(
-        review_json(
-            root, load(root / "irminsul.toml"), changed=changed_line_numbers(GitReader(), root)
-        )
-    )
+    report = _written_report(root)
     return report["items"]
 
 
@@ -824,7 +879,10 @@ def test_a_renumbered_item_stays_queued_in_a_guidance_file_that_is_not_markdown(
     commit_all(root, "init", when=_dt.datetime(2020, 1, 1, tzinfo=_dt.UTC))
     write(root, ".cursorrules", "1. Keep the first step.\n2. Keep the last step.\n")
     report = review_json(
-        root, load(root / "irminsul.toml"), changed=changed_line_numbers(GitReader(), root)
+        root,
+        load(root / "irminsul.toml"),
+        changed=changed_line_numbers(GitReader(), root),
+        listed="written",
     )
     items = json.loads(report)["items"]
     assert _edits(items) == [("2. Keep the last step.", "2. Drop this step.")]
@@ -962,11 +1020,7 @@ def test_every_sentence_of_a_new_doc_is_edited_even_when_another_doc_says_it(
         "docs/components/fresh.md",
         _doc("fresh", "This sentence names no code at all. `check` exits 1.\n"),
     )
-    report = json.loads(
-        review_json(
-            root, load(root / "irminsul.toml"), changed=changed_line_numbers(GitReader(), root)
-        )
-    )
+    report = _written_report(root)
     assert sorted(_edited(report["items"])) == [
         "This sentence names no code at all.",
         "`check` exits 1.",
@@ -985,11 +1039,7 @@ def test_a_numbered_list_marker_is_not_a_sentence_of_its_own(tmp_path: Path) -> 
             "1. Run `check` first. It is fast.\n2. Fix what it names.\n10) Run it again.\n",
         ),
     )
-    report = json.loads(
-        review_json(
-            root, load(root / "irminsul.toml"), changed=changed_line_numbers(GitReader(), root)
-        )
-    )
+    report = _written_report(root)
     assert _edited(report["items"]) == [
         "1. Run `check` first.",
         "It is fast.",
@@ -1069,10 +1119,10 @@ def test_a_sentence_moved_out_of_the_decision_is_queued_as_removed(tmp_path: Pat
 
 
 def test_a_governing_claim_is_queued_when_only_its_code_changed(tmp_path: Path) -> None:
-    """The review queue reaches a claim through changed code, not just changed prose.
+    """The review queue reaches a claim through changed code, not just changed prose: the
+    Scenario `Evidence touched`.
 
-    Every other entry starts from a doc line the change touched. This one cannot: the
-    document was never opened, which is the case where nobody would re-read the
+    The document was never opened, which is the case where nobody would re-read the
     contract on their own.
     """
     root = _repo(tmp_path)
@@ -1109,6 +1159,7 @@ def test_a_governing_claim_is_queued_when_only_its_code_changed(tmp_path: Path) 
     assert "evidence:src/cli.py" in queued[0]["markers"]
     doc_lines = (root / "docs/components/pipeline.md").read_text(encoding="utf-8").splitlines()
     assert doc_lines[queued[0]["line"] - 1].strip() == "- id: config-lookup-walks-up"
+    assert _written_report(root)["items"] == []
 
 
 def _legend(output: str) -> list[str]:
@@ -1117,8 +1168,8 @@ def _legend(output: str) -> list[str]:
     return lines[lines.index("markers:") + 1 :]
 
 
-def _review_changed_plain(root: Path) -> str:
-    result = runner.invoke(app, ["list", "review", "--changed", "--path", str(root)])
+def _review_written_plain(root: Path) -> str:
+    result = runner.invoke(app, ["list", "review", "--written", "--path", str(root)])
     assert result.exit_code == 0, result.output
     return result.output
 
@@ -1137,7 +1188,7 @@ def test_plain_review_explains_each_marker_it_shows_once(tmp_path: Path) -> None
     root = _repo(tmp_path)
     _rewrite_one_sentence_and_delete_another(root)
 
-    legend = _legend(_review_changed_plain(root))
+    legend = _legend(_review_written_plain(root))
 
     assert [line.split()[0] for line in legend] == ["edited", "removed-sentence"]
     assert MARKER_MEANINGS["edited"] in legend[0]
@@ -1148,7 +1199,7 @@ def test_plain_review_shows_the_sentence_an_edit_replaced(tmp_path: Path) -> Non
     root = _repo(tmp_path)
     _rewrite_one_sentence_and_delete_another(root)
 
-    output = _review_changed_plain(root)
+    output = _review_written_plain(root)
 
     assert "`find_config()` exits 2 when no config exists.\n  was: " + FIND in output
 
@@ -1178,21 +1229,22 @@ def test_json_review_carries_the_meaning_of_each_marker_it_shows(tmp_path: Path)
     _rewrite_one_sentence_and_delete_another(root)
     _edit_cli(root, "    return start\n", "    return start.parent\n")
 
-    result = runner.invoke(
-        app, ["list", "review", "--changed", "--format", "json", "--path", str(root)]
-    )
-
-    assert result.exit_code == 0, result.output
-    report = json.loads(result.output)
-    shown = {name.split(":")[0] for item in report["items"] for name in item["markers"]}
-    assert shown == {
-        "edited",
-        "names-changed-code",
-        "removed-sentence",
-        "governing-claim",
-        "evidence",
+    expected = {
+        # The rewritten sentence names `find_config()`, whose body the change edited, so its
+        # `edited` item carries the marker and the queue has no item of its own for it.
+        "--written": {"edited", "names-changed-code", "removed-sentence"},
+        "--changed": {"governing-claim", "evidence"},
     }
-    assert report["markers"] == {name: MARKER_MEANINGS[name] for name in sorted(shown)}
+    for flag, markers in expected.items():
+        result = runner.invoke(
+            app, ["list", "review", flag, "--format", "json", "--path", str(root)]
+        )
+
+        assert result.exit_code == 0, result.output
+        report = json.loads(result.output)
+        shown = {name.split(":")[0] for item in report["items"] for name in item["markers"]}
+        assert shown == markers, flag
+        assert report["markers"] == {name: MARKER_MEANINGS[name] for name in sorted(shown)}
 
 
 def test_review_explains_only_the_markers_of_the_items_it_shows(tmp_path: Path) -> None:
@@ -1255,9 +1307,9 @@ def test_before_the_first_commit_every_sentence_that_names_code_is_new(tmp_path:
     assert all(item["markers"] == ["names-code", "edited"] for item in shown)
 
 
-def _changed_report(root: Path, *args: str) -> dict:
+def _changed_report(root: Path, *args: str, flag: str = "--changed") -> dict:
     result = runner.invoke(
-        app, ["list", "review", "--changed", "--format", "json", *args, "--path", str(root)]
+        app, ["list", "review", flag, "--format", "json", *args, "--path", str(root)]
     )
     assert result.exit_code == 0, result.output
     return json.loads(result.output)
@@ -1299,12 +1351,13 @@ def test_changed_without_a_base_names_the_commits_it_did_not_read(tmp_path: Path
 
     plain = runner.invoke(app, ["list", "review", "--changed", "--path", str(root)])
     assert "note: " in plain.output and "--base-ref origin/main" in plain.output
+    assert _changed_report(root, flag="--written")["note"] == report["note"]
 
-    covered = _changed_report(root, "--base-ref", "origin/main")
+    covered = _changed_report(root, "--base-ref", "origin/main", flag="--written")
     assert covered["base"] == "origin/main" and covered["note"] is None
     assert {item["path"] for item in covered["items"]} == {"docs/components/more.md"}
     named = runner.invoke(
-        app, ["list", "review", "--changed", "--base-ref", "origin/main", "--path", str(root)]
+        app, ["list", "review", "--written", "--base-ref", "origin/main", "--path", str(root)]
     )
     assert "compared with the merge base of origin/main and HEAD" in named.output
     assert "note: " not in named.output

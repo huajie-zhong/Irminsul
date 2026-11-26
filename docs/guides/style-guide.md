@@ -31,7 +31,7 @@ Whoever reads a doc already has the code, symbol search, git history, and the `i
 
 **Describe what is; do not promote it to a rule.** "The loop records no session" reports current behaviour. "The loop must never record a session" is a constraint, and writing it needs intent a person stated — a decision record, a foundation principle, or the user's word — never an inference from the code. [Agents get stateless read-only queries and one written loop](../decisions/agents-get-stateless-read-only-queries-and-one-written-loop.md) decided that `context` is stateless, so that sentence may be written as a rule. When no such source exists, describe the behaviour and ask.
 
-**Removing a sentence that fails this test is a repair.** When `irminsul list review --changed` lists the deletion as `removed-sentence`, the justification is the test it failed: a copy of the named file, or a repeat of the named doc.
+**Removing a sentence that fails this test is a repair.** When `irminsul list review --written` lists the deletion as `removed-sentence`, the justification is the test it failed: a copy of the named file, or a repeat of the named doc.
 
 ## Claims
 
