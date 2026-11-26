@@ -22,14 +22,18 @@ Work every change in this order. `irminsul orient` lists the commands; each take
    describe. When a sentence explains code — what it does, why it works this way, what
    it guarantees — name that code in a code span, anchor the paragraph to it, or declare
    it as a claim with evidence. A doc is re-asked about code only through those
-   connections.
+   connections. A sentence that says what the code does is best anchored to the test
+   that asserts it: it is then asked about when that test changes, and the test fails
+   when the code stops doing it.
 4. After editing, run `irminsul context --after-edit` for the findings your change
    introduced, and `irminsul list review --changed` to re-read each sentence you added
    or changed against the code it names. Both also queue the claims whose evidence you
-   touched, in docs you may never have opened: read the doc and the decisions it links,
-   and answer the question asked. The review queue is a reading list: fix a sentence
-   that is wrong, and leave one you re-read and found right. Only a finding needs a
-   recorded answer. On a branch with committed work, give both `--base-ref origin/<base>`.
+   touched, and the review queue the sentences anywhere that name a Python function or
+   class you changed, in docs you may never have opened: read the doc and the decisions it
+   links, and answer the question asked. The review queue is a reading list: fix a
+   sentence that is wrong, and leave one you re-read and found right. Only a finding
+   needs a recorded answer. On a branch with committed work, give both
+   `--base-ref origin/<base>`.
 5. Run `irminsul fix` for the deterministic remediations of mechanical findings.
 6. Before committing, run `irminsul check` and the tests your change touches; it must
    exit 0.
@@ -42,7 +46,7 @@ Work every change in this order. `irminsul orient` lists the commands; each take
 
 Report any warning you leave and any decision still open. Accepting or finalizing an RFC
 is the user's decision; the [agent protocol](docs/guides/agent-protocol.md) says how to
-act on a finding and how to change direction.
+tie a sentence to a test, how to act on a finding and how to change direction.
 
 ## Follow the foundation layer
 

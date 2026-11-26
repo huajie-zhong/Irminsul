@@ -60,12 +60,13 @@ rules, per section and per changed definition, were considered and deferred by
 A decision record's `governs:` names the code it decides, and nothing reads that list yet. The
 accepted RFC `decision-records-govern-what-they-decide` makes `irminsul context <path>` name the
 governing record before an edit; it does not re-ask the record's Decision when that code
-changes. A Decision that names the code in a code span will be queued by
-`a-change-re-asks-the-sentences-that-name-its-code`. One that states the rule in plain words is
-reached by neither, and the case `decision-governs-the-function` of `tests/test_seeded_rot.py`
-pins that. On 2026-11-25 every one of the 14 records named code somewhere in its Decision, and
-167 of the 339 Decision sentences named code the queue resolves (a review). Queue a record's Decision when a change touches what the
-record governs.
+changes. A Decision that names a function or class in a code span is queued by
+`list review --changed` when the change touches it, marked `names-changed-code`. One that names
+only a command, an option or a file, or states the rule in plain words, is reached by neither,
+and the case `decision-governs-the-function` of `tests/test_seeded_rot.py` pins the last. On
+2026-11-25 every one of the 14 records named code somewhere in its Decision, and 167 of the 339
+Decision sentences named code the queue resolves (a review). Queue a record's Decision when a
+change touches what the record governs.
 
 ### `defined-means-two-things`
 
@@ -79,6 +80,15 @@ to nothing, is listed as `unbound` by `list review --changed`, and is never pair
 definition; `anchors --suggest` then offers that very anchor (re-run on 2026-10-28). One
 rule for "this module defines that name" would let the two agree; which rule is right is a
 decision, not a refactor.
+
+### `changed-lines-read-an-added-line-as-a-file-name`
+
+`changed_line_numbers` (`src/irminsul/git/changes.py`) takes any line of git's diff that starts
+`+++ ` for the name of the next file, and a line the change added that starts `++ ` prints that
+way. With `-- a/one` replaced by `++ b/two` on line 1 of `src/a.sql` and line 3 edited too, it
+returns `{"src/a.sql": {1}, "two": {3}}`: the later hunk is filed under a path that does not
+exist, so `list review --changed` reads no change on those lines (run on 2026-11-26). A file's
+two names come between its `diff --git` line and its first hunk; read them only there.
 
 ### `narrowed-surface-is-not-a-filter`
 
@@ -290,6 +300,19 @@ wrong function for four sentences, and a dotted span resolves by its last segmen
 (`UnmatchedPath.recorded_debt` bound to `adoption.recorded_debt`) with no `unbound-name` raised
 (dogfood, 2026-10-29). Show every candidate a name could bind to, or bind none.
 
+### `a-name-two-files-define-pairs-with-nothing`
+
+`CodeResolver.resolve` (`src/irminsul/code_references.py`) pairs a span with a function or class
+only when one definition in the source has that name, so a bare name that two definitions share
+pairs with neither, in the queue with a change and without one. `parse` is a function of
+`src/irminsul/checks/acknowledgement.py` and a method of `PythonModule` in
+`src/irminsul/inventory/base.py`. The sentence of `docs/components/checks.md:125` that says what
+`parse` reads was therefore not asked about for `parse` when the pull request `dde68e0..ffa39b4`
+changed what `parse` takes for a reason; `list review --changed` queued it only because the same
+sentence names `acknowledge`, which the pull request also touched (measured on 2026-11-26). A
+span in a doc that owns one of the defining files could pair with that file's definition; which
+definition a name means elsewhere is `review-binds-common-words`.
+
 ### `first-review-after-init-queues-the-scaffold`
 
 The first `list review --changed` after `irminsul init` in a brownfield repository queues 113
@@ -321,26 +344,48 @@ about 70 of them the agent's own new sentences, with the claims whose evidence c
 doc nobody edited mixed in (2026-10-29). Group the plain output by marker, the items the change
 did not write first.
 
-### `changed-queue-reads-doc-edits-not-code-edits`
+### `change-queue-asks-through-functions-and-classes-alone`
 
-`list review --changed` reads sentences only from the docs the change touched
-(`src/irminsul/listing/review.py:292`). Beside those it holds the claims that cite a changed
-file as evidence, stale summaries, and moved or removed sentences. A change to code that no
-claim cites queues nothing: commit `460c44c`, which changed `review.py` and its test, prints
-"0 items", which reads as "nothing to re-read". Run with today's code on 2026-11-25 over the
-three pull requests merged on 2026-10-30 and 2026-10-31 (heads `89772e4`, `dde68e0`, `ffa39b4`)
-and two single commits, the queue held 189 items: 99 sentences the change itself wrote, 29
-summaries of docs whose body changed, 20 claims whose evidence file changed in a part they do
-not rest on, 19 removed sentences, 8 with a wrong reference, and 14 worth the re-read. A few
-of the 19 were list items a deletion had only renumbered, which are no longer queued. Eight sentences those pull requests made false and did not edit were in no queue. The
-accepted RFC `a-change-re-asks-the-sentences-that-name-its-code` queues the ones that name
-changed code; four of the eight name no code, which is
-`connected-doc-hides-unconnected-sections`. Until it lands, say in the output that changed
-source is not read. The owner's direction on 2026-11-25 is that this queue asks only about what
-the change did not write and may have made stale, and leaves the sentences the change wrote to
-its reviewer; a draft RFC, `the-change-queue-asks-about-what-the-change-did-not-write`, on the
-branch `rfc/change-queue-asks-what-the-change-did-not-write` and not on main, proposes it. These counts replace the ones in
-`queue-is-unranked`, measured before the fixes of 2026-10-31.
+Since 2026-11-26 `list review --changed` queues each sentence whose code span names a Python
+function or class the change touched, marked `names-changed-code` (`_sentences_naming_changed_code`,
+`src/irminsul/listing/review.py`), and pairs nothing else with a change (`ChangePairing`,
+`src/irminsul/listing/changed_code.py`). That is the owner's decision of that day in the RFC
+`a-change-re-asks-the-sentences-that-name-its-code`, taken after a first build that paired every
+kind of name took the queue of the pull request `dde68e0..ffa39b4` from 48 items to 214. Run
+that day with the rule as it stands over the same four ranges, the queue went from 0 to 0 items
+for commit `460c44c`, from 26 to 27 for commit `9759e15`, from 48 to 51 for the pull request and
+from 108 to 109 for `ffa39b4..55ab870`; 0, 6, 4 and 12 of them carry the marker, 17 of those 22
+on a sentence the change itself wrote. Five items are about a sentence the change did not
+write. One was worth the re-read: the sentence of `docs/components/checks.md` that names
+`trailer_for`, queued by the pull request, which had also put that trailer in the JSON the
+sentence leaves out; the one beside it, naming `acknowledge`, was still true. The other three are one sentence,
+`docs/components/mcp-server.md:46`, which says what `create_server` records when it runs and was
+queued by three of the four changes, each time because the change reworded the description of
+a tool: every MCP tool is a function nested in `create_server` (`src/irminsul/mcp_server.py`),
+so an edit to any of them changes that function's own lines, which is how the Decision of
+`derive-facts-and-leave-meaning-to-the-reader` judges touched. Counting a function as touched
+only by its lines outside the functions nested in it would drop those three; it changes what a
+function's own lines are in that Decision, so it is the owner's call.
+
+What the rule leaves out on purpose: a sentence that names only a command, an option, an
+environment variable or a file is not asked about when the behaviour behind the name changes,
+unless its doc owns the code or anchors the test that asserts it. The RFC leaves open pairing a
+sentence with the part of a file it names, once `claim-evidence-names-a-part` gives the finders.
+`460c44c` still prints "0 items", because no sentence names the functions it changed in a code
+span, which is `connected-doc-hides-unconnected-sections`.
+
+The measurement of 2026-11-25 that the entries beside this one cite: run with that day's code
+over the three pull requests merged on 2026-10-30 and 2026-10-31 (heads `89772e4`, `dde68e0`,
+`ffa39b4`) and two single commits, the queue held 189 items: 99 sentences the change itself
+wrote, 29 summaries of docs whose body changed, 20 claims whose evidence file changed in a part
+they do not rest on, 19 removed sentences, 8 with a wrong reference, and 14 worth the re-read. A
+few of the 19 were list items a deletion had only renumbered, which are no longer queued. Eight
+sentences those pull requests made false and did not edit were in no queue; four of the eight
+name no code, which is `connected-doc-hides-unconnected-sections`. The owner's direction on
+2026-11-25 is that this queue asks only about what the change did not write and may have made
+stale, and leaves the sentences the change wrote to its reviewer; the accepted RFC
+`the-change-queue-asks-about-what-the-change-did-not-write` carries it out. These counts replace
+the ones in `queue-is-unranked`, measured before the fixes of 2026-10-31.
 
 ### `stale-summary-asks-after-any-body-edit`
 
@@ -350,6 +395,45 @@ were summaries the edit could not have affected: "CLI entry point." for
 `docs/components/cli.md` was queued by each of three consecutive pull requests. The decision
 record says "a rewritten body", and one changed line is not that. Print them as one group that
 closes the plain output, or decide what "rewritten" means; the second is a decision.
+
+### `path-packet-pairs-every-code-span`
+
+Since 2026-11-26 `irminsul context <path>` names the docs that name code in the path
+(`_named_by`, `src/irminsul/context.py`). To count their sentences, `docs_naming`
+(`src/irminsul/listing/review.py`) builds a `CodeResolver`, which extracts every surface and
+indexes every function and class of the source, and pairs every code span in the docs, whatever
+the path. `irminsul context src/irminsul/cli.py --format json` went from 1.5 to 2.6 seconds that
+day, the median of fifteen runs on one machine, and an MCP caller of `context_for_path` waits as
+long; building the resolver is 0.9 of the added 1.1 seconds. The JSON went from 26 to 32 KB,
+with 50 docs under `named_by`, where a first build that listed each sentence gave 112 KB.
+`list review --changed` on the pull request `dde68e0..ffa39b4` went from 2.3 to 3.0 seconds on
+the same machine, because it builds a second resolver for the merge base. Not measured: which
+surfaces a packet could leave unextracted without changing what a span names. Counting every
+name Irminsul resolves to the path, as the owner decided later that day, left the packet for
+`cli.py` at 50 docs and took `mcp_server.py` from 1 doc to 27 and `frontmatter.py` from 1 to 27,
+through the MCP tools and the frontmatter fields their sentences name.
+
+### `http-route-resolves-from-no-code-span`
+
+`CodeResolver.resolve` (`src/irminsul/code_references.py`) finds an identity of a kind with no
+mention pattern only when the span is identifier-shaped, and an HTTP route's identity, such as
+`GET /items` from the `fastapi` pack, has a space and a slash. So a sentence that names
+`` `GET /items` `` resolves to nothing: `irminsul context` does not count it under `named_by`
+for the file that declares the route. With a `[[surface.rules]]` entry for kind `http` that gives a `mention_pattern`, the
+same sentence counts (both run on 2026-11-26 in a scratch FastAPI project). A built-in mention
+pattern for `http` would make it count everywhere, and would also make `code-references` and
+the review queue read routes; that changes what a code span names, so it is a decision.
+
+### `environment-variable-counts-for-one-file`
+
+`EnvVarsExtractor.extract` (`src/irminsul/inventory/env_vars.py:68`) keeps one item for each
+variable, from the first file that reads it, so a variable two files read is reported from one
+of them. `irminsul context <path>` counts a sentence that names the variable under `named_by`
+for that file alone (`docs_naming`, `src/irminsul/listing/review.py`): with `LEDGER_DATE_FORMAT`
+read in `dates.py` and in `fees.py` of the `names-changed-code` fixture, the packet for `fees.py`
+does not count the usage guide's sentence about it (run on 2026-11-26). `irminsul surface
+env-vars` names one file for the same reason. Keep every file that reads a variable, which
+changes what the surface prints.
 
 ### `lifecycle-queue-shows-no-progress`
 
@@ -379,6 +463,69 @@ the number. The owner decided on 2026-11-25 that `init` should scaffold a gate t
 hints as well, once every hint has an answer. That reverses the Scope of
 `every-warning-hint-has-an-answer`, which keeps the scaffolded default at certain findings
 alone, so it needs its own RFC.
+
+### `no-command-lists-the-changes-a-test-misses`
+
+A paragraph anchored to a test is guarded only as far as that test fails when its sentence
+becomes false. Seeing it fail once is a written step of the agent protocol
+(`docs/guides/agent-protocol.md`, "Tying a sentence to a test") that nothing verifies, and one
+failure shows one way of breaking the code. The command the RFC
+`a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts` left out (decision 2 of
+2026-11-26) would change a function in several small ways, run the tests its paragraphs are
+anchored to, and list the changes no test noticed. It runs code, so it is no check, and each
+language runs tests its own way. Recorded on 2026-11-26, when that RFC was implemented.
+
+### `init-declares-no-test-roots`
+
+`irminsul init` writes no `paths.test_roots`, and `SourceTree.test_walk`
+(`src/irminsul/source_tree.py`) walks nothing without it, so in a freshly initialized
+repository `anchors --suggest --doc <doc>` says "no test names it" and "no test file was read"
+for a function its test calls, and `context <source file>` prints `tests: -` (both run on
+2026-11-26). The agent protocol's step on finding a test now says so and sends the reader to
+search the test files. Declaring the roots is the adopter's fix, and it raises
+`test-ownership/unowned-test`, an error, for every test file no doc lists in `owns_tests`
+(`src/irminsul/checks/owned_tests.py`), so the first declaration turns a passing repository
+red. Decide whether `init` detects a test tree and declares it, and how the files in it that
+predate adoption are excepted, as the adoption record excepts source files. Found by a review
+of the RFC `a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts` on 2026-11-26.
+
+### `context-lists-no-tests-for-an-unowned-source-file`
+
+`irminsul context <source file>` for a file no doc owns answers "no owning doc found", exits 1
+and lists no test, even when a file under the declared test roots imports it (run on
+2026-11-26): `Ranker.rank` (`src/irminsul/ranked_tests.py`) ranks the tests for an owning doc
+(`src/irminsul/context.py`, where it is called once per owner), and an unowned file has none.
+The agent protocol sends a sentence that names no code to this packet for its test, and an
+undocumented file is where such a sentence is most likely. List the importing tests of an
+unowned source file in the packet as well, with the reason each is listed. Found by a review of
+the RFC `a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts` on 2026-11-26.
+
+### `suggest-hides-how-many-tests-name-a-definition`
+
+`anchors --suggest --doc <doc>` offers at most three tests for a definition, the first by path
+and line (`naming_tests` in `src/irminsul/binding.py`), and neither its plain output nor its
+JSON says how many more name it. In this repository 23 tests name `acknowledge` and 14 name
+`Finding` (counted on 2026-11-26), so three by path order says little about which assert the
+sentence, and a reader cannot tell three from three hundred. Print the count beside the three,
+and keep it in each row's JSON. Found by a review of the RFC
+`a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts` on 2026-11-26.
+
+### `suggest-json-hides-that-no-test-was-read`
+
+With no `paths.test_roots` declared, `anchors --suggest --doc <doc>` prints "no test file was
+read" in its plain output alone (`_suggest_anchors` in `src/irminsul/cli.py`); in the JSON each
+row's `tests` is `[]`, the same as for a function no test names, so an agent reading the JSON
+cannot tell the two apart. The plain output also prints "no
+test names it" under each name when it read no test at all. Found by a review on 2026-11-26.
+
+### `a-file-level-rebinding-still-names-the-definition`
+
+`anchors --suggest --doc` counts a test as naming a function when its body uses a name the
+file imported from the defining module and the test does not bind itself. A test file that
+imports `late_fee` and then rebinds it at file level, by `def late_fee`, an assignment or a
+later import of another `late_fee`, still has its tests offered for the function
+(`src/irminsul/binding.py`). Found by a review on 2026-11-26; no test of this repository does
+it.
 
 ### `decision-edit-is-confirmed-twice`
 

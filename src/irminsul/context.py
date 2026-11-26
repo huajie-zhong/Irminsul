@@ -82,6 +82,9 @@ _MAX_EXCERPT_CHARS = 1_200
 #: How many tests plain output lists when none has a reason to be named. A test with a
 #: reason is always listed; the JSON carries every test either way.
 _MAX_UNREASONED_TESTS = 10
+#: How many of the docs that name code in one path plain output lists, those with the most
+#: sentences first, before it counts the rest. The JSON carries every one.
+_MAX_NAMING_DOCS = 8
 #: What the plain output prints over the findings `_awaiting_trailer` names, after the others.
 _WAITING_HEADING = "Of these, findings that wait for the commit's trailer and do not fail this run"
 
@@ -289,6 +292,20 @@ class ClaimReview:
 
 
 @dataclass(frozen=True)
+class NamingDoc:
+    """A doc, decision record or guidance file that names code in one of the paths in hand:
+    its `path`, how many of its `sentences` do, and `names`, the path whose code they name.
+
+    A pointer, not a finding and not a claim: it says which docs speak of the file about to
+    be edited, whether or not they own it, and nothing about whether they are right.
+    """
+
+    path: str
+    sentences: int
+    names: str
+
+
+@dataclass(frozen=True)
 class OmittedMatches:
     """The topic matches that needed body prose and that a packet names without listing.
 
@@ -309,7 +326,9 @@ class ContextReport:
 
     `results` has one entry per owning doc and `unmatched` the paths no doc owns.
     `claim_reviews` lists the claims whose evidence the paths in hand cite, so a topic
-    lookup, which has no paths, has none. `validation` is set only after an edit: a mode
+    lookup, which has no paths, has none. `named_by` lists the docs that name code in the
+    paths a path packet was asked for, and is None in the other two modes, which leave it
+    out of the JSON. `validation` is set only after an edit: a mode
     that ran no checks leaves it out of the JSON rather than reporting an empty verdict.
     `findings` is the same edit's findings, once for the whole report: those the change
     caused, or every finding of the run when the change was not compared, which
@@ -336,6 +355,8 @@ class ContextReport:
     records: list[dict[str, object]] | None = None
     #: The topic matches left out of `results`; empty in every other mode.
     omitted_matches: OmittedMatches = field(default_factory=OmittedMatches)
+    #: The docs that name code in the paths in hand; `None` outside a path packet.
+    named_by: list[NamingDoc] | None = None
 
 
 @dataclass(frozen=True)
@@ -480,6 +501,7 @@ def build_context_report(
         findings=findings,
         records=None if findings is None else _records(findings, graph),
         omitted_matches=omitted_matches,
+        named_by=_named_by(graph, subjects) if mode == "path" else None,
     )
 
 
@@ -601,6 +623,8 @@ def format_context_plain(report: ContextReport) -> str:
                 lines.append(f"    declared tests: {', '.join(review.tests)}")
             lines.append(f"    question: {review.question}")
         lines.append("  This is a question for you, not a finding: no check can answer it.")
+
+    lines.extend(_named_by_lines(report.named_by or [], blank_first=bool(lines)))
 
     if report.mode != "topic":
         if lines:
@@ -1021,6 +1045,29 @@ def _match_topic(
         needs_headings=needs_headings,
         needs_body=needs_body,
     )
+
+
+def _named_by(graph: DocGraph, paths: set[str]) -> list[NamingDoc]:
+    """Each live doc, decision record and guidance file with a sentence whose code span
+    names code in one of `paths`, with the number of such sentences, ordered by the path
+    named, then by that number, largest first, then by the doc's path.
+
+    What counts is `docs_naming`'s to say: anything the review queue's pairing resolves to a
+    path, a Python function or class, a command, an option one command alone declares, an
+    environment variable or any other surface identity, and not the path itself.
+    It is derived here on every call, like everything else in a packet. An owning doc is
+    listed with the rest: the list answers "which docs speak of this file", and the owner
+    is often not the only one that does.
+    """
+    from irminsul.listing.review import docs_naming
+
+    if graph.config is None or not paths:
+        return []
+    found = [
+        NamingDoc(path=path, sentences=sentences, names=names)
+        for (names, path), sentences in docs_naming(graph.config, graph, paths).items()
+    ]
+    return sorted(found, key=lambda item: (item.names, -item.sentences, item.path))
 
 
 def _governing_claims(graph: DocGraph, display: str) -> list[GoverningClaim]:
@@ -1858,6 +1905,11 @@ def _report_to_dict(report: ContextReport) -> dict[str, object]:
         payload["retrieve"] = left_out.retrieve
     payload["unmatched"] = [_unmatched_to_dict(item) for item in report.unmatched]
     payload["claim_reviews"] = [_claim_review_to_dict(review) for review in report.claim_reviews]
+    if report.named_by is not None:
+        payload["named_by"] = [
+            {"path": item.path, "sentences": item.sentences, "names": item.names}
+            for item in report.named_by
+        ]
     if report.validation is not None:
         payload["validation"] = _validation_to_dict(report.validation)
     if report.records is not None:
@@ -2110,6 +2162,30 @@ def _input_labels(result: ContextResult) -> list[str]:
         f"{path} (does not exist)" if path in result.missing_inputs else path
         for path in result.input
     ]
+
+
+def _named_by_lines(named_by: list[NamingDoc], *, blank_first: bool) -> list[str]:
+    """One block for each path some doc names code in: the docs with the most sentences,
+    each with its count, then a count of the docs left out, which the JSON lists. The
+    command that lists one doc's sentences closes the last block."""
+    lines: list[str] = []
+    for names in dict.fromkeys(item.names for item in named_by):
+        naming = [item for item in named_by if item.names == names]
+        if blank_first or lines:
+            lines.append("")
+        lines.append(f"Docs that name code in {names}:")
+        lines.extend(
+            f"  {item.path}: {item.sentences} sentence{'' if item.sentences == 1 else 's'}"
+            for item in naming[:_MAX_NAMING_DOCS]
+        )
+        left = len(naming) - _MAX_NAMING_DOCS
+        if left > 0:
+            lines.append(
+                f"  … {left} more doc{'' if left == 1 else 's'} (--format json lists every doc)"
+            )
+    if named_by:
+        lines.append("  irminsul list review --doc <doc> --all lists the sentences of one doc")
+    return lines
 
 
 def _format_tests(result: ContextResult) -> list[str]:

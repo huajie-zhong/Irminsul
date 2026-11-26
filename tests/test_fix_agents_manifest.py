@@ -4,11 +4,13 @@ checks; it is the only generated artifact."""
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from typer.testing import CliRunner
 
 from irminsul.cli import app
+from irminsul.init.command import render_scaffold
 from irminsul.regen.agents_md import GENERATED_END, GENERATED_START, replace_generated_section
 
 from .conftest import check_findings, write_config
@@ -71,6 +73,13 @@ def test_a_scaffolded_manifest_holds_the_laws_and_points_at_the_loop(tmp_path: P
     protocol = text.split("## Protocol", 1)[1]
     [paragraph] = [line for line in protocol.splitlines() if line.strip()]
     assert "AGENTS.md" in paragraph
+    # Every procedure of the protocol `init` scaffolds is named, so one added there and not
+    # here leaves a reader of the manifest unaware of it.
+    scaffold = render_scaffold("docs/guides/agent-protocol.md.j2", {})
+    procedures = re.findall(r"^## (.+)$", scaffold, re.M)
+    assert procedures[-1] == "Scope & Limitations"
+    for procedure in procedures[:-1]:
+        assert procedure.lower() in paragraph.lower()
 
     principles = Path(__file__).resolve().parents[1] / "docs" / "foundation" / "principles.md"
     assert _law_3_line(text) == _law_3_line(principles.read_text(encoding="utf-8"))

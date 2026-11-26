@@ -237,7 +237,7 @@ def create_server(repo_root: Path) -> MCPServer:
     @server.tool()
     @guarded
     def context_for_path(paths: list[str]) -> str:
-        """Call before editing source or doc files to get each one's owning doc, source claims, tests, dependencies, active RFCs, claims to read, and excerpts. For a source file, `tests` is ranked: the tests that import it come first, then those that changed with it, and `test_reasons` says why each of those is named. Runs no checks; call `check` or `context_after_edit` for findings."""
+        """Call before editing source or doc files to get each one's owning doc, source claims, tests, dependencies, active RFCs, claims to read, and excerpts, and under `named_by` the docs that name code in each path, each with how many of its sentences do. For a source file, `tests` is ranked: the tests that import it come first, then those that changed with it, and `test_reasons` says why each of those is named. Runs no checks; call `check` or `context_after_edit` for findings."""
         return context_for_path_json(root, _config(), paths)
 
     @server.tool()
