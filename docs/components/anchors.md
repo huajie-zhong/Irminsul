@@ -2,7 +2,6 @@
 id: anchors
 title: Anchored prose claims
 status: stable
-summary: Anchored prose claims pinned to code.
 describes:
   - src/irminsul/anchors.py
   - src/irminsul/binding.py
@@ -15,8 +14,10 @@ depends_on:
 owns_tests:
   - tests/test_binding.py
   - tests/test_cli_anchors.py
+summary: Anchored prose claims pinned to code.
 implements:
   - acknowledge-a-reviewed-co-change-or-evidence-drift
+  - a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts
 ---
 
 # Anchored prose claims
@@ -153,3 +154,9 @@ measures how much of a function its tests guard.
 
 - **acknowledge-a-reviewed-co-change-or-evidence-drift#re-pin-writes-claim-pins** — `irminsul anchors --re-pin --doc <doc>` SHALL write the current normalized hash of every evidence file of every claim in that doc, and SHALL drop a pin on a path the claim no longer cites. (provenance: code; [RFC](../rfcs/acknowledge-a-reviewed-co-change-or-evidence-drift.md))
   <!-- anchor: src/irminsul/anchors.py#repin_claims @sha256:b7fbcd86889c -->
+- **a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts#suggest-offers-the-tests-of-a-definition** — `irminsul anchors --suggest --doc <doc>` SHALL list each code span of that doc that resolves to one Python function or class, with up to three test functions, in files under the configured test roots that import the defining module, whose body names that definition through the file's imports, each as an anchor marker ready to paste. A name the test binds itself SHALL NOT count as naming the definition. Without `--doc` it SHALL list what it lists today. (provenance: code; [RFC](../rfcs/a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts.md))
+  <!-- anchor: src/irminsul/binding.py#naming_tests @sha256:ba5b26e133c5 -->
+  <!-- anchor: tests/test_binding.py#test_suggest_offers_the_test_that_calls_a_function_the_doc_names @sha256:94b5c37f7a7b -->
+  <!-- anchor: tests/test_binding.py#test_a_name_the_test_binds_itself_does_not_name_the_definition @sha256:ad1bee32b830 -->
+  <!-- anchor: tests/test_binding.py#test_suggest_says_so_when_no_test_names_the_definition @sha256:a96352d4b56f -->
+  <!-- anchor: tests/test_binding.py#test_suggest_without_a_doc_lists_unbound_names_and_no_test @sha256:d85d40281025 -->
