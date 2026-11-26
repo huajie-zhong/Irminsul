@@ -118,16 +118,21 @@ Answered by the owner on 2026-11-26:
   function is a function whose name starts with `test`, in a Python file under
   `paths.test_roots` that imports the defining module, which is the reading `Ranker` in
   `src/irminsul/ranked_tests.py` already makes for the packet. They are ordered by path and
-  line, printed as markers like the definitions, and carried in the JSON under `tests`. A
-  test file that does not parse is skipped, as a source file is. Without `--doc` the output
-  is as today. Tests in another language are not offered yet.
+  line and printed as markers like the definitions. A name no test names is listed too, and
+  said to have none. The JSON keeps `unbound` and its version, and under `--doc` gains a list
+  `resolved`: each row holds the doc's path and line, the name, where it is defined, and its
+  `tests`. The closing line counts these names apart from the unbound ones. A test file that
+  does not parse is skipped, as a source file is. Without `--doc` the output is as today.
+  Tests in another language are not offered yet.
 - **A sentence that names no code.** The procedure sends its reader to
   `irminsul context <source file>`, whose packet lists the tests that import that file.
-- **The skill** is unchanged: it points at the loop and the protocol.
+- **The skill** is unchanged: it points at the root `AGENTS.md`, which holds the loop.
 - **What already works.** An anchor to a test resolves, is pinned and drifts like any other:
   `claim-anchor/pinned-drift`, a hint a re-pin answers after the paragraph is re-read.
 - **The seeded-rot suite** gains a case whose sentence is anchored to a test of its fixture.
-  The fixture's test file, a placeholder today, gains that test. The case shows two things:
+  The fixture's test file, a placeholder today, gains that test. It imports a package only
+  the fixture has, so this repository's own test run does not collect it. The case shows two
+  things:
   the edit that makes the sentence false makes the test fail, run as the suite's probes run
   the fixture's code; and editing the test to pass again draws `pinned-drift` on the
   sentence's paragraph.
@@ -159,7 +164,7 @@ each as an anchor marker ready to paste. Without `--doc` it SHALL list what it l
 
 #### Scenario: No test names it
 - **WHEN** no test function names the definition
-- **THEN** the output lists no test for that name
+- **THEN** the output lists that name and says no test names it
 
 #### Scenario: No doc is given
 - **WHEN** `irminsul anchors --suggest` runs with no `--doc`

@@ -185,5 +185,5 @@ paragraphs, which trains a reader to re-pin without reading.
 - 2026-11-25: Accepted [The change queue asks about what the change did not write](../rfcs/the-change-queue-asks-about-what-the-change-did-not-write.md):
   an unbound name is marked under `list review --written`.
 - 2026-11-26: Accepted [A sentence about behaviour is anchored to the test that asserts it](../rfcs/a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts.md):
-  `anchors --suggest` offers, with a definition, the tests that name it, and a sentence about what
-  code does is best anchored to the test that asserts it.
+  under `--doc`, `anchors --suggest` lists each function or class the doc names with the tests
+  that name it, and a sentence about what code does is best anchored to the test that asserts it.
