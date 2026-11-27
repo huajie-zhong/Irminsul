@@ -227,4 +227,4 @@ paragraphs, which trains a reader to re-pin without reading.
   longer lists the sentences a change wrote.
 - 2026-11-27: Accepted [Each language reads its code through one interface](../rfcs/each-language-reads-its-code-through-one-interface.md):
   a pin into a TypeScript, Go or Rust definition will hash its syntax tree without comments,
-  as a Python pin does, with the grammars pinned to exact versions.
+  as a Python pin does, with the tree-sitter runtime and grammars pinned to exact versions.
