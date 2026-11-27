@@ -6,7 +6,6 @@ Shared by the review queue, which pairs a sentence with the code it names, and b
 
 from __future__ import annotations
 
-import ast
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,9 +33,9 @@ _SYMBOL_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*(?:\(\))?$")
 
 
 class _Definition(NamedTuple):
-    """A Python function or class: its file, its `def` or `class` line, the last line of its
-    body, `first`, its first decorator line, or `line` when it has none, and `qualified`,
-    its name with its class before it when it is a method."""
+    """A function or class, as its file's reader reads it: its file, the line that names it,
+    the last line of its body, `first`, its first decorator line, or `line` when it has none,
+    and `qualified`, its name with its class before it when it is a method."""
 
     display: str
     line: int
@@ -114,26 +113,24 @@ class CodeResolver:
     def _symbol_index(
         files: list[tuple[Path, str]], reader: SourceReader
     ) -> dict[str, list[_Definition]]:
-        """Python definitions by bare name and by `Class.name`."""
+        """The functions and classes at the top level of each file a reader reads, and those in
+        a class there, by bare name and by `Class.name`: first a file's top level, then its
+        classes' members, each in source order."""
         index: dict[str, list[_Definition]] = {}
-        for module, display in reader.python_modules(files):
-            tree = module.tree
-            scopes: list[tuple[str, list[ast.stmt]]] = [("", tree.body)] + [
-                (f"{n.name}.", n.body) for n in tree.body if isinstance(n, ast.ClassDef)
+        for abs_path, display in files:
+            reading = reader.reading(abs_path)
+            if reading is None:
+                continue
+            named = [
+                d
+                for d in reading.definitions()
+                if d.kind != "variable" and d.reachable and len(d.scope) <= 1
             ]
-            for prefix, scope in scopes:
-                for node in scope:
-                    if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
-                        where = _Definition(
-                            display,
-                            node.lineno,
-                            node.end_lineno or node.lineno,
-                            min([node.lineno, *(d.lineno for d in node.decorator_list)]),
-                            f"{prefix}{node.name}",
-                        )
-                        index.setdefault(node.name, []).append(where)
-                        if prefix:
-                            index.setdefault(f"{prefix}{node.name}", []).append(where)
+            for found in sorted(named, key=lambda d: len(d.scope)):
+                where = _Definition(display, found.line, found.end, found.first, found.symbol)
+                index.setdefault(found.name, []).append(where)
+                if found.scope:
+                    index.setdefault(found.symbol, []).append(where)
         return index
 
     def appears_in_source(self, name: str) -> bool:
@@ -223,7 +220,8 @@ class CodeResolver:
         return None if module is None else command_options(module, item.line)
 
     def defines_symbol(self, name: str) -> bool | None:
-        """Whether a Python function or class of this name exists; None with no Python source."""
+        """Whether a function or class of this name exists; None when no file a reader reads
+        defines one."""
         if not self._symbols:
             return None
         return name in self._symbols
@@ -241,8 +239,9 @@ class CodeResolver:
         An option is found by its mention pattern, a command by the longest identity the span
         begins with, and any other configured surface kind by exactly its identity or a dotted
         path ending in it, with or without a trailing `()`. Only a span no surface matches is
-        tried as a Python function or class by name, which resolves when one definition has
-        that name, and then as a repository file by path, inside a source root or not.
+        tried as a function or class by name, as a reader reads one, which resolves when one
+        definition has that name, and then as a repository file by path, inside a source root
+        or not.
         """
         text, _ = self.strip_program(span)
         refs: list[Reference] = []
@@ -311,10 +310,13 @@ class CodeResolver:
         ]
 
     def unparsed(self, display: str) -> bool:
-        """Whether the walked file `display` cannot be read as Python, so that what it
-        defines is unknown and not gone."""
+        """Whether the walked file `display` cannot be read by its language's reader, so that
+        what it defines is unknown and not gone."""
         path = self._abs_by_display.get(display)
-        return path is not None and self._reader.module(path) is None
+        if path is None:
+            return False
+        reading = self._reader.reading(path)
+        return reading is None or not reading.parsed
 
     def _repo_file(self, text: str) -> Path | None:
         """A repository file named by its repo-relative path, inside a source root or not."""

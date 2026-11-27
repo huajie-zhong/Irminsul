@@ -28,7 +28,7 @@ from irminsul.git.changes import (
     tracked_paths_at_ref,
     working_tree_changed_paths,
 )
-from irminsul.inventory.base import PythonModule
+from irminsul.languages.reader import CodeReader, CodeReading
 from irminsul.source_tree import SourceTree
 
 if TYPE_CHECKING:
@@ -112,10 +112,10 @@ class SourceAtCommit(SourceTree):
                 self._texts[key] = None
         return self._texts[key]
 
-    def module(self, path: Path) -> PythonModule | None:
+    def read_with(self, path: Path, reader: CodeReader) -> CodeReading | None:
         if os.fspath(path) not in self._at_commit:
-            return self._live.module(path)
-        return super().module(path)
+            return self._live.read_with(path, reader)
+        return super().read_with(path, reader)
 
 
 class ChangePairing:
