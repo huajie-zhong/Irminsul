@@ -223,6 +223,46 @@ def test_a_file_that_no_longer_parses_changed_its_functions_and_removed_none(
         }
 
 
+@pytest.mark.parametrize("renamed", ["src/ledger/fees", "src/ledger/fees.pyi"])
+def test_a_file_renamed_to_a_name_no_reader_reads_removed_its_functions(
+    ledger: Path, renamed: str
+) -> None:
+    """The file still reads as the Python it was, so what it defines is not unknown: no
+    reader reads it under its new name, and each definition a sentence named is gone."""
+    git(ledger, "mv", FEES, renamed)
+
+    items = _queue(ledger)
+
+    assert _named(items) == {(USAGE, "late_fee()"), (USAGE, "due_day()")}
+    assert _changed_code(items, USAGE, "late_fee()") == {
+        "span": "late_fee()",
+        "identity": "late_fee",
+        "path": FEES,
+        "line": 4,
+        "removed": True,
+    }
+
+
+def test_a_renamed_file_that_no_longer_parses_as_what_it_was_removed_no_function(
+    ledger: Path,
+) -> None:
+    renamed = "src/ledger/fees.pyi"
+    git(ledger, "mv", FEES, renamed)
+    replace_text(
+        ledger, renamed, "def due_day(entered: int) -> int:", "def due_day(entered: int -> int:"
+    )
+
+    items = _queue(ledger)
+
+    assert _changed_code(items, USAGE, "late_fee()") == {
+        "span": "late_fee()",
+        "identity": "late_fee",
+        "path": renamed,
+        "line": None,
+        "removed": False,
+    }
+
+
 def test_a_change_to_a_decorator_alone_queues_the_sentence_that_names_its_function(
     ledger: Path,
 ) -> None:

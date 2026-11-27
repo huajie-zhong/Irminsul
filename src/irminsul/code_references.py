@@ -18,7 +18,7 @@ from irminsul.inventory import SurfaceItem, available_kinds, kind_capabilities
 from irminsul.inventory.base import SourceReader
 from irminsul.inventory.cli_options import command_options
 from irminsul.inventory.programs import program_names
-from irminsul.languages import LANGUAGE_REGISTRY
+from irminsul.languages import LANGUAGE_REGISTRY, reader_for
 
 if TYPE_CHECKING:
     from irminsul.git.reader import GitReader
@@ -309,13 +309,15 @@ class CodeResolver:
             if where.display == display and where.qualified == name
         ]
 
-    def unparsed(self, display: str) -> bool:
-        """Whether the walked file `display` cannot be read by its language's reader, so that
-        what it defines is unknown and not gone."""
+    def unparsed(self, display: str, was: str) -> bool:
+        """Whether the walked file `display` cannot be read by the reader that read it under
+        the path `was`, where its definitions were found, so that what it defines is unknown
+        and not gone. A rename to a suffix no reader lists leaves it readable as what it was."""
         path = self._abs_by_display.get(display)
-        if path is None:
+        reader = reader_for(was)
+        if path is None or reader is None:
             return False
-        reading = self._reader.reading(path)
+        reading = self._reader.read_with(path, reader)
         return reading is None or not reading.parsed
 
     def _repo_file(self, text: str) -> Path | None:

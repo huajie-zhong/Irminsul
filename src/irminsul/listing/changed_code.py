@@ -223,7 +223,7 @@ class ChangePairing:
                 if self.after.definitions(name, now_in):
                     judged.add((name, now_in))
                     out.extend(self._edited(span, ref.identity, name, now_in, was_in))
-                elif self.after.unparsed(now_in):
+                elif self.after.unparsed(now_in, was_in):
                     out.append(ChangedCode(span, ref.identity, now_in, None))
                 else:
                     out.append(ChangedCode(span, ref.identity, was_in, ref.line, removed=True))
