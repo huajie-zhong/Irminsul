@@ -105,7 +105,8 @@ TypeScript file was once written five times with five answers.
 - An `env-vars` inventory item that only a `.rb` file reads is `inventory-drift/item-not-found`.
 - **Known limits.** The lift of a base's old table lives in `parse_snapshot` and goes once no
   base a run can meet predates the rename. The `uniqueness` skip list still names Python's
-  files itself.
+  files itself, as the source walk, the program names and the launchers each still name a
+  language's files and tools themselves.
 - An exact pin on tree-sitter and its grammars conflicts with another tool in the same
   environment that needs another version of them, and where no wheel exists, installing
   Irminsul compiles C code.

@@ -324,6 +324,9 @@ making a feature, a refactor and an RFC-driven change in it.
     answers each definition and import around it.
   - A function in a block or in an object literal is not something an anchor or a code span can
     name, and `anchors --suggest` lists it as out of reach.
+- A file named with a suffix a language profile lists is never read as a code name.
+  `ledger.mts` and `types.cts` were, and `anchors --suggest` listed them as unbound names,
+  because it kept a list of suffixes of its own that missed them.
 - A language profile holds the pattern that reads an environment variable in its language,
   `env_var_pattern`, where the `env-vars` extractor held one per language. `irminsul surface
   env-vars` prints what it printed.

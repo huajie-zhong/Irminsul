@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING
 from irminsul.anchors import Anchor, defines, definition_line, parse_anchors, resolve
 from irminsul.checks.globs import resolve_display_path
 from irminsul.code_references import CodeResolver
-from irminsul.languages import reader_for
+from irminsul.languages import LANGUAGE_REGISTRY, reader_for
 from irminsul.languages.reader import Import, References, dotted
 from irminsul.ranked_tests import Ranker
 
@@ -38,13 +38,13 @@ if TYPE_CHECKING:
 
 _NAME_RE = re.compile(r"^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*(?:\(\))?$")
 _CAMEL_RE = re.compile(r"[a-z0-9][A-Z]")
+# The suffixes of files no language profile lists; a language's are its profile's.
 _FILE_SUFFIXES = frozenset(
     [
         "md",
         "mdx",
         "rst",
         "txt",
-        "py",
         "toml",
         "json",
         "yaml",
@@ -53,14 +53,6 @@ _FILE_SUFFIXES = frozenset(
         "cfg",
         "lock",
         "env",
-        "ts",
-        "tsx",
-        "js",
-        "jsx",
-        "mjs",
-        "cjs",
-        "go",
-        "rs",
         "rb",
         "java",
         "kt",
@@ -106,15 +98,20 @@ class Suggestions:
     """Definitions a reader found inside a function or a block, which no anchor can name."""
 
 
+def _is_file_name(name: str) -> bool:
+    suffix = name.rsplit(".", 1)[-1].lower()
+    return suffix in _FILE_SUFFIXES or any(
+        f".{suffix}" in profile.suffixes for profile in LANGUAGE_REGISTRY.values()
+    )
+
+
 def code_name(span: str) -> str | None:
     """The name a code span cites, when the span can only be a code name."""
     text = span.strip()
     if not _NAME_RE.match(text):
         return None
     name = text.removesuffix("()")
-    if "." in name and (
-        name.rsplit(".", 1)[-1].lower() in _FILE_SUFFIXES or name.split(".", 1)[0] in _NOT_OURS
-    ):
+    if "." in name and (_is_file_name(name) or name.split(".", 1)[0] in _NOT_OURS):
         return None
     distinctive = (
         text.endswith("()") or "_" in name or "." in name or _CAMEL_RE.search(name) is not None

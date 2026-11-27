@@ -14,6 +14,7 @@ from irminsul.binding import code_name
 from irminsul.checks.claim_anchor import ClaimAnchorCheck
 from irminsul.cli import app
 from irminsul.config import load
+from irminsul.languages import LANGUAGE_REGISTRY, LanguageProfile
 from irminsul.source_tree import SourceTree
 
 from .conftest import invoke, invoke_json, run_check, seed_repo, write, write_config, write_doc
@@ -219,6 +220,26 @@ def test_stdlib_and_file_names_are_not_code_names() -> None:
     for span in ("os.environ", "json.dumps()", "self.surfaces", "setup.cfg", "Cargo.lock"):
         assert code_name(span) is None
     assert code_name("store.flush") == "store.flush"
+
+
+def test_a_file_name_of_any_registered_language_is_not_a_code_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A language's suffixes are its profile's one list, so a file of a language registered
+    a moment ago is known for a file with nothing here edited, as `ledger.mts` is."""
+    assert code_name("desk.gox") == "desk.gox"
+    monkeypatch.setitem(
+        LANGUAGE_REGISTRY,
+        "gox",
+        LanguageProfile(
+            name="gox", source_root_candidates=(), schema_leak_patterns=(), suffixes=(".gox",)
+        ),
+    )
+
+    suffixes = {suffix for profile in LANGUAGE_REGISTRY.values() for suffix in profile.suffixes}
+
+    assert {".gox", ".py", ".mts", ".cts", ".go", ".rs"} <= suffixes
+    assert [suffix for suffix in sorted(suffixes) if code_name(f"ledger{suffix}")] == []
 
 
 def test_suggest_only_offers_markers_that_resolve(tmp_path: Path) -> None:

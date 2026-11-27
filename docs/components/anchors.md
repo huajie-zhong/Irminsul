@@ -75,6 +75,12 @@ writes nothing: the agent picks the file. A definition inside a function or a
 block, which no anchor can name, is listed as such rather than dropped, so a name the
 code defines is never answered with "no source file contains it".
 
+A dotted span that ends in a file's suffix names a file, not code, so it is never a code
+name: `ledger.mts` ends in a suffix a [language profile](languages.md) lists, whichever
+language is enabled, and `setup.cfg` in one of the suffixes of files no profile reads that
+`code_name` keeps itself.
+<!-- anchor: tests/test_binding.py#test_a_file_name_of_any_registered_language_is_not_a_code_name @sha256:49c8c1874620 -->
+
 ## Offering the test that asserts a sentence
 
 A sentence that says what code does is best anchored to the test that asserts it: it is

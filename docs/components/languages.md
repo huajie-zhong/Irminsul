@@ -131,7 +131,7 @@ A language is its profile, its grammar package, pinned to an exact version in `p
 
 ## Scope & Limitations
 
-Language profiles are pure-data records with no behavioral logic; the checks that use them (`schema-leak`, the init detector) consume them generically. Profiles do not validate that source files conform to the expected language syntax.
+Language profiles are pure-data records with no behavioral logic; the checks that use them (`schema-leak`, the init detector) consume them generically. Profiles do not validate that source files conform to the expected language syntax. A profile does not hold everything a check knows of its language: the files `uniqueness` asks no doc to claim, the bytecode and package directories the source walk skips, Python's standard-library modules, and the manifests and launchers a program's name is read through are each listed where they are used.
 
 Python's reader is the running interpreter's parser, so a file written for a newer Python than the one running Irminsul may not parse, and it then defines nothing. It lists what the `else` and `finally` of a `try` statement hold before what its handlers hold, so its definitions and imports are in the file's order everywhere but there.
 
