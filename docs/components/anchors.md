@@ -125,6 +125,37 @@ nothing exits 2 and writes nothing, because re-pinning nothing would read as suc
 <!-- anchor: src/irminsul/anchors.py#repin_doc @sha256:a335249a82a0 -->
 <!-- anchor: tests/test_cli_anchors.py#test_the_evidence_drift_suggestion_re_pins_only_the_evidence_it_names @sha256:4de675f9c06d -->
 
+## Listing the pins that no longer match
+
+`irminsul anchors --stale` lists every pin that no longer matches what it pins, in every doc
+or the one `--doc` names: each anchor whose target resolves and hashes differently from its
+pin, and each pin of a claim's evidence whose file does. `stale_pins` reads each through
+`resolve` and `file_pin`, as `--re-pin` reads it, so nothing a re-pin just wrote is listed,
+and a target that does not resolve is left to the findings that report it. A row names the
+doc and the line of the anchor marker, or of the claim's `<!-- claim:<id> -->` marker, or 1
+when no paragraph declares the claim; the pin and the current hash; and the `--re-pin`
+command narrowed to that one pin, `--anchor <path#symbol>` or `--claim <id> --evidence
+<path>`. Plain output prints one row per line and a count, and `--format json` prints
+`{"version": 1, "stale": [...]}`. It writes nothing and exits 0, since the checks are the gate
+([Code is named in code spans and bound by anchors](../decisions/code-is-named-in-code-spans-and-bound-by-anchors.md)),
+and with `--re-pin` or `--suggest` it exits 2 and writes nothing: one action per run.
+<!-- anchor: src/irminsul/anchors.py#stale_pins @sha256:79a5be70b7f9 -->
+<!-- anchor: tests/test_cli_anchors.py#test_stale_lists_a_component_claims_changed_evidence @sha256:fc748e708176 -->
+<!-- anchor: tests/test_cli_anchors.py#test_stale_lists_nothing_when_every_pin_matches @sha256:266cf2aec24d -->
+<!-- anchor: tests/test_cli_anchors.py#test_stale_with_another_action_exits_2_and_writes_nothing @sha256:f4c0c567ab07 -->
+
+A pin can be stale with no check asking about it. `claim-provenance/evidence-drift` judges
+the claims of the foundation and architecture layers alone, and reads a pin that no longer
+matches as no pin, falling back to commit times, so a doc committed after its evidence hides
+it ([checks](checks.md)). Each row's `reported_by` says which: the listing runs
+`claim-anchor` and `claim-provenance` over the same graph and names `claim-anchor/pinned-drift`
+for a stale anchor, `claim-provenance/evidence-drift` for a claim's evidence that the finding
+names, and null for a pin no finding names, such as a second stale pin of a claim whose
+finding names only the evidence that changed after the doc.
+<!-- anchor: src/irminsul/anchors.py#StalePin.reported_by @sha256:a0876d8fce1b -->
+<!-- anchor: tests/test_cli_anchors.py#test_only_the_evidence_a_drift_finding_names_is_reported_by_it @sha256:0a8f078dddec -->
+<!-- anchor: tests/test_cli_anchors.py#test_stale_lists_a_changed_anchor_with_its_finding @sha256:fc0670330775 -->
+
 ## Scope & Limitations
 
 Anchors are opt-in — only paragraphs that carry a marker are checked; everything else
@@ -140,6 +171,12 @@ covers only the symbol it names: a paragraph anchored to one function says nothi
 a second function the same paragraph describes, and a behaviour changed through code no
 anchor names is not seen. Anchoring each name a paragraph depends on is the answer;
 nothing derives that set.
+
+`--stale` lists pins and fails nothing: a pin it lists stays stale until someone re-reads
+the prose and re-pins it, and no gate asks whether anyone ran it. It reads only what is
+pinned, so an unpinned anchor or evidence entry is not listed, nor a pin on a path its claim
+no longer cites, which nothing reads. The MCP `anchors` tool returns `claim-anchor` findings
+and has no such listing.
 
 The tests `--suggest --doc` offers are found in the syntax tree, and nothing is run. A
 test that reaches the function through a helper, a fixture or the command line is not

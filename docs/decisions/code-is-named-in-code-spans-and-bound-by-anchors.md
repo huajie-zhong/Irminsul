@@ -17,6 +17,7 @@ governs:
   - src/irminsul/cli.py#_repin_scope_problem
   - src/irminsul/cli.py#_re_pin
   - src/irminsul/cli.py#_suggest_anchors
+  - src/irminsul/cli.py#_list_stale
 retires:
   - id: prose-file-reference-own-markers
     kind: concept
@@ -88,6 +89,12 @@ paragraphs, which trains a reader to re-pin without reading.
   `--claim`, `--evidence` or `--anchor`, writes a claim's `pinned` map of evidence path to
   normalized hash. A pin on a path the claim no longer cites is dropped by the next re-pin.
   `irminsul fix` never re-pins.
+- **A stale pin is listed, and nothing fails.** `irminsul anchors --stale`, in every doc or the
+  one `--doc` names, lists each anchor whose target resolves and hashes differently from its
+  pin, and each claim evidence pin whose file does, read as a re-pin reads it. Each row names
+  the finding of `claim-anchor` or `claim-provenance` that already asks about that pin, or
+  none, and the `--re-pin` command narrowed to that pin. It writes nothing and exits 0, so the
+  checks stay the gate, and with `--re-pin` or `--suggest` it exits 2: one action per run.
 - **Unbound names are queued, not failed.** Under `list review --written`, a span in an edited
   sentence that names code distinctively, as `name()` or a dotted, snake_case or camelCase
   identifier, which nothing resolves and no anchor in the doc binds, is marked `unbound-name`.
@@ -231,3 +238,6 @@ paragraphs, which trains a reader to re-pin without reading.
 - 2026-11-27: Accepted [A pin that no longer matches its file is listed](../rfcs/a-pin-that-no-longer-matches-its-file-is-listed.md):
   `irminsul anchors --stale` will list every anchor and claim evidence pin whose file no longer
   has the pinned hash, with the command that re-pins only it, and exit 0.
+- 2026-11-27: The stale listing is implemented and stated in the Decision: `anchors --stale`
+  lists every anchor and claim evidence pin that no longer matches its file, each with the
+  finding that already reports it, if any, and the re-pin of that pin alone, and exits 0.

@@ -19,8 +19,10 @@ from .conftest import (
     check_findings,
     cli_output,
     commit_all,
+    findings_of,
     git_init,
     invoke,
+    invoke_json,
     load_graph,
     write,
     write_config,
@@ -573,3 +575,190 @@ def test_the_claim_anchor_suggestion_re_pins_only_the_anchor_it_reports(
     )
     assert _run_suggested(repo, finding["suggestion"]) == 0
     assert _anchor_findings(repo) == []
+
+
+def _stale(repo: Path, *args: str) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = invoke_json(repo, "anchors", "--stale", *args)["stale"]
+    return rows
+
+
+def _line_of(repo: Path, rel: str, text: str) -> int:
+    """The 1-based line of `rel` holding `text`."""
+    lines = (repo / rel).read_text(encoding="utf-8").splitlines()
+    return next(number for number, line in enumerate(lines, start=1) if text in line)
+
+
+_LOANS_DOC = "docs/components/loans.md"
+
+
+def _component_claim_repo(tmp_path: Path, *, marker: bool = True) -> Path:
+    """A component doc whose claim pins `src/loans/policy.py`, which changed after the pin,
+    and the doc committed after that change."""
+    from irminsul.anchors import file_pin
+
+    repo = tmp_path / "loans"
+    write_config(repo, project_name="loans", source_roots=["src"])
+    write(repo, "src/loans/policy.py", "def cap():\n    return 100\n")
+    declared = " <!-- claim:loans-are-capped -->" if marker else ""
+    write(
+        repo,
+        _LOANS_DOC,
+        "---\nid: loans\ntitle: Loans\nstatus: stable\ndescribes: [src/loans/policy.py]\n"
+        "claims:\n  - id: loans-are-capped\n    state: implemented\n    kind: invariant\n"
+        "    claim: A loan is capped.\n    evidence:\n      - src/loans/policy.py\n"
+        f"    pinned:\n      src/loans/policy.py: {file_pin(repo / 'src/loans/policy.py')}\n"
+        f"---\n\n# Loans\n\nA loan is capped.{declared}\n",
+    )
+    git_init(repo)
+    commit_all(repo, "seed", when="2024-01-01T00:00:00Z")
+    write(repo, "src/loans/policy.py", "def cap():\n    return 200\n")
+    commit_all(repo, "raise the cap", when="2024-02-01T00:00:00Z")
+    doc = repo / _LOANS_DOC
+    doc.write_text(doc.read_text(encoding="utf-8") + "\nA loan is listed.\n", encoding="utf-8")
+    commit_all(repo, "a doc edit", when="2024-03-01T00:00:00Z")
+    return repo
+
+
+def test_stale_lists_a_component_claims_changed_evidence(tmp_path: Path) -> None:
+    """Scenario: a component claim's evidence changed, with the doc committed after it, which
+    no check reports."""
+    from irminsul.anchors import file_pin
+
+    repo = _component_claim_repo(tmp_path)
+    assert findings_of(repo, "claim-provenance/evidence-drift") == []
+
+    code, output = invoke(repo, "anchors", "--stale")
+
+    assert code == 0, output
+    assert "--claim loans-are-capped --evidence src/loans/policy.py" in output
+    assert output.splitlines()[-1] == "1 stale pin(s), 0 reported by a check"
+    (row,) = _stale(repo)
+    assert row["re_pin"] == (
+        f"irminsul anchors --re-pin --doc {_LOANS_DOC} --claim loans-are-capped "
+        "--evidence src/loans/policy.py"
+    )
+    assert row["reported_by"] is None
+    assert row["line"] == _line_of(repo, _LOANS_DOC, "<!-- claim:loans-are-capped -->")
+    assert row["current"] == file_pin(repo / "src/loans/policy.py")
+
+
+def test_a_claim_no_paragraph_declares_is_listed_at_line_1(tmp_path: Path) -> None:
+    repo = _component_claim_repo(tmp_path, marker=False)
+
+    (row,) = _stale(repo)
+
+    assert row["line"] == 1
+
+
+def test_stale_lists_nothing_when_every_pin_matches(tmp_path: Path) -> None:
+    """Scenario: every pin matches. The re-pin and the listing read a pin the same way, so
+    nothing a re-pin just wrote is stale."""
+    repo = _selector_repo(tmp_path)
+    assert len(_stale(repo)) == 5
+    code, output = _re_pin(repo)
+    assert code == 0, output
+
+    code, output = invoke(repo, "anchors", "--stale")
+
+    assert code == 0, output
+    assert output.splitlines() == ["0 stale pin(s), 0 reported by a check"]
+    assert invoke_json(repo, "anchors", "--stale") == {"version": 1, "stale": []}
+
+
+@pytest.mark.parametrize("action", ["--re-pin", "--suggest"])
+def test_stale_with_another_action_exits_2_and_writes_nothing(tmp_path: Path, action: str) -> None:
+    """Scenario: two actions in one run."""
+    repo = _selector_repo(tmp_path)
+    doc = repo / "docs" / "foundation" / "rules.md"
+    before = doc.read_bytes()
+
+    code, output = invoke(repo, "anchors", "--stale", action, "--doc", "rules")
+
+    assert code == 2
+    assert "--stale" in output
+    assert doc.read_bytes() == before
+
+
+def test_stale_lists_a_changed_anchor_with_its_finding(tmp_path: Path) -> None:
+    from irminsul.anchors import Anchor, resolve
+
+    repo = _two_doc_repo(tmp_path)
+    current = resolve(repo, Anchor(0, "", "src/mod.py", "alpha", None)).current
+
+    rows = _stale(repo)
+
+    assert [(row["doc"], row["target"]) for row in rows] == [
+        ("docs/components/c.md", "src/mod.py#alpha"),
+        ("docs/components/d.md", "src/other.py#beta"),
+    ]
+    assert rows[0] == {
+        "doc": "docs/components/c.md",
+        "line": _line_of(repo, "docs/components/c.md", "<!-- anchor: src/mod.py#alpha"),
+        "kind": "anchor",
+        "target": "src/mod.py#alpha",
+        "claim": None,
+        "pinned": "sha256:0000deadbeef",
+        "current": f"sha256:{current}",
+        "reported_by": "claim-anchor/pinned-drift",
+        "re_pin": "irminsul anchors --re-pin --doc docs/components/c.md --anchor src/mod.py#alpha",
+    }
+    code, _ = invoke(repo, *shlex.split(str(rows[0]["re_pin"]))[1:])
+    assert code == 0
+    assert [row["target"] for row in _stale(repo)] == ["src/other.py#beta"]
+
+
+def test_only_the_evidence_a_drift_finding_names_is_reported_by_it(tmp_path: Path) -> None:
+    """Both of a claim's pins are stale, and `evidence-drift` names only the file that changed
+    after the doc, so only that row is reported by it."""
+    repo = _two_evidence_repo(tmp_path, util_after_doc=False)
+    marker = _line_of(repo, "docs/foundation/rules.md", "<!-- claim:alpha-works -->")
+
+    rows = _stale(repo)
+
+    assert [(r["kind"], r["claim"], r["target"], r["reported_by"], r["line"]) for r in rows] == [
+        ("claim-evidence", "alpha-works", "src/mod.py", "claim-provenance/evidence-drift", marker),
+        ("claim-evidence", "alpha-works", "src/util.py", None, marker),
+    ]
+    assert rows[1]["re_pin"] == (
+        "irminsul anchors --re-pin --doc docs/foundation/rules.md --claim alpha-works "
+        "--evidence src/util.py"
+    )
+
+
+@pytest.mark.parametrize("doc", ["d", "docs/components/d.md"])
+def test_stale_doc_lists_one_doc_by_id_or_path(tmp_path: Path, doc: str) -> None:
+    repo = _two_doc_repo(tmp_path)
+
+    rows = _stale(repo, "--doc", doc)
+
+    assert [(row["doc"], row["target"]) for row in rows] == [
+        ("docs/components/d.md", "src/other.py#beta")
+    ]
+
+
+def test_stale_json_has_a_version_and_one_row_per_pin(tmp_path: Path) -> None:
+    repo = _selector_repo(tmp_path)
+
+    report = invoke_json(repo, "anchors", "--stale")
+
+    assert set(report) == {"version", "stale"} and report["version"] == 1
+    assert [list(row) for row in report["stale"]] == [
+        [
+            "doc",
+            "line",
+            "kind",
+            "target",
+            "claim",
+            "pinned",
+            "current",
+            "reported_by",
+            "re_pin",
+        ]
+    ] * 5
+    assert sorted((row["kind"], row["claim"], row["target"]) for row in report["stale"]) == [
+        ("anchor", None, "src/mod.py#alpha"),
+        ("anchor", None, "src/other.py#beta"),
+        ("claim-evidence", "alpha-works", "src/mod.py"),
+        ("claim-evidence", "alpha-works", "src/util.py"),
+        ("claim-evidence", "beta-works", "src/other.py"),
+    ]

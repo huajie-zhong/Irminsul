@@ -143,18 +143,18 @@ claims, which no longer matched the merged file, and touched both docs, so the b
 passed; squashed onto main, the commit touched `cli.py` and not the docs, and three
 `evidence-drift` warnings appeared there. Either judge every stable
 doc's claims, or stop pinning evidence that nothing reads. The accepted RFC
-`claim-evidence-names-a-part` judges every layer, as its last step. Until then, a read-only way to list the pins that no longer match would
-let an agent see them without `--re-pin --all` rewriting them.
+`claim-evidence-names-a-part` judges every layer, as its last step, and still skips a stale pin
+behind a later doc commit. Since 2026-11-27 `irminsul anchors --stale` lists every pin that no
+longer matches, each saying whether a check reports it, so an agent sees them without
+`--re-pin --all` rewriting them; it fails nothing, so a gate still passes over each one.
 
 Two branches that each re-pin the same claim's evidence conflict on the pin line when merged,
 since each writes the hash of its own version of the file, and taking either side leaves a pin
 that matches neither version once the code merges; the merge commit touches the doc, so the
 fallback above keeps `evidence-drift` silent (a dogfood agent, 2026-11-26). The one right
-resolution is a re-pin after re-reading the merged file, and nothing says the pin needs one:
-`irminsul anchors` without `--re-pin` reports anchor findings alone, `--re-pin` has no dry run,
-and `evidence-drift` skips a component claim. Listing every claim pin that no longer matches its
-file in `irminsul anchors`, or a dry run of `--re-pin`, changes a command's output or its
-flags, so it is the owner's call.
+resolution is a re-pin after re-reading the merged file, and no gate says the pin needs one:
+`evidence-drift` skips a component claim, and the merge commit hides it in any layer.
+`irminsul anchors --stale` lists the pin, with no check reporting it, only when someone runs it.
 
 ### `same-tree-test-answers-two-questions`
 
