@@ -98,12 +98,12 @@ extra would let a file resolve on one machine and fail on another, which
 `checks-are-deterministic` in [enforcement](../foundation/enforcement.md) rules out, as the
 accepted `claim-evidence-names-a-part` already says.
 
-**A grammar's release can rename a node** and break a query, and under decision 4(a) it can
+**A grammar's release can rename a node** and break a query, and under decision 4 it can
 move every pin of its language. Each grammar and the `tree-sitter` runtime are pinned to one
 exact version, so two machines cannot disagree, and each language's queries are tested against a fixture of its code. A
 grammar upgrade is a release of Irminsul whose notes say which pins move.
 
-**Every non-Python anchor's pin moves once** if its hash changes from text to syntax tree
+**Every non-Python anchor's pin moves once**, since its hash changes from text to syntax tree
 (decision 4), and each is answered by one re-pin after its paragraph is re-read.
 
 **Time.** The probe parsed and queried a small file in 1 to 6 milliseconds, the first query
@@ -116,8 +116,9 @@ Answered by the owner on 2026-11-27:
 1. **TypeScript, Go and Rust are read through tree-sitter, as a required dependency**, as
    `claim-evidence-names-a-part` records. Every adopter installs it, Python-only ones
    included, and builds it from source where no wheel exists. Not chosen: a regular
-   expression per language, which misses nested and multi-line definitions; each language's
-   own tool, which every machine running the gate would need installed.
+   expression per language, which needs no dependency but misses nested and multi-line
+   definitions; each language's own tool, the most exact, which every machine running the
+   gate would need installed.
 2. **Python stays on its own parser**, so no Python pin of any adopter moves. Given up: a
    project written for a newer Python than the one running Irminsul can hold files that do
    not parse.
@@ -127,7 +128,8 @@ Answered by the owner on 2026-11-27:
 4. **A non-Python pin hashes the definition's syntax tree without comments**, as a Python pin
    does. Every existing non-Python pin moves once, and the grammars and the runtime are pinned
    to exact versions so that only a release of Irminsul moves them again. Not chosen: the
-   definition's text, which keeps asking about a paragraph after a comment edit.
+   definition's text, which no grammar upgrade moves but which keeps asking about a paragraph
+   after a comment edit.
 5. **A language is added in this repository**, not by a separate package. Registering one from
    outside is left to a later RFC.
 6. **The foundation gains the principle** "A feature that reads code reads it through the
@@ -249,10 +251,10 @@ check.
 
 - `T1` Add the interface, with Python's answers from its parser and no change in behaviour. (req: definitions-in-every-supported-language)
 - `T2` Move the five modules that call Python's parser for these questions onto the interface: `code_references.py`, `anchors.py`, `binding.py`, `ranked_tests.py` and `checks/dependency_check.py`. (req: features-read-code-through-the-interface)
-- `T3` Add tree-sitter as a required dependency, with readers and query files for TypeScript, Go and Rust and a fixture each. (req: definitions-in-every-supported-language)
+- `T3` Add tree-sitter as a required dependency, with readers and query files for TypeScript, Go and Rust and a fixture each, `.tsx` read through the TSX dialect, and the grammar for JavaScript files chosen by measuring both on real JavaScript. (req: definitions-in-every-supported-language)
 - `T4` Hash a non-Python pin from its syntax tree, pin the runtime and grammars exactly, and say how an adopter answers the moved pins. (component: anchors)
 - `T5` Move the environment variable pattern into the profile, and say in the languages doc how a language is added. (req: a-language-is-added-in-one-place)
-- `T6` Lift the Python-only sentences of the two RFCs and the loop, and state the rules in the records. (component: languages)
+- `T6` Lift the Python-only sentences the two implemented RFCs left in the loop, the component docs and the records, and state the rules in the records; the sealed RFCs stay as they are. (component: languages)
 - `T7` Add the principle of decision 6 to `docs/foundation/principles.md` in the pull request that lands the interface. (component: languages)
 
 ## Resolution
