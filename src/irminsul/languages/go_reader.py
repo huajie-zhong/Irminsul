@@ -3,10 +3,10 @@ say: what an import binds, and which files an import path names.
 
 An import path names a package, which is a directory. It is placed through the module paths
 its repository declares: the nearest `go.mod`, the local directories that file's `replace`
-lines name, the modules a `go.work` above it uses, and every other module a `go.mod` in or
-above a source root declares. Every other path is the standard library's or another
-repository's, so under a `go.mod` this reader places every import. A file with none above
-it has no module, and nothing says where its import paths lead.
+lines name, the modules a `go.work` above it uses, and every other module a `go.mod` among
+the run's source files or above a source root declares. Every other path is the standard
+library's or another repository's, so under a `go.mod` this reader places every import. A
+file with none above it has no module, and nothing says where its import paths lead.
 
 A file also reads every name of the other files of its package, with no import statement,
 so its `package` clause is read as an import of them: a test beside the code it tests is
@@ -76,12 +76,18 @@ def _package_files(package: Path, memo: Memo) -> list[Path]:
 def files_of(source: str, importer: Path, roots: Sequence[Path], memo: Memo) -> list[Path]:
     """The Go files of the package `source` names, its tests aside, when a module of the
     importer's repository holds it: the importer's own package without the importer, and
-    none for a package of the standard library or of another repository."""
+    none for a package of the standard library or of another repository. A module two
+    directories declare is in both, so the package is looked for in each."""
     if source == OWN_PACKAGE:
         return [path for path in _package_files(importer.parent, memo) if path != importer]
-    for module, directory in go_modules(importer, roots, memo):
+    for module, directories in go_modules(importer, roots, memo):
         if source == module or source.startswith(f"{module}/"):
-            return _package_files(directory.joinpath(*source[len(module) :].split("/")), memo)
+            inside = source[len(module) :].split("/")
+            return [
+                path
+                for directory in directories
+                for path in _package_files(directory.joinpath(*inside), memo)
+            ]
     return []
 
 
@@ -94,11 +100,12 @@ def mentioned_as(path: Path) -> frozenset[str] | None:
         own = _PACKAGE_RE.search(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError):
         own = None
-    for module, directory in go_modules(path, (), {}):
-        if package == directory or directory in package.parents:
-            inside = package.relative_to(directory).as_posix()
-            imported = f"{module}/{inside}".rstrip("/.").rsplit("/", 1)[-1]
-            return frozenset({imported, *([own.group(1)] if own else [])})
+    for module, directories in go_modules(path, (), {}):
+        for directory in directories:
+            if package == directory or directory in package.parents:
+                inside = package.relative_to(directory).as_posix()
+                imported = f"{module}/{inside}".rstrip("/.").rsplit("/", 1)[-1]
+                return frozenset({imported, *([own.group(1)] if own else [])})
     return None
 
 

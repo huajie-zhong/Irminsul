@@ -21,7 +21,7 @@ from irminsul.inventory.base import SourceReader, SurfaceItem
 
 class SourceTree(SourceReader):
     def __init__(self, repo_root: Path, config: IrminsulConfig) -> None:
-        super().__init__()
+        super().__init__(lambda: [path for path, _ in self.files])
         self._surfaces: dict[tuple[str, tuple[str, ...]], tuple[SurfaceItem, ...]] = {}
         self.repo_root = repo_root
         self.config = config

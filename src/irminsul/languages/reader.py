@@ -16,11 +16,18 @@ from __future__ import annotations
 from collections.abc import Collection, MutableMapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Final, Literal, Protocol
 
 Memo = MutableMapping[object, object]
 """What a reader may keep between the files of one run, such as a directory it listed. A
 run hands every reading the same one and drops it when it ends."""
+
+SOURCE_FILES: Final = "source.files"
+"""The memo key under which a run that walks its source roots offers what it found: a
+function of no argument that returns the files' paths. A reader that must know what the
+repository holds, as Go's must know every module it declares, asks this and walks nothing
+itself, so one rule says which files are the repository's. A reading made outside such a
+run finds no such key."""
 
 
 def dotted(symbol: str) -> str:
@@ -145,7 +152,8 @@ class CodeReading(Protocol):
         in the repository, so that an import it places nowhere leaves the repository. Only
         then does a file with no import of another say the two are unrelated. It is asked
         of a file because the answer can rest on what stands around it, as a Go file's
-        does on a `go.mod` above it."""
+        does on a `go.mod` above it, and it is no for a text that did not parse whole,
+        whose imports are not all known."""
         ...
 
     def references(self, definition: Definition) -> References:

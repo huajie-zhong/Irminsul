@@ -672,7 +672,8 @@ The canonical text of a TypeScript, Go or Rust definition
 comments, a trailing comma and the tokens a query file marks as layout. A review on
 2026-11-27 found both kinds of error by running each case. A formatter's rewrite that
 changes a token moves the pin with no change of meaning: prettier's `x => x` to
-`(x) => x`, `{'a': 1}` to `{a: 1}`, `'it\'s'` to `"it's"`, `0xAB` to `0xab`, and for a pin
+`(x) => x`, `{'a': 1}` to `{a: 1}`, `'it\'s'` to `"it's"`, `0xAB` to `0xab`, gofmt's
+`for ;; {}` to `for {}` and `for ; c; {}` to `for c {}`, and for a pin
 on a whole file gofmt's sorting of an import block. And three pairs that differ in meaning
 hash alike: in TypeScript `(a?.b).c` and `a?.b.c`, because a parenthesized expression is
 written as what it holds (`typescript.scm`) and the parentheses end the optional chain; in

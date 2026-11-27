@@ -272,4 +272,6 @@ paragraphs, which trains a reader to re-pin without reading.
   as drifted once. An anchor there names a definition the reader finds, and one to anything
   else is `missing-symbol` with no fallback to a search of the text, which the owner chose on
   that day over keeping the search until part markers exist; the tests the suggestion offers
-  follow each language's convention, the TypeScript one as the RFC words it.
+  follow each language's convention, the TypeScript one as the RFC words it, and a Go test
+  is told by its one `*testing.T` parameter. A pin there leaves out layout, not every
+  rewrite a formatter makes.

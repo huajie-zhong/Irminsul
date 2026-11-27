@@ -20,6 +20,7 @@ from .conftest import (
     FIXTURE_REPOS_DIR,
     invoke,
     invoke_json,
+    load_graph,
     replace_text,
     run_check,
     seed_repo,
@@ -602,8 +603,6 @@ def test_an_import_of_another_module_the_repository_declares_is_placed(tmp_path:
         "server/main.go",
         'package main\n\nimport "example.com/api"\n\nfunc main() {\n\t_ = api.Version()\n}\n',
     )
-    write(tmp_path, "server/testdata/go.mod", "module example.com/apiary\n")
-    write(tmp_path, "server/testdata/apiary.go", "package apiary\n")
     write_config(tmp_path, source_roots=["api", "server"])
     write(tmp_path, "docs/components/api.md", _component("api", "api/**"))
     write(tmp_path, "docs/components/server.md", _component("server", "server/**", "api"))
@@ -612,8 +611,87 @@ def test_an_import_of_another_module_the_repository_declares_is_placed(tmp_path:
     files = _reading(main).files("example.com/api", main, roots)
 
     assert _relative(files, tmp_path) == ["api/api.go"]
-    assert _reading(main).files("example.com/apiary", main, roots) == []
     assert run_check(DependencyCheck, tmp_path) == []
+
+
+def _server_requiring_api(root: Path, *homes: str) -> Path:
+    """A server module that requires `example.com/api`, which each of `homes` declares,
+    under the one source root `.`; the `api` doc owns the first of them."""
+    for home in homes:
+        write(root, f"{home}/go.mod", "module example.com/api\n\ngo 1.22\n")
+        write(root, f"{home}/api.go", "package api\n\nfunc Version() int {\n\treturn 1\n}\n")
+    write(
+        root,
+        "server/go.mod",
+        "module example.com/server\n\ngo 1.22\n\nrequire example.com/api v1.0.0\n",
+    )
+    main = write(
+        root,
+        "server/main.go",
+        'package main\n\nimport "example.com/api"\n\nfunc main() {\n\t_ = api.Version()\n}\n',
+    )
+    write_config(root, source_roots=["."])
+    write(root, "docs/components/api.md", _component("api", f"{homes[0]}/**"))
+    write(root, "docs/components/server.md", _component("server", "server/**", "api"))
+    return main
+
+
+def test_a_module_is_found_among_the_source_files_whatever_its_directory_is_called(
+    tmp_path: Path,
+) -> None:
+    """The `go` tool leaves `_shared` out of `./...`, and a module there is a module still:
+    the run's own listing of the source root holds its `go.mod`."""
+    main = _server_requiring_api(tmp_path, "_shared")
+    tree = load_graph(tmp_path).source
+    reading = tree.reading(main)
+    assert reading is not None
+
+    files = reading.files("example.com/api", main, [tmp_path])
+
+    assert _relative(files, tmp_path) == ["_shared/api.go"]
+    assert run_check(DependencyCheck, tmp_path) == []
+
+
+def test_a_module_two_directories_declare_is_looked_for_in_both(tmp_path: Path) -> None:
+    """Nothing says which copy the server means, so its import may load either, and the
+    dependency on the doc that owns one of them is backed whichever the walk meets first."""
+    main = _server_requiring_api(tmp_path, "services/api", "legacy/api")
+    tree = load_graph(tmp_path).source
+    reading = tree.reading(main)
+    assert reading is not None
+
+    files = reading.files("example.com/api", main, [tmp_path])
+
+    assert _relative(files, tmp_path) == ["legacy/api/api.go", "services/api/api.go"]
+    assert run_check(DependencyCheck, tmp_path) == []
+
+
+def test_a_file_names_its_own_module_and_not_a_copy_of_it(tmp_path: Path) -> None:
+    _server_requiring_api(tmp_path, "services/api", "legacy/api")
+    inside = write(
+        tmp_path,
+        "services/api/sub/sub.go",
+        'package sub\n\nimport "example.com/api"\n\nvar V = api.Version()\n',
+    )
+    tree = load_graph(tmp_path).source
+    reading = tree.reading(inside)
+    assert reading is not None
+
+    files = reading.files("example.com/api", inside, [tmp_path])
+
+    assert _relative(files, tmp_path) == ["services/api/api.go"]
+
+
+def test_a_module_outside_what_the_source_walk_lists_is_not_found(tmp_path: Path) -> None:
+    main = _server_requiring_api(tmp_path, "services/api")
+    write(tmp_path, ".gitignore", "node_modules/\n")
+    write(tmp_path, "node_modules/pkg/go.mod", "module example.com/apiary\n")
+    write(tmp_path, "node_modules/pkg/apiary.go", "package apiary\n")
+    tree = load_graph(tmp_path).source
+    reading = tree.reading(main)
+    assert reading is not None
+
+    assert reading.files("example.com/apiary", main, [tmp_path]) == []
 
 
 def test_the_fields_of_a_variable_of_an_unnamed_struct_type_are_not_definitions() -> None:

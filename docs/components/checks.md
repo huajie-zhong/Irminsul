@@ -156,6 +156,8 @@ Checks do not apply fixes; `irminsul fix` remediates. They do not evaluate prose
 <!-- anchor: tests/test_languages_rust_reader.py#test_an_unbacked_depends_on_is_silent_because_rust_does_not_place_every_import @sha256:2cfe5d282d84 -->
 <!-- anchor: tests/test_languages_go_reader.py#test_a_true_dependency_is_not_reported_where_no_go_mod_says_where_imports_lead @sha256:94689059519a -->
 <!-- anchor: tests/test_languages_tree_sitter.py#test_a_missing_import_denies_a_dependency_only_where_every_shared_import_is_placed @sha256:efbd9523343f -->
+<!-- anchor: tests/test_languages_tree_sitter.py#test_a_file_that_does_not_parse_denies_no_dependency @sha256:c4485eafef6f -->
+<!-- anchor: tests/test_languages_tree_sitter.py#test_two_components_with_other_languages_that_differ_are_still_judged @sha256:c74df8b874ff -->
 
 `claim-provenance` reads the claims a doc declares and never the prose around them: no wording, however emphatic, asks for a claim ([Derive facts and leave meaning to the reader](../decisions/derive-facts-and-leave-meaning-to-the-reader.md)). Valid evidence shows a claim points at something real, not that the claim is true. Evidence drift is reported only for claims in stable `foundation` and `architecture` docs.
 

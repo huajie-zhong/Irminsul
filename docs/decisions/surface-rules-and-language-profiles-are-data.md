@@ -76,7 +76,8 @@ TypeScript file was once written five times with five answers.
   and the reading says the rest is unknown. Python stays all or nothing.
 - **A missing import denies a dependency only where every import is placed.** A reading says
   whether every import of its file that stays in the repository is placed. A Python file's
-  always is, and a Go file's under a `go.mod`. A TypeScript or a Rust file's never is, since a
+  is, and a Go file's under a `go.mod`, when the file parses whole. A TypeScript or a Rust
+  file's never is, since a
   path alias, a workspace package or another crate may stand between two files. `import-deps`
   reports a `depends_on` no import backs only when the two docs own code of a language in
   common and every file the depending doc owns of each such language has its imports placed.
@@ -108,9 +109,9 @@ TypeScript file was once written five times with five answers.
   Irminsul compiles C code.
 - A dependency that only a TypeScript path alias or a Rust path into another crate carries is
   neither denied nor seen, and one between two components of different languages is not
-  judged. Nor is one between two components that each own a TypeScript, JavaScript or Rust
-  file beside their Python, which was judged through the Python alone before those files
-  were read.
+  judged. Nor is one between two components that each own a file of the same one of those
+  languages beside their Python, TypeScript and JavaScript counting as one, which was judged
+  through the Python alone before those files were read.
 
 ## Changes
 
@@ -132,4 +133,5 @@ TypeScript file was once written five times with five answers.
   through the TSX dialect, the outcome of the measurement the RFC's third decision asked for.
   Whether every import is placed is asked of a file, not of a language: a Go file with no
   `go.mod` above it has no module to place its imports by, which the review of the change
-  found reported as a missing dependency.
+  found reported as a missing dependency. A file that does not parse whole places none in
+  any language, so a Python file with a syntax error no longer denies a dependency.

@@ -175,3 +175,33 @@ def test_a_missing_import_denies_a_dependency_only_where_every_shared_import_is_
     write(tmp_path, "src/billing/rate.js", "export const rate = 2;\n")
 
     assert run_check(DependencyCheck, tmp_path) == []
+
+
+def test_a_file_that_does_not_parse_denies_no_dependency(tmp_path: Path) -> None:
+    """The cart imports the invoice and then holds a syntax error, so none of its imports
+    is read: the missing import proves nothing, and the `depends_on` is not reported."""
+    write(tmp_path, "src/shop/cart.py", "from billing import invoice\nmatch = \n")
+    write(tmp_path, "src/billing/invoice.py", "RATE = 2\n")
+    write_config(tmp_path, source_roots=["src"])
+    write(tmp_path, "docs/components/shop.md", _component("shop", "src/shop/**", "billing"))
+    write(tmp_path, "docs/components/billing.md", _component("billing", "src/billing/**"))
+
+    assert run_check(DependencyCheck, tmp_path) == []
+
+
+def test_two_components_with_other_languages_that_differ_are_still_judged(
+    tmp_path: Path,
+) -> None:
+    """The two share Python alone: a TypeScript file cannot import a Rust one, so neither
+    could carry the dependency, and the missing Python import still denies it."""
+    write(tmp_path, "src/shop/cart.py", "TOTAL = 0\n")
+    write(tmp_path, "src/shop/cart.ts", "export const total = 0;\n")
+    write(tmp_path, "src/billing/invoice.py", "RATE = 2\n")
+    write(tmp_path, "src/billing/rate.rs", "pub const RATE: u32 = 2;\n")
+    write_config(tmp_path, source_roots=["src"])
+    write(tmp_path, "docs/components/shop.md", _component("shop", "src/shop/**", "billing"))
+    write(tmp_path, "docs/components/billing.md", _component("billing", "src/billing/**"))
+
+    assert [f.code for f in run_check(DependencyCheck, tmp_path)] == [
+        "import-deps/hallucinated-dependency"
+    ]

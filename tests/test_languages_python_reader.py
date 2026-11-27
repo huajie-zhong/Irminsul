@@ -86,6 +86,9 @@ def test_the_python_profile_names_its_reader() -> None:
     assert reader_for(Path("src") / "ledger.py") is PYTHON_READER
     assert reader_for("src/fees.rb") is None
     assert PYTHON_READER.read("import fees\n").places_every_import(Path("src/ledger.py"))
+    assert not PYTHON_READER.read("import fees\nmatch = \n").places_every_import(
+        Path("src/ledger.py")
+    )
 
 
 def test_a_definition_carries_its_name_holder_and_lines() -> None:

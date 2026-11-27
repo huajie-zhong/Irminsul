@@ -12,7 +12,7 @@ needs to change.
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Protocol, runtime_checkable
@@ -21,7 +21,7 @@ from irminsul.languages import reader_for
 from irminsul.languages.python import PYTHON_PROFILE
 from irminsul.languages.python_reader import PYTHON_READER, PythonReading
 from irminsul.languages.python_reader import PythonModule as PythonModule
-from irminsul.languages.reader import CodeReader, CodeReading, Memo
+from irminsul.languages.reader import SOURCE_FILES, CodeReader, CodeReading, Memo
 
 
 @dataclass(frozen=True)
@@ -70,7 +70,11 @@ class SourceReader:
     case-insensitively on Windows even where the filesystem does not.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, files: Callable[[], Sequence[Path]] | None = None) -> None:
+        """`files` gives the files of the repository's source roots, when the one who
+        builds this reader has walked them: it is offered to each language's reader and
+        called only if one asks, so reading one file walks nothing."""
+        self._listed = files
         self._texts: dict[str, str | None] = {}
         self._readings: dict[tuple[str, CodeReader], CodeReading | None] = {}
         self._memos: dict[CodeReader, Memo] = {}
@@ -102,7 +106,12 @@ class SourceReader:
         key = (os.fspath(path), reader)
         if key not in self._readings:
             text = self.text(path)
-            memo = self._memos.setdefault(reader, {})
+            if reader not in self._memos:
+                memo: Memo = {}
+                if self._listed is not None:
+                    memo[SOURCE_FILES] = self._listed
+                self._memos[reader] = memo
+            memo = self._memos[reader]
             self._readings[key] = None if text is None else reader.read(text, memo)
         return self._readings[key]
 
