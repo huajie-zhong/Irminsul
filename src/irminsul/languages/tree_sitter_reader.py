@@ -446,6 +446,10 @@ class TreeSitterReading:
             children = node.children
             if not children:
                 text = node_text(node)
+                if not text and not node.is_named:
+                    # A token of no text, as Go's grammar puts where the text ends without
+                    # a newline: it is layout, like the newline it stands for.
+                    continue
                 if node.id in marked["collapse"]:
                     text = " ".join(text.split())
                 out.append(f"{label}{node.type}:{text!a} " if node.is_named else f"{text!a} ")

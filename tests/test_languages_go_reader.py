@@ -440,6 +440,17 @@ def test_a_package_clause_on_the_first_line_of_a_file_with_a_byte_order_mark_is_
     assert GO_READER.mentioned_as(marked) == frozenset({"other", "main"})
 
 
+def test_a_final_newline_does_not_move_the_pin_of_a_whole_file() -> None:
+    """Where the text ends without a newline the grammar puts a token of no text, which is
+    layout as the newline is: the file hashes alike with it, without it and with a comment
+    after its last line, and not when its code changes."""
+    plain = GO_READER.read("package desk\n\nvar Limit = 5\n").canonical()
+
+    assert GO_READER.read("package desk\n\nvar Limit = 5").canonical() == plain
+    assert GO_READER.read("package desk\n\nvar Limit = 5\n// the cap\n").canonical() == plain
+    assert GO_READER.read("package desk\n\nvar Limit = 6").canonical() != plain
+
+
 def test_a_go_file_that_is_not_utf8_denies_no_dependency(tmp_path: Path) -> None:
     """The cart imports nothing, so its doc's `depends_on` is reported. Saved as Latin-1 its
     text is not read, no import of it is known, and the report goes."""

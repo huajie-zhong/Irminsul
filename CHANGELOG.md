@@ -328,6 +328,9 @@ making a feature, a refactor and an RFC-driven change in it.
 - A file named with a suffix a language profile lists is never read as a code name.
   `ledger.mts` and `types.cts` were, and `anchors --suggest` listed them as unbound names,
   because it kept a list of suffixes of its own that missed them.
+- A pin on a whole Go file no longer moves when the file's final newline is added or taken
+  away: the token of no text that Go's grammar puts where a text ends without one is left
+  out of what a pin hashes, as other layout is.
 - A language profile lists what the checks leave out or look past for its language: the
   files no doc is asked to claim, the directories and compiled files its tools write, the
   directories of installed code and the file that marks an installed environment, and its
