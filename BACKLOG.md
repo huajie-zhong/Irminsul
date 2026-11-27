@@ -776,8 +776,8 @@ for the compared case.
 
 ### `a-failed-diff-always-blames-a-ref`
 
-`resolve` (`src/irminsul/checks/change_range.py`) raises `ChangeRangeError` whenever
-`changed_since` returns nothing, and `_diff_failure_reason` then says "at least one ref could
+`resolve_change_range` (`src/irminsul/checks/change_range.py`) raises `ChangeRangeError`
+whenever `changed_since` returns None, and `_diff_failure_reason` then says "at least one ref could
 not be resolved in this repository" for every repository that has a commit, whatever made git
 fail (read on 2026-11-27). A reviewer's full test run on a loaded machine failed once that day
 with this message, in

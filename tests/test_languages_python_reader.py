@@ -207,7 +207,9 @@ def test_tests_are_functions_named_test_that_an_anchor_reaches() -> None:
 
 def test_a_file_saved_with_a_byte_order_mark_reads_as_the_file_without_it() -> None:
     """Python runs such a file, so its mark is no part of its code: the same definitions on
-    the same lines, the same imports and the same text for a pin."""
+    the same lines, the same imports and the same text for a pin. Only one mark, and only at
+    the start, is dropped: Python refuses a file with two, and one inside a string is the
+    string's."""
     plain, marked = _read(LEDGER), _read("\ufeff" + LEDGER)
 
     assert marked.parsed
@@ -215,6 +217,8 @@ def test_a_file_saved_with_a_byte_order_mark_reads_as_the_file_without_it() -> N
     assert marked.imports() == plain.imports()
     assert marked.canonical() == plain.canonical()
     assert marked.canonical("late_fee") == plain.canonical("late_fee")
+    assert not _read("\ufeff\ufeff" + LEDGER).parsed
+    assert _read('MARK = "\ufeff"\n').canonical() != _read('MARK = ""\n').canonical()
 
 
 def test_a_file_that_does_not_parse_answers_nothing_and_says_so(tmp_path: Path) -> None:
