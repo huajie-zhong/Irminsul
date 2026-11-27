@@ -18,6 +18,7 @@ summary: Anchored prose claims pinned to code.
 implements:
   - acknowledge-a-reviewed-co-change-or-evidence-drift
   - a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts
+  - a-pin-that-no-longer-matches-its-file-is-listed
 ---
 
 # Anchored prose claims
@@ -210,3 +211,9 @@ measures how much of a function its tests guard.
   <!-- anchor: tests/test_binding.py#test_a_name_the_test_binds_itself_does_not_name_the_definition @sha256:ad1bee32b830 -->
   <!-- anchor: tests/test_binding.py#test_suggest_says_so_when_no_test_names_the_definition @sha256:a96352d4b56f -->
   <!-- anchor: tests/test_binding.py#test_suggest_without_a_doc_lists_unbound_names_and_no_test @sha256:d85d40281025 -->
+- **a-pin-that-no-longer-matches-its-file-is-listed#stale-pins-are-listed** — `irminsul anchors --stale` SHALL list each anchor and each claim evidence pin, in every doc or the one `--doc` names, whose target's current hash differs from its pin, each with the command that re-pins only that pin, or that pin and the other anchors of its doc that name the same target, and SHALL exit 0. (provenance: code; [RFC](../rfcs/a-pin-that-no-longer-matches-its-file-is-listed.md))
+  <!-- anchor: src/irminsul/anchors.py#stale_pins @sha256:ffb7528712e8 -->
+  <!-- anchor: tests/test_cli_anchors.py#test_stale_lists_a_component_claims_changed_evidence @sha256:fc748e708176 -->
+  <!-- anchor: tests/test_cli_anchors.py#test_stale_lists_nothing_when_every_pin_matches @sha256:266cf2aec24d -->
+  <!-- anchor: tests/test_cli_anchors.py#test_stale_with_another_action_exits_2_and_writes_nothing @sha256:f4c0c567ab07 -->
+  <!-- anchor: tests/test_cli_anchors.py#test_anchors_that_share_a_target_are_each_listed_with_one_re_pin @sha256:0a3dea875ed1 -->
