@@ -3,7 +3,7 @@ id: each-language-reads-its-code-through-one-interface
 title: "Each language reads its code through one interface"
 status: stable
 describes: []
-rfc_state: accepted
+rfc_state: implemented
 affects:
   - languages
   - anchors

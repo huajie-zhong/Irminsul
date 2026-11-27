@@ -2,7 +2,6 @@
 id: languages
 title: Language profiles
 status: stable
-summary: Language-profile registry, and the reader a profile names to read its language's code.
 describes:
   - src/irminsul/languages/**
 owns_tests:
@@ -13,6 +12,9 @@ owns_tests:
   - tests/test_languages_typescript_reader.py
   - tests/test_languages_go_reader.py
   - tests/test_languages_rust_reader.py
+summary: Language-profile registry, and the reader a profile names to read its language's code.
+implements:
+  - each-language-reads-its-code-through-one-interface
 ---
 
 # Language profiles
@@ -148,3 +150,26 @@ Only files under `paths.test_roots` are read for tests, so a Rust unit test in t
 A tree-sitter pin leaves out layout, not every rewrite a formatter makes. A rewrite that changes a token still moves it: parentheses added around an arrow function's one parameter, the quotes taken off a property name, an escape inside a string that the change of quote made needless, the case of a hexadecimal literal, gofmt's `for ;; {}` to `for {}`, and for a pin on a whole file the order of an import block. And three pairs that differ in meaning hash alike, since what tells them apart is what a formatter also moves: in TypeScript `(a?.b).c` and `a?.b.c`, where the parentheses end the optional chain, and in Rust the one-element tuple `(a,)` beside `(a)`, and `m!(a,)` beside `m!(a)`.
 
 A span that names a TypeScript export names the one definition of that name in TypeScript or JavaScript, so an export that renames, as `export { handler as config }` does, is taken for a function named `config` when one other file defines one. A method of a Rust blanket `impl<T> Trait for T` is listed under the type parameter's name.
+
+## Implemented requirements
+
+- **each-language-reads-its-code-through-one-interface#definitions-in-every-supported-language** — For a file of Python, TypeScript, Go or Rust, the language's reader SHALL return each function, class or type and each method, with its name, the type that holds it, and its first and last line. (provenance: code; [RFC](../rfcs/each-language-reads-its-code-through-one-interface.md))
+  <!-- anchor: src/irminsul/languages/reader.py#CodeReading.definitions @sha256:5831d36d444a -->
+  <!-- anchor: tests/test_languages_python_reader.py#test_a_definition_carries_its_name_holder_and_lines @sha256:ce9d084548b6 -->
+  <!-- anchor: tests/test_languages_tree_sitter.py#test_a_typescript_function_is_found_with_its_lines @sha256:d92153b01ca6 -->
+  <!-- anchor: tests/test_languages_tree_sitter.py#test_a_go_method_is_found_on_its_line_and_held_by_its_receiver @sha256:83cf47f5f7b5 -->
+  <!-- anchor: tests/test_languages_rust_reader.py#test_the_definitions_of_fees_are_listed_in_file_order_with_their_lines_and_reach @sha256:41217a88326c -->
+- **each-language-reads-its-code-through-one-interface#features-read-code-through-the-interface** — Binding a code span, the review queue's touched code, a packet's tests, the tests `anchors --suggest` offers, `import-deps` and anchor pins SHALL read definitions and imports through the language's reader. (provenance: code; [RFC](../rfcs/each-language-reads-its-code-through-one-interface.md))
+  <!-- anchor: src/irminsul/languages/__init__.py#reader_for @sha256:3cb4aa810fe7 -->
+  <!-- anchor: tests/test_languages_python_reader.py#test_only_the_reader_and_the_framework_extractors_import_pythons_parser @sha256:be2203c71e3c -->
+  <!-- anchor: tests/test_languages_tree_sitter.py#test_a_change_to_a_typescript_function_queues_the_sentence_that_names_it @sha256:18403efefaf0 -->
+  <!-- anchor: tests/test_languages_typescript_reader.py#test_context_lists_the_test_that_imports_a_file_with_that_reason @sha256:2d81d83d1f88 -->
+  <!-- anchor: tests/test_languages_typescript_reader.py#test_suggest_offers_the_test_function_that_calls_late_fee @sha256:296622051fe4 -->
+  <!-- anchor: tests/test_languages_typescript_reader.py#test_a_pinned_function_is_clean_after_an_edit_to_its_comment @sha256:cf966b0ec2fb -->
+  <!-- anchor: tests/test_languages_go_reader.py#test_a_depends_on_no_import_backs_is_reported_once_and_one_backed_is_not @sha256:fb06c34dcf38 -->
+- **each-language-reads-its-code-through-one-interface#a-language-is-added-in-one-place** — A language SHALL be added by its profile, its grammar and its query file, with no change to a check. (provenance: code; [RFC](../rfcs/each-language-reads-its-code-through-one-interface.md))
+  <!-- anchor: src/irminsul/languages/base.py#LanguageProfile @sha256:606b2acb3bef -->
+  <!-- anchor: tests/test_languages_tree_sitter.py#test_a_language_is_added_by_a_profile_a_grammar_and_a_query_file @sha256:9603483a602f -->
+  <!-- anchor: tests/test_inventory_extractors.py#test_a_registered_profile_reads_its_env_vars_by_its_own_pattern @sha256:f80f6e98b88a -->
+  <!-- anchor: tests/test_languages.py#test_a_registered_language_is_known_to_each_check_by_its_profile @sha256:ac94c9fcbc33 -->
+  <!-- anchor: tests/test_languages.py#test_no_check_holds_a_name_a_profile_lists @sha256:29c2646a5de0 -->
