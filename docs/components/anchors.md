@@ -45,7 +45,7 @@ an assignment, so a threshold or a registry can be anchored as readily as a func
 and a constant's hash covers its whole assignment statement: two names bound by one
 `A, B = ...` share a hash, and an edit to either re-asks both claims. In a TypeScript,
 JavaScript, Go or Rust file it is the tree the language's grammar gives, written without
-its comments and without what a formatter chooses, such as a trailing comma
+its comments and without the layout a formatter chooses, such as a line break or a trailing comma
 ([languages](languages.md#typescript-javascript-go-and-rust)). In each of these a symbol
 is a definition the reader finds, and no search of the text for its name stands in for
 one: a symbol the reader does not find is missing, or unreadable when the file holds

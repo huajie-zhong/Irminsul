@@ -152,11 +152,12 @@ Answered by the owner on 2026-11-27, while the tree-sitter readers were built:
    anything else, such as a key of an object literal, is `claim-anchor/missing-symbol`, with
    no search of the text for the name. Not chosen: keeping the search until the part markers
    of `claim-evidence-names-a-part` exist, which would have kept every such anchor resolving.
-9. **`import-deps` reports a missing import only where every import is placed.** A reader
-   says whether it places every import of its language: Python's and Go's do, TypeScript's and
-   Rust's do not, since a path alias or another crate may stand between two files. A
-   `depends_on` is judged only between docs whose common languages all do. Not chosen: judging
-   every language with a reader, which would report true dependencies with no way to answer.
+9. **`import-deps` reports a missing import only where every import is placed.** A reading
+   says whether every import of its file is placed: a Python file's always is and a Go file's
+   under a `go.mod`, a TypeScript or a Rust file's never is, since a path alias or another
+   crate may stand between two files. A `depends_on` is judged only between docs whose common
+   languages have every import of the depending doc's files placed. Not chosen: judging every
+   language with a reader, which would report true dependencies with no way to answer.
 10. **For TypeScript, every named function a test file defines is offered as a test**, as the
     design detail below says; the reader knows a test file by the test call it holds. Not
     chosen: offering none, since such a function is often a helper.
@@ -196,8 +197,10 @@ Answered by the owner on 2026-11-27, while the tree-sitter readers were built:
   does not parse answers no definitions and says so, as today; decision 7 says what a file
   tree-sitter cannot read whole answers.
 - **Tests, by convention.** Python: a function whose name starts with `test`. Go: a function
-  named `Test...` in a `_test.go` file. Rust: a function under `#[test]`. TypeScript: a test
-  is a call, not a definition, so only a named function a test file defines can be offered.
+  named `Test...` in a `_test.go` file, which a reader given a file's text and not its name
+  tells by the function's one `*testing.T` parameter. Rust: a function under `#[test]`.
+  TypeScript: a test is a call, not a definition, so only a named function a test file
+  defines can be offered.
 - **The query file**, for TypeScript, as the probe used it:
 
   ```

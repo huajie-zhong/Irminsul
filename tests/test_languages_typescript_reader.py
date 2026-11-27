@@ -445,6 +445,9 @@ def test_a_function_is_no_test_in_a_file_that_holds_no_test_call() -> None:
         "export function lateFee(days: number) {\n  return days;\n}\n"
         'const late = /late/.test("late");\n'
         'app.get("/fees", () => lateFee(1));\n'
+        'const even = yup.number().test("is-even", "must be even", function (value) {\n'
+        "  return value % 2 === 0;\n});\n"
+        'schema.describe("a fee", () => lateFee(2));\n'
     )
 
     assert _inline(source).tests() == ()
@@ -457,7 +460,7 @@ def test_a_function_is_no_test_in_a_file_that_holds_no_test_call() -> None:
         'it("caps the fee", async () => {});',
         'describe("fees", function () {});',
         "test.only(`caps the fee`, () => {});",
-        'Deno.test("caps the fee", { permissions: {} }, () => {});',
+        'describe.skip("fees", { timeout: 5 }, () => {});',
     ],
 )
 def test_a_file_that_holds_a_test_call_offers_the_functions_it_defines(call: str) -> None:
@@ -478,11 +481,51 @@ def test_a_source_function_does_not_give_its_name_up_to_a_second_definition(
     assert resolver.resolve("waived()") == []
 
 
-def test_a_file_is_mentioned_by_its_stem_and_an_index_file_by_its_directory() -> None:
+def test_a_file_is_mentioned_by_its_stem_and_an_index_file_by_nothing_sure() -> None:
+    """An index file is imported by its directory, which a file beside it writes as `.`
+    and one below it as `..`, so no name rules a file out unread."""
     reader = _reader("src/ledger/fees.ts")
 
     assert reader.mentioned_as(Path("src/ledger/fees.ts")) == frozenset({"fees"})
-    assert reader.mentioned_as(Path("src/ledger/index.ts")) == frozenset({"ledger"})
+    assert reader.mentioned_as(Path("src/ledger/index.ts")) is None
+
+
+def test_a_commonjs_assignment_defines_a_function_of_the_module_or_a_method() -> None:
+    text = (
+        "exports.slugify = function (text) {\n  return text;\n};\n"
+        "function Store() {}\n"
+        "Store.prototype.flush = function () {\n  return 1;\n};\n"
+        "module.exports.parse = (s) => s;\n"
+        "exports.LIMIT = 5;\n"
+        "other.thing = function () {};\n"
+    )
+
+    assert [
+        (d.symbol, d.kind, d.line, d.end, d.reachable)
+        for d in _inline(text, "util.js").definitions()
+    ] == [
+        ("slugify", "function", 1, 3, True),
+        ("Store", "function", 4, 4, True),
+        ("Store.flush", "function", 5, 7, True),
+        ("parse", "function", 8, 8, True),
+        ("LIMIT", "variable", 9, 9, True),
+    ]
+
+
+def test_an_export_under_another_name_is_not_a_definition_of_another_language(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    """`config` is what the index file exports `handler` as. The one definition named
+    `config` is a Python function, which the export is not, so the span names the export."""
+    root = fixture_repo("typescript-ledger")
+    write(root, "src/ledger/impl.ts", "export function handler(): number {\n  return 1;\n}\n")
+    write(root, "src/ledger/barrel.ts", 'export { handler as config } from "./impl";\n')
+    write(root, "src/ledger/settings.py", "def config():\n    return 1\n")
+    resolver = CodeResolver(SourceTree(root, load(root / "irminsul.toml")))
+
+    assert resolver.resolve("config()") == [
+        Reference("config()", "exports", "config", "src/ledger/barrel.ts", 1, 1)
+    ]
 
 
 def test_a_call_span_naming_a_function_resolves_to_its_definition_and_last_line(

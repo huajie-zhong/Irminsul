@@ -276,6 +276,11 @@ class PythonReading:
         included, in the order `definitions` has: source order, but for a `try` statement."""
         return tuple(self._walk.imports)
 
+    def places_every_import(self, importer: Path) -> bool:
+        """A module is a file under the importing file's package or a source root, or it is
+        not this repository's."""
+        return True
+
     def files(self, source: str, importer: Path, roots: Sequence[Path]) -> list[Path]:
         """The `.py` file and the package `__init__.py` that can hold the module `source`
         names: under `importer`'s own package for a relative import, one parent up for each
@@ -357,10 +362,6 @@ class PythonReading:
 
 class PythonReader:
     """Reads Python through `ast`, the parser of the interpreter running Irminsul."""
-
-    places_every_import = True
-    """A module is a file under the importing file's package or a source root, or it is not
-    this repository's."""
 
     def read(self, text: str, memo: Memo | None = None) -> PythonReading:
         return PythonReading(PythonModule.parse(text))

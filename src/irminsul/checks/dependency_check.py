@@ -7,11 +7,12 @@ relationship found. The reverse direction (imports not declared) is intentionall
 flagged: `depends_on` is curated intent, not a complete projection of the import graph.
 
 A missing import says two docs are unrelated only where an import would have shown the
-relation: the two own code of a language in common, and the reader of every language they
-have in common places every import. A reader that does not, because a path alias or another
-package may stand between two files, backs a dependency it finds and denies none. A doc
-that also owns code no reader reads is judged through the rest alone, so a dependency only
-that code backs is still reported.
+relation: the two own code of a language in common, and every import of the depending
+doc's files of each such language is placed, which a reading says of its file. A file whose
+imports are only partly placed, because a path alias or another package may stand between
+two files, backs a dependency it finds and denies none. A doc that also owns code no
+reader reads is judged through the rest alone, so a dependency only that code backs is
+still reported.
 """
 
 from __future__ import annotations
@@ -23,15 +24,8 @@ from typing import ClassVar
 
 from irminsul.checks.base import Answer, Finding, FindingClass, Severity
 from irminsul.docgraph import DocGraph
-from irminsul.languages import (
-    language_read,
-    languages_placing_every_import,
-    places_every_import,
-    reader_for,
-)
+from irminsul.languages import language_read, reader_for
 from irminsul.languages.reader import imported_files
-
-_LANGUAGES_JUDGED = " or ".join(languages_placing_every_import())
 
 
 @dataclass(frozen=True)
@@ -108,15 +102,6 @@ def _languages(files: list[Path]) -> frozenset[str]:
     return frozenset(name for name in map(language_read, files) if name is not None)
 
 
-def _denied_by_no_import(owned: frozenset[str], other: frozenset[str]) -> bool:
-    """Whether two docs that own code of these languages are unrelated when no import was
-    found between them: they share a language, and each language they share has every
-    import placed. One they share whose imports are only partly placed could hold the
-    import unseen."""
-    shared = owned & other
-    return bool(shared) and all(places_every_import(language) for language in shared)
-
-
 CODE_HALLUCINATED_DEPENDENCY = "import-deps/hallucinated-dependency"
 
 
@@ -127,10 +112,11 @@ class DependencyCheck:
         CODE_HALLUCINATED_DEPENDENCY: (
             "A `depends_on` entry is declared but no import relationship backs it in "
             "code. It is judged only where an import would have shown it: the two docs "
-            "own code of a language in common, and every import of each language they have "
-            f"in common can be placed ({_LANGUAGES_JUDGED}). "
-            "Remove the stale declaration, or verify the doc claiming the dependent module "
-            "actually covers the right files."
+            "own code of a language in common, and every import of this doc's files of each "
+            "such language can be placed. Where a path alias, another package or a missing "
+            "manifest may stand between two files, a missing import proves nothing and "
+            "the entry is not judged. Remove the stale declaration, or verify the doc "
+            "claiming the dependent module actually covers the right files."
         ),
     }
     classes: ClassVar[dict[str, FindingClass]] = {
@@ -156,24 +142,28 @@ class DependencyCheck:
 
         out: list[Finding] = []
         for node in graph.nodes.values():
-            # A dependency on a doc with no language in common, or with one in common
-            # whose imports are only partly placed, is a relationship no missing import
-            # denies; judging it would report a true `depends_on` as hallucinated.
+            # A dependency on a doc with no language in common is a relationship no
+            # missing import denies; judging it would report a true `depends_on` as
+            # hallucinated.
             files = code_files.get(node.id, [])
             owned = languages.get(node.id, nothing)
-            declared_deps = {
-                dep
-                for dep in node.frontmatter.depends_on
-                if _denied_by_no_import(owned, languages.get(dep, nothing))
+            shared = {
+                dep: owned & languages.get(dep, nothing) for dep in node.frontmatter.depends_on
             }
+            declared_deps = {dep for dep, common in shared.items() if common}
             if not declared_deps:
                 continue
 
             actual_deps: set[str] = set()
+            # The languages of which this doc owns a file whose imports are only partly
+            # placed: one of them could hold an import unseen.
+            unplaced: set[str] = set()
             for abs_path in files:
                 reading = graph.source.reading(abs_path)
                 if reading is None:
                     continue
+                if not reading.places_every_import(abs_path):
+                    unplaced.update(_languages([abs_path]))
                 for candidate in imported_files(reading, abs_path, roots):
                     dep_id = ownership.owner_of(candidate)
                     if dep_id and dep_id != node.id:
@@ -185,6 +175,8 @@ class DependencyCheck:
             # pressure the "derive, don't materialize" principle rejects. depends_on
             # is curated intent, not a complete projection of the import graph.
             for dep_id in sorted(declared_deps - actual_deps):
+                if shared[dep_id] & unplaced:
+                    continue
                 out.append(
                     Finding(
                         check=self.name,

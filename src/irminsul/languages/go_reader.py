@@ -3,8 +3,10 @@ say: what an import binds, and which files an import path names.
 
 An import path names a package, which is a directory. It is placed through the module paths
 its repository declares: the nearest `go.mod`, the local directories that file's `replace`
-lines name, and the modules a `go.work` above it uses. Every other path is the standard
-library's or another repository's, so this reader places every import.
+lines name, the modules a `go.work` above it uses, and every other module a `go.mod` in or
+above a source root declares. Every other path is the standard library's or another
+repository's, so under a `go.mod` this reader places every import. A file with none above
+it has no module, and nothing says where its import paths lead.
 
 A file also reads every name of the other files of its package, with no import statement,
 so its `package` clause is read as an import of them: a test beside the code it tests is
@@ -20,7 +22,7 @@ from pathlib import Path
 import tree_sitter_go
 from tree_sitter import Node
 
-from irminsul.languages.manifests import go_modules, listing
+from irminsul.languages.manifests import go_modules, listing, nearest
 from irminsul.languages.reader import ImportedName, Memo
 from irminsul.languages.tree_sitter_reader import TreeSitterReader, node_text, query_file
 
@@ -77,7 +79,7 @@ def files_of(source: str, importer: Path, roots: Sequence[Path], memo: Memo) -> 
     none for a package of the standard library or of another repository."""
     if source == OWN_PACKAGE:
         return [path for path in _package_files(importer.parent, memo) if path != importer]
-    for module, directory in go_modules(importer, memo):
+    for module, directory in go_modules(importer, roots, memo):
         if source == module or source.startswith(f"{module}/"):
             return _package_files(directory.joinpath(*source[len(module) :].split("/")), memo)
     return []
@@ -92,12 +94,18 @@ def mentioned_as(path: Path) -> frozenset[str] | None:
         own = _PACKAGE_RE.search(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError):
         own = None
-    for module, directory in go_modules(path, {}):
+    for module, directory in go_modules(path, (), {}):
         if package == directory or directory in package.parents:
             inside = package.relative_to(directory).as_posix()
             imported = f"{module}/{inside}".rstrip("/.").rsplit("/", 1)[-1]
             return frozenset({imported, *([own.group(1)] if own else [])})
     return None
+
+
+def places_imports(path: Path, memo: Memo) -> bool:
+    """Whether a `go.mod` stands above the file `path`: only then does its module say where
+    each of its import paths leads."""
+    return nearest(path.parent, "go.mod", memo) is not None
 
 
 GO_READER = TreeSitterReader(
@@ -106,5 +114,5 @@ GO_READER = TreeSitterReader(
     imports_of=imports_of,
     files_of=files_of,
     mentioned_as=mentioned_as,
-    places_every_import=True,
+    places_imports=places_imports,
 )

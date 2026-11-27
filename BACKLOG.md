@@ -658,6 +658,30 @@ reader's definitions under an `export`, which the reader does not say today; the
 `surface-rules-and-language-profiles-are-data` keeps surfaces as rules, so merging them is the
 owner's call.
 
+Until then a span that names an export is taken for the one definition of that name in
+TypeScript or JavaScript (`CodeResolver.resolve`, `src/irminsul/code_references.py`), and
+nothing checks that the definition is what the export exports: with
+`export { handler as config } from "./impl"` in one file and an unrelated `function config`
+in another, the span `config` names the function (by reading, 2026-11-27). The reader reads a
+re-export as an import that binds nothing, so the name it exports under is not known to it.
+
+### `a-tree-sitter-pin-hashes-some-layout-and-misses-three-changes`
+
+The canonical text of a TypeScript, Go or Rust definition
+(`TreeSitterReading._written`, `src/irminsul/languages/tree_sitter_reader.py`) leaves out
+comments, a trailing comma and the tokens a query file marks as layout. A review on
+2026-11-27 found both kinds of error by running each case. A formatter's rewrite that
+changes a token moves the pin with no change of meaning: prettier's `x => x` to
+`(x) => x`, `{'a': 1}` to `{a: 1}`, `'it\'s'` to `"it's"`, `0xAB` to `0xab`, and for a pin
+on a whole file gofmt's sorting of an import block. And three pairs that differ in meaning
+hash alike: in TypeScript `(a?.b).c` and `a?.b.c`, because a parenthesized expression is
+written as what it holds (`typescript.scm`) and the parentheses end the optional chain; in
+Rust `(a,)` and `(a)`, and `m!(a,)` and `m!(a)`, because `_trailing` drops the comma that
+makes a one-element tuple. A parenthesized expression kept where it is the object of a
+member, a call or a subscript would close the first, at the cost of a pin that moves when a
+formatter removes needless parentheses there; the tuple needs the grammar's node kinds, which
+the engine does not know.
+
 ### `a-python-source-root-that-is-its-own-package`
 
 Python's reader places an absolute import under each source root

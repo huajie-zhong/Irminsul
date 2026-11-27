@@ -51,6 +51,9 @@ class LanguageProfile:
     A doc naming one cites the language, not this repository's code, so no source file is
     asked to define it. Empty where the profile lists none.
     """
+    path_separator: str = "."
+    """What the language writes between the parts of a path to a definition, as Rust writes
+    `Desk::new`. A doc may write a path that way where the language is enabled."""
     reader: str | None = None
     """The name, in `READERS`, of the reader that answers for a file of this language what it
     defines, imports and refers to (`irminsul.languages.reader`). A name rather than the reader,

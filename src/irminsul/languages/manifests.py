@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 import tomllib
+from collections.abc import Sequence
 from pathlib import Path
 
 from irminsul.languages.reader import Memo
@@ -92,32 +93,65 @@ def _go_module_path(directory: Path) -> str | None:
     return _unquoted(found.group(1)) if found else None
 
 
-def go_modules(importer: Path, memo: Memo) -> tuple[tuple[str, Path], ...]:
+def _go_ignores(name: str) -> bool:
+    """Whether the `go` tool passes over a directory of this name."""
+    return name.startswith((".", "_")) or name in ("testdata", "vendor")
+
+
+def _go_declared(roots: Sequence[Path], memo: Memo) -> dict[str, Path]:
+    """Each module the repository declares in or above a source root, by its path, with the
+    directory of its `go.mod`. A module another module only requires is found here: its
+    code is in the repository whichever copy of it a build would fetch."""
+    key = ("go.declared", tuple(os.fspath(root) for root in roots))
+    if key not in memo:
+        homes: list[Path] = []
+        for root in roots:
+            above = nearest(root, "go.mod", memo)
+            if above is not None:
+                homes.append(above)
+            for directory, names, files in os.walk(root):
+                names[:] = sorted(name for name in names if not _go_ignores(name))
+                if "go.mod" in files:
+                    homes.append(Path(directory))
+        declared: dict[str, Path] = {}
+        for home in homes:
+            path = _go_module_path(home)
+            if path is not None:
+                declared.setdefault(path, home)
+        memo[key] = declared
+    held = memo[key]
+    assert isinstance(held, dict)
+    return held
+
+
+def go_modules(importer: Path, roots: Sequence[Path], memo: Memo) -> tuple[tuple[str, Path], ...]:
     """Each module path a Go file can import from its repository, with the directory that
     holds it, the longest path first: the module of the nearest `go.mod`, the modules it
-    replaces with a local directory, and those a `go.work` above it uses."""
+    replaces with a local directory, those a `go.work` above it uses, and every other module
+    a `go.mod` in or above one of `roots` declares."""
     home = nearest(importer.parent, "go.mod", memo)
-    if home is None:
-        return ()
-    key = ("go.modules", os.fspath(home))
+    key = ("go.modules", None if home is None else os.fspath(home), *map(os.fspath, roots))
     if key not in memo:
         modules: dict[str, Path] = {}
-        own = _go_module_path(home)
-        if own is not None:
-            modules[own] = home
-        for line in _go_lines(home / "go.mod", "replace"):
-            replaced = _GO_REPLACE_RE.match(line)
-            if replaced is not None:
-                local = Path(os.path.normpath(home / replaced.group(2)))
-                modules.setdefault(_unquoted(replaced.group(1)), local)
-        workspace = nearest(home, "go.work", memo)
-        for line in _go_lines(workspace / "go.work", "use") if workspace is not None else ():
-            used = _GO_USE_RE.match(line)
-            if used is not None and workspace is not None:
-                directory = Path(os.path.normpath(workspace / used.group(1)))
-                path = _go_module_path(directory)
-                if path is not None:
-                    modules.setdefault(path, directory)
+        if home is not None:
+            own = _go_module_path(home)
+            if own is not None:
+                modules[own] = home
+            for line in _go_lines(home / "go.mod", "replace"):
+                replaced = _GO_REPLACE_RE.match(line)
+                if replaced is not None:
+                    local = Path(os.path.normpath(home / replaced.group(2)))
+                    modules.setdefault(_unquoted(replaced.group(1)), local)
+            workspace = nearest(home, "go.work", memo)
+            for line in _go_lines(workspace / "go.work", "use") if workspace is not None else ():
+                used = _GO_USE_RE.match(line)
+                if used is not None and workspace is not None:
+                    directory = Path(os.path.normpath(workspace / used.group(1)))
+                    path = _go_module_path(directory)
+                    if path is not None:
+                        modules.setdefault(path, directory)
+        for path, directory in _go_declared(roots, memo).items():
+            modules.setdefault(path, directory)
         memo[key] = tuple(sorted(modules.items(), key=lambda item: -len(item[0])))
     held = memo[key]
     assert isinstance(held, tuple)

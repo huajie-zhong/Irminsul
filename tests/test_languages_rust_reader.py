@@ -8,6 +8,7 @@ import datetime as _dt
 from collections.abc import Callable
 from pathlib import Path
 
+from irminsul.binding import bound_names, unbound_names
 from irminsul.checks.claim_anchor import ClaimAnchorCheck
 from irminsul.checks.dependency_check import DependencyCheck
 from irminsul.code_references import CodeResolver
@@ -560,3 +561,24 @@ def test_an_edit_to_a_pinned_methods_body_is_pinned_drift(
     assert [finding.code for finding in run_check(ClaimAnchorCheck, root)] == [
         "claim-anchor/pinned-drift"
     ]
+
+
+def test_a_path_written_with_a_double_colon_is_a_code_name_only_where_rust_is_enabled(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    """`Desk::close` names no definition, so a Rust project lists it as unbound. A project
+    of another language reads `std::vector` as no name of its own, as it always did."""
+    root = fixture_repo("rust-loans")
+    resolver = CodeResolver(SourceTree(root, load(root / "irminsul.toml")))
+    spans = ["Desk::close()", "std::vector"]
+
+    assert unbound_names(spans, resolver, set()) == ["Desk.close", "std.vector"]
+    assert unbound_names(spans, resolver, bound_names("<!-- anchor: src/x.rs#Desk::close -->")) == [
+        "std.vector"
+    ]
+
+    replace_text(root, "irminsul.toml", 'enabled = ["rust"]', 'enabled = ["python"]')
+    elsewhere = CodeResolver(SourceTree(root, load(root / "irminsul.toml")))
+
+    assert unbound_names(spans, elsewhere, set()) == []
+    assert elsewhere.resolve("Desk::new()") == []

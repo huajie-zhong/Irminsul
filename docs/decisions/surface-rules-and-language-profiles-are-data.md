@@ -74,13 +74,14 @@ TypeScript file was once written five times with five answers.
 - **A file its grammar cannot read whole still answers what parsed.** The grammars lag their
   languages, so a definition or an import whose own node holds no syntax error is answered,
   and the reading says the rest is unknown. Python stays all or nothing.
-- **A missing import denies a dependency only where every import is placed.** A reader says
-  whether it places every import of its language that stays in the repository. Python's and
-  Go's do. TypeScript's and Rust's do not, since a path alias, a workspace package or another
-  crate may stand between two files. `import-deps` reports a `depends_on` no import backs
-  only when the two docs own code of a language in common and the reader of every language
-  they have in common places every import. The test ranking and the `new-dependency` pass
-  report only imports they found, so they read every language.
+- **A missing import denies a dependency only where every import is placed.** A reading says
+  whether every import of its file that stays in the repository is placed. A Python file's
+  always is, and a Go file's under a `go.mod`. A TypeScript or a Rust file's never is, since a
+  path alias, a workspace package or another crate may stand between two files. `import-deps`
+  reports a `depends_on` no import backs only when the two docs own code of a language in
+  common and every file the depending doc owns of each such language has its imports placed.
+  The test ranking and the `new-dependency` pass report only imports they found, so they read
+  every language.
 
 ## Alternatives Considered
 
@@ -107,7 +108,9 @@ TypeScript file was once written five times with five answers.
   Irminsul compiles C code.
 - A dependency that only a TypeScript path alias or a Rust path into another crate carries is
   neither denied nor seen, and one between two components of different languages is not
-  judged.
+  judged. Nor is one between two components that each own a TypeScript, JavaScript or Rust
+  file beside their Python, which was judged through the Python alone before those files
+  were read.
 
 ## Changes
 
@@ -127,3 +130,6 @@ TypeScript file was once written five times with five answers.
   between docs whose common languages all have every import placed, which is Python and Go,
   where the RFC had it read every language that answers imports. And JavaScript is read
   through the TSX dialect, the outcome of the measurement the RFC's third decision asked for.
+  Whether every import is placed is asked of a file, not of a language: a Go file with no
+  `go.mod` above it has no module to place its imports by, which the review of the change
+  found reported as a missing dependency.

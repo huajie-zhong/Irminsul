@@ -151,9 +151,11 @@ A run walks each scope once — the configured source roots, and the declared te
 
 Checks do not apply fixes; `irminsul fix` remediates. They do not evaluate prose quality or writing style, and they do not modify source files or docs. Neither the source walk nor the doc walk follows a directory symlink.
 
-`import-deps` reports a `depends_on` that no import backs only where a missing import means something: the two docs own code of a language in common, and the [reader](languages.md#readers) of every language they have in common places every import of it. A language whose reader does not, because a path alias or another package may stand between two files, backs the dependencies it finds and denies none ([Surface rules and language profiles are data](../decisions/surface-rules-and-language-profiles-are-data.md)).
+`import-deps` reports a `depends_on` that no import backs only where a missing import means something: the two docs own code of a language in common, and every file the depending doc owns of each such language has all its imports placed, which its [reading](languages.md#readers) says. A file whose imports are only partly placed, because a path alias, another package or a missing manifest may stand between two files, backs the dependencies it finds and denies none, so two components that each own a JavaScript file beside their Python are not judged ([Surface rules and language profiles are data](../decisions/surface-rules-and-language-profiles-are-data.md)).
 <!-- anchor: tests/test_languages_go_reader.py#test_a_depends_on_no_import_backs_is_reported_once_and_one_backed_is_not @sha256:fb06c34dcf38 -->
 <!-- anchor: tests/test_languages_rust_reader.py#test_an_unbacked_depends_on_is_silent_because_rust_does_not_place_every_import @sha256:2cfe5d282d84 -->
+<!-- anchor: tests/test_languages_go_reader.py#test_a_true_dependency_is_not_reported_where_no_go_mod_says_where_imports_lead @sha256:94689059519a -->
+<!-- anchor: tests/test_languages_tree_sitter.py#test_a_missing_import_denies_a_dependency_only_where_every_shared_import_is_placed @sha256:efbd9523343f -->
 
 `claim-provenance` reads the claims a doc declares and never the prose around them: no wording, however emphatic, asks for a claim ([Derive facts and leave meaning to the reader](../decisions/derive-facts-and-leave-meaning-to-the-reader.md)). Valid evidence shows a claim points at something real, not that the claim is true. Evidence drift is reported only for claims in stable `foundation` and `architecture` docs.
 

@@ -114,7 +114,7 @@ its change connects to.
   misses one the code gained. A function or class is one a reader reads with its lines, in
   Python, TypeScript, JavaScript, Go or Rust, and one of a language no reader reads is paired
   with nothing. An export is no second name beside its definition: a span that names one names
-  the definition. A sentence the change did not write is queued
+  the definition of that name in the export's language. A sentence the change did not write is queued
   in `--changed` under the marker, and one the change itself wrote carries the marker on its one
   `edited` item in `--written`. `list review` alone lists these sentences, and
   `context --after-edit` none of them. Whether a queued sentence still holds is

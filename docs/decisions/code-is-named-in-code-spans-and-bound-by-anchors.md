@@ -93,14 +93,16 @@ paragraphs, which trains a reader to re-pin without reading.
   sha256 of that text, for a symbol anchor, a file anchor and a claim evidence pin alike.
 - **A pin into TypeScript, JavaScript, Go or Rust hashes the tree its grammar gives**: each
   node's type, the field it fills, its children, and the text no child covers. Comments are
-  left out, but for one the compiler reads, such as `//go:embed`, and so is what a formatter
-  chooses: a trailing comma, and what the language's query file marks, such as a statement's
-  semicolon, a string's quote and the parentheses around a wrapped expression. A decorator, an
+  left out, but for one the compiler reads, such as `//go:embed`, and so is the layout a
+  formatter chooses: line breaks, a trailing comma, and what the language's query file marks,
+  such as a statement's semicolon, a string's quote and the parentheses around a wrapped
+  expression. A rewrite that changes a token, such as parentheses added around an arrow
+  function's parameter, still moves the pin. A decorator, an
   attribute and the signatures of an overload are part of the definition under them. A symbol
   that several definitions share hashes them all.
 - **What a pin covers does not change.** A docstring edit drifts a Python pin; a comment or a
-  reformat does not, in any language a reader reads. Anchors into a file no reader reads keep
-  the whitespace-normalized text.
+  reformat does not. In the other languages a reader reads, a comment or a change of layout
+  does not. Anchors into a file no reader reads keep the whitespace-normalized text.
 - **A re-pin records a re-read.** `irminsul anchors --re-pin --doc <doc>`, narrowed by
   `--claim`, `--evidence` or `--anchor`, writes a claim's `pinned` map of evidence path to
   normalized hash. A pin on a path the claim no longer cites is dropped by the next re-pin.
@@ -130,7 +132,8 @@ paragraphs, which trains a reader to re-pin without reading.
   also lists each code span of that doc that resolves to one function or class, with
   up to three test functions that name it, ordered by path and line, each as a marker to
   paste. A test function is what its language's reader says is one: in Python a function whose
-  name starts with `test`, in Go one named `Test` and then no lower-case letter, in Rust one
+  name starts with `test`, in Go one named `Test` and then no lower-case letter that takes
+  a `*testing.T` alone, in Rust one
   under `#[test]`, and in TypeScript, where a test is a call with a string for its name, any
   named function defined in a file that holds such a call. It is in a file under
   `paths.test_roots` that imports the defining module, whose body names the definition through

@@ -63,17 +63,6 @@ def language_read(path: str | PurePath) -> str | None:
     return None if found is None else found[0].name
 
 
-def places_every_import(language: str) -> bool:
-    """Whether the reader of `language` places every import of it."""
-    reader = LANGUAGE_REGISTRY[language].reader
-    return reader is not None and READERS[reader].places_every_import
-
-
-def languages_placing_every_import() -> list[str]:
-    """The names of the languages whose reader places every import, in registry order."""
-    return [name for name in LANGUAGE_REGISTRY if places_every_import(name)]
-
-
 __all__ = [
     "GO_PROFILE",
     "LANGUAGE_REGISTRY",
@@ -83,7 +72,5 @@ __all__ = [
     "TYPESCRIPT_PROFILE",
     "LanguageProfile",
     "language_read",
-    "languages_placing_every_import",
-    "places_every_import",
     "reader_for",
 ]

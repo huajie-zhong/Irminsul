@@ -108,7 +108,7 @@ class Suggestions:
 
 def code_name(span: str) -> str | None:
     """The name a code span cites, when the span can only be a code name."""
-    text = dotted(span.strip())
+    text = span.strip()
     if not _NAME_RE.match(text):
         return None
     name = text.removesuffix("()")
@@ -127,8 +127,9 @@ def bound_names(text: str) -> set[str]:
     out: set[str] = set()
     for anchor in parse_anchors(text):
         if anchor.symbol:
-            out.add(anchor.symbol)
-            out.add(anchor.symbol.rsplit(".", 1)[-1])
+            symbol = dotted(anchor.symbol)
+            out.add(symbol)
+            out.add(symbol.rsplit(".", 1)[-1])
     return out
 
 
@@ -139,7 +140,7 @@ def unbound_names(spans: list[str], resolver: CodeResolver, bound: set[str]) -> 
     """
     out: list[str] = []
     for span in spans:
-        name = code_name(span)
+        name = code_name(resolver.dotted(span))
         if name is None or name in bound or name.rsplit(".", 1)[-1] in bound:
             continue
         if name.split(".", 1)[0] in resolver.builtins:

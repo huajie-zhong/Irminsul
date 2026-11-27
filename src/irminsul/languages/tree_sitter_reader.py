@@ -64,6 +64,8 @@ FilesOf = Callable[[str, Path, Sequence[Path], Memo], list[Path]]
 """`CodeReading.files`, with the run's memo to keep what it reads from disk."""
 MentionedAs = Callable[[Path], Collection[str] | None]
 """`CodeReader.mentioned_as`."""
+PlacesImports = Callable[[Path, Memo], bool]
+"""Whether every import of the file at a path can be placed, by what stands around it."""
 
 _KINDS: Final[dict[str, DefinitionKind]] = {
     "definition.function": "function",
@@ -157,14 +159,14 @@ class TreeSitterReader:
         imports_of: ImportsOf | None = None,
         files_of: FilesOf | None = None,
         mentioned_as: MentionedAs | None = None,
-        places_every_import: bool = False,
+        places_imports: PlacesImports | None = None,
     ) -> None:
         self._grammar = grammar
         self._query_text = queries
         self.imports_of = imports_of
         self.files_of = files_of
         self._mentioned_as = mentioned_as
-        self.places_every_import = places_every_import
+        self.places_imports = places_imports
 
     def mentioned_as(self, path: Path) -> Collection[str] | None:
         """What the language says a file importing `path` spells; None when it was given no
@@ -214,6 +216,12 @@ class TreeSitterReading:
         what the file answers is what parsed around the error."""
         return not self._root.has_error
 
+    def places_every_import(self, importer: Path) -> bool:
+        """Whether every import of this file is placed: the language says where each leads
+        from `importer`, and the whole text parsed, so none is hidden in an error."""
+        places = self._reader.places_imports
+        return places is not None and self.parsed and places(importer, self._memo)
+
     @cached_property
     def _layout(self) -> _Layout:
         """Every definition, and the nodes that name what they hold: read once for the
@@ -256,7 +264,10 @@ class TreeSitterReading:
         inner: set[int] = set()
         for start, (kind, node, name, holder) in named.items():
             while self._wraps_one(node, marked["wrapper"], marked["decoration"]):
-                inner.add(node.id)
+                # What a variable's own node holds is its value, which no path reaches
+                # into, so only a function's or a type's node is seen through.
+                if kind != "variable":
+                    inner.add(node.id)
                 assert node.parent is not None
                 node = node.parent
             widened[start] = (kind, node, name, holder)

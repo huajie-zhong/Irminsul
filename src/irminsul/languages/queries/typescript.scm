@@ -10,7 +10,6 @@
   function: [
     (identifier) @_runner
     (member_expression object: (identifier) @_runner)
-    (member_expression property: (property_identifier) @_runner)
   ]
   arguments: (arguments
     . [(string) (template_string)]
@@ -37,6 +36,50 @@
     value: [(arrow_function) (function_expression) (generator_function)])) @definition.function @test.standin
 (lexical_declaration (variable_declarator name: (identifier) @name)) @definition.variable
 (variable_declaration (variable_declarator name: (identifier) @name)) @definition.variable
+
+; CommonJS: a name assigned on `exports` or `module.exports` is the module's, and a
+; function assigned on a prototype is a method of the function that is its class.
+((expression_statement
+   (assignment_expression
+     left: (member_expression
+       object: (identifier) @_exports
+       property: (property_identifier) @name)
+     right: [(arrow_function) (function_expression) (generator_function)])) @definition.function
+ (#eq? @_exports "exports"))
+((expression_statement
+   (assignment_expression
+     left: (member_expression
+       object: (member_expression
+         object: (identifier) @_module
+         property: (property_identifier) @_exports)
+       property: (property_identifier) @name)
+     right: [(arrow_function) (function_expression) (generator_function)])) @definition.function
+ (#eq? @_module "module")
+ (#eq? @_exports "exports"))
+((expression_statement
+   (assignment_expression
+     left: (member_expression
+       object: (identifier) @_exports
+       property: (property_identifier) @name))) @definition.variable
+ (#eq? @_exports "exports"))
+((expression_statement
+   (assignment_expression
+     left: (member_expression
+       object: (member_expression
+         object: (identifier) @_module
+         property: (property_identifier) @_exports)
+       property: (property_identifier) @name))) @definition.variable
+ (#eq? @_module "module")
+ (#eq? @_exports "exports"))
+((expression_statement
+   (assignment_expression
+     left: (member_expression
+       object: (member_expression
+         object: (identifier) @holder
+         property: (property_identifier) @_prototype)
+       property: (property_identifier) @name)
+     right: [(arrow_function) (function_expression) (generator_function)])) @definition.function
+ (#eq? @_prototype "prototype"))
 
 ; The members of a class.
 (method_definition

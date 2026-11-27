@@ -10,6 +10,7 @@ import pytest
 import tree_sitter_go
 
 from irminsul import languages
+from irminsul.checks.dependency_check import DependencyCheck
 from irminsul.code_references import CodeResolver
 from irminsul.config import load
 from irminsul.languages import READERS, reader_for
@@ -18,7 +19,15 @@ from irminsul.languages.reader import Definition
 from irminsul.languages.tree_sitter_reader import TreeSitterReader
 from irminsul.source_tree import SourceTree
 
-from .conftest import invoke_json, replace_text, seed_repo, write, write_config, write_doc
+from .conftest import (
+    invoke_json,
+    replace_text,
+    run_check,
+    seed_repo,
+    write,
+    write_config,
+    write_doc,
+)
 
 SEEDED = _dt.datetime(2024, 1, 1, 12, tzinfo=_dt.UTC)
 
@@ -135,3 +144,34 @@ def test_a_language_is_added_by_a_profile_a_grammar_and_a_query_file(
         3,
         5,
     )
+
+
+def _component(doc_id: str, describes: str, depends_on: str | None = None) -> str:
+    needs = f"depends_on:\n  - {depends_on}\n" if depends_on else ""
+    return (
+        f"---\nid: {doc_id}\ntitle: {doc_id.title()}\nstatus: stable\n"
+        f"summary: The {doc_id} component.\ndescribes:\n  - {describes}\n{needs}---\n\n"
+        f"# {doc_id.title()}\n\nThe {doc_id} component.\n"
+    )
+
+
+def test_a_missing_import_denies_a_dependency_only_where_every_shared_import_is_placed(
+    tmp_path: Path,
+) -> None:
+    """Two components of Python alone, with no import between them, are unrelated, and the
+    `depends_on` is reported. Give each a JavaScript file and one of those could carry the
+    dependency through a path alias the reader does not follow, so it is no longer judged."""
+    write(tmp_path, "src/shop/cart.py", "TOTAL = 0\n")
+    write(tmp_path, "src/billing/invoice.py", "RATE = 2\n")
+    write_config(tmp_path, source_roots=["src"])
+    write(tmp_path, "docs/components/shop.md", _component("shop", "src/shop/**", "billing"))
+    write(tmp_path, "docs/components/billing.md", _component("billing", "src/billing/**"))
+
+    assert [f.code for f in run_check(DependencyCheck, tmp_path)] == [
+        "import-deps/hallucinated-dependency"
+    ]
+
+    write(tmp_path, "src/shop/cart.js", 'import { rate } from "@billing/rate";\n')
+    write(tmp_path, "src/billing/rate.js", "export const rate = 2;\n")
+
+    assert run_check(DependencyCheck, tmp_path) == []

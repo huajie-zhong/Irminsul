@@ -4,7 +4,8 @@ A feature that asks what a file defines and on which lines, what it imports, whi
 definition's body refers to, which text of a definition a pin hashes, or which definitions are
 tests asks the reader of the file's language, never a parser. A reader answers for a file's
 text, so a revision read from git is answered as the working tree is, and a text that does not
-parse answers no definitions and says so through `CodeReading.parsed`.
+parse whole says so through `CodeReading.parsed`: Python's reader then answers nothing, and a
+tree-sitter reader what parsed around the error.
 
 A profile names its reader in `LanguageProfile.reader` and `READERS` in `irminsul.languages`
 holds the reader that name stands for: the profile is data and the reader is code.
@@ -119,8 +120,9 @@ class CodeReading(Protocol):
 
     @property
     def parsed(self) -> bool:
-        """Whether the text parses. One that does not answers no definitions, imports or tests,
-        and no canonical text."""
+        """Whether the whole text parses. One that does not answers nothing to Python's
+        reader; a tree-sitter reader still answers each definition and import whose own
+        syntax holds no error, and the rest of the file is unknown."""
         ...
 
     def definitions(self) -> tuple[Definition, ...]:
@@ -138,6 +140,14 @@ class CodeReading(Protocol):
         under the source roots `roots`: the candidates, which need not exist."""
         ...
 
+    def places_every_import(self, importer: Path) -> bool:
+        """Whether `files` places every import of this file, read at `importer`, that stays
+        in the repository, so that an import it places nowhere leaves the repository. Only
+        then does a file with no import of another say the two are unrelated. It is asked
+        of a file because the answer can rest on what stands around it, as a Go file's
+        does on a `go.mod` above it."""
+        ...
+
     def references(self, definition: Definition) -> References:
         """What the body of `definition`, one of `definitions()`, refers to and binds."""
         ...
@@ -145,8 +155,9 @@ class CodeReading(Protocol):
     def canonical(self, symbol: str | None = None) -> str | None:
         """The text a pin hashes for the definition `symbol` names, by the dotted path an
         anchor writes, or for the whole file when `symbol` is None: a change a comment or a
-        reformat makes does not change it. None when nothing in the file binds `symbol`, or
-        the text does not parse."""
+        change of layout makes does not change it. None when no definition the reader
+        answers has that path, which in a text that does not parse whole may only mean it
+        was not read."""
         ...
 
     def tests(self) -> tuple[Definition, ...]:
@@ -157,13 +168,6 @@ class CodeReading(Protocol):
 
 class CodeReader(Protocol):
     """A language's reader: code, named by its profile."""
-
-    @property
-    def places_every_import(self) -> bool:
-        """Whether `CodeReading.files` places every import of the language that stays in the
-        repository, so that an import it places nowhere leaves it. Only then does a file
-        with no import of another say the two are unrelated."""
-        ...
 
     def read(self, text: str, memo: Memo | None = None) -> CodeReading:
         """`text`, a file of this language, read. `memo` is the run's, for what the reader

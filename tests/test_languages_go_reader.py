@@ -90,10 +90,9 @@ def _relative(paths: list[Path], root: Path) -> list[str]:
     return [path.relative_to(root).as_posix() for path in paths]
 
 
-def test_the_go_profile_names_its_reader_and_places_every_import() -> None:
+def test_the_go_profile_names_its_reader() -> None:
     assert READERS["go"] is GO_READER
     assert reader_for(DESK) is GO_READER
-    assert GO_READER.places_every_import
 
 
 def test_desk_go_lists_each_definition_with_its_lines_and_reachability() -> None:
@@ -556,3 +555,91 @@ def test_an_edit_to_a_pinned_methods_body_is_pinned_drift(
 
     [finding] = run_check(ClaimAnchorCheck, root)
     assert finding.code == "claim-anchor/pinned-drift"
+
+
+def _component(doc_id: str, describes: str, depends_on: str | None = None) -> str:
+    needs = f"depends_on:\n  - {depends_on}\n" if depends_on else ""
+    return (
+        f"---\nid: {doc_id}\ntitle: {doc_id.title()}\nstatus: stable\n"
+        f"summary: The {doc_id} component.\ndescribes:\n  - {describes}\n{needs}---\n\n"
+        f"# {doc_id.title()}\n\nThe {doc_id} component.\n"
+    )
+
+
+def test_a_go_file_places_every_import_only_under_a_go_mod(tmp_path: Path) -> None:
+    under = write(tmp_path, "lib/desk/desk.go", "package desk\n")
+    loose = write(tmp_path, "loose/desk.go", "package desk\n")
+    write(tmp_path, "lib/go.mod", "module example.com/lib\n\ngo 1.22\n")
+
+    assert _reading(under).places_every_import(under)
+    assert not _reading(loose).places_every_import(loose)
+    assert not _reading(under, "package desk\n\nfunc (").places_every_import(under)
+
+
+def test_a_true_dependency_is_not_reported_where_no_go_mod_says_where_imports_lead(
+    fixture_repo: Callable[[str], Path],
+) -> None:
+    """With its `go.mod` gone the library's imports cannot be placed, so a missing import
+    proves nothing: neither the dependency its code has nor the one it has not is judged."""
+    root = fixture_repo("go-library")
+    (root / "go.mod").unlink()
+
+    assert run_check(DependencyCheck, root) == []
+
+
+def test_an_import_of_another_module_the_repository_declares_is_placed(tmp_path: Path) -> None:
+    """The server only requires the api module: no `replace` line and no `go.work` says the
+    module is next door, and its `go.mod` under a source root does."""
+    write(tmp_path, "api/go.mod", "module example.com/api\n\ngo 1.22\n")
+    write(tmp_path, "api/api.go", "package api\n\nfunc Version() int {\n\treturn 1\n}\n")
+    write(
+        tmp_path,
+        "server/go.mod",
+        "module example.com/server\n\ngo 1.22\n\nrequire example.com/api v1.0.0\n",
+    )
+    main = write(
+        tmp_path,
+        "server/main.go",
+        'package main\n\nimport "example.com/api"\n\nfunc main() {\n\t_ = api.Version()\n}\n',
+    )
+    write(tmp_path, "server/testdata/go.mod", "module example.com/apiary\n")
+    write(tmp_path, "server/testdata/apiary.go", "package apiary\n")
+    write_config(tmp_path, source_roots=["api", "server"])
+    write(tmp_path, "docs/components/api.md", _component("api", "api/**"))
+    write(tmp_path, "docs/components/server.md", _component("server", "server/**", "api"))
+    roots = [tmp_path / "api", tmp_path / "server"]
+
+    files = _reading(main).files("example.com/api", main, roots)
+
+    assert _relative(files, tmp_path) == ["api/api.go"]
+    assert _reading(main).files("example.com/apiary", main, roots) == []
+    assert run_check(DependencyCheck, tmp_path) == []
+
+
+def test_the_fields_of_a_variable_of_an_unnamed_struct_type_are_not_definitions() -> None:
+    """`Port` is a field of the value of `Config`, which no path names: it is not a
+    variable at the top of the file."""
+    text = "package a\n\nvar Config struct {\n\tPort int\n\tHost string\n}\n"
+
+    assert [(d.symbol, d.kind, d.reachable) for d in _reading(SAMPLE, text).definitions()] == [
+        ("Config", "variable", True)
+    ]
+
+
+def test_a_function_named_test_that_takes_no_testing_t_is_no_test() -> None:
+    text = (
+        'package desk\n\nimport "testing"\n\n'
+        "func TestConnection() bool {\n\treturn true\n}\n\n"
+        "func TestTwo(t *testing.T, n int) {}\n\n"
+        "func TestBench(b *testing.B) {}\n\n"
+        "func TestOpen(t *testing.T) {}\n"
+    )
+
+    assert [d.symbol for d in _reading(SAMPLE, text).tests()] == ["TestOpen"]
+
+
+def test_a_statement_reads_the_same_ended_by_a_semicolon_or_a_line_break() -> None:
+    one_line = "package a\n\nfunc f() int {\n\tx := 1; y := 2\n\treturn x + y\n}\n"
+    two_lines = "package a\n\nfunc f() int {\n\tx := 1\n\ty := 2\n\treturn x + y\n}\n"
+
+    assert _reading(SAMPLE, one_line).canonical("f") == _reading(SAMPLE, two_lines).canonical("f")

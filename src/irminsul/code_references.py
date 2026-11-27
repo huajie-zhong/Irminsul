@@ -18,8 +18,7 @@ from irminsul.inventory import SurfaceItem, available_kinds, kind_capabilities
 from irminsul.inventory.base import SourceReader
 from irminsul.inventory.cli_options import command_options
 from irminsul.inventory.programs import program_names
-from irminsul.languages import LANGUAGE_REGISTRY, reader_for
-from irminsul.languages.reader import dotted
+from irminsul.languages import LANGUAGE_REGISTRY, language_read, reader_for
 
 if TYPE_CHECKING:
     from irminsul.git.reader import GitReader
@@ -62,6 +61,9 @@ class CodeResolver:
         repo_root, config = tree.repo_root, tree.config
         self.builtins: frozenset[str] = frozenset().union(
             *(LANGUAGE_REGISTRY[name].builtins for name in config.languages.enabled)
+        )
+        self._separators = sorted(
+            {LANGUAGE_REGISTRY[name].path_separator for name in config.languages.enabled} - {"."}
         )
         self._repo_root = repo_root
         files = tree.files
@@ -248,6 +250,14 @@ class CodeResolver:
         stripped = self.program_prefix.sub("", text, count=1)
         return stripped, stripped != text
 
+    def dotted(self, text: str) -> str:
+        """A path as a definition's symbol spells it, where an enabled language writes its
+        paths with another separator: `Desk::new` is `Desk.new` in a Rust project. In any
+        other project `::` is not ours, as in a mention of C++'s `std::vector`."""
+        for separator in self._separators:
+            text = text.replace(separator, ".")
+        return text
+
     def resolve(self, span: str) -> list[Reference]:
         """Where the code a span names is defined.
 
@@ -257,11 +267,11 @@ class CodeResolver:
         tried as a function or class by name, as a reader reads one, which resolves when one
         definition has that name, and then as a repository file by path, inside a source root
         or not. An identity of a kind that names definitions, such as an export, gives way to
-        the one definition of that name, when a reader reads it. A path written with `::`,
-        as Rust writes one, is the dotted path.
+        the one definition of that name, when a reader reads it in the export's language. A
+        path written as an enabled language writes one, as Rust's `::`, is the dotted path.
         """
         text, _ = self.strip_program(span)
-        named = dotted(text)
+        named = self.dotted(text)
         refs: list[Reference] = []
         for kind, regexes in self.mentions.items():
             for regex in regexes:
@@ -288,8 +298,15 @@ class CodeResolver:
                     # The identity is a definition's name, so where a reader reads that
                     # definition the span names it, lines and all, wherever a file
                     # re-exports it, and not the first line of an export.
+                    # A definition of another language only shares the name.
                     key = self._symbol_key(named)
-                    if key is not None and len(self._symbols[key]) == 1:
+                    found = self._symbols[key] if key is not None else []
+                    exported = items[best].display
+                    if (
+                        len(found) == 1
+                        and exported is not None
+                        and language_read(found[0].display) == language_read(exported)
+                    ):
                         best = None
             if best is not None:
                 refs.append(self._ref(span, kind, items[best]))
@@ -317,7 +334,7 @@ class CodeResolver:
         """The name that tells the function or class `ref` names from every other in its
         file: `Class.name` for a method, however its span wrote it, so that `Ledger.remove`
         and the `Drawer.remove` a bare `remove` may pair with are two names."""
-        key = self._symbol_key(dotted(self.strip_program(ref.span)[0]))
+        key = self._symbol_key(self.dotted(self.strip_program(ref.span)[0]))
         found = self._symbols[key] if key is not None else []
         return found[0].qualified if len(found) == 1 else ref.identity
 

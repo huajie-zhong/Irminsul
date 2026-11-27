@@ -132,11 +132,11 @@ def files_of(source: str, importer: Path, roots: Sequence[Path], memo: Memo) -> 
 
 
 def mentioned_as(path: Path) -> frozenset[str] | None:
-    """A file that imports `path` spells its stem, or its directory's name for an index
-    file."""
+    """A file that imports `path` spells its stem. An index file is imported by its
+    directory, which a file beside or below it writes as `.` or `..`, so nothing is sure
+    to be there."""
     stem = path.name.split(".", 1)[0]
-    name = path.parent.name if stem == "index" else stem
-    return frozenset({name}) if name else None
+    return frozenset({stem}) if stem and stem != "index" else None
 
 
 def _queries(*languages: str) -> Callable[[], str]:

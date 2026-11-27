@@ -304,18 +304,22 @@ making a feature, a refactor and an RFC-driven change in it.
     with all its lines, where it named the export's first line; in JSON its `kind` is `symbol`
     and no longer `exports`.
   - `context <file>` ranks the tests that import the file, and `anchors --suggest --doc`
-    offers the tests that name a definition: a Go function named `Test...`, a Rust function
+    offers the tests that name a definition: a Go function named `Test...` that takes a
+    `*testing.T`, a Rust function
     under `#[test]`, and for TypeScript, where a test is a call, the named functions a test
     file defines.
   - The `new-dependency` pass reports an import a change added between two documented
-    components. `import-deps` reports a `depends_on` no import backs for Go as it does for
-    Python, and not for TypeScript or Rust, where a path alias or another crate can carry a
-    dependency the reader does not follow; between two components of different languages it
-    judges nothing. `irminsul explain import-deps/hallucinated-dependency` says so.
+    components. `import-deps` reports a `depends_on` no import backs for Go files under a
+    `go.mod` as it does for Python, and not for TypeScript or Rust, where a path alias or
+    another crate can carry a dependency the reader does not follow; between two components
+    of different languages it judges nothing. `irminsul explain
+    import-deps/hallucinated-dependency` says so.
   - An anchor into one of these files names a definition the reader finds: a function, a type,
-    a member of a type, or a name bound outside a function. Its pin hashes the definition's
-    syntax tree, so a comment, a reformat or a trailing comma no longer moves it, and a
-    decorator, an attribute or an overload's signature above the definition is part of it.
+    a member of a type, a name bound outside a function, or in JavaScript a function assigned
+    on `exports`, `module.exports` or a prototype. Its pin hashes the definition's syntax
+    tree, so a comment, a change of line breaks or indentation, or a trailing comma no longer
+    moves it, and a decorator, an attribute or an overload's signature above the definition is
+    part of it.
   - A file that holds syntax the grammar does not know, as some valid TypeScript does, still
     answers each definition and import around it.
   - A function in a block or in an object literal is not something an anchor or a code span can
@@ -342,6 +346,10 @@ making a feature, a refactor and an RFC-driven change in it.
   definition the paragraph is about, or at the whole file.
 - A Go project can see `import-deps/hallucinated-dependency` for the first time, on a
   `depends_on` between two Go components that no import backs.
+- A `depends_on` between two components that each own a TypeScript, JavaScript or Rust file
+  beside their Python is no longer judged by `import-deps`: one of those files could carry
+  the dependency through an import the reader does not follow. It was judged through the
+  Python alone before.
 - A code span that names a function or class of those languages used to be `unbound-name` in
   `list review --written` and listed by `anchors --suggest`; it now resolves, and only a
   constant or a name no reader finds is still unbound.

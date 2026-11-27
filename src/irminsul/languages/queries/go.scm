@@ -41,9 +41,19 @@
 ; A comment the compiler reads, such as `//go:embed`, is part of what it stands above.
 ((comment) @decoration (#match? @decoration "^//go:"))
 
-; `go test` runs a function named Test and then anything but a lower-case letter.
-((function_declaration name: (identifier) @name) @test
- (#match? @name "^Test($|[^a-z])"))
+; `go test` runs a function named Test and then anything but a lower-case letter that
+; takes a `*testing.T` and nothing else.
+((function_declaration
+   name: (identifier) @name
+   parameters: (parameter_list
+     . (parameter_declaration
+         type: (pointer_type
+           (qualified_type
+             package: (package_identifier) @_package
+             name: (type_identifier) @_type))) .)) @test
+ (#match? @name "^Test($|[^a-z])")
+ (#eq? @_package "testing")
+ (#eq? @_type "T"))
 
 ; ---- imports
 
@@ -70,3 +80,9 @@
 (variadic_parameter_declaration name: (identifier) @bound)
 (range_clause left: (expression_list (identifier) @bound))
 (receive_statement left: (expression_list (identifier) @bound))
+
+; ---- canonical text
+
+; A statement is ended by a line break or a semicolon, as `gofmt` chooses: a clause of a
+; `for` or an `if` is told from the next by the field it fills, not by the semicolon.
+";" @layout
