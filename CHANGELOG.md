@@ -161,9 +161,9 @@ making a feature, a refactor and an RFC-driven change in it.
   which no check reports, is now seen without `--re-pin --all` rewriting it
   ([A pin that no longer matches its file is listed](docs/rfcs/a-pin-that-no-longer-matches-its-file-is-listed.md)).
 - `anchors --suggest --doc <doc>` also lists each code span of that doc that resolves to one
-  Python function or class, once for each definition, with where it is defined and up to three
-  test functions that name it, each as an anchor marker ready to paste: a function whose name
-  starts with `test`, in a Python file under `paths.test_roots` that imports the defining
+  function or class, once for each definition, with where it is defined and up to three
+  test functions that name it, each as an anchor marker ready to paste: a function its language's reader calls a test, in Python one whose name
+  starts with `test`, in a file under `paths.test_roots` that imports the defining
   module, whose body refers to the definition through an import of that module. A parameter, a
   fixture or a local variable spelled like the definition does not count, and a method counts
   as an attribute of its name in a test whose imports reach its class or its module. A name no
@@ -220,15 +220,16 @@ making a feature, a refactor and an RFC-driven change in it.
 - `list review` no longer splits the marker of a numbered list item, such as `1.`, into a sentence
   of its own, and without `--changed` it lists every code-naming sentence of a doc no commit holds
   yet, instead of reporting that none changed since the doc was last committed.
-- `list review --changed` also queues each sentence whose code span names a Python function or
+- `list review --changed` also queues each sentence whose code span names a function or
   class the change edited, renamed or deleted, marked `names-changed-code`, in any live doc,
   decision record's Decision or guidance file, whether or not the change opened it: a guide that
   names a function is asked about it when the function changes. A function or class is its decorators,
-  its `def` or `class` line and its body, and it is touched when the change leaves it other
+  its definition line and its body, and it is touched when the change leaves it other
   lines than it had at the merge base, so a deletion just below it does not touch it. One the
   change removed or renamed is found in the merge base's text, and so is one whose name a
   second definition took; in a file that no longer parses, each definition a sentence named is
-  listed as changed, with no line. Only Python functions and classes are paired. A command, an
+  listed as changed, with no line. A function or class of any language a reader reads is
+  paired, in Python, TypeScript, JavaScript, Go or Rust. A command, an
   option, an environment variable and a path are not paired with a change.
   Each item lists the name and the change's file and line, as `changed_code` in the JSON and as
   `changed:` and `removed:` lines in plain output. A sentence the change itself wrote keeps its
@@ -237,7 +238,7 @@ making a feature, a refactor and an RFC-driven change in it.
 - `context <path...>` names the docs that name code in each path, under `named_by` in the JSON
   and as "Docs that name code in <path>" in plain output: each live doc, decision record, read by
   its Decision alone, and guidance file with a sentence whose code span names anything Irminsul
-  resolves to the path, with the number of such sentences: a Python function or class, a
+  resolves to the path, with the number of such sentences: a function or class, a
   command, an option, an environment variable, or any other surface identity the configured
   extractors and rules give the path, such as a TypeScript export or an MCP tool. An
   option counts only when its sentence names the command that declares it, or one command alone
@@ -273,7 +274,7 @@ making a feature, a refactor and an RFC-driven change in it.
   lines between two nearby edits read as changed. A rename below the git root is read whatever
   `diff.relative` says.
 - `list review --changed` lists only what a change left as it was and may have made stale: the
-  sentences that name a Python function or class it touched, the claims whose evidence it
+  sentences that name a function or class it touched, the claims whose evidence it
   touched, an old owner's sentences about a file it moved, and a summary a body edit left
   behind. The sentences the change added, reworded or deleted move to `list review --written`,
   for whoever reviews the change, built as before with their `was`, `unbound-name` and

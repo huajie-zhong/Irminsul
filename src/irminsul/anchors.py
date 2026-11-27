@@ -11,8 +11,9 @@ symbol's definition. For Python that is its **syntax tree** — a function or cl
 docstring, or the whole assignment statement that binds a constant — written out as node
 types and fields, without positions. Formatting and comment churn do not trip it, only a
 real change to the code the claim describes does, and every Python version that parses the
-code to the same tree gives the same hash. In any other text
-file the symbol resolves when its name appears as a whole token, and the hash is taken
+code to the same tree gives the same hash. For a language tree-sitter reads it is the
+definition's tree as the grammar gives it, without comments or layout. In a text file no
+reader reads, the symbol resolves when its name appears as a whole token, and the hash is taken
 over the block that defines it, with whitespace normalized: the line that defines the
 name (a definition keyword or an assignment, else its first mention outside a comment),
 the decorator lines above it, and the lines indented under it. A marker inside a code

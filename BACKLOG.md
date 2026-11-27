@@ -418,7 +418,7 @@ did not write first.
 
 ### `change-queue-asks-through-functions-and-classes-alone`
 
-Since 2026-11-26 `list review --changed` queues each sentence whose code span names a Python
+Since 2026-11-26 `list review --changed` queues each sentence whose code span names a
 function or class the change touched, marked `names-changed-code` (`_sentences_naming_changed_code`,
 `src/irminsul/listing/review.py`), and pairs nothing else with a change (`ChangePairing`,
 `src/irminsul/listing/changed_code.py`). That is the owner's decision of that day in the RFC
