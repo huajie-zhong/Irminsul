@@ -61,9 +61,8 @@ TypeScript file was once written five times with five answers.
   imports and which repository files an import may load, what a definition's body refers to,
   the canonical text a pin hashes, and which definitions are tests. A feature that reads code
   asks the reader of the file's language and names no language, so `import-deps` reads every
-  language whose reader answers imports. Python's reader is its own parser, `ast`. TypeScript,
-  Go and Rust are read through tree-sitter, a required dependency (accepted, not yet
-  implemented), and until then Python is the one language with a reader.
+  language whose reader answers imports. Python's reader is its own parser, `ast`, and no
+  other language has a reader yet.
 
 ## Alternatives Considered
 
@@ -96,5 +95,5 @@ TypeScript file was once written five times with five answers.
 - 2026-11-27: The interface and Python's reader are implemented and stated in the Decision: a
   profile names its reader, and anchor pins, the definitions and tests `anchors --suggest`
   offers, the pairing of a code span with a function, the test ranking and both import checks
-  read through it, so `IMPORT_LANGUAGE` is gone. No Python pin moved. The tree-sitter readers
-  are not built yet.
+  read through it, so `IMPORT_LANGUAGE` is gone. No pin of code this left unchanged moved. The
+  tree-sitter readers are not built yet and their rule joins the Decision when they are.

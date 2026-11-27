@@ -248,4 +248,5 @@ paragraphs, which trains a reader to re-pin without reading.
 - 2026-11-27: The language interface is implemented for Python: a pin hashes the canonical
   text the reader of the file's language gives, which for Python is `_canonical` of the tree as
   before, now in `src/irminsul/languages/python_reader.py` with the resolution of a symbol, and
-  `anchors --suggest` reads definitions and tests through that reader. No pin moved.
+  `anchors --suggest` reads definitions and tests through that reader. No pin of code this
+  left unchanged moved.
