@@ -427,6 +427,25 @@ def test_a_depends_on_no_import_backs_is_reported_once_and_one_backed_is_not(
     assert finding.message == "depends_on 'desk' declared but no import relationship found"
 
 
+def test_a_go_file_that_is_not_utf8_denies_no_dependency(tmp_path: Path) -> None:
+    """The cart imports nothing, so its doc's `depends_on` is reported. Saved as Latin-1 its
+    text is not read, no import of it is known, and the report goes."""
+    write(tmp_path, "go.mod", "module example.com/shop\n\ngo 1.22\n")
+    cart = write(tmp_path, "src/shop/cart.go", "package shop\n\n// cafe\n")
+    write(tmp_path, "src/billing/invoice.go", "package billing\n")
+    write_config(tmp_path, source_roots=["src"])
+    write(tmp_path, "docs/components/shop.md", _component("shop", "src/shop/**", "billing"))
+    write(tmp_path, "docs/components/billing.md", _component("billing", "src/billing/**"))
+
+    assert [f.code for f in run_check(DependencyCheck, tmp_path)] == [
+        "import-deps/hallucinated-dependency"
+    ]
+
+    cart.write_bytes(b"package shop\n\n// caf\xe9\n")
+
+    assert run_check(DependencyCheck, tmp_path) == []
+
+
 def test_two_files_of_one_package_owned_by_two_docs_are_related_with_no_import(
     tmp_path: Path,
 ) -> None:

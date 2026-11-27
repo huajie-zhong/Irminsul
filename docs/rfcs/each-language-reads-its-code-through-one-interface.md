@@ -30,7 +30,8 @@ interface that asks those five questions of any language. Python answers through
 as today; TypeScript, Go and Rust answer through tree-sitter, the route
 `claim-evidence-names-a-part` already records. A feature asks the interface and reaches
 every language that answers, and adding a language is a profile, a grammar package and a
-file of queries. The owner put it on the roadmap on 2026-11-26 and answered its six decisions
+file of queries, with code beside them for what a query cannot say. The owner put it on the
+roadmap on 2026-11-26 and answered its six decisions
 on 2026-11-27.
 
 ## Problem
@@ -160,8 +161,8 @@ Answered by the owner on 2026-11-27, while the tree-sitter readers were built:
    only between docs whose common languages have every import of the depending doc's files
    placed. Not chosen: judging every language with a reader, which would report true
    dependencies with no way to answer. The owner added later that day, after the readers had
-   merged, that a Python file which does not parse or is not UTF-8 places none, where it had
-   still denied a dependency.
+   merged, that a Python file which does not parse places none, where it had still denied a
+   dependency, and that no file does whose text is not UTF-8.
 10. **For TypeScript, every named function a test file defines is offered as a test**, as the
     design detail below says; the reader knows a test file by the test call it holds. Not
     chosen: offering none, since such a function is often a helper.

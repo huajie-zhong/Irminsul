@@ -80,7 +80,8 @@ TypeScript file was once written five times with five answers.
   and the reading says the rest is unknown. Python stays all or nothing.
 - **A missing import denies a dependency only where every import is placed.** A reading says
   whether every import of its file that stays in the repository is placed. A Python file's
-  is, and a Go file's under a `go.mod`, when the file parses whole. A TypeScript or a
+  is, and a Go file's under a `go.mod`, when the file parses whole; a file whose text is
+  not UTF-8 places none. A TypeScript or a
   Rust file's never is, since a
   path alias, a workspace package or another crate may stand between two files. `import-deps`
   reports a `depends_on` no import backs only when the two docs own code of a language in
@@ -144,7 +145,8 @@ TypeScript file was once written five times with five answers.
 - 2026-11-27: The owner answered that question the same day: a Python file that does not
   parse places no import either, as a Go file does not, so `import-deps` no longer reports a
   `depends_on` of a doc that owns one. None of such a file's imports is read, and a missing
-  one proved nothing.
+  one proved nothing. A file of any read language whose text is not UTF-8 is not read at
+  all and follows the same rule, by the owner's answer of that day.
 - 2026-11-27: The pattern that reads an environment variable is a field of the language's
   profile, `env_var_pattern`, where the `env-vars` extractor held one pattern per language
   and joined them to the profiles by suffix. The surface prints what it printed.

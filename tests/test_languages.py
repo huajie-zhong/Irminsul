@@ -84,6 +84,7 @@ def _seen_by_the_checks(repo: Path) -> tuple[object, ...]:
     return (
         sorted(display for _, display in walk_configured_source_files(repo, graph.config).files),
         omitted_from_source_ownership("src/desk/mod.gox", None),
+        index.holds("gox_cache/desk.gox", ""),
         index.holds("other/NOTICE.txt", ""),
         index.holds("lib/ACTIVATE.txt", ""),
         _invoked_program(["goxpm", "run", "irminsul", "check"]),
@@ -116,7 +117,15 @@ def test_a_registered_language_is_known_to_each_check_by_its_profile(
         "src/desk/mod.gox",
     ]
 
-    assert _seen_by_the_checks(tmp_path) == (every_file, False, True, True, "goxpm", "gox1.2")
+    assert _seen_by_the_checks(tmp_path) == (
+        every_file,
+        False,
+        True,
+        True,
+        True,
+        "goxpm",
+        "gox1.2",
+    )
 
     monkeypatch.setitem(
         LANGUAGE_REGISTRY,
@@ -139,6 +148,7 @@ def test_a_registered_language_is_known_to_each_check_by_its_profile(
     assert _seen_by_the_checks(tmp_path) == (
         ["src/desk/desk.gox", "src/desk/mod.gox"],
         True,
+        False,
         False,
         False,
         "irminsul",

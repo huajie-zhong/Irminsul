@@ -81,9 +81,9 @@ class LanguageProfile:
     `inventory-drift` looks past one for the program a documented command line runs."""
     interpreter: re.Pattern[str] | None = None
     """What the whole name of the language's interpreter looks like, as `python3.12` and `py`
-    are Python's. `inventory-drift` reads a command line that starts with one as running the
-    module after `-m`, or the script the interpreter is given. None where the language's
-    programs are not run through one."""
+    are Python's. `inventory-drift` reads a command of that name, first on its line or
+    behind a launcher, as running the module after `-m`, or the script the interpreter is
+    given. None where the language's programs are not run through one."""
     path_separator: str = "."
     """What the language writes between the parts of a path to a definition, as Rust writes
     `Desk::new`. A doc may write a path that way where the language is enabled."""

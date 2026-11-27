@@ -332,15 +332,15 @@ making a feature, a refactor and an RFC-driven change in it.
   files no doc is asked to claim, the directories and compiled files its tools write, the
   directories of installed code and the file that marks an installed environment, and its
   launchers and interpreter. `uniqueness`, the source walk, the file index and
-  `inventory-drift` read them there, where each kept a list of Python's and Node's, and
+  `inventory-drift` read them there, where each kept a list of Python's or Node's, and
   report what they reported.
 - A language profile holds the pattern that reads an environment variable in its language,
   `env_var_pattern`, where the `env-vars` extractor held one per language. `irminsul surface
   env-vars` prints what it printed.
 - `import-deps` no longer reports a `depends_on` of a doc that owns a Python file with a
-  syntax error, or one that is not UTF-8. None of that file's imports is read, so a missing
-  one proves nothing: with `from billing import invoice` above a broken line, the true
-  `depends_on: billing` was reported as hallucinated.
+  syntax error, or a Python or Go file that is not UTF-8. None of that file's imports is
+  read, so a missing one proves nothing: with `from billing import invoice` above a broken
+  line, the true `depends_on: billing` was reported as hallucinated.
 - tree-sitter is a required dependency: `tree-sitter` 0.26.0 with the TypeScript, Go and Rust
   grammars, each pinned to one version because a pin hashes the tree it gives. They ship
   wheels for CPython on Linux, macOS and Windows; on musl ARM64, PyPy or a free-threaded
