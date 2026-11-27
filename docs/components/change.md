@@ -31,8 +31,8 @@ claims:
       - src/irminsul/change/transition.py
       - src/irminsul/change/finalize.py
     pinned:
-      src/irminsul/change/transition.py: sha256:ee4464bfd577
-      src/irminsul/change/finalize.py: sha256:d1c2e789012e
+      src/irminsul/change/transition.py: sha256:b01a0a810dae
+      src/irminsul/change/finalize.py: sha256:f25f746c2024
 inventory:
   - kind: cli
     source: src/irminsul/cli.py

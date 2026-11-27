@@ -1,16 +1,18 @@
 ---
 id: each-language-reads-its-code-through-one-interface
 title: "Each language reads its code through one interface"
-status: draft
-summary: "Every feature that asks what a file defines, on which lines, what it imports or what a function body refers to asks one interface, which Python answers through its own parser and TypeScript, Go and Rust through tree-sitter, so a feature reaches every language and a language is added in one place."
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: accepted
 affects:
   - languages
   - anchors
   - new-list-regen
   - context
   - checks
+resolved_by: docs/decisions/surface-rules-and-language-profiles-are-data.md
+summary: "Every feature that asks what a file defines, on which lines, what it imports or what a function body refers to asks one interface, which Python answers through its own parser and TypeScript, Go and Rust through tree-sitter, so a feature reaches every language and a language is added in one place."
+required_updates: []
 weight: large
 ---
 
@@ -27,7 +29,8 @@ interface that asks those five questions of any language. Python answers through
 as today; TypeScript, Go and Rust answer through tree-sitter, the route
 `claim-evidence-names-a-part` already records. A feature asks the interface and reaches
 every language that answers, and adding a language is a profile, a grammar package and a
-file of queries. The owner put it on the roadmap on 2026-11-26; six decisions are open.
+file of queries. The owner put it on the roadmap on 2026-11-26 and answered its six decisions
+on 2026-11-27.
 
 ## Problem
 
@@ -95,12 +98,12 @@ extra would let a file resolve on one machine and fail on another, which
 `checks-are-deterministic` in [enforcement](../foundation/enforcement.md) rules out, as the
 accepted `claim-evidence-names-a-part` already says.
 
-**A grammar's release can rename a node** and break a query, and under decision 4(a) it can
+**A grammar's release can rename a node** and break a query, and under decision 4 it can
 move every pin of its language. Each grammar and the `tree-sitter` runtime are pinned to one
 exact version, so two machines cannot disagree, and each language's queries are tested against a fixture of its code. A
 grammar upgrade is a release of Irminsul whose notes say which pins move.
 
-**Every non-Python anchor's pin moves once** if its hash changes from text to syntax tree
+**Every non-Python anchor's pin moves once**, since its hash changes from text to syntax tree
 (decision 4), and each is answered by one re-pin after its paragraph is re-read.
 
 **Time.** The probe parsed and queried a small file in 1 to 6 milliseconds, the first query
@@ -108,37 +111,31 @@ of a language included. Files are parsed once per run and cached, as Python modu
 
 ## Decisions
 
-Open, for the owner:
+Answered by the owner on 2026-11-27:
 
-1. **The parser for TypeScript, Go and Rust.** (a) tree-sitter, required, as recommended and
-   as `claim-evidence-names-a-part` records. (b) A regular expression per language: no
-   dependency, but it misses nested and multi-line definitions and each language is written
-   again from nothing. (c) Each language's own tool, such as `tsc` or `go/ast`: the most
-   exact, but CI and every agent's machine would need that toolchain, and each starts slowly.
-   The cost of (a) is a compiled dependency for every adopter, Python-only ones included,
-   built from source where no wheel exists.
-2. **Python stays on its own parser.** Recommended: moving it to tree-sitter would move every
-   Python pin of every adopter. What it would buy: `ast` parses only the syntax of the Python
-   running Irminsul, so a project written for a newer Python can hold files that do not parse,
-   and a grammar does not depend on the running Python.
-3. **The first languages.** The three with profiles, TypeScript, Go and Rust. The TypeScript
-   profile lists JavaScript's suffixes, so this also decides whether those files are read
-   through the TypeScript grammar or the JavaScript one; recommended is to measure both on
-   real JavaScript before choosing. A `.tsx` file needs the grammar's TSX dialect, which ships
-   in the same package; the TypeScript dialect reports an error on JSX.
-4. **How a non-Python pin is hashed.** (a) The definition's syntax tree without comments, as
-   a Python pin is: every existing non-Python pin moves once, and may move again when a grammar
-   is upgraded, which is why grammars are pinned exactly. Recommended. (b) The definition's
-   text, whitespace collapsed, as today, but found by the reader rather than by a keyword
-   guess: a comment edit keeps asking about the paragraph, and a grammar upgrade moves
-   nothing.
-5. **Whether an adopter can add a language without a release.** (a) In this repository only,
-   at first. Recommended. (b) A package registers a language through an entry point, which a
-   later RFC would design.
-6. **A principle in the foundation.** Proposed for `docs/foundation/principles.md`: "A
-   feature that reads code reads it through the language interface, so it reaches every
-   language Irminsul reads, and a language is added in one place." A change to the
-   foundation's prose is the owner's sign-off.
+1. **TypeScript, Go and Rust are read through tree-sitter, as a required dependency**, as
+   `claim-evidence-names-a-part` records. Every adopter installs it, Python-only ones
+   included, and builds it from source where no wheel exists. Not chosen: a regular
+   expression per language, which needs no dependency but misses nested and multi-line
+   definitions; each language's own tool, the most exact, which every machine running the
+   gate would need installed.
+2. **Python stays on its own parser**, so no Python pin of any adopter moves. Given up: a
+   project written for a newer Python than the one running Irminsul can hold files that do
+   not parse.
+3. **The first languages are TypeScript, Go and Rust.** Whether JavaScript files are read
+   through the TypeScript grammar or the JavaScript one is chosen by measuring both on real
+   JavaScript; a `.tsx` file is read through the grammar's TSX dialect.
+4. **A non-Python pin hashes the definition's syntax tree without comments**, as a Python pin
+   does. Every existing non-Python pin moves once, and the grammars and the runtime are pinned
+   to exact versions so that only a release of Irminsul moves them again. Not chosen: the
+   definition's text, which no grammar upgrade moves but which keeps asking about a paragraph
+   after a comment edit.
+5. **A language is added in this repository**, not by a separate package. Registering one from
+   outside is left to a later RFC.
+6. **The foundation gains the principle** "A feature that reads code reads it through the
+   language interface, so it reaches every language Irminsul reads, and a language is added in
+   one place", in the pull request that lands the interface, since it cannot be followed
+   before.
 
 ## Design detail
 
@@ -254,7 +251,16 @@ check.
 
 - `T1` Add the interface, with Python's answers from its parser and no change in behaviour. (req: definitions-in-every-supported-language)
 - `T2` Move the five modules that call Python's parser for these questions onto the interface: `code_references.py`, `anchors.py`, `binding.py`, `ranked_tests.py` and `checks/dependency_check.py`. (req: features-read-code-through-the-interface)
-- `T3` Add tree-sitter as a required dependency, with readers and query files for TypeScript, Go and Rust and a fixture each. (req: definitions-in-every-supported-language)
-- `T4` Hash a non-Python pin from its syntax tree, if decision 4 says so, and say how an adopter answers the moved pins. (component: anchors)
+- `T3` Add tree-sitter as a required dependency, with readers and query files for TypeScript, Go and Rust and a fixture each, `.tsx` read through the TSX dialect, and the grammar for JavaScript files chosen by measuring both on real JavaScript. (req: definitions-in-every-supported-language)
+- `T4` Hash a non-Python pin from its syntax tree, pin the runtime and grammars exactly, and say how an adopter answers the moved pins. (component: anchors)
 - `T5` Move the environment variable pattern into the profile, and say in the languages doc how a language is added. (req: a-language-is-added-in-one-place)
-- `T6` Lift the Python-only sentences of the two RFCs and the loop, and state the rules in the records. (component: languages)
+- `T6` Lift the Python-only sentences the two implemented RFCs left in the loop, the component docs and the records, and state the rules in the records; the sealed RFCs stay as they are. (component: languages)
+- `T7` Add the principle of decision 6 to `docs/foundation/principles.md` in the pull request that lands the interface. (component: languages)
+
+## Resolution
+
+Accepted by the owner on 2026-11-27, with the answers recorded under Decisions, and resolved by
+[Surface rules and language profiles are data](../decisions/surface-rules-and-language-profiles-are-data.md),
+whose Changes item records it. [Code is named in code spans and bound by anchors](../decisions/code-is-named-in-code-spans-and-bound-by-anchors.md)
+records its part too, how a pin is hashed. Each rule joins its record's Decision with the
+implementation, as an edit in place.

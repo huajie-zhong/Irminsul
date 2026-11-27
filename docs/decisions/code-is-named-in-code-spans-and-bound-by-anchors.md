@@ -225,3 +225,6 @@ paragraphs, which trains a reader to re-pin without reading.
 - 2026-11-26: The written list is implemented and stated in the Decision: an unbound name is
   marked on the `edited` item of `list review --written`, since `list review --changed` no
   longer lists the sentences a change wrote.
+- 2026-11-27: Accepted [Each language reads its code through one interface](../rfcs/each-language-reads-its-code-through-one-interface.md):
+  a pin into a TypeScript, Go or Rust definition will hash its syntax tree without comments,
+  as a Python pin does, with the tree-sitter runtime and grammars pinned to exact versions.
