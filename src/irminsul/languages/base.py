@@ -1,8 +1,8 @@
 """LanguageProfile dataclass.
 
 Profiles are pure data, and each field says what reads it. New languages are added by
-creating a profile and registering it in `irminsul.languages`; nothing in the core checks
-needs to change.
+creating a profile and registering it in `irminsul.languages`, with the reader its `reader`
+names registered in `READERS` there; nothing in the core checks needs to change.
 """
 
 from __future__ import annotations
@@ -51,3 +51,8 @@ class LanguageProfile:
     A doc naming one cites the language, not this repository's code, so no source file is
     asked to define it. Empty where the profile lists none.
     """
+    reader: str | None = None
+    """The name, in `READERS`, of the reader that answers for a file of this language what it
+    defines, imports and refers to (`irminsul.languages.reader`). A name rather than the reader,
+    since a profile is data and a reader is code. None where no reader reads the language yet,
+    so no feature that reads code reaches its files."""

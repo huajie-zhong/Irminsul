@@ -14,6 +14,7 @@ from irminsul.languages.base import LanguageProfile
 
 PYTHON_PROFILE = LanguageProfile(
     name="python",
+    reader="python",
     builtins=frozenset(dir(builtins)),
     fence_labels=("python", "py"),
     suffixes=(".py",),

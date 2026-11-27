@@ -35,7 +35,7 @@ file is curated and survives it.
 | `frontmatter` | [Frontmatter](components/frontmatter.md) | Per-doc YAML frontmatter parser/validator. |
 | `git` | [Git helpers](components/git.md) | Git helpers for changed paths, commit times, and blame. |
 | `init` | [Init scaffolder](components/init.md) | Scaffolding command and templates. |
-| `languages` | [Language profiles](components/languages.md) | Language-profile registry. |
+| `languages` | [Language profiles](components/languages.md) | Language-profile registry, and the reader a profile names to read its language's code. |
 | `mcp-server` | [MCP server](components/mcp-server.md) | Read-only MCP stdio server that lets AI agents query the doc graph natively instead of shelling out to the CLI. |
 | `new-list-regen` | [New / List / Fix commands](components/new-list-regen.md) | `new`, `list`, and `fix` commands, and the agent manifest `fix` rewrites. |
 | `orient` | [Agent orientation command](components/orient.md) | The first call for agents — repo structure, doc totals, source ownership coverage, entry docs and commands as one report. |

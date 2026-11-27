@@ -11,15 +11,17 @@ needs to change.
 
 from __future__ import annotations
 
-import ast
 import os
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from functools import cached_property
 from pathlib import Path, PurePosixPath
 from typing import Protocol, runtime_checkable
 
+from irminsul.languages import reader_for
 from irminsul.languages.python import PYTHON_PROFILE
+from irminsul.languages.python_reader import PYTHON_READER, PythonReading
+from irminsul.languages.python_reader import PythonModule as PythonModule
+from irminsul.languages.reader import CodeReader, CodeReading
 
 
 @dataclass(frozen=True)
@@ -58,38 +60,19 @@ def dedupe(items: list[SurfaceItem]) -> list[SurfaceItem]:
     return out
 
 
-@dataclass(frozen=True)
-class PythonModule:
-    """A Python file's syntax tree, and every node in it in `ast.walk` order."""
-
-    tree: ast.Module
-
-    @cached_property
-    def nodes(self) -> tuple[ast.AST, ...]:
-        return tuple(ast.walk(self.tree))
-
-    @classmethod
-    def parse(cls, text: str) -> PythonModule | None:
-        """The module `text` holds, or None when it does not parse."""
-        try:
-            return cls(ast.parse(text))
-        except SyntaxError:
-            return None
-
-
 class SourceReader:
     """Files read and parsed at most once each, for the life of the reader.
 
     A file that is missing, unreadable or not UTF-8 carries no surface the extractors can
     see, and one such file in a source root must not stop a run over the rest, so it
-    reads as None; so does Python that does not parse. Keyed by the path's spelling rather
-    than by `Path`, which compares case-insensitively on Windows even where the filesystem
-    does not.
+    reads as None; so does Python that does not parse, as a module, while its reading says
+    it did not parse. Keyed by the path's spelling rather than by `Path`, which compares
+    case-insensitively on Windows even where the filesystem does not.
     """
 
     def __init__(self) -> None:
         self._texts: dict[str, str | None] = {}
-        self._modules: dict[str, PythonModule | None] = {}
+        self._readings: dict[tuple[str, CodeReader], CodeReading | None] = {}
 
     def text(self, path: Path) -> str | None:
         key = os.fspath(path)
@@ -100,12 +83,26 @@ class SourceReader:
                 self._texts[key] = None
         return self._texts[key]
 
+    def reading(self, path: Path) -> CodeReading | None:
+        """The file as its language's reader reads it; None when no language with a reader
+        lists its suffix, or it cannot be read as text."""
+        reader = reader_for(path)
+        return None if reader is None else self.read_with(path, reader)
+
     def module(self, path: Path) -> PythonModule | None:
-        key = os.fspath(path)
-        if key not in self._modules:
+        """The file's Python syntax tree, which the framework extractors read, whatever its
+        suffix; None when it does not parse. It is the parse Python's reader reads, so a file
+        both read is parsed once."""
+        reading = self.read_with(path, PYTHON_READER)
+        return reading.module if isinstance(reading, PythonReading) else None
+
+    def read_with(self, path: Path, reader: CodeReader) -> CodeReading | None:
+        """The file as `reader` reads it, read once; None when it cannot be read as text."""
+        key = (os.fspath(path), reader)
+        if key not in self._readings:
             text = self.text(path)
-            self._modules[key] = None if text is None else PythonModule.parse(text)
-        return self._modules[key]
+            self._readings[key] = None if text is None else reader.read(text)
+        return self._readings[key]
 
     def python_modules(
         self, source_files: Iterable[tuple[Path, str]]
