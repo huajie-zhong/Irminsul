@@ -190,6 +190,21 @@ def test_a_python_file_that_does_not_parse_denies_no_dependency(tmp_path: Path) 
     assert run_check(DependencyCheck, tmp_path) == []
 
 
+def test_a_python_file_that_is_not_utf8_denies_no_dependency(tmp_path: Path) -> None:
+    """The cart is Latin-1, as its first line says, so its text is not read and its import
+    of the invoice is not seen: the `depends_on` is not reported."""
+    write(tmp_path, "src/shop/cart.py", "")
+    (tmp_path / "src/shop/cart.py").write_bytes(
+        b"# -*- coding: latin-1 -*-\nfrom billing import invoice\nNAME = '\xe9'\n"
+    )
+    write(tmp_path, "src/billing/invoice.py", "RATE = 2\n")
+    write_config(tmp_path, source_roots=["src"])
+    write(tmp_path, "docs/components/shop.md", _component("shop", "src/shop/**", "billing"))
+    write(tmp_path, "docs/components/billing.md", _component("billing", "src/billing/**"))
+
+    assert run_check(DependencyCheck, tmp_path) == []
+
+
 def test_two_components_with_other_languages_that_differ_are_still_judged(
     tmp_path: Path,
 ) -> None:

@@ -10,7 +10,8 @@ A missing import says two docs are unrelated only where an import would have sho
 relation: the two own code of a language in common, and every import of the depending
 doc's files of each such language is placed, which a reading says of its file. A file whose
 imports are only partly placed, because a path alias or another package may stand between
-two files or because it does not parse, backs a dependency it finds and denies none. A doc
+two files or because it does not parse or is not UTF-8, backs a dependency it finds and
+denies none. A doc
 that also owns code no reader reads is judged through the rest alone, so a dependency only
 that code backs is still reported.
 """
@@ -114,9 +115,9 @@ class DependencyCheck:
             "code. It is judged only where an import would have shown it: the two docs "
             "own code of a language in common, and every import of this doc's files of each "
             "such language can be placed. Where a path alias, another package or a missing "
-            "manifest may stand between two files, or one of its files does not parse, a "
-            "missing import proves nothing and the entry is not judged. Remove the stale "
-            "declaration, or verify the doc "
+            "manifest may stand between two files, or one of its files is not "
+            "UTF-8 or does not parse, a missing import proves nothing and the entry is not "
+            "judged. Remove the stale declaration, or verify the doc "
             "claiming the dependent module actually covers the right files."
         ),
     }
@@ -157,14 +158,15 @@ class DependencyCheck:
 
             actual_deps: set[str] = set()
             # The languages of which this doc owns a file whose imports are only partly
-            # placed: one of them could hold an import unseen.
+            # placed, or whose text could not be read: one of them could hold an import
+            # unseen.
             unplaced: set[str] = set()
             for abs_path in files:
                 reading = graph.source.reading(abs_path)
+                if reading is None or not reading.places_every_import(abs_path):
+                    unplaced.update(_languages([abs_path]))
                 if reading is None:
                     continue
-                if not reading.places_every_import(abs_path):
-                    unplaced.update(_languages([abs_path]))
                 for candidate in imported_files(reading, abs_path, roots):
                     dep_id = ownership.owner_of(candidate)
                     if dep_id and dep_id != node.id:

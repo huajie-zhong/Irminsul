@@ -97,12 +97,18 @@ def test_a_relationship_python_imports_cannot_show_is_not_judged(
 
 
 def test_a_python_file_that_is_not_utf8_is_not_read(tmp_path: Path) -> None:
+    """Its text is not read, so the run goes on and none of its imports is known: the
+    `depends_on` it may back is not reported."""
     files = {"src/pkg/__init__.py": "", "src/pkg/a.py": "import json\n", "src/pkg/b.py": "x = 1\n"}
     repo = _two_docs(tmp_path, files, "src/pkg/a.py", "src/pkg/b.py")
-    (repo / "src" / "pkg" / "a.py").write_bytes(b"x = '\xff\xfe'\n")
+
     assert [f.message for f in _findings(repo)] == [
         "depends_on 'b' declared but no import relationship found"
     ]
+
+    (repo / "src" / "pkg" / "a.py").write_bytes(b"x = '\xff\xfe'\n")
+
+    assert _findings(repo) == []
 
 
 def _ownership(repo: Path) -> SourceOwnership:
