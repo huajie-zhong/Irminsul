@@ -93,7 +93,9 @@ slug two headings share, a key in a file of several YAML documents. That is
 knows. A part of a file whose type has no finder, with no marker of that name, is
 `claim-anchor/part-unsupported`: the name may stand in the file, and the answer is to mark
 the lines or to anchor the whole file. `anchors --suggest` offers `path#name` only where it
-resolves, and otherwise the file.
+resolves, and otherwise the file, as a mention; for a dotted name, only a file that spells
+each of its parts.
+<!-- anchor: tests/test_binding.py#test_a_file_that_holds_only_the_last_word_of_a_dotted_name_is_no_mention @sha256:c374b15fa838 -->
 <!-- anchor: src/irminsul/parts.py#find_part @sha256:ba32c028efc9 -->
 <!-- anchor: tests/test_binding.py#test_a_symbol_in_a_file_no_reader_reads_is_unsupported_without_markers @sha256:837deb964faf -->
 <!-- anchor: tests/test_binding.py#test_a_marked_region_of_a_file_no_reader_reads_is_the_part @sha256:f5fca8bcd203 -->

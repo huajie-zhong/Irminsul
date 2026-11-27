@@ -321,6 +321,22 @@ def test_a_mention_is_offered_only_when_nothing_defines_the_name(tmp_path: Path)
     assert mention.marker("lonely_name") == "<!-- anchor: src/notes.txt -->"
 
 
+def test_a_file_that_holds_only_the_last_word_of_a_dotted_name_is_no_mention(
+    tmp_path: Path,
+) -> None:
+    """`test.only` is spelled by a file that holds both words, not by one that says `only`."""
+    from irminsul.binding import load_sources, suggest
+
+    root = _nested_repo(tmp_path, "")
+    write(root, "src/notes.txt", "Run a test alone with only.\n")
+    write(root, "src/other.txt", "It is the only way.\n")
+    sources = load_sources(SourceTree(root, load(root / "irminsul.toml")))
+
+    assert [found.path for found in suggest(root, sources, "test.only").candidates] == [
+        "src/notes.txt"
+    ]
+
+
 RUBY = """\
 class Session
   def fetch_user_session(id)

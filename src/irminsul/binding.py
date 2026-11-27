@@ -166,6 +166,10 @@ def load_sources(tree: SourceTree) -> Sources:
     return out
 
 
+def _whole_word(name: str) -> re.Pattern[str]:
+    return re.compile(rf"(?<![\w$]){re.escape(name)}(?![\w$])")
+
+
 def suggest(repo_root: Path, sources: Sources, name: str) -> Suggestions:
     """Where an anchor for `name` could point, definitions first.
 
@@ -177,8 +181,11 @@ def suggest(repo_root: Path, sources: Sources, name: str) -> Suggestions:
     are offered only when nothing defines the name: a file that merely names it is the
     wrong place to bind.
     """
-    leaf = name.rsplit(".", 1)[-1]
-    token = re.compile(rf"(?<![\w$]){re.escape(leaf)}(?![\w$])")
+    *above, leaf = name.split(".")
+    token = _whole_word(leaf)
+    # A file that spells a dotted name spells each part of it; one that holds its last word
+    # alone, as any file holds `only`, is no place to look for `test.only`.
+    holders = [_whole_word(part) for part in above]
     definitions: list[Candidate] = []
     mentions: list[Candidate] = []
     unreachable: list[Candidate] = []
@@ -196,7 +203,7 @@ def suggest(repo_root: Path, sources: Sources, name: str) -> Suggestions:
         anchor = Anchor(line=0, raw="", path=display, symbol=name, pinned=None)
         if resolve(repo_root, anchor).status == "ok":
             definitions.append(Candidate(display, line, True))
-        else:
+        elif all(any(part.search(text) for text in lines) for part in holders):
             mentions.append(Candidate(display, line, False, whole=True))
     chosen = definitions or ([] if unreachable else mentions)
     chosen.sort(key=lambda c: (c.path, c.line))
