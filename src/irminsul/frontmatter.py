@@ -407,7 +407,7 @@ _FIRST_YAML_LINE = 2
 _loaders = threading.local()
 
 
-def _safe_yaml() -> YAML:
+def safe_yaml() -> YAML:
     """A YAML 1.2 loader that builds plain Python values.
 
     Pure Python, so an error reads the same whether or not the optional C parser is
@@ -472,7 +472,7 @@ def read_frontmatter(text: str) -> tuple[dict[str, Any], str, int] | None:
             "the frontmatter block never closes: no second `---` line follows it"
         ) from exc
     try:
-        data = _safe_yaml().load(raw_yaml)
+        data = safe_yaml().load(raw_yaml)
     except MarkedYAMLError as exc:
         raise FrontmatterError(_describe_yaml_error(exc)) from exc
     if data is None or data == {}:
@@ -497,7 +497,7 @@ def entry_line(path: Path, key: str, value: str | None = None) -> int | None:
     """
     try:
         raw_yaml, _ = split_frontmatter(path.read_text(encoding="utf-8"))
-        root = _safe_yaml().compose(raw_yaml)
+        root = safe_yaml().compose(raw_yaml)
     except (OSError, ValueError, YAMLError):
         return None
     if not isinstance(root, MappingNode):

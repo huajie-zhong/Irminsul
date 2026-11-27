@@ -32,8 +32,7 @@ fact in the older vocabulary: error exactly when the effective class is certain.
 
 from __future__ import annotations
 
-import difflib
-from collections.abc import Collection, Iterable
+from collections.abc import Collection
 from contextlib import suppress
 from dataclasses import dataclass, field, replace
 from functools import cache
@@ -57,6 +56,7 @@ from irminsul.checks.base import (
     FindingSource,
     Pass,
     Severity,
+    did_you_mean,
     sort_findings,
 )
 from irminsul.checks.co_change import CoChangePass
@@ -438,15 +438,6 @@ def run_checks(
 def describe_unknown_checks(names: Collection[str]) -> str:
     """Each name, with the registered check it most resembles, for an error message."""
     return ", ".join(f"'{name}'{did_you_mean(name, REGISTRY)}" for name in names)
-
-
-def did_you_mean(name: str, choices: Iterable[str], *, limit: int = 1) -> str:
-    """` (did you mean 'x'?)` for the `limit` closest of `choices`, or "" when none is close."""
-    matches = difflib.get_close_matches(name, list(choices), n=limit)
-    if not matches:
-        return ""
-    quoted = " or ".join(f"'{match}'" for match in matches)
-    return f" (did you mean {quoted}?)"
 
 
 class UnknownCheckError(UserError, ValueError):

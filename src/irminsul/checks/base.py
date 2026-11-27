@@ -6,13 +6,23 @@ prints them and uses their class to decide the exit code.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Collection
+import difflib
+from collections.abc import Callable, Collection, Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import ClassVar, Protocol, runtime_checkable
 
 from irminsul.docgraph import DocGraph, DocNode
+
+
+def did_you_mean(name: str, choices: Iterable[str], *, limit: int = 1) -> str:
+    """` (did you mean 'x'?)` for the `limit` closest of `choices`, or "" when none is close."""
+    matches = difflib.get_close_matches(name, list(choices), n=limit)
+    if not matches:
+        return ""
+    quoted = " or ".join(f"'{match}'" for match in matches)
+    return f" (did you mean {quoted}?)"
 
 
 class Severity(StrEnum):

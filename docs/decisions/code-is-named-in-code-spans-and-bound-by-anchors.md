@@ -35,7 +35,9 @@ retires:
 
 ## Status
 
-Accepted, 2026-10-28.
+Accepted, 2026-10-28. Its sentence on what a file no reader reads resolves is qualified by
+[Claim evidence names a part](../rfcs/claim-evidence-names-a-part.md):
+a part there is found by a finder or a pair of markers, never by a search of the text.
 
 ## Context
 
@@ -82,8 +84,11 @@ paragraphs, which trains a reader to re-pin without reading.
   the top level or under the types that hold it, as `Class.member` or `Type::member`, and no
   search of the text stands in for one. A symbol not found there is `missing-symbol`, or
   `unreadable` where the file holds syntax its grammar could not read, since the symbol may be
-  in that part. Any other text file resolves a symbol whose every dotted part appears as a
-  whole token, and pins the whitespace-normalized block at its defining line. A file anchor
+  in that part. A file no reader reads has a part only where a finder names one: a
+  heading's section in Markdown, a dotted key in TOML, YAML or JSON, and in any file the
+  lines between `irminsul:part <name>` and `irminsul:end <name>`, which win over a
+  definition, a heading or a key of the same name. A part of a file with neither a finder
+  nor a marker is `claim-anchor/part-unsupported`, certain. A file anchor
   pins the whole file. A span resolves with or without a trailing `()`.
 - **A Python pin hashes `_canonical` of the tree**, the canonical text Python's reader gives
   in `src/irminsul/languages/python_reader.py`: each node's
@@ -102,7 +107,8 @@ paragraphs, which trains a reader to re-pin without reading.
   that several definitions share hashes them all.
 - **What a pin covers does not change.** A docstring edit drifts a Python pin; a comment or a
   reformat does not. In the other languages a reader reads, a comment or a change of layout
-  does not. Anchors into a file no reader reads keep the whitespace-normalized text.
+  does not. A whole file no reader reads keeps the whitespace-normalized text, and a marked
+  region is hashed the way a whole file of its type is.
 - **A re-pin records a re-read.** `irminsul anchors --re-pin --doc <doc>`, narrowed by
   `--claim`, `--evidence` or `--anchor`, writes a claim's `pinned` map of evidence path to
   normalized hash. A pin on a path the claim no longer cites is dropped by the next re-pin.
@@ -120,8 +126,9 @@ paragraphs, which trains a reader to re-pin without reading.
   unbound name with up to three places and the marker to paste. A definition in a file a
   reader reads comes from that reader under the dotted path an anchor accepts; one inside a function or block is
   listed as out of reach rather than dropped; a file that only mentions the name is offered
-  only when nothing defines it. The agent chooses and writes the anchor.
-  <!-- anchor: src/irminsul/binding.py#suggest @sha256:56aa1c362862 -->
+  only when nothing defines it, and a file no reader reads is offered whole unless a marker,
+  a heading or a key in it has the name. The agent chooses and writes the anchor.
+  <!-- anchor: src/irminsul/binding.py#suggest @sha256:d1a003455ed5 -->
 - **A sentence about behaviour is best anchored to the test that asserts it.** A test
   function is a symbol, so an anchor names it, pins it and drifts with it like any other. The
   paragraph is then asked about when that test changes, and the test fails when the code stops
@@ -148,19 +155,18 @@ paragraphs, which trains a reader to re-pin without reading.
   <!-- anchor: tests/test_binding.py#test_suggest_offers_the_test_that_calls_a_function_the_doc_names @sha256:94b5c37f7a7b -->
 - **Framework extractors stay** as precision for the kinds they know, such as an option checked
   against its own command.
-- **Claim evidence and anchors name a part of a file** (accepted, not yet implemented):
+- **Claim evidence names a part of a file** (accepted, not yet implemented; anchors do):
   - An evidence entry may name a part as `path#part`, one part per entry, and its pin covers
     only that part.
-  - A finder chosen by the file's extension locates the part without guessing: a definition in
-    Python, a heading's section in Markdown, a dotted key in TOML, YAML and JSON, and the lines
-    between `irminsul:part <name>` and `irminsul:end <name>` markers in any text file. A marker
-    wins over a same-named symbol, heading or key. A name that is ambiguous, unclosed or absent
-    does not resolve, and an entry that does not resolve is certain.
-  - A Python part, marked or defined, is hashed through its syntax tree, as every Python pin
-    is, so a comment edit does not re-ask it; a marked Python region that does not parse on its
+  - A finder chosen by the file's type locates the part without guessing: a definition in a
+    file its language's reader reads, a heading's section in Markdown, a dotted key in TOML,
+    YAML and JSON, and the lines between `irminsul:part <name>` and `irminsul:end <name>`
+    markers in any text file. A marker wins over a same-named symbol, heading or key. A name
+    that is ambiguous, unclosed or absent does not resolve, and an entry that does not
+    resolve is certain.
+  - A marked region is hashed the way a whole file of its type is, so in a language a reader
+    reads a comment edit does not re-ask it; a marked Python region that does not parse on its
     own does not resolve.
-  - Anchors resolve through the same finders, and the guess that located a non-Python symbol
-    goes.
 - **A path is named when git lists it** (accepted, not yet implemented). In a git repository a
   path a doc names exists when `git ls-files --cached --others --exclude-standard` lists it, or
   lists a file under it for a directory, or when the source walk holds it, never because a file
@@ -231,8 +237,9 @@ paragraphs, which trains a reader to re-pin without reading.
   the whole file, so narrowing is a choice made per claim.
 - A part that leaves out code its claim rests on under-asks it silently, which is why bare
   paths stay the default and each narrowing is re-read.
-- An adopter's non-Python symbol anchor that relied on the guess stops resolving until the
-  symbol is marked.
+- An adopter's anchor to a symbol in a file no reader reads, which relied on the guess, is
+  `claim-anchor/part-unsupported` until the lines are marked, or resolves through the heading
+  or the key finder with another hash.
 
 ## Changes
 
@@ -275,3 +282,9 @@ paragraphs, which trains a reader to re-pin without reading.
   follow each language's convention, the TypeScript one as the RFC words it, and a Go test
   is told by its one `*testing.T` parameter. A pin there leaves out layout, not every
   rewrite a formatter makes.
+- 2026-11-27: Anchors resolve a part through the finders of
+  [Claim evidence names a part](../rfcs/claim-evidence-names-a-part.md),
+  its first three tasks, and the search of a file's text for a symbol is gone. Two answers the
+  owner gave that day are in the RFC as decisions 3 and 4: the file with no finder is one no
+  reader reads, since TypeScript, JavaScript, Go and Rust have readers, and a marked region
+  is hashed the way a whole file of its type is. Claim evidence does not name parts yet.

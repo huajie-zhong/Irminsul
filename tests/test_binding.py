@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
-from irminsul.anchors import Anchor, parse_anchors, resolve
+from irminsul.anchors import Anchor, Resolution, parse_anchors, resolve
 from irminsul.binding import code_name
 from irminsul.checks.claim_anchor import ClaimAnchorCheck
 from irminsul.cli import app
@@ -17,7 +17,16 @@ from irminsul.config import load
 from irminsul.languages import LANGUAGE_REGISTRY, LanguageProfile
 from irminsul.source_tree import SourceTree
 
-from .conftest import invoke, invoke_json, run_check, seed_repo, write, write_config, write_doc
+from .conftest import (
+    invoke,
+    invoke_json,
+    replace_text,
+    run_check,
+    seed_repo,
+    write,
+    write_config,
+    write_doc,
+)
 
 runner = CliRunner()
 
@@ -309,6 +318,122 @@ def test_a_mention_is_offered_only_when_nothing_defines_the_name(tmp_path: Path)
     sources = load_sources(SourceTree(root, load(root / "irminsul.toml")))
     [mention] = suggest(root, sources, "lonely_name").candidates
     assert (mention.path, mention.definition) == ("src/notes.txt", False)
+    assert mention.marker("lonely_name") == "<!-- anchor: src/notes.txt -->"
+
+
+RUBY = """\
+class Session
+  def fetch_user_session(id)
+    lookup(id)
+  end
+end
+"""
+MARKED_RUBY = """\
+class Session
+  # irminsul:part fetch_user_session
+  def fetch_user_session(id)
+    lookup(id)  # by id
+  end
+  # irminsul:end fetch_user_session
+end
+"""
+
+
+def _ruby_repo(tmp_path: Path, ruby: str, body: str) -> Path:
+    write_config(tmp_path, source_roots=["lib"])
+    write(tmp_path, "lib/session.rb", ruby)
+    write_doc(tmp_path, "docs/components/session.md", doc_id="session", body=body)
+    return tmp_path
+
+
+def test_a_symbol_in_a_file_no_reader_reads_is_unsupported_without_markers(
+    tmp_path: Path,
+) -> None:
+    """The name stands in the file, and nothing searches the text for it: with no reader
+    for Ruby and no marker of that name, the part cannot be found, which is certain."""
+    root = _ruby_repo(
+        tmp_path,
+        RUBY,
+        "Sessions are looked up by id.\n<!-- anchor: lib/session.rb#fetch_user_session -->\n",
+    )
+
+    [finding] = run_check(ClaimAnchorCheck, root)
+
+    assert finding.code == "claim-anchor/part-unsupported"
+    assert "irminsul:part fetch_user_session" in (finding.suggestion or "")
+    code, plain = invoke(root, "check", "--only", "claim-anchor")
+    assert code == 1, plain
+
+
+def test_a_marked_region_of_a_file_no_reader_reads_is_the_part(tmp_path: Path) -> None:
+    """The two markers say where the part is, and its pin is the lines between them with
+    whitespace collapsed, so an edit elsewhere in the file leaves it and an edit inside
+    moves it."""
+    root = _ruby_repo(
+        tmp_path,
+        MARKED_RUBY,
+        "Sessions are looked up by id.\n<!-- anchor: lib/session.rb#fetch_user_session -->\n",
+    )
+    anchor = Anchor(line=0, raw="", path="lib/session.rb", symbol="fetch_user_session", pinned=None)
+
+    pinned = resolve(root, anchor)
+
+    assert pinned.status == "ok"
+    replace_text(root, "lib/session.rb", "class Session", "class UserSession")
+    assert resolve(root, anchor) == pinned
+    replace_text(root, "lib/session.rb", "lookup(id)  # by id", "lookup(id.to_s)")
+    assert resolve(root, anchor).current != pinned.current
+
+
+def test_a_file_level_anchor_on_a_file_no_reader_reads_keeps_its_hash(tmp_path: Path) -> None:
+    """A whole file no reader reads is its text with whitespace collapsed, as before parts:
+    the hash is the one the same text had on the commit before the finders."""
+    write(tmp_path, "docs-pr.yml.j2", "name: docs\non:\n  pull_request:\n    paths: [docs/**]\n")
+    anchor = Anchor(line=0, raw="", path="docs-pr.yml.j2", symbol=None, pinned=None)
+
+    assert resolve(tmp_path, anchor) == Resolution("ok", "11f098e007de")
+
+
+def test_a_key_and_a_heading_on_the_first_line_of_a_file_with_a_byte_order_mark_are_found(
+    tmp_path: Path,
+) -> None:
+    """The mark an editor saved before the first character is no part of the first line, so
+    a table opened there and a heading written there are found as in the file without it."""
+    for rel, text, part in (
+        ("pyproject.toml", '[project]\nname = "desk"\n', "project.name"),
+        ("notes.md", "# Late fees\n\nThe fine is capped.\n", "late-fees"),
+    ):
+        write(tmp_path, rel, text)
+        anchor = Anchor(line=0, raw="", path=rel, symbol=part, pinned=None)
+        plain = resolve(tmp_path, anchor)
+        write(tmp_path, rel, "\ufeff" + text)
+
+        assert plain.status == "ok"
+        assert resolve(tmp_path, anchor) == plain
+
+
+def test_suggest_offers_the_file_where_no_finder_reads_the_name(tmp_path: Path) -> None:
+    """`fetch_user_session` is defined only in a Ruby file with no marker, so `path#name`
+    would not resolve: the file is offered, and no part of it."""
+    root = _ruby_repo(tmp_path, RUBY, "`fetch_user_session()` looks a session up by id.\n")
+
+    report = invoke_json(root, "anchors", "--suggest")
+
+    [row] = report["unbound"]
+    assert row["name"] == "fetch_user_session"
+    assert [candidate["marker"] for candidate in row["candidates"]] == [
+        "<!-- anchor: lib/session.rb -->"
+    ]
+
+
+def test_suggest_offers_a_marked_part_by_its_name(tmp_path: Path) -> None:
+    root = _ruby_repo(tmp_path, MARKED_RUBY, "`fetch_user_session()` looks a session up by id.\n")
+
+    [row] = invoke_json(root, "anchors", "--suggest")["unbound"]
+
+    assert [candidate["marker"] for candidate in row["candidates"]] == [
+        "<!-- anchor: lib/session.rb#fetch_user_session -->"
+    ]
 
 
 PY = """\
@@ -565,7 +690,7 @@ def test_suggest_without_a_doc_lists_unbound_names_and_no_test(tmp_path: Path) -
     )
     unbound = [
         f"{GUIDE}:10 `renewLoan`",
-        "  src/loans/desk.php:1 (definition)  <!-- anchor: src/loans/desk.php#renewLoan -->",
+        "  src/loans/desk.php:1 (mention)  <!-- anchor: src/loans/desk.php -->",
     ]
 
     code, plain = invoke(root, "anchors", "--suggest")

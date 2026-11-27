@@ -12,12 +12,12 @@ docstring, or the whole assignment statement that binds a constant — written o
 types and fields, without positions. Formatting and comment churn do not trip it, only a
 real change to the code the claim describes does, and every Python version that parses the
 code to the same tree gives the same hash. For a language tree-sitter reads it is the
-definition's tree as the grammar gives it, without comments or layout. In a text file no
-reader reads, the symbol resolves when its name appears as a whole token, and the hash is taken
-over the block that defines it, with whitespace normalized: the line that defines the
-name (a definition keyword or an assignment, else its first mention outside a comment),
-the decorator lines above it, and the lines indented under it. A marker inside a code
-span or a fenced block is an example, not an anchor.
+definition's tree as the grammar gives it, without comments or layout. A file no reader
+reads is hashed whole as text with its whitespace collapsed, and a part of one is found by
+the finders of `irminsul.parts`: a heading's section in Markdown, a key in TOML, YAML or
+JSON, and the lines between two `irminsul:part` markers in any file. Nothing searches a
+text for a name. A marker inside a code span or a fenced block is an example, not an
+anchor.
 
 This module is parsing, resolution and hashing, which the check and the CLI command build
 on, and the two readings of every pin in a doc that act on them: the re-pin, which writes,
@@ -37,11 +37,13 @@ from typing import TYPE_CHECKING
 from irminsul.fences import FenceTracker
 from irminsul.frontmatter import Claim
 from irminsul.frontmatter_edit import set_claim_pins, strip_claim_pins
+from irminsul.parts import find_part
 
 if TYPE_CHECKING:
     from irminsul.checks.base import Finding
     from irminsul.docgraph import DocGraph, DocNode
     from irminsul.inventory.base import SourceReader
+    from irminsul.languages.reader import CodeReading
 
 ANCHOR_RE = re.compile(
     r"<!--\s*anchor:\s*(?P<path>[^\s#@]+)(?:#(?P<symbol>[^\s@]+))?"
@@ -70,8 +72,14 @@ class Anchor:
 
 @dataclass(frozen=True)
 class Resolution:
-    status: str  # "ok" | "missing_file" | "missing_symbol" | "unreadable"
+    status: str  # "ok" | "missing_file" | "missing_symbol" | "unreadable" | "unsupported"
+    """`unsupported`: the anchor names a part of a file whose type has no finder, and no
+    marker in the file names it."""
     current: str | None = None
+    known: tuple[str, ...] = ()
+    """The names the file's finder knows, when the part an anchor names is not one of them."""
+    why: str | None = None
+    """What kept a name the file holds from resolving, such as two headings that share it."""
 
 
 def parse_anchors(body: str) -> list[Anchor]:
@@ -102,11 +110,12 @@ def resolve(repo_root: Path, anchor: Anchor, reader: SourceReader | None = None)
     """Resolve an anchor's target and compute its current normalized hash.
 
     `reader` is the snapshot to read the target from; a caller with a graph passes
-    `graph.source`, so a file is parsed once however many anchors name it. A file whose
-    language has a reader is hashed over the canonical text that reader gives for the
-    symbol, or for the whole file; any other is resolved and hashed as text. A symbol the
-    reader does not find is missing when the whole file parsed, and unreadable when part of
-    it did not, since the symbol may be in that part."""
+    `graph.source`, so a file is parsed once however many anchors name it. A whole file is
+    hashed over the canonical text its language's reader gives, or as text where no reader
+    reads it. A part is found by the finders of `irminsul.parts` and by nothing else: a
+    part the file's finder does not know is missing when the whole file parsed and
+    unreadable when part of it did not, since the name may be in that part, and a part of a
+    file whose type has no finder and that holds no marker for it is unsupported."""
     from irminsul.inventory.base import SourceReader
 
     reader = reader or SourceReader()
@@ -118,14 +127,30 @@ def resolve(repo_root: Path, anchor: Anchor, reader: SourceReader | None = None)
         return Resolution("unreadable")
 
     reading = reader.reading(target)
-    if reading is None:
-        if target.suffix == ".md" and anchor.symbol is None:
-            text = without_pins(text)
-        return _resolve_text(text, anchor.symbol)
-    canonical = reading.canonical(anchor.symbol)
-    if canonical is None:
-        return Resolution("missing_symbol" if reading.parsed else "unreadable")
-    return Resolution("ok", _hash(canonical))
+    if anchor.symbol is None:
+        whole = _whole(target, text, reading)
+        return Resolution("unreadable") if whole is None else Resolution("ok", _hash(whole))
+    part = find_part(
+        target.suffix,
+        text,
+        anchor.symbol,
+        reading,
+        lambda region: _whole(target, region, reader.read_text(target, region)),
+    )
+    if part.status == "ok" and part.text is not None:
+        return Resolution("ok", _hash(part.text))
+    status = "missing_symbol" if part.status in ("ok", "missing") else part.status
+    return Resolution(status, known=part.known, why=part.why)
+
+
+def _whole(target: Path, text: str, reading: CodeReading | None) -> str | None:
+    """The text a pin hashes for the whole of `text`, a file of `target`'s type or a region
+    of one: what its language's reader gives, which is None for a text Python cannot parse,
+    and where no reader reads the type, the text with its whitespace collapsed, a doc
+    without its pins."""
+    if reading is not None:
+        return reading.canonical()
+    return _normalize_whitespace(without_pins(text) if target.suffix == ".md" else text)
 
 
 def without_pins(text: str) -> str:
@@ -151,58 +176,6 @@ def file_pin(target: Path, reader: SourceReader | None = None) -> str | None:
     anchor = Anchor(line=0, raw="", path=target.name, symbol=None, pinned=None)
     resolution = resolve(target.parent, anchor, reader)
     return f"{_ALGO}:{resolution.current}" if resolution.status == "ok" else None
-
-
-def _resolve_text(text: str, symbol: str | None) -> Resolution:
-    """Resolve an anchor into a file of any language by whole-token occurrence.
-
-    A dotted name is looked for after its parent's first mention.
-    """
-    if symbol is None:
-        return Resolution("ok", _hash(_normalize_whitespace(text)))
-    lines = text.splitlines()
-    parts = symbol.split(".")
-    if not all(_token_pattern(part).search(text) for part in parts):
-        return Resolution("missing_symbol")
-    after = 0
-    if len(parts) > 1:
-        parent = _token_pattern(parts[-2])
-        after = next((i for i, line in enumerate(lines) if parent.search(line)), 0)
-    start = definition_line(lines, parts[-1], after)
-    if start is None:
-        return Resolution("missing_symbol")
-    return Resolution("ok", _hash(_normalize_whitespace("\n".join(text_block(lines, start)))))
-
-
-_DEFINITION_KEYWORDS = (
-    r"\b(?:def|class|function|func|fn|const|let|var|interface|type|struct|enum|trait)\s+"
-)
-_COMMENT_PREFIXES = ("#", "//", "/*", "*", "--", ";")
-
-
-def defines(line: str, name: str) -> bool:
-    """Whether `line` defines `name`: a definition keyword before it, or an assignment."""
-    escaped = re.escape(name)
-    return (
-        re.search(rf"{_DEFINITION_KEYWORDS}(?:\w+\s+)?{escaped}(?![\w$])", line) is not None
-        or re.match(rf"^\s*(?:export\s+)?{escaped}\s*(?::|=(?!=))", line) is not None
-    )
-
-
-def definition_line(lines: list[str], name: str, after: int = 0) -> int | None:
-    """The index of the line that defines `name` at or after `after`, else of its first
-    mention outside a comment."""
-    token = _token_pattern(name)
-    mention: int | None = None
-    for index in range(after, len(lines)):
-        line = lines[index]
-        if not token.search(line) or line.lstrip().startswith(_COMMENT_PREFIXES):
-            continue
-        if defines(line, name):
-            return index
-        if mention is None:
-            mention = index
-    return mention
 
 
 def text_block(lines: list[str], start: int) -> list[str]:
@@ -243,10 +216,6 @@ def _block(lines: list[str], start: int) -> list[str]:
 
 def _indent(line: str) -> int:
     return len(line) - len(line.lstrip())
-
-
-def _token_pattern(name: str) -> re.Pattern[str]:
-    return re.compile(rf"(?<![\w$]){re.escape(name)}(?![\w$])")
 
 
 def _normalize_whitespace(text: str) -> str:

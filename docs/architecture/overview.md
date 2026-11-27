@@ -15,7 +15,7 @@ claims:
       - src/irminsul/checks/pipeline.py
     pinned:
       src/irminsul/docgraph.py: sha256:9190f540e920
-      src/irminsul/checks/pipeline.py: sha256:f1a8e696a4a4
+      src/irminsul/checks/pipeline.py: sha256:4805565a289f
   - id: action-adds-no-logic
     state: implemented
     kind: invariant
@@ -26,7 +26,7 @@ claims:
       - src/irminsul/cli.py
     pinned:
       action.yml: sha256:565555652eab
-      src/irminsul/cli.py: sha256:e99e03d855cc
+      src/irminsul/cli.py: sha256:513de9c637d7
 ---
 
 # Architecture overview

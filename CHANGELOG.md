@@ -328,6 +328,24 @@ making a feature, a refactor and an RFC-driven change in it.
 - A file named with a suffix a language profile lists is never read as a code name.
   `ledger.mts` and `types.cts` were, and `anchors --suggest` listed them as unbound names,
   because it kept a list of suffixes of its own that missed them.
+- An anchor's `#name` is found by a finder for its file's type, and nothing searches a file's
+  text for the name
+  ([Claim evidence names a part](docs/rfcs/claim-evidence-names-a-part.md), its first tasks):
+  - In any text file, the lines between `irminsul:part <name>` and `irminsul:end <name>`,
+    each in a comment, are the part `name`, and win over a definition, a heading or a key of
+    that name. The region is hashed the way a whole file of its type is: through the file's
+    reader where one reads it, with whitespace collapsed otherwise.
+  - In Markdown, `doc.md#slug` is the section of the one heading with that slug, down to the
+    next heading of its level or a higher one.
+  - In TOML, YAML and JSON, `pyproject.toml#project.dependencies` is the value at that key
+    path as canonical JSON, so reordering or reformatting the file, or editing another key,
+    does not move the pin.
+  - `claim-anchor/part-unsupported`, a certain finding, reports a part of a file whose type
+    has no finder and that holds no marker of that name. `claim-anchor/missing-symbol` names
+    the closest name the finder knows and says why a part marked twice, a shared slug or a
+    file of several YAML documents does not resolve.
+  - `anchors --suggest` offers `path#name` only where it resolves; for a name that only a
+    file no reader reads spells, it offers the file.
 - A pin on a whole Go file no longer moves when the file's final newline is added or taken
   away: the token of no text that Go's grammar puts where a text ends without one is left
   out of what a pin hashes, as other layout is.
@@ -371,6 +389,12 @@ making a feature, a refactor and an RFC-driven change in it.
   object literal, a local variable, or a name the file only mentions, resolved by a search of
   the text and is now `claim-anchor/missing-symbol`, a certain finding. Point it at the
   definition the paragraph is about, or at the whole file.
+- An anchor with a `#symbol` into a file no reader reads, such as a Ruby, shell or template
+  file, resolved by a search of the text and is now `claim-anchor/part-unsupported`, a
+  certain finding. Mark the lines with `irminsul:part <name>` and `irminsul:end <name>`, or
+  anchor the whole file. One into a Markdown, TOML, YAML or JSON file now names a heading's
+  slug or a key path: its pin moves once where the name is one, and it is
+  `claim-anchor/missing-symbol` where it is not.
 - A Go project can see `import-deps/hallucinated-dependency` for the first time, on a
   `depends_on` between two Go components that no import backs.
 - A `depends_on` between two components that each own a file of the same one of those

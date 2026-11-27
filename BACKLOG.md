@@ -686,16 +686,13 @@ the engine does not know.
 ### `a-byte-order-mark-stays-in-the-text-a-file-is-read-as`
 
 `unmarked` (`src/irminsul/languages/reader.py`) drops a leading UTF-8 byte order mark for
-Python's parser, the surface rules and packs, the exports extractor and Go's `package`
-clause. `SourceReader.text` (`src/irminsul/inventory/base.py`) still returns the mark, so
-three things keep it (read on 2026-11-27): the whitespace-collapsed text a pin hashes for a
-file no reader reads; which line the text route takes to define a name there (`defines` and
-`definition_line`, `src/irminsul/anchors.py`), for an anchor and for `anchors --suggest`, so
-that with `RATE=5` on line 1 of a marked file and `RATE=6` below, the anchor `#RATE` pins the
-second (a reviewer's run on 2026-11-27); and the lines the review queue compares, where
-adding or removing a mark shows as a change to line 1. Dropping the mark in one helper
-that `SourceReader.text` and `SourceAtCommit.text` (`src/irminsul/listing/changed_code.py`),
-which reads a git revision, both read through would close those three.
+Python's parser, the surface rules and packs, the exports extractor, Go's `package` clause
+and the part finders (`src/irminsul/parts.py`). `SourceReader.text` (`src/irminsul/inventory/base.py`) still returns the mark, so
+two things keep it (read on 2026-11-27): the whitespace-collapsed text a pin hashes for a
+whole file no reader reads; and the lines the review queue compares, where adding or
+removing a mark shows as a change to line 1. Dropping the mark in one helper that
+`SourceReader.text` and `SourceAtCommit.text` (`src/irminsul/listing/changed_code.py`),
+which reads a git revision, both read through would close those two.
 It moves the pin of every marked file no reader reads once, which changes what a pin hashes,
 so it is a rule.
 

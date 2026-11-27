@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from irminsul.anchors import Anchor, defines, definition_line, parse_anchors, resolve
+from irminsul.anchors import Anchor, parse_anchors, resolve
 from irminsul.checks.globs import resolve_display_path
 from irminsul.code_references import CodeResolver
 from irminsul.languages import LANGUAGE_REGISTRY, reader_for
@@ -85,8 +85,12 @@ class Candidate:
     definition: bool
     symbol: str | None = None
     """The name to anchor when it differs from the cited one, such as `Store.flush`."""
+    whole: bool = False
+    """The file is what an anchor can name: no finder finds a part of that name in it."""
 
     def marker(self, name: str) -> str:
+        if self.whole:
+            return f"<!-- anchor: {self.path} -->"
         return f"<!-- anchor: {self.path}#{self.symbol or name} -->"
 
 
@@ -167,9 +171,11 @@ def suggest(repo_root: Path, sources: Sources, name: str) -> Suggestions:
 
     In a file whose language has a reader, a definition is what that reader finds, so a
     class member is offered under its dotted path, and a file that does not parse offers
-    nothing. Any other file resolves by text, so there the line that looks like a
-    definition is offered, else the first mention. Mentions are offered only when nothing
-    defines the name: a file that merely names it is the wrong place to bind.
+    nothing. In any other file that spells the name, a part of that name is offered where
+    a marker, a heading or a key names one, and otherwise the file itself, as a mention:
+    nothing there is known to define the name, so `path#name` would not resolve. Mentions
+    are offered only when nothing defines the name: a file that merely names it is the
+    wrong place to bind.
     """
     leaf = name.rsplit(".", 1)[-1]
     token = re.compile(rf"(?<![\w$]){re.escape(leaf)}(?![\w$])")
@@ -186,15 +192,12 @@ def suggest(repo_root: Path, sources: Sources, name: str) -> Suggestions:
                     candidate = Candidate(display, found.line, True, found.symbol)
                     (definitions if found.reachable else unreachable).append(candidate)
             continue
+        line = next(index for index, text in enumerate(lines, 1) if token.search(text))
         anchor = Anchor(line=0, raw="", path=display, symbol=name, pinned=None)
-        if resolve(repo_root, anchor).status != "ok":
-            continue
-        index = definition_line(lines, leaf)
-        if index is not None:
-            is_definition = defines(lines[index], leaf)
-            (definitions if is_definition else mentions).append(
-                Candidate(display, index + 1, is_definition)
-            )
+        if resolve(repo_root, anchor).status == "ok":
+            definitions.append(Candidate(display, line, True))
+        else:
+            mentions.append(Candidate(display, line, False, whole=True))
     chosen = definitions or ([] if unreachable else mentions)
     chosen.sort(key=lambda c: (c.path, c.line))
     return Suggestions(chosen[:_SUGGESTION_LIMIT], unreachable[:_SUGGESTION_LIMIT])

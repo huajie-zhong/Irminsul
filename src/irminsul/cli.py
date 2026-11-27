@@ -1321,7 +1321,7 @@ def explain_command(
         _explain_check(code, checks[code])
         return
 
-    from irminsul.checks.pipeline import did_you_mean
+    from irminsul.checks.base import did_you_mean
 
     known = [*checks, *(known_code for cls in checks.values() for known_code in cls.explanations)]
     raise UserError(

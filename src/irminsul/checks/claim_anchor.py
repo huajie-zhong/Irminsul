@@ -13,11 +13,12 @@ from __future__ import annotations
 from typing import ClassVar
 
 from irminsul.anchors import parse_anchors, resolve
-from irminsul.checks.base import Answer, Finding, FindingClass, Severity
+from irminsul.checks.base import Answer, Finding, FindingClass, Severity, did_you_mean
 from irminsul.docgraph import DocGraph
 
 CODE_MISSING_FILE = "claim-anchor/missing-file"
 CODE_MISSING_SYMBOL = "claim-anchor/missing-symbol"
+CODE_PART_UNSUPPORTED = "claim-anchor/part-unsupported"
 CODE_UNREADABLE = "claim-anchor/unreadable"
 CODE_UNPINNED = "claim-anchor/unpinned"
 CODE_PINNED_DRIFT = "claim-anchor/pinned-drift"
@@ -33,9 +34,18 @@ class ClaimAnchorCheck:
             "only when that code is gone, in which case the prose goes with it."
         ),
         CODE_MISSING_SYMBOL: (
-            "An anchor's symbol was not found in its target file, usually because it was "
-            "renamed. Point the anchor at its current name. Remove the marker only when "
-            "the code is gone, in which case the prose it marks goes with it."
+            "An anchor names a part its target file does not hold, usually because it was "
+            "renamed: a definition its language's reader does not find, a heading no slug "
+            "matches or two share, a key that is not there, or a marker opened twice or "
+            "never closed. Nothing searches the text for the name. Point the anchor at the "
+            "part's current name. Remove the marker only when the code is gone, in which "
+            "case the prose it marks goes with it."
+        ),
+        CODE_PART_UNSUPPORTED: (
+            "An anchor names a part of a file whose type has no finder: no language reader "
+            "reads it, and it is not Markdown, TOML, YAML or JSON. Mark the lines the "
+            "paragraph is about with `irminsul:part <name>` and `irminsul:end <name>` in "
+            "comments of the file, or anchor the whole file by dropping `#<name>`."
         ),
         CODE_UNREADABLE: (
             "An anchor's target file could not be read, or holds syntax its language's "
@@ -57,6 +67,7 @@ class ClaimAnchorCheck:
     classes: ClassVar[dict[str, FindingClass]] = {
         CODE_MISSING_FILE: FindingClass.certain,
         CODE_MISSING_SYMBOL: FindingClass.certain,
+        CODE_PART_UNSUPPORTED: FindingClass.certain,
         CODE_UNREADABLE: FindingClass.hint,
         CODE_UNPINNED: FindingClass.hint,
         CODE_PINNED_DRIFT: FindingClass.hint,
@@ -104,18 +115,45 @@ class ClaimAnchorCheck:
                         )
                     )
                 elif resolution.status == "missing_symbol":
+                    symbol = anchor.symbol or ""
+                    closest = did_you_mean(symbol, resolution.known)
+                    reason = f": {resolution.why}" if resolution.why else ""
                     out.append(
                         Finding(
                             check=self.name,
                             code=CODE_MISSING_SYMBOL,
                             severity=Severity.error,
-                            message=f"anchor symbol '{anchor.symbol}' not found in '{anchor.path}'",
+                            message=(
+                                f"anchor symbol '{symbol}' not found in "
+                                f"'{anchor.path}'{reason}{closest}"
+                            ),
                             path=node.path,
                             doc_id=node.id,
                             line=node.file_line(anchor.line),
                             suggestion=(
                                 "point the anchor at the symbol's current name; "
                                 "remove it only if that code is gone"
+                            ),
+                        )
+                    )
+                elif resolution.status == "unsupported":
+                    out.append(
+                        Finding(
+                            check=self.name,
+                            code=CODE_PART_UNSUPPORTED,
+                            severity=Severity.error,
+                            message=(
+                                f"anchor part '{anchor.symbol}' cannot be found in "
+                                f"'{anchor.path}': no finder reads this type of file and "
+                                f"no `irminsul:part {anchor.symbol}` marker is in it"
+                            ),
+                            path=node.path,
+                            doc_id=node.id,
+                            line=node.file_line(anchor.line),
+                            suggestion=(
+                                f"mark the lines with `irminsul:part {anchor.symbol}` and "
+                                f"`irminsul:end {anchor.symbol}` in comments of the file, "
+                                "or anchor the whole file"
                             ),
                         )
                     )

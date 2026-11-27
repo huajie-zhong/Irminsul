@@ -5,6 +5,7 @@ status: stable
 describes:
   - src/irminsul/anchors.py
   - src/irminsul/binding.py
+  - src/irminsul/parts.py
 depends_on:
   - checks
   - context
@@ -15,6 +16,7 @@ depends_on:
 owns_tests:
   - tests/test_binding.py
   - tests/test_cli_anchors.py
+  - tests/test_parts.py
 summary: Anchored prose claims pinned to code.
 implements:
   - acknowledge-a-reviewed-co-change-or-evidence-drift
@@ -49,17 +51,63 @@ its comments and without the layout a formatter chooses, such as a line break or
 ([languages](languages.md#typescript-javascript-go-and-rust)). In each of these a symbol
 is a definition the reader finds, and no search of the text for its name stands in for
 one: a symbol the reader does not find is missing, or unreadable when the file holds
-syntax its grammar could not read, since the symbol may be in that part. In a file no
-reader reads, the symbol resolves by name as a whole token, and the hash covers the
-block that starts at the line defining it, with whitespace normalized. A marker written
+syntax its grammar could not read, since the symbol may be in that part. A file no
+reader reads is hashed whole as its text with whitespace collapsed, and has a part only
+where a finder names one ([Parts of a file](#parts-of-a-file)). A marker written
 inside a code span or a fenced block is an example and is not read, so this syntax can
 be documented without the example becoming a live anchor.
-<!-- anchor: src/irminsul/anchors.py#resolve @sha256:cf3b307eb8a4 -->
+<!-- anchor: src/irminsul/anchors.py#resolve @sha256:4f84029104fb -->
 <!-- anchor: src/irminsul/languages/python_reader.py#_find_symbol @sha256:95c45a01a21c -->
 <!-- anchor: tests/test_languages_typescript_reader.py#test_a_pinned_function_is_clean_after_an_edit_to_its_comment @sha256:cf966b0ec2fb -->
 <!-- anchor: tests/test_languages_typescript_reader.py#test_an_anchor_to_a_local_variable_is_a_missing_symbol @sha256:a6f75928ea67 -->
 <!-- anchor: tests/test_languages_typescript_reader.py#test_an_absent_name_is_unreadable_in_a_file_that_did_not_parse @sha256:e36c635aa9d0 -->
 <!-- anchor: src/irminsul/languages/python_reader.py#_canonical @sha256:1c9d471d4bfc -->
+
+## Parts of a file
+
+An anchor's `#name` is one part of its file, found by a finder for the file's type and by
+nothing else: no search of the text for the name stands in for one ([Claim evidence names a part](../rfcs/claim-evidence-names-a-part.md)).
+`find_part` in `src/irminsul/parts.py` is given the file's text and returns the text a pin
+hashes, so a revision read from git is found the same way.
+
+- **A pair of markers, in any text file.** The lines between `irminsul:part <name>` and
+  `irminsul:end <name>`, each written in a comment of the file, are the part `name`. Markers
+  win over a definition, a heading or a key of the same name, because they are the author
+  saying where the part is. The region is dedented and hashed the way a whole file of its
+  type is: through the file's reader where one reads it, so a comment or a change of layout
+  does not move the pin, and as text with whitespace collapsed otherwise. A Python region
+  that does not parse on its own does not resolve; a TypeScript, JavaScript, Go or Rust
+  region always hashes, as a whole file of theirs does.
+- **A definition**, in a file its language's reader reads, as above.
+- **A heading's section, in Markdown.** The name is the heading's slug as a link fragment
+  spells it, and the part is the heading line and the lines down to the next heading of its
+  level or a higher one, hashed without its pins and with whitespace collapsed.
+- **A key, in TOML, YAML or JSON.** The name is a dotted key path through mappings, a
+  segment that holds a dot written in double quotes, and the part is the value as canonical
+  JSON, so reordering the keys of a table, reformatting it or editing another key does not
+  move the pin. A list is hashed whole.
+
+A name that is absent or ambiguous does not resolve: a part marked twice or never closed, a
+slug two headings share, a key in a file of several YAML documents. That is
+`claim-anchor/missing-symbol`, whose message says why and names the closest name the finder
+knows. A part of a file whose type has no finder, with no marker of that name, is
+`claim-anchor/part-unsupported`: the name may stand in the file, and the answer is to mark
+the lines or to anchor the whole file. `anchors --suggest` offers `path#name` only where it
+resolves, and otherwise the file.
+<!-- anchor: src/irminsul/parts.py#find_part @sha256:ba32c028efc9 -->
+<!-- anchor: tests/test_binding.py#test_a_symbol_in_a_file_no_reader_reads_is_unsupported_without_markers @sha256:837deb964faf -->
+<!-- anchor: tests/test_binding.py#test_a_marked_region_of_a_file_no_reader_reads_is_the_part @sha256:f5fca8bcd203 -->
+<!-- anchor: tests/test_binding.py#test_a_file_level_anchor_on_a_file_no_reader_reads_keeps_its_hash @sha256:18dd96d25f8a -->
+<!-- anchor: tests/test_binding.py#test_suggest_offers_the_file_where_no_finder_reads_the_name @sha256:89b218eef49d -->
+<!-- anchor: tests/test_parts.py#test_marker_wins_over_a_same_named_python_function @sha256:e7b19ae2859d -->
+<!-- anchor: tests/test_parts.py#test_region_is_hashed_through_its_language_reader @sha256:94956285b4e1 -->
+<!-- anchor: tests/test_parts.py#test_python_region_of_half_a_statement_does_not_resolve @sha256:87635a3cb834 -->
+<!-- anchor: tests/test_parts.py#test_section_stops_at_a_later_heading_of_the_same_level @sha256:0121122e6b8a -->
+<!-- anchor: tests/test_parts.py#test_two_headings_with_one_slug_do_not_resolve @sha256:11ee9eca0590 -->
+<!-- anchor: tests/test_parts.py#test_pyproject_dependencies_ignores_another_table_and_follows_a_new_dependency @sha256:edf77adc59ab -->
+<!-- anchor: tests/test_parts.py#test_key_hash_ignores_the_order_of_keys_in_a_table @sha256:78681f137ff0 -->
+<!-- anchor: tests/test_parts.py#test_yaml_file_with_several_documents_does_not_resolve @sha256:93780bc31a71 -->
+<!-- anchor: tests/test_parts.py#test_missing_symbol_offers_the_closest_known_name @sha256:afaa67c9c0c8 -->
 
 ## Binding the code a doc names
 
@@ -111,7 +159,7 @@ beside `unbound`. Without `--doc` the command lists the unbound names alone.
 <!-- anchor: tests/test_binding.py#test_suggest_offers_the_test_that_calls_a_function_the_doc_names @sha256:94b5c37f7a7b -->
 <!-- anchor: tests/test_binding.py#test_suggest_offers_at_most_three_tests_by_path_and_line @sha256:5b74b5ae3195 -->
 <!-- anchor: tests/test_binding.py#test_suggest_says_so_when_no_test_names_the_definition @sha256:a96352d4b56f -->
-<!-- anchor: tests/test_binding.py#test_suggest_without_a_doc_lists_unbound_names_and_no_test @sha256:f01f47ab26b4 -->
+<!-- anchor: tests/test_binding.py#test_suggest_without_a_doc_lists_unbound_names_and_no_test @sha256:f8eaafd82094 -->
 <!-- anchor: tests/test_binding.py#test_suggest_lists_two_methods_of_one_name_in_one_file @sha256:80050085aed1 -->
 <!-- anchor: tests/test_binding.py#test_a_test_names_a_definition_through_an_import_of_its_module @sha256:a6e3bf78495a -->
 <!-- anchor: tests/test_binding.py#test_a_name_the_test_binds_itself_does_not_name_the_definition @sha256:ad1bee32b830 -->
@@ -188,10 +236,10 @@ finding names only the evidence that changed after the doc.
 ## Scope & Limitations
 
 Anchors are opt-in — only paragraphs that carry a marker are checked; everything else
-stays on the coarse mtime net. In a file no reader reads, such as a config file or
-code of a language without a reader, a symbol resolves by name, so a name left
-in a string or a trailing comment still resolves, and the block hash re-flags a claim for
-any edit inside the block. `--suggest` searches the configured source roots for
+stays on the coarse mtime net. A marker is plain text, so `irminsul:part` written in a
+string of a file counts as one; only in Markdown is a marker in a fenced block or a code
+span left out, as an example. A key or a marker name that holds a space or an `@` cannot be
+written in an anchor. `--suggest` searches the configured source roots for
 definitions, and under `--doc` the declared test roots for the tests that name them, each
 read from the graph's [source tree](docgraph.md), and a check resolves an anchor through that
 tree's [`SourceReader`](surface.md), so a file many anchors name is read and parsed once
@@ -232,7 +280,7 @@ test file was read. Nothing measures how much of a function its tests guard.
   <!-- anchor: tests/test_binding.py#test_suggest_offers_the_test_that_calls_a_function_the_doc_names @sha256:94b5c37f7a7b -->
   <!-- anchor: tests/test_binding.py#test_a_name_the_test_binds_itself_does_not_name_the_definition @sha256:ad1bee32b830 -->
   <!-- anchor: tests/test_binding.py#test_suggest_says_so_when_no_test_names_the_definition @sha256:a96352d4b56f -->
-  <!-- anchor: tests/test_binding.py#test_suggest_without_a_doc_lists_unbound_names_and_no_test @sha256:f01f47ab26b4 -->
+  <!-- anchor: tests/test_binding.py#test_suggest_without_a_doc_lists_unbound_names_and_no_test @sha256:f8eaafd82094 -->
   <!-- anchor: tests/test_languages_typescript_reader.py#test_suggest_offers_the_test_function_that_calls_late_fee @sha256:296622051fe4 -->
   <!-- anchor: tests/test_languages_go_reader.py#test_suggest_offers_the_test_that_calls_late_fee_for_the_guide_sentence @sha256:697d9eb5462f -->
   <!-- anchor: tests/test_languages_rust_reader.py#test_suggest_offers_the_integration_test_that_calls_the_function_a_guide_names @sha256:6ed061e33ad5 -->
