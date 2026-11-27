@@ -228,3 +228,6 @@ paragraphs, which trains a reader to re-pin without reading.
 - 2026-11-27: Accepted [Each language reads its code through one interface](../rfcs/each-language-reads-its-code-through-one-interface.md):
   a pin into a TypeScript, Go or Rust definition will hash its syntax tree without comments,
   as a Python pin does, with the tree-sitter runtime and grammars pinned to exact versions.
+- 2026-11-27: Accepted [A pin that no longer matches its file is listed](../rfcs/a-pin-that-no-longer-matches-its-file-is-listed.md):
+  `irminsul anchors --stale` will list every anchor and claim evidence pin whose file no longer
+  has the pinned hash, with the command that re-pins only it, and exit 0.

@@ -1,13 +1,15 @@
 ---
 id: a-pin-that-no-longer-matches-its-file-is-listed
 title: "A pin that no longer matches its file is listed"
-status: draft
-summary: "`irminsul anchors --stale` lists every anchor and claim evidence pin, in any doc, whose file no longer has the pinned hash, with the command that re-pins only that one, and fails nothing."
+status: stable
 describes: []
-rfc_state: draft
+rfc_state: accepted
 affects:
   - anchors
   - cli
+resolved_by: docs/decisions/code-is-named-in-code-spans-and-bound-by-anchors.md
+summary: "`irminsul anchors --stale` lists every anchor and claim evidence pin, in any doc, whose file no longer has the pinned hash, with the command that re-pins only that one, and fails nothing."
+required_updates: []
 weight: small
 ---
 
@@ -21,21 +23,19 @@ about it judges two layers of docs only, and skips a pin whose doc was committed
 file, a rule the accepted RFC on naming a part of evidence keeps. On 2026-11-26 nine such
 pins sat in component docs, and two reviewers each wrote a script to find them. This [RFC](../GLOSSARY.md#rfc) adds a read-only listing of every pin that no longer matches, so an
 agent can see them and re-read each one, without changing what any check reports. The owner
-chose this over changing the check on 2026-11-27; three decisions remain.
+chose this over changing the check on 2026-11-27, and answered its three decisions the same day.
 
 ## Decisions
 
-1. **Where it lives.** (a) A flag, `irminsul anchors --stale`. Recommended: the command
-   already reports and re-pins pins, and nothing it prints today changes. (b) In the plain
-   output of `irminsul anchors`, beside the findings it reports: no new flag, but the JSON of
-   that command changes shape.
-2. **Its exit code.** (a) Always 0, as a reading list. Recommended: the gate stays what the
-   checks decide. (b) Non-zero when any pin is stale: a script could fail on it, but it would
-   be a second gate beside `check`.
-3. **What it lists.** (a) Every stale pin, anchors and claim evidence alike, each saying
-   whether a check already reports it. Recommended: one place answers "what is stale".
-   (b) Only the claim evidence pins no check reports: shorter, but an agent then runs two
-   commands.
+Answered by the owner on 2026-11-27:
+
+1. **It is a flag, `irminsul anchors --stale`**, so nothing `irminsul anchors` prints today
+   changes. Not chosen: rows in its plain output, which would change that command's JSON.
+2. **It always exits 0**: a reading list, with the gate left to the checks. Not chosen: a
+   non-zero exit when anything is stale, a second gate beside `check`.
+3. **It lists every stale pin**, anchors and claim evidence alike, each saying whether a check
+   already reports it, so one place answers what is stale. Not chosen: only the pins no check
+   reports, which would send an agent to two commands.
 
 ## Design detail
 
@@ -110,3 +110,10 @@ command that re-pins only that pin, and SHALL exit 0.
 
 - `T1` List the stale anchors and claim evidence pins under `anchors --stale`, plain and JSON, with the narrow re-pin command for each. (req: stale-pins-are-listed)
 - `T2` Say it in the anchors doc, the help of `anchors` and the changelog, and close the backlog's request for a read-only listing. (component: anchors)
+
+## Resolution
+
+Accepted by the owner on 2026-11-27, with the answers recorded under Decisions, and resolved by
+[Code is named in code spans and bound by anchors](../decisions/code-is-named-in-code-spans-and-bound-by-anchors.md),
+which decides what `irminsul anchors` reports and re-pins and whose Changes item records it.
+The rule joins the record's Decision with the implementation, as an edit in place.
