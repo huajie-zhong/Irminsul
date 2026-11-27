@@ -49,7 +49,9 @@ TypeScript file was once written five times with five answers.
   `frameworks.command_names` overrides them.
 - **A language profile is the one list of its files.** Every extractor and pack reads
   `LanguageProfile.suffixes`; the TypeScript profile lists JavaScript's with its own,
-  `.ts .tsx .mts .cts .js .jsx .mjs .cjs`. Profiles exist for Python, TypeScript, Go and Rust;
+  `.ts .tsx .mts .cts .js .jsx .mjs .cjs`. A profile also holds the pattern that reads an
+  environment variable in those files, which the `env-vars` surface matches, so that
+  extractor names no language. Profiles exist for Python, TypeScript, Go and Rust;
   a language without one, such as Ruby, is read by none, and a project needing one of its
   surfaces declares a `surface.rules` rule.
 - **`markers` and `confirmed_by` drive `init`.** A profile lists the root files that show its
@@ -140,3 +142,6 @@ TypeScript file was once written five times with five answers.
   parse places no import either, as a Go file does not, so `import-deps` no longer reports a
   `depends_on` of a doc that owns one. None of such a file's imports is read, and a missing
   one proved nothing.
+- 2026-11-27: The pattern that reads an environment variable is a field of the language's
+  profile, `env_var_pattern`, where the `env-vars` extractor held one pattern per language
+  and joined them to the profiles by suffix. The surface prints what it printed.

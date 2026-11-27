@@ -498,7 +498,7 @@ the review queue read routes; that changes what a code span names, so it is a de
 
 ### `environment-variable-counts-for-one-file`
 
-`EnvVarsExtractor.extract` (`src/irminsul/inventory/env_vars.py:68`) keeps one item for each
+`EnvVarsExtractor.extract` (`src/irminsul/inventory/env_vars.py:45`) keeps one item for each
 variable, from the first file that reads it, so a variable two files read is reported from one
 of them. `irminsul context <path>` counts a sentence that names the variable under `named_by`
 for that file alone (`docs_naming`, `src/irminsul/listing/review.py`): with `LEDGER_DATE_FORMAT`

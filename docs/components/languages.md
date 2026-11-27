@@ -17,7 +17,8 @@ owns_tests:
 
 # Language profiles
 
-A `LanguageProfile` is a pure-data record, and `LANGUAGE_REGISTRY` is the only lookup: [config](config.md) validation, `schema-leak`, the [init detector](init.md), `code-references` and the file selection of the [surface](surface.md) extractors and packs all read it. Adding a language is a profile constant registered there and changes no check; `languages/base.py` says what each field is for. A profile's `builtins` lists the names its language defines itself, such as Python's `IndexError`, which `code-references` and the review queue's unbound-name test read as the language's rather than as code this repository owes a definition; only the Python profile lists any. Python, TypeScript, Go and Rust are included. What an extractor reads inside the language's files stays the extractor's own code, written once per surface.
+A `LanguageProfile` is a pure-data record, and `LANGUAGE_REGISTRY` is the only lookup: [config](config.md) validation, `schema-leak`, the [init detector](init.md), `code-references` and the file selection of the [surface](surface.md) extractors and packs all read it. Adding a language is a profile constant registered there and changes no check; `languages/base.py` says what each field is for. A profile's `builtins` lists the names its language defines itself, such as Python's `IndexError`, which `code-references` and the review queue's unbound-name test read as the language's rather than as code this repository owes a definition; only the Python profile lists any. Python, TypeScript, Go and Rust are included. A profile's `env_var_pattern` is what reading an environment variable looks like in its language, and the `env-vars` [surface](surface.md) matches it in the files the profile lists, so a language registered with one is read with no extractor edited. What a framework's extractor reads inside the language's files stays the extractor's own code, written once per surface.
+<!-- anchor: tests/test_inventory_extractors.py#test_a_registered_profile_reads_its_env_vars_by_its_own_pattern @sha256:f80f6e98b88a -->
 
 ## Readers
 
@@ -125,7 +126,7 @@ JavaScript has no grammar of its own here: the TSX dialect reads it. On 6,792 Ja
 
 ### Adding a language
 
-A language is its profile, its grammar package, pinned to an exact version in `pyproject.toml`, and its query file, with a `TreeSitterReader` registered in `READERS` under the name the profile gives. With those alone its definitions are read, so a code span that names one of its functions is paired with it, an anchor pins it and a change to it re-asks the sentences that name it, and no check or feature is edited. Its imports and its tests need the code a query cannot say, in a module beside the others.
+A language is its profile, its grammar package, pinned to an exact version in `pyproject.toml`, and its query file, with a `TreeSitterReader` registered in `READERS` under the name the profile gives. The profile is where its facts are: the suffixes of its files, the files that mark a repository as holding it, its test file names, its built-in names, how it writes a path to a definition, and the pattern that reads an environment variable. With those alone its definitions are read, so a code span that names one of its functions is paired with it, an anchor pins it and a change to it re-asks the sentences that name it, and no check or feature is edited. Its imports and its tests need the code a query cannot say, in a module beside the others.
 <!-- anchor: tests/test_languages_tree_sitter.py#test_a_language_is_added_by_a_profile_a_grammar_and_a_query_file @sha256:9603483a602f -->
 
 ## Scope & Limitations

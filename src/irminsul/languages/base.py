@@ -51,6 +51,12 @@ class LanguageProfile:
     A doc naming one cites the language, not this repository's code, so no source file is
     asked to define it. Empty where the profile lists none.
     """
+    env_var_pattern: re.Pattern[str] | None = None
+    """What reading an environment variable looks like in this language's files, which the
+    `env-vars` surface matches: each match reads one variable, whose name is the group that
+    matched. None where the profile has no pattern, so its files put no variable on that
+    surface.
+    """
     path_separator: str = "."
     """What the language writes between the parts of a path to a definition, as Rust writes
     `Desk::new`. A doc may write a path that way where the language is enabled."""

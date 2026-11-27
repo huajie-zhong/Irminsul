@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -10,7 +11,7 @@ import pytest
 from irminsul.config import IrminsulConfig, SurfaceRule, SurfaceSettings
 from irminsul.inventory import get_extractor
 from irminsul.inventory.base import SourceReader
-from irminsul.languages import LANGUAGE_REGISTRY, TYPESCRIPT_PROFILE
+from irminsul.languages import LANGUAGE_REGISTRY, TYPESCRIPT_PROFILE, LanguageProfile
 
 CLI_SRC = """\
 import typer
@@ -174,6 +175,34 @@ def test_a_file_no_profile_lists_is_read_by_no_extractor(tmp_path: Path, suffix:
 
     for kind in ("exports", "env-vars", "cli", "cli-options", "http"):
         assert _identities(get_extractor(kind, cfg), files) == set()
+
+
+@pytest.mark.parametrize(
+    ("pattern", "read"),
+    [(re.compile(r'env\("(\w+)"\)'), {"LOAN_LIMIT"}), (None, set())],
+)
+def test_a_registered_profile_reads_its_env_vars_by_its_own_pattern(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    pattern: re.Pattern[str] | None,
+    read: set[str],
+) -> None:
+    """The pattern is the profile's, so a language registered with one has its files read
+    with no extractor edited, and one registered without puts nothing on the surface."""
+    monkeypatch.setitem(
+        LANGUAGE_REGISTRY,
+        "gox",
+        LanguageProfile(
+            name="gox",
+            source_root_candidates=(),
+            schema_leak_patterns=(),
+            suffixes=(".gox",),
+            env_var_pattern=pattern,
+        ),
+    )
+    files = _files(tmp_path, "src/desk.gox", 'limit := env("LOAN_LIMIT")\n')
+
+    assert _identities(get_extractor("env-vars", IrminsulConfig()), files) == read
 
 
 def test_exports_extractor_multiline_named_block(tmp_path: Path) -> None:

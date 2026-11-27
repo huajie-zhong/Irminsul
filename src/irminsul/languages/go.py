@@ -16,6 +16,7 @@ from irminsul.languages.base import LanguageProfile
 GO_PROFILE = LanguageProfile(
     name="go",
     reader="go",
+    env_var_pattern=re.compile(r"os\.(?:Getenv|LookupEnv)\(\s*\"(\w+)\""),
     fence_labels=("go",),
     suffixes=(".go",),
     markers=("go.mod",),

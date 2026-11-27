@@ -15,6 +15,7 @@ from irminsul.languages.base import LanguageProfile
 RUST_PROFILE = LanguageProfile(
     name="rust",
     reader="rust",
+    env_var_pattern=re.compile(r"env::var(?:_os)?\(\s*\"(\w+)\""),
     path_separator="::",
     fence_labels=("rust", "rs"),
     suffixes=(".rs",),

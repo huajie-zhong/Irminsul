@@ -15,6 +15,9 @@ TYPESCRIPT_PROFILE = LanguageProfile(
     name="typescript",
     reader="typescript",
     suffix_readers=tuple((suffix, "tsx") for suffix in (".tsx", ".js", ".jsx", ".mjs", ".cjs")),
+    env_var_pattern=re.compile(
+        r"process\.env\.([A-Za-z_]\w*)|process\.env\[\s*['\"](\w+)['\"]\s*\]"
+    ),
     fence_labels=("typescript", "ts", "tsx", "javascript", "js"),
     suffixes=(".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"),
     markers=("package.json",),

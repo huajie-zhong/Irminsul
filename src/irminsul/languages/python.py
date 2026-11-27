@@ -12,10 +12,19 @@ import re
 
 from irminsul.languages.base import LanguageProfile
 
+# `os.` or nothing before the name, so `from os import environ` counts and a WSGI
+# `request.environ[...]` does not.
+_OS = r"(?:\bos\.|(?<![\w.]))"
+
 PYTHON_PROFILE = LanguageProfile(
     name="python",
     reader="python",
     builtins=frozenset(dir(builtins)),
+    env_var_pattern=re.compile(
+        rf"{_OS}environ\s*\[\s*[\"'](\w+)[\"']\s*\]"
+        rf"|{_OS}environ\.get\s*\(\s*[\"'](\w+)[\"']"
+        rf"|{_OS}getenv\s*\(\s*[\"'](\w+)[\"']"
+    ),
     fence_labels=("python", "py"),
     suffixes=(".py",),
     markers=("pyproject.toml", "setup.py", "setup.cfg", "requirements*.txt"),
