@@ -215,9 +215,10 @@ def test_two_components_with_other_languages_that_differ_are_still_judged(
 
 def test_the_nearest_manifest_is_found_from_each_directory_under_it(tmp_path: Path) -> None:
     """A run asks each directory once: the second question, from a sibling, meets a
-    directory the first already asked and takes its answer."""
+    directory the first already asked and takes its answer, so the file gone from disk in
+    between is still the run's answer, and the next run's memo reads the disk again."""
     home = tmp_path / "lib"
-    write(tmp_path, "lib/go.mod", "module example.com/lib\n")
+    manifest = write(tmp_path, "lib/go.mod", "module example.com/lib\n")
     deep = home / "desk" / "ledger"
     beside = home / "policy"
     deep.mkdir(parents=True)
@@ -225,6 +226,9 @@ def test_the_nearest_manifest_is_found_from_each_directory_under_it(tmp_path: Pa
     memo: Memo = {}
 
     assert nearest(deep, "go.mod", memo) == home
+    manifest.unlink()
+
     assert nearest(beside, "go.mod", memo) == home
     assert nearest(home / "desk", "go.mod", memo) == home
-    assert nearest(home, "Cargo.toml", memo) == nearest(home, "Cargo.toml", {})
+    assert nearest(home, "go.work", memo) is None
+    assert nearest(beside, "go.mod", {}) is None
