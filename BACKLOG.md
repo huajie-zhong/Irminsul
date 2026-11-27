@@ -683,16 +683,6 @@ member, a call or a subscript would close the first, at the cost of a pin that m
 formatter removes needless parentheses there; the tuple needs the grammar's node kinds, which
 the engine does not know.
 
-### `a-python-file-with-a-byte-order-mark-defines-nothing`
-
-`SourceReader.text` (`src/irminsul/inventory/base.py`) reads a file as UTF-8 and keeps a
-leading U+FEFF, and Python's parser rejects it in a string, so a Python file an editor saved
-with a byte order mark does not parse: its reading defines nothing, an anchor into it is
-`claim-anchor/unreadable`, and no span names its functions, though Python runs the file. The
-TypeScript, Go and Rust readers read the same mark and answer (each run on 2026-11-27 over a
-one-function file). Dropping one leading U+FEFF before Python's parse moves no line and no
-pin of a file that parses today.
-
 ### `a-python-source-root-that-is-its-own-package`
 
 Python's reader places an absolute import under each source root

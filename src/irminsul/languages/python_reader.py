@@ -36,9 +36,11 @@ class PythonModule:
 
     @classmethod
     def parse(cls, text: str) -> PythonModule | None:
-        """The module `text` holds, or None when it does not parse."""
+        """The module `text` holds, or None when it does not parse. A byte order mark an
+        editor saved at its start is no part of the code, as the interpreter takes it, so it
+        is dropped before the parse."""
         try:
-            return cls(ast.parse(text))
+            return cls(ast.parse(text.removeprefix("\ufeff")))
         except SyntaxError:
             return None
 
