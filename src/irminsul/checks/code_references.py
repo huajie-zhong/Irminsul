@@ -12,9 +12,9 @@ not. The check reads the code spans of live docs and of the guidance files named
 - an inline span written like a file path that names no file in the repository.
 
 An unknown command or option is certain, because the span names the project's own program. An
-unknown `name()` is a hint: the symbol index reads Python only, and a doc may name another
-language's function. So are an unknown environment variable, which CI or another tool may read,
-and an unknown path, which a doc may use as an example.
+unknown `name()` is a hint: the symbol index holds the languages a reader reads, and a doc may
+name a function of another language or of a library. So are an unknown environment variable,
+which CI or another tool may read, and an unknown path, which a doc may use as an example.
 """
 
 from __future__ import annotations

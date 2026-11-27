@@ -21,7 +21,7 @@ from irminsul.languages import reader_for
 from irminsul.languages.python import PYTHON_PROFILE
 from irminsul.languages.python_reader import PYTHON_READER, PythonReading
 from irminsul.languages.python_reader import PythonModule as PythonModule
-from irminsul.languages.reader import CodeReader, CodeReading
+from irminsul.languages.reader import CodeReader, CodeReading, Memo
 
 
 @dataclass(frozen=True)
@@ -73,6 +73,7 @@ class SourceReader:
     def __init__(self) -> None:
         self._texts: dict[str, str | None] = {}
         self._readings: dict[tuple[str, CodeReader], CodeReading | None] = {}
+        self._memos: dict[CodeReader, Memo] = {}
 
     def text(self, path: Path) -> str | None:
         key = os.fspath(path)
@@ -101,7 +102,8 @@ class SourceReader:
         key = (os.fspath(path), reader)
         if key not in self._readings:
             text = self.text(path)
-            self._readings[key] = None if text is None else reader.read(text)
+            memo = self._memos.setdefault(reader, {})
+            self._readings[key] = None if text is None else reader.read(text, memo)
         return self._readings[key]
 
     def python_modules(

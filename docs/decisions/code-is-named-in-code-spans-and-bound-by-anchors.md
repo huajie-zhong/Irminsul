@@ -77,18 +77,30 @@ paragraphs, which trains a reader to re-pin without reading.
   source defines or reads is a hint.
 - **An anchor binds a paragraph to code.** `<!-- anchor: path#symbol -->` names the file and
   symbol a paragraph describes; `claim-anchor/missing-file` and `missing-symbol` are certain,
-  `pinned-drift` and `unpinned` hints. A Python file resolves a symbol through its syntax tree,
-  at the top level or as `Class.member`. Another text file resolves a symbol whose every dotted
-  part appears as a whole token, and pins the whitespace-normalized block at its defining line.
-  A file anchor pins the whole file. A span resolves with or without a trailing `()`.
+  `pinned-drift` and `unpinned` hints. A file its language's reader reads, in Python,
+  TypeScript, JavaScript, Go or Rust, resolves a symbol to a definition that reader finds, at
+  the top level or under the types that hold it, as `Class.member` or `Type::member`, and no
+  search of the text stands in for one. A symbol not found there is `missing-symbol`, or
+  `unreadable` where the file holds syntax its grammar could not read, since the symbol may be
+  in that part. Any other text file resolves a symbol whose every dotted part appears as a
+  whole token, and pins the whitespace-normalized block at its defining line. A file anchor
+  pins the whole file. A span resolves with or without a trailing `()`.
 - **A Python pin hashes `_canonical` of the tree**, the canonical text Python's reader gives
   in `src/irminsul/languages/python_reader.py`: each node's
   type name and its fields from `ast.iter_fields`, nodes and lists recursively, leaves through
   `ascii`. Positions are never written, a field that is `None` or `[]` is left out, and an
   empty literal inside an f-string is dropped. The pin is the first 12 hex digits of the
   sha256 of that text, for a symbol anchor, a file anchor and a claim evidence pin alike.
+- **A pin into TypeScript, JavaScript, Go or Rust hashes the tree its grammar gives**: each
+  node's type, the field it fills, its children, and the text no child covers. Comments are
+  left out, but for one the compiler reads, such as `//go:embed`, and so is what a formatter
+  chooses: a trailing comma, and what the language's query file marks, such as a statement's
+  semicolon, a string's quote and the parentheses around a wrapped expression. A decorator, an
+  attribute and the signatures of an overload are part of the definition under them. A symbol
+  that several definitions share hashes them all.
 - **What a pin covers does not change.** A docstring edit drifts a Python pin; a comment or a
-  reformat does not. Anchors into other languages keep the whitespace-normalized text.
+  reformat does not, in any language a reader reads. Anchors into a file no reader reads keep
+  the whitespace-normalized text.
 - **A re-pin records a re-read.** `irminsul anchors --re-pin --doc <doc>`, narrowed by
   `--claim`, `--evidence` or `--anchor`, writes a claim's `pinned` map of evidence path to
   normalized hash. A pin on a path the claim no longer cites is dropped by the next re-pin.
@@ -103,8 +115,8 @@ paragraphs, which trains a reader to re-pin without reading.
   sentence that names code distinctively, as `name()` or a dotted, snake_case or camelCase
   identifier, which nothing resolves and no anchor in the doc binds, is marked `unbound-name`.
 - **Suggestions name only what an anchor can reach.** `irminsul anchors --suggest` lists each
-  unbound name with up to three places and the marker to paste. A Python definition comes from
-  the syntax tree under the dotted path an anchor accepts; one inside a function or block is
+  unbound name with up to three places and the marker to paste. A definition in a file a
+  reader reads comes from that reader under the dotted path an anchor accepts; one inside a function or block is
   listed as out of reach rather than dropped; a file that only mentions the name is offered
   only when nothing defines it. The agent chooses and writes the anchor.
   <!-- anchor: src/irminsul/binding.py#suggest @sha256:56aa1c362862 -->
@@ -115,9 +127,12 @@ paragraphs, which trains a reader to re-pin without reading.
   sentence is false and sees the test fail, then restores the code: a written step, since
   Irminsul runs no code, and a test that still passes does not guard the sentence.
 - **Asked about one doc, the suggestion offers tests.** `irminsul anchors --suggest --doc <doc>`
-  also lists each code span of that doc that resolves to one Python function or class, with
+  also lists each code span of that doc that resolves to one function or class, with
   up to three test functions that name it, ordered by path and line, each as a marker to
-  paste. A test function is a function whose name starts with `test`, in a Python file under
+  paste. A test function is what its language's reader says is one: in Python a function whose
+  name starts with `test`, in Go one named `Test` and then no lower-case letter, in Rust one
+  under `#[test]`, and in TypeScript, where a test is a call with a string for its name, any
+  named function defined in a file that holds such a call. It is in a file under
   `paths.test_roots` that imports the defining module, whose body names the definition through
   the file's imports: a name imported from that module, under an alias too, or an attribute of
   a name bound to it. A name the test binds itself, as a parameter, a local or a fixture, does
@@ -126,8 +141,7 @@ paragraphs, which trains a reader to re-pin without reading.
   root declared, the listing says that no test file was read. A name no test names is listed
   and said to have none, the closing line counts these names apart
   from the unbound ones, and the JSON keeps `unbound` and gains a list `resolved`. A test file
-  that does not parse is skipped. Without `--doc` the listing is the unbound names alone, and
-  tests in another language are not offered.
+  that does not parse is skipped. Without `--doc` the listing is the unbound names alone.
   <!-- anchor: tests/test_binding.py#test_suggest_offers_the_test_that_calls_a_function_the_doc_names @sha256:94b5c37f7a7b -->
 - **Framework extractors stay** as precision for the kinds they know, such as an option checked
   against its own command.
@@ -250,3 +264,9 @@ paragraphs, which trains a reader to re-pin without reading.
   before, now in `src/irminsul/languages/python_reader.py` with the resolution of a symbol, and
   `anchors --suggest` reads definitions and tests through that reader. No pin of code this
   left unchanged moved.
+- 2026-11-27: The readers of TypeScript, JavaScript, Go and Rust are implemented and stated in
+  the Decision. A pin into one hashes its syntax tree, so every such pin written before reads
+  as drifted once. An anchor there names a definition the reader finds, and one to anything
+  else is `missing-symbol` with no fallback to a search of the text, which the owner chose on
+  that day over keeping the search until part markers exist; the tests the suggestion offers
+  follow each language's convention, the TypeScript one as the RFC words it.

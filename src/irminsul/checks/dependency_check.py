@@ -4,9 +4,14 @@ A file's imports are read by its language's reader (`irminsul.languages`), which
 which repository files each may load, so only a file of a language that has a reader backs
 a dependency. Flags hallucinated deps: `depends_on` declared but with no import
 relationship found. The reverse direction (imports not declared) is intentionally not
-flagged: `depends_on` is curated intent, not a complete projection of the import graph. A
-doc that mixes a language a reader reads with one none does is read through the first
-alone, so a dependency only its other code backs is still reported.
+flagged: `depends_on` is curated intent, not a complete projection of the import graph.
+
+A missing import says two docs are unrelated only where an import would have shown the
+relation: the two own code of a language in common, and the reader of every language they
+have in common places every import. A reader that does not, because a path alias or another
+package may stand between two files, backs a dependency it finds and denies none. A doc
+that also owns code no reader reads is judged through the rest alone, so a dependency only
+that code backs is still reported.
 """
 
 from __future__ import annotations
@@ -18,10 +23,15 @@ from typing import ClassVar
 
 from irminsul.checks.base import Answer, Finding, FindingClass, Severity
 from irminsul.docgraph import DocGraph
-from irminsul.languages import languages_read, reader_for
+from irminsul.languages import (
+    language_read,
+    languages_placing_every_import,
+    places_every_import,
+    reader_for,
+)
 from irminsul.languages.reader import imported_files
 
-_LANGUAGES_READ = " or ".join(languages_read())
+_LANGUAGES_JUDGED = " or ".join(languages_placing_every_import())
 
 
 @dataclass(frozen=True)
@@ -93,6 +103,20 @@ def resolve_ownership(graph: DocGraph) -> SourceOwnership:
     )
 
 
+def _languages(files: list[Path]) -> frozenset[str]:
+    """The languages a reader reads `files` as."""
+    return frozenset(name for name in map(language_read, files) if name is not None)
+
+
+def _denied_by_no_import(owned: frozenset[str], other: frozenset[str]) -> bool:
+    """Whether two docs that own code of these languages are unrelated when no import was
+    found between them: they share a language, and each language they share has every
+    import placed. One they share whose imports are only partly placed could hold the
+    import unseen."""
+    shared = owned & other
+    return bool(shared) and all(places_every_import(language) for language in shared)
+
+
 CODE_HALLUCINATED_DEPENDENCY = "import-deps/hallucinated-dependency"
 
 
@@ -102,10 +126,11 @@ class DependencyCheck:
     explanations: ClassVar[dict[str, str]] = {
         CODE_HALLUCINATED_DEPENDENCY: (
             "A `depends_on` entry is declared but no import relationship backs it in "
-            f"code. Only {_LANGUAGES_READ} imports are read, so a doc or dependency "
-            f"that owns no {_LANGUAGES_READ} file is not judged. Remove the stale "
-            "declaration, or verify the doc claiming the dependent module actually covers "
-            "the right files."
+            "code. It is judged only where an import would have shown it: the two docs "
+            "own code of a language in common, and every import of each language they have "
+            f"in common can be placed ({_LANGUAGES_JUDGED}). "
+            "Remove the stale declaration, or verify the doc claiming the dependent module "
+            "actually covers the right files."
         ),
     }
     classes: ClassVar[dict[str, FindingClass]] = {
@@ -126,14 +151,22 @@ class DependencyCheck:
         ownership = resolve_ownership(graph)
         code_files = ownership.doc_code_files
 
+        languages = {doc_id: _languages(files) for doc_id, files in code_files.items()}
+        nothing: frozenset[str] = frozenset()
+
         out: list[Finding] = []
         for node in graph.nodes.values():
-            # Imports are read only where a language has a reader, so a doc that owns no
-            # such file, or a dependency that owns none, is a relationship this check cannot
-            # see; judging it would report every true `depends_on` of such a doc as
-            # hallucinated.
+            # A dependency on a doc with no language in common, or with one in common
+            # whose imports are only partly placed, is a relationship no missing import
+            # denies; judging it would report a true `depends_on` as hallucinated.
             files = code_files.get(node.id, [])
-            if not files:
+            owned = languages.get(node.id, nothing)
+            declared_deps = {
+                dep
+                for dep in node.frontmatter.depends_on
+                if _denied_by_no_import(owned, languages.get(dep, nothing))
+            }
+            if not declared_deps:
                 continue
 
             actual_deps: set[str] = set()
@@ -145,8 +178,6 @@ class DependencyCheck:
                     dep_id = ownership.owner_of(candidate)
                     if dep_id and dep_id != node.id:
                         actual_deps.add(dep_id)
-
-            declared_deps = {dep for dep in node.frontmatter.depends_on if code_files.get(dep)}
 
             # Intent-only: flag a declared dependency that has no actual
             # import (a hallucinated/stale declaration), but never the reverse —

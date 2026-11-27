@@ -292,12 +292,59 @@ making a feature, a refactor and an RFC-driven change in it.
   body refers to, which functions are tests or which text a pin hashes asks that reader, where
   each used to parse Python itself: anchor pins, the definitions and tests `anchors --suggest`
   offers, the function a code span is paired with, the tests `context` ranks by their imports,
-  `import-deps` and the new-dependency pass. Python's reader is its own parser, so no output
-  changes and no pin moves. A TypeScript, Go or Rust file still has no reader, so these features
-  do not reach it yet
+  `import-deps` and the new-dependency pass. Python's reader is its own parser, so no Python
+  output changes and no Python pin moves
   ([Each language reads its code through one interface](docs/rfcs/each-language-reads-its-code-through-one-interface.md)).
+- TypeScript, JavaScript, Go and Rust have readers, through tree-sitter, so those features
+  reach their files:
+  - A code span that names a function, a class or a type is paired with its definition and its
+    lines, a method as `Type.method`, or as `Type::method` in Rust. `list review --changed`
+    queues each sentence that names one a change touched, and `context <path>` counts the docs
+    that name it. A span that names an exported TypeScript function now names the function,
+    with all its lines, where it named the export's first line; in JSON its `kind` is `symbol`
+    and no longer `exports`.
+  - `context <file>` ranks the tests that import the file, and `anchors --suggest --doc`
+    offers the tests that name a definition: a Go function named `Test...`, a Rust function
+    under `#[test]`, and for TypeScript, where a test is a call, the named functions a test
+    file defines.
+  - The `new-dependency` pass reports an import a change added between two documented
+    components. `import-deps` reports a `depends_on` no import backs for Go as it does for
+    Python, and not for TypeScript or Rust, where a path alias or another crate can carry a
+    dependency the reader does not follow; between two components of different languages it
+    judges nothing. `irminsul explain import-deps/hallucinated-dependency` says so.
+  - An anchor into one of these files names a definition the reader finds: a function, a type,
+    a member of a type, or a name bound outside a function. Its pin hashes the definition's
+    syntax tree, so a comment, a reformat or a trailing comma no longer moves it, and a
+    decorator, an attribute or an overload's signature above the definition is part of it.
+  - A file that holds syntax the grammar does not know, as some valid TypeScript does, still
+    answers each definition and import around it.
+  - A function in a block or in an object literal is not something an anchor or a code span can
+    name, and `anchors --suggest` lists it as out of reach.
+- tree-sitter is a required dependency: `tree-sitter` 0.26.0 with the TypeScript, Go and Rust
+  grammars, each pinned to one version because a pin hashes the tree it gives. They ship
+  wheels for CPython on Linux, macOS and Windows; on musl ARM64, PyPy or a free-threaded
+  build, installing Irminsul compiles C code. An exact pin conflicts with another tool in the
+  same environment that needs another version, so install Irminsul in an environment of its
+  own, as `pipx` and `uv tool` do. Reading these languages costs about a millisecond or two a
+  file on each `check` and `context` run.
+- `claim-anchor/unreadable` names a second way to answer it: where the code is valid and the
+  reader cannot parse it, anchor a definition the reader does find, or the whole file.
 
 **Upgrading.**
+- Every pin into a TypeScript, JavaScript, Go or Rust file moves once, because it now hashes
+  the syntax tree and not the text. Each such anchor reports `claim-anchor/pinned-drift`, and a
+  claim pin on such a file stops matching; `irminsul anchors --stale` lists them all. As for
+  Python pins on the move to 0.4.0, `irminsul anchors --re-pin --all` once after upgrading is
+  a format migration, not a re-read.
+- An anchor into one of those files whose symbol is not a definition, such as a key of an
+  object literal, a local variable, or a name the file only mentions, resolved by a search of
+  the text and is now `claim-anchor/missing-symbol`, a certain finding. Point it at the
+  definition the paragraph is about, or at the whole file.
+- A Go project can see `import-deps/hallucinated-dependency` for the first time, on a
+  `depends_on` between two Go components that no import backs.
+- A code span that names a function or class of those languages used to be `unbound-name` in
+  `list review --written` and listed by `anchors --suggest`; it now resolves, and only a
+  constant or a name no reader finds is still unbound.
 - A claim that cites a doc as evidence is now judged on that doc's words, with its pins left out,
   so re-pinning an anchor in the doc no longer re-asks the claim. Once after upgrading, a claim
   that cites a doc holding a pin can report `claim-provenance/evidence-drift`, because the doc's

@@ -103,7 +103,9 @@ def resolve(repo_root: Path, anchor: Anchor, reader: SourceReader | None = None)
     `reader` is the snapshot to read the target from; a caller with a graph passes
     `graph.source`, so a file is parsed once however many anchors name it. A file whose
     language has a reader is hashed over the canonical text that reader gives for the
-    symbol, or for the whole file; any other is resolved and hashed as text."""
+    symbol, or for the whole file; any other is resolved and hashed as text. A symbol the
+    reader does not find is missing when the whole file parsed, and unreadable when part of
+    it did not, since the symbol may be in that part."""
     from irminsul.inventory.base import SourceReader
 
     reader = reader or SourceReader()
@@ -119,11 +121,9 @@ def resolve(repo_root: Path, anchor: Anchor, reader: SourceReader | None = None)
         if target.suffix == ".md" and anchor.symbol is None:
             text = without_pins(text)
         return _resolve_text(text, anchor.symbol)
-    if not reading.parsed:
-        return Resolution("unreadable")
     canonical = reading.canonical(anchor.symbol)
     if canonical is None:
-        return Resolution("missing_symbol")
+        return Resolution("missing_symbol" if reading.parsed else "unreadable")
     return Resolution("ok", _hash(canonical))
 
 

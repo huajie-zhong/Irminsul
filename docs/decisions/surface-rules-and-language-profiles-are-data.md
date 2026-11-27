@@ -42,9 +42,10 @@ TypeScript file was once written five times with five answers.
   same record. `guard` is a regular expression searched across a whole file with `^` at every
   line, and a file it does not match is not read. A config with `checks.inventory_drift` fails
   to load naming `[[surface.rules]]`, and a rule written with `glob` is an unknown key.
-- **Checks read capabilities, not kind names.** A kind resolves to its mention pattern and
-  whether its identity is a command path, which `inventory-drift`, `code-references` and
-  `list review` read. A command path's program names come from package manifests, and
+- **Checks read capabilities, not kind names.** A kind resolves to its mention pattern,
+  whether its identity is a command path, and whether its identity is the name of a
+  definition, as an export's is, which `inventory-drift`, `code-references` and `list review`
+  read. A command path's program names come from package manifests, and
   `frameworks.command_names` overrides them.
 - **A language profile is the one list of its files.** Every extractor and pack reads
   `LanguageProfile.suffixes`; the TypeScript profile lists JavaScript's with its own,
@@ -56,13 +57,30 @@ TypeScript file was once written five times with five answers.
   them. `package.json` belongs to every JavaScript project, so TypeScript also needs a
   `tsconfig.json` or a `.ts` file.
 - **A profile names its language's reader, which is code.** `LanguageProfile.reader` is a name
-  that `READERS` in `src/irminsul/languages/__init__.py` maps to the reader, so the profile
-  stays data. For a file's text a reader answers what it defines and on which lines, what it
-  imports and which repository files an import may load, what a definition's body refers to,
-  the canonical text a pin hashes, and which definitions are tests. A feature that reads code
-  asks the reader of the file's language and names no language, so `import-deps` reads every
-  language whose reader answers imports. Python's reader is its own parser, `ast`, and no
-  other language has a reader yet.
+  that `READERS` in `src/irminsul/languages/__init__.py` maps to the reader, and
+  `suffix_readers` names the dialect that reads a suffix, so the profile stays data. For a
+  file's text a reader answers what it defines and on which lines, what it imports and which
+  repository files an import may load, what a definition's body refers to, the canonical text
+  a pin hashes, and which definitions are tests. A feature that reads code asks the reader of
+  the file's language and names no language.
+- **Python is read by its own parser, and TypeScript, JavaScript, Go and Rust through
+  tree-sitter.** tree-sitter is a required dependency, with its runtime and each grammar
+  pinned to one exact version. One reader serves those languages, with a query file each that
+  says what a definition, an import and a test look like in the grammar, and a module each
+  for what a query cannot say. JavaScript is read through the TSX dialect of TypeScript's
+  grammar, which a measurement on 6,792 JavaScript files chose over a grammar of its own. A
+  language is added by its profile, its grammar and its query file, with no change to a
+  check.
+- **A file its grammar cannot read whole still answers what parsed.** The grammars lag their
+  languages, so a definition or an import whose own node holds no syntax error is answered,
+  and the reading says the rest is unknown. Python stays all or nothing.
+- **A missing import denies a dependency only where every import is placed.** A reader says
+  whether it places every import of its language that stays in the repository. Python's and
+  Go's do. TypeScript's and Rust's do not, since a path alias, a workspace package or another
+  crate may stand between two files. `import-deps` reports a `depends_on` no import backs
+  only when the two docs own code of a language in common and the reader of every language
+  they have in common places every import. The test ranking and the `new-dependency` pass
+  report only imports they found, so they read every language.
 
 ## Alternatives Considered
 
@@ -83,8 +101,13 @@ TypeScript file was once written five times with five answers.
 - An `env-vars` inventory item that only a `.rb` file reads is `inventory-drift/item-not-found`.
 - **Known limits.** The lift of a base's old table lives in `parse_snapshot` and goes once no
   base a run can meet predates the rename. The `uniqueness` skip list still names Python's
-  files itself, and the cheap test `ranked_tests` makes before it reads a test file's imports,
-  whether the file mentions the module's name, knows a Python package's `__init__.py`.
+  files itself.
+- An exact pin on tree-sitter and its grammars conflicts with another tool in the same
+  environment that needs another version of them, and where no wheel exists, installing
+  Irminsul compiles C code.
+- A dependency that only a TypeScript path alias or a Rust path into another crate carries is
+  neither denied nor seen, and one between two components of different languages is not
+  judged.
 
 ## Changes
 
@@ -97,3 +120,10 @@ TypeScript file was once written five times with five answers.
   offers, the pairing of a code span with a function, the test ranking and both import checks
   read through it, so `IMPORT_LANGUAGE` is gone. No pin of code this left unchanged moved. The
   tree-sitter readers are not built yet and their rule joins the Decision when they are.
+- 2026-11-27: The tree-sitter readers are implemented and stated in the Decision, with three
+  answers the owner gave that day while they were built. A file with a syntax error to its
+  grammar answers what parsed around it, where the RFC had it answer nothing: one Vitest
+  idiom made 93 of 1,924 project files fail whole. `import-deps` judges a missing import only
+  between docs whose common languages all have every import placed, which is Python and Go,
+  where the RFC had it read every language that answers imports. And JavaScript is read
+  through the TSX dialect, the outcome of the measurement the RFC's third decision asked for.

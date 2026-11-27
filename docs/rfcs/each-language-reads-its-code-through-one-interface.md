@@ -73,7 +73,7 @@ file's imports, from about five lines of query per language.
 **Features ask the interface.** The five modules that call Python's parser for these
 questions call the interface instead, once, and nothing in a check names a language. So the
 queue, the packet's tests, the suggested tests and `import-deps` reach TypeScript, Go and Rust
-when this lands.
+when this lands, `import-deps` as far as decision 9 lets it.
 
 **Adding a language** is a profile, a grammar package and a query file, with a fixture that
 tests the queries. The environment variable pattern moves into the profile, so a language's
@@ -125,7 +125,8 @@ Answered by the owner on 2026-11-27:
    not parse.
 3. **The first languages are TypeScript, Go and Rust.** Whether JavaScript files are read
    through the TypeScript grammar or the JavaScript one is chosen by measuring both on real
-   JavaScript; a `.tsx` file is read through the grammar's TSX dialect.
+   JavaScript; a `.tsx` file is read through the grammar's TSX dialect. Measured on
+   2026-11-27: the TSX dialect reads JavaScript too.
 4. **A non-Python pin hashes the definition's syntax tree without comments**, as a Python pin
    does. Every existing non-Python pin moves once, and the grammars and the runtime are pinned
    to exact versions so that only a release of Irminsul moves them again. Not chosen: the
@@ -137,6 +138,28 @@ Answered by the owner on 2026-11-27:
    language interface, so it reaches every language Irminsul reads, and a language is added in
    one place", in the pull request that lands the interface, since it cannot be followed
    before.
+
+Answered by the owner on 2026-11-27, while the tree-sitter readers were built:
+
+7. **A file the grammar cannot read whole answers what parsed.** A definition or an import
+   whose own syntax holds no error is answered, and a symbol not found in such a file is
+   unreadable, not missing. The grammars lag their languages: of 1,924 TypeScript files of
+   real projects 99 held an error to the grammar, 93 of them on the one line
+   `importOriginal<typeof import("./api")>()`, and the newest TypeScript grammar dates from
+   2024-11. Not chosen: such a file answers nothing, as this RFC first said and as a Python
+   file does.
+8. **An anchor into TypeScript, Go or Rust names a definition the reader finds.** One to
+   anything else, such as a key of an object literal, is `claim-anchor/missing-symbol`, with
+   no search of the text for the name. Not chosen: keeping the search until the part markers
+   of `claim-evidence-names-a-part` exist, which would have kept every such anchor resolving.
+9. **`import-deps` reports a missing import only where every import is placed.** A reader
+   says whether it places every import of its language: Python's and Go's do, TypeScript's and
+   Rust's do not, since a path alias or another crate may stand between two files. A
+   `depends_on` is judged only between docs whose common languages all do. Not chosen: judging
+   every language with a reader, which would report true dependencies with no way to answer.
+10. **For TypeScript, every named function a test file defines is offered as a test**, as the
+    design detail below says; the reader knows a test file by the test call it holds. Not
+    chosen: offering none, since such a function is often a helper.
 
 ## Design detail
 
@@ -169,8 +192,9 @@ Answered by the owner on 2026-11-27:
   the profile's data. Python's reader wraps today's code; the others share one tree-sitter
   reader that loads the language's grammar and query file. A Rust attribute such as
   `#[derive]` is a sibling of the item it annotates in the grammar, so the reader joins the
-  attributes above a definition to its lines, as Python's decorators are. A file that does
-  not parse answers no definitions and says so, as a Python file does today.
+  attributes above a definition to its lines, as Python's decorators are. A Python file that
+  does not parse answers no definitions and says so, as today; decision 7 says what a file
+  tree-sitter cannot read whole answers.
 - **Tests, by convention.** Python: a function whose name starts with `test`. Go: a function
   named `Test...` in a `_test.go` file. Rust: a function under `#[test]`. TypeScript: a test
   is a call, not a definition, so only a named function a test file defines can be offered.

@@ -19,6 +19,7 @@ from irminsul.inventory.base import SourceReader
 from irminsul.inventory.cli_options import command_options
 from irminsul.inventory.programs import program_names
 from irminsul.languages import LANGUAGE_REGISTRY, reader_for
+from irminsul.languages.reader import dotted
 
 if TYPE_CHECKING:
     from irminsul.git.reader import GitReader
@@ -42,6 +43,8 @@ class _Definition(NamedTuple):
     end: int
     first: int
     qualified: str
+    test: bool = False
+    """Whether its file's reader reads it as a test."""
 
 
 @dataclass(frozen=True)
@@ -71,6 +74,7 @@ class CodeResolver:
         self.surfaces: dict[str, dict[str, SurfaceItem]] = {}
         self.mentions: dict[str, list[re.Pattern[str]]] = {}
         self.command_kinds: set[str] = set()
+        self.definition_kinds: set[str] = set()
         names = program_names(repo_root, config)
         self.program_prefix = (
             re.compile(rf"^(?:{'|'.join(re.escape(n) for n in names)})\s+") if names else None
@@ -81,6 +85,8 @@ class CodeResolver:
                 self.mentions[kind] = [mention_regex(p) for p in capabilities.mention_patterns]
             if capabilities.command_path:
                 self.command_kinds.add(kind)
+            if capabilities.definition:
+                self.definition_kinds.add(kind)
             items = tree.surface(kind)
             if items:
                 self.surfaces[kind] = {item.identity: item for item in items}
@@ -115,22 +121,31 @@ class CodeResolver:
     ) -> dict[str, list[_Definition]]:
         """The functions and classes at the top level of each file a reader reads, and those in
         a class there, by bare name and by `Class.name`: first a file's top level, then its
-        classes' members, each in source order."""
+        classes' members, each in source order. A test that shares a name with one other
+        definition, as a Rust unit test may share its function's, leaves the name to that
+        one."""
         index: dict[str, list[_Definition]] = {}
         for abs_path, display in files:
             reading = reader.reading(abs_path)
             if reading is None:
                 continue
+            tests = set(reading.tests())
             named = [
                 d
                 for d in reading.definitions()
                 if d.kind != "variable" and d.reachable and len(d.scope) <= 1
             ]
             for found in sorted(named, key=lambda d: len(d.scope)):
-                where = _Definition(display, found.line, found.end, found.first, found.symbol)
+                where = _Definition(
+                    display, found.line, found.end, found.first, found.symbol, found in tests
+                )
                 index.setdefault(found.name, []).append(where)
                 if found.scope:
                     index.setdefault(found.symbol, []).append(where)
+        for name, sharing in index.items():
+            others = [where for where in sharing if not where.test]
+            if len(others) == 1 and len(sharing) > 1:
+                index[name] = others
         return index
 
     def appears_in_source(self, name: str) -> bool:
@@ -241,9 +256,12 @@ class CodeResolver:
         path ending in it, with or without a trailing `()`. Only a span no surface matches is
         tried as a function or class by name, as a reader reads one, which resolves when one
         definition has that name, and then as a repository file by path, inside a source root
-        or not.
+        or not. An identity of a kind that names definitions, such as an export, gives way to
+        the one definition of that name, when a reader reads it. A path written with `::`,
+        as Rust writes one, is the dotted path.
         """
         text, _ = self.strip_program(span)
+        named = dotted(text)
         refs: list[Reference] = []
         for kind, regexes in self.mentions.items():
             for regex in regexes:
@@ -264,12 +282,19 @@ class CodeResolver:
             else:
                 # Configured kinds are often ordinary words, so only a span that is the
                 # identity, or a dotted path ending in it, names one.
-                leaf = text.removesuffix("()").rsplit(".", 1)[-1]
-                best = leaf if leaf in items and _SYMBOL_RE.match(text) else None
+                leaf = named.removesuffix("()").rsplit(".", 1)[-1]
+                best = leaf if leaf in items and _SYMBOL_RE.match(named) else None
+                if best is not None and kind in self.definition_kinds:
+                    # The identity is a definition's name, so where a reader reads that
+                    # definition the span names it, lines and all, wherever a file
+                    # re-exports it, and not the first line of an export.
+                    key = self._symbol_key(named)
+                    if key is not None and len(self._symbols[key]) == 1:
+                        best = None
             if best is not None:
                 refs.append(self._ref(span, kind, items[best]))
-        if not refs and _SYMBOL_RE.match(text):
-            key = self._symbol_key(text)
+        if not refs and _SYMBOL_RE.match(named):
+            key = self._symbol_key(named)
             found = self._symbols[key] if key is not None else []
             if key is not None and len(found) == 1:
                 where = found[0]
@@ -282,17 +307,17 @@ class CodeResolver:
     def _symbol_key(self, text: str) -> str | None:
         """The index name a symbol span is looked up under: `Class.name` when the span is
         dotted and a class has that member, else the bare name when anything has it."""
-        dotted = text.removesuffix("()").split(".")
-        qualified = ".".join(dotted[-2:])
-        if len(dotted) > 1 and self._symbols.get(qualified):
+        parts = text.removesuffix("()").split(".")
+        qualified = ".".join(parts[-2:])
+        if len(parts) > 1 and self._symbols.get(qualified):
             return qualified
-        return dotted[-1] if self._symbols.get(dotted[-1]) else None
+        return parts[-1] if self._symbols.get(parts[-1]) else None
 
     def named_as(self, ref: Reference) -> str:
         """The name that tells the function or class `ref` names from every other in its
         file: `Class.name` for a method, however its span wrote it, so that `Ledger.remove`
         and the `Drawer.remove` a bare `remove` may pair with are two names."""
-        key = self._symbol_key(self.strip_program(ref.span)[0])
+        key = self._symbol_key(dotted(self.strip_program(ref.span)[0]))
         found = self._symbols[key] if key is not None else []
         return found[0].qualified if len(found) == 1 else ref.identity
 

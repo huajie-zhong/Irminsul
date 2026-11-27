@@ -1,8 +1,8 @@
 """Context keeps no session: each call re-derives what it reports from the repository.
 
-These pin the observable half of the `context-is-stateless` contract. A change to the docs
-or to git history made between two calls in one process shows up in the second call, and a
-call writes nothing into the repository. They cannot show that no future code path holds
+These pin the observable half of the `context-is-stateless` contract. A change to the docs,
+to git history or to a manifest a reader places imports through, made between two calls in
+one process, shows up in the second call, and a call writes nothing into the repository. They cannot show that no future code path holds
 hidden state; that stays a question for review.
 """
 
@@ -14,7 +14,7 @@ from pathlib import Path
 from irminsul.config import find_config, load
 from irminsul.context import build_context_report
 
-from .conftest import commit_all, seed_repo
+from .conftest import commit_all, git_init, seed_repo
 
 _OLD = _dt.datetime(2024, 1, 1, tzinfo=_dt.UTC)
 _LATER = _dt.datetime(2025, 1, 1, tzinfo=_dt.UTC)
@@ -109,3 +109,44 @@ def test_context_calls_write_nothing_into_the_repository(tmp_path: Path) -> None
     build_context_report(root, config, topic="alpha")
 
     assert snapshot() == before
+
+
+def test_a_second_call_sees_a_manifest_rewritten_between_calls(tmp_path: Path) -> None:
+    """A reader places a Go import through `go.mod`, which it reads once for a run. The next
+    call is another run: once the module is renamed, the test's import leads out of the
+    repository and the test is no longer ranked for the file."""
+    root = tmp_path / "r"
+    (root / "desk").mkdir(parents=True)
+    (root / "tests").mkdir()
+    (root / "docs" / "components").mkdir(parents=True)
+    (root / "go.mod").write_text("module example.com/lib\n\ngo 1.22\n", encoding="utf-8")
+    (root / "desk" / "desk.go").write_text(
+        "package desk\n\nfunc Renew() int {\n\treturn 1\n}\n", encoding="utf-8"
+    )
+    (root / "tests" / "desk_test.go").write_text(
+        'package tests\n\nimport (\n\t"testing"\n\n\t"example.com/lib/desk"\n)\n\n'
+        "func TestRenew(t *testing.T) {\n\tif desk.Renew() != 1 {\n\t\tt.Fail()\n\t}\n}\n",
+        encoding="utf-8",
+    )
+    (root / "docs" / "components" / "desk.md").write_text(
+        _doc("desk", ["desk/desk.go"]), encoding="utf-8"
+    )
+    (root / "irminsul.toml").write_text(
+        'project_name = "stateless"\n[paths]\ndocs_root = "docs"\nsource_roots = ["desk"]\n'
+        'test_roots = ["tests"]\n[checks]\nenabled = ["frontmatter"]\n',
+        encoding="utf-8",
+    )
+    git_init(root)
+
+    def ranked() -> dict[str, list[str]]:
+        report = build_context_report(
+            root, load(find_config(root)), target_paths=[root / "desk" / "desk.go"]
+        )
+        [result] = report.results
+        return result.test_reasons
+
+    assert ranked() == {"tests/desk_test.go": ["imports desk/desk.go"]}
+
+    (root / "go.mod").write_text("module example.com/moved\n\ngo 1.22\n", encoding="utf-8")
+
+    assert ranked() == {}

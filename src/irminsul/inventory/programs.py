@@ -7,10 +7,10 @@ They are `frameworks.command_names` when set, otherwise `[project.scripts]`, the
 from __future__ import annotations
 
 import json
-import tomllib
 from pathlib import Path
 
 from irminsul.config import IrminsulConfig
+from irminsul.languages.manifests import read_toml
 
 
 def program_names(repo_root: Path, config: IrminsulConfig) -> tuple[str, ...]:
@@ -32,16 +32,8 @@ def _manifest_roots(repo_root: Path, config: IrminsulConfig) -> list[Path]:
     return list(dict.fromkeys(root for root in roots if root.is_dir()))
 
 
-def _read_toml(path: Path) -> dict[str, object]:
-    try:
-        with path.open("rb") as f:
-            return tomllib.load(f)
-    except (OSError, tomllib.TOMLDecodeError):
-        return {}
-
-
 def _pyproject_scripts(path: Path) -> list[str]:
-    project = _read_toml(path).get("project")
+    project = read_toml(path).get("project")
     scripts = project.get("scripts") if isinstance(project, dict) else None
     return [str(name) for name in scripts] if isinstance(scripts, dict) else []
 
@@ -62,7 +54,7 @@ def _package_json_bins(path: Path) -> list[str]:
 
 
 def _cargo_bins(path: Path) -> list[str]:
-    data = _read_toml(path)
+    data = read_toml(path)
     bins = data.get("bin")
     names = (
         [str(b["name"]) for b in bins if isinstance(b, dict) and "name" in b]

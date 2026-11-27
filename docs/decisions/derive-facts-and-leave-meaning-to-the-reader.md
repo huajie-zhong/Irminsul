@@ -93,7 +93,7 @@ its change connects to.
 - **`list review` routes semantic checking and never decides truth.** It reads live docs, the
   `## Decision` of decision records, and the guidance files. A change has two lists, one per
   run. `--changed`, which `--base-ref` alone also means, queues what the change left as it was
-  and may have made stale: each sentence whose code span names a Python function or class the
+  and may have made stale: each sentence whose code span names a function or class the
   change touched, each claim other than a report whose evidence it touched, each sentence an
   old owner keeps about a file moved to another doc, and each `summary:` left behind a
   rewritten body. `--written` lists what the change wrote, for whoever reviews it: each
@@ -102,7 +102,7 @@ its change connects to.
   together exit 2. Without a change it queues sentences that name code. An item's markers name
   the fact that selected it, and the output defines each once.
 - **A change re-asks the sentences that name its code.** In every file the queue reads, the
-  change's own or not, a sentence whose code span names a Python function or class the change
+  change's own or not, a sentence whose code span names a function or class the change
   edited, renamed or deleted is queued, marked `names-changed-code`, with the name and the
   change's file and line. What a span names is what freshness says it names. A function or class
   is touched when its own lines, its decorators included, differ between the merge base and
@@ -111,8 +111,10 @@ its change connects to.
   with a change: not a command, an option, an environment variable or a path, which too many
   sentences name for too many reasons. What already answers for those stays: `code-references`
   reports a command or option the code no longer has, and `inventory-drift` a doc's list that
-  misses one the code gained. Nor is a function or class of another language, since only Python
-  code is read into definitions with their lines. A sentence the change did not write is queued
+  misses one the code gained. A function or class is one a reader reads with its lines, in
+  Python, TypeScript, JavaScript, Go or Rust, and one of a language no reader reads is paired
+  with nothing. An export is no second name beside its definition: a span that names one names
+  the definition. A sentence the change did not write is queued
   in `--changed` under the marker, and one the change itself wrote carries the marker on its one
   `edited` item in `--written`. `list review` alone lists these sentences, and
   `context --after-edit` none of them. Whether a queued sentence still holds is
@@ -179,3 +181,8 @@ its change connects to.
   and the JSON of each names its list. A sentence the change wrote carries
   `names-changed-code` on its `edited` item in `--written`, and the retired concept's guidance
   and the Consequences name `--written`.
+- 2026-11-27: The readers of TypeScript, JavaScript, Go and Rust are implemented, so the change
+  queue pairs a function or class of any language a reader reads, as
+  [Each language reads its code through one interface](../rfcs/each-language-reads-its-code-through-one-interface.md)
+  decides when it lifts the Python-only rule of 2026-11-26. A span that names an export names
+  its definition, with its lines.

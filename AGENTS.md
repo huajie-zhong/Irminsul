@@ -27,8 +27,8 @@ Work every change in this order. `irminsul orient` lists the commands; each take
    when the code stops doing it.
 4. After editing, run `irminsul context --after-edit` for the findings your change
    introduced, and `irminsul list review --changed` for the sentences it may have made
-   stale and did not write: those anywhere that name a Python function or class you
-   changed, the summary of a doc whose body you edited, and what an old owner still says
+   stale and did not write: those anywhere that name a function or class you changed,
+   the summary of a doc whose body you edited, and what an old owner still says
    about a file you moved. Both also ask about the claims whose evidence you touched, in
    docs you may never have opened: read the doc and the decisions it links, and answer the
    question asked. The review queue is a reading list: fix a sentence that is wrong, and

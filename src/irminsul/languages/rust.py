@@ -14,6 +14,7 @@ from irminsul.languages.base import LanguageProfile
 
 RUST_PROFILE = LanguageProfile(
     name="rust",
+    reader="rust",
     fence_labels=("rust", "rs"),
     suffixes=(".rs",),
     markers=("Cargo.toml",),

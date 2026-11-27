@@ -1,0 +1,9 @@
+project_name = "rust-loans"
+
+[paths]
+docs_root = "docs"
+source_roots = ["src"]
+test_roots = ["tests"]
+
+[languages]
+enabled = ["rust"]

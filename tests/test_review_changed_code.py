@@ -658,14 +658,14 @@ def test_the_doc_filter_keeps_the_sentences_of_that_doc(ledger: Path) -> None:
     assert _named(_queue(ledger, "--doc", COMPONENT)) == {(COMPONENT, "Ledger.add")}
 
 
-def test_the_help_of_changed_names_the_sentences_that_name_a_python_function_or_class() -> None:
+def test_the_help_of_changed_names_the_sentences_that_name_a_function_or_class() -> None:
     result = CliRunner().invoke(app, ["list", "review", "--help"], terminal_width=160)
 
     assert result.exit_code == 0, result.output
     # Rich may colour and wrap the help whatever width is asked for, as it does in CI.
     plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
     text = " ".join(re.sub(r"[│╭╮╰╯─]", " ", plain).split())
-    assert "the sentences in any doc that name a Python function or class it touched" in text
+    assert "the sentences in any doc that name a function or class it touched" in text
 
 
 def test_the_edit_report_of_context_lists_none_of_these_sentences(ledger: Path) -> None:

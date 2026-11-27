@@ -125,14 +125,22 @@ class Ranker:
         config = graph.config
         assert config is not None and graph.repo_root is not None
         found: dict[str, list[str]] = {subject: [] for subject in subjects}
-        read = [subject for subject in subjects if reader_for(subject) is not None]
+        read = {
+            subject: (reader, self._absolute(subject))
+            for subject in subjects
+            if (reader := reader_for(subject)) is not None
+        }
         if not read:
             return found
-        targets = {_key(self._absolute(subject)): subject for subject in read}
-        names = "|".join(sorted({re.escape(_module_name(subject)) for subject in read}))
-        # A file importing a module spells its name as a whole identifier, so this cheap
-        # test leaves the parse to the few files that could.
-        mentions = re.compile(rf"\b(?:{names})\b")
+        targets = {_key(path): subject for subject, (_, path) in read.items()}
+        # A file importing a module spells a name the module's language can give, so this
+        # cheap test leaves the parse to the few files that could. A subject whose language
+        # can give none rules no file out.
+        spelled = [reader.mentioned_as(path) for reader, path in read.values()]
+        names = "|".join(
+            sorted({re.escape(name) for given in spelled if given is not None for name in given})
+        )
+        mentions = None if None in spelled else re.compile(rf"\b(?:{names})\b")
         roots = [graph.repo_root / root for root in config.paths.source_roots]
         for abs_path, display in graph.source.test_walk.files:
             if reader_for(display) is None:
@@ -140,7 +148,7 @@ class Ranker:
             if not governed_as_test(display, config, in_test_root=True):
                 continue
             text = graph.source.text(abs_path)
-            if text is None or mentions.search(text) is None:
+            if text is None or (mentions is not None and mentions.search(text) is None):
                 continue
             reading = graph.source.reading(abs_path)
             if reading is None:
@@ -243,13 +251,6 @@ class Ranker:
                 for entry in node.frontmatter.owns_tests:
                     self._test_owner.setdefault(entry, node)
         return self._test_owner.get(test)
-
-
-def _module_name(display: str) -> str:
-    path = PurePosixPath(display)
-    if path.stem == "__init__" and path.parent.name:
-        return path.parent.name
-    return path.stem
 
 
 def _key(path: Path) -> str:

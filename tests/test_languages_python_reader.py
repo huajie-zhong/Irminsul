@@ -8,7 +8,7 @@ import pytest
 
 import irminsul
 from irminsul.inventory.base import SourceReader
-from irminsul.languages import PYTHON_PROFILE, READERS, languages_read, reader_for
+from irminsul.languages import PYTHON_PROFILE, READERS, reader_for
 from irminsul.languages.python_reader import PYTHON_READER, PythonReading
 from irminsul.languages.reader import Definition, imported_files
 
@@ -84,8 +84,8 @@ def test_the_python_profile_names_its_reader() -> None:
     assert READERS["python"] is PYTHON_READER
     assert reader_for("src/loans/ledger.py") is PYTHON_READER
     assert reader_for(Path("src") / "ledger.py") is PYTHON_READER
-    assert reader_for("src/fees.ts") is None
-    assert languages_read() == ["python"]
+    assert reader_for("src/fees.rb") is None
+    assert PYTHON_READER.places_every_import
 
 
 def test_a_definition_carries_its_name_holder_and_lines() -> None:
@@ -259,6 +259,6 @@ def test_a_source_reader_keeps_one_reading_of_a_file_and_shares_its_parse(tmp_pa
     assert on_disk is not None and on_disk is source.reading(path)
     assert on_disk.definitions() == _read().definitions()
     assert on_disk.canonical("Ledger") == _read().canonical("Ledger")
-    assert source.reading(tmp_path / "fees.ts") is None
+    assert source.reading(tmp_path / "fees.rb") is None
     assert source.module(path) is not None
     assert isinstance(on_disk, PythonReading) and source.module(path) is on_disk.module

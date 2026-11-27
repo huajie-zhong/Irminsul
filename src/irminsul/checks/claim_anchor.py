@@ -38,8 +38,11 @@ class ClaimAnchorCheck:
             "the code is gone, in which case the prose it marks goes with it."
         ),
         CODE_UNREADABLE: (
-            "An anchor's target file could not be read or parsed, so the claim can't be "
-            "verified. Fix the source file's syntax or the anchor path."
+            "An anchor's target file could not be read, or holds syntax its language's "
+            "reader could not parse with the symbol nowhere in the rest, so the claim can't be "
+            "verified. Fix the source file's syntax or the anchor path. Where the code is valid "
+            "and the reader's grammar does not know it yet, anchor a definition the reader does "
+            "find, or the whole file."
         ),
         CODE_UNPINNED: (
             "An anchor has never been pinned to a code hash. Run `irminsul anchors "
@@ -59,7 +62,10 @@ class ClaimAnchorCheck:
         CODE_PINNED_DRIFT: FindingClass.hint,
     }
     answers: ClassVar[dict[str, Answer]] = {
-        CODE_UNREADABLE: Answer.fix("fix the source file's syntax or the anchor's path"),
+        CODE_UNREADABLE: Answer.fix(
+            "fix the source file's syntax or the anchor's path; where the code is valid and "
+            "the reader cannot parse it, anchor a definition it does find, or the whole file"
+        ),
         CODE_UNPINNED: Answer.pin(
             "run `irminsul anchors --re-pin --doc <doc> --anchor <path#symbol>` to record the "
             "code the prose was written against"
@@ -126,7 +132,11 @@ class ClaimAnchorCheck:
                             path=node.path,
                             doc_id=node.id,
                             line=node.file_line(anchor.line),
-                            suggestion="Fix the source file's syntax or the anchor path",
+                            suggestion=(
+                                "Fix the source file's syntax or the anchor path; where the "
+                                "code is valid and the reader cannot parse it, anchor a "
+                                "definition it does find, or the whole file"
+                            ),
                         )
                     )
                 elif resolution.status != "ok":

@@ -1,0 +1,9 @@
+project_name = "typescript-ledger-fixture"
+
+[paths]
+docs_root = "docs"
+source_roots = ["src"]
+test_roots = ["tests"]
+
+[languages]
+enabled = ["typescript"]

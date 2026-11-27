@@ -2387,7 +2387,7 @@ def list_review(
         typer.Option(
             "--changed",
             help="What a change may have made stale, in the working tree vs HEAD: the "
-            "sentences in any doc that name a Python function or class it touched, the "
+            "sentences in any doc that name a function or class it touched, the "
             "claims whose evidence it touched, the files it moved, and the summaries of docs "
             "whose bodies it edited. The sentences it wrote are --written's.",
         ),

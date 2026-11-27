@@ -76,7 +76,7 @@ rate-limited and makes a run depend on the network.
 - **A path packet names the docs that name the file's code.** `context <path...>` lists, under
   `named_by`, each live doc, decision record and guidance file with a sentence whose code span
   names anything Irminsul resolves to a path in hand, with the number of such sentences, whether
-  or not a doc owns that path: a Python function or class, a command, an option, an environment
+  or not a doc owns that path: a function or class, a command, an option, an environment
   variable, or any other surface identity the configured extractors and rules give the path,
   such as a TypeScript export or an MCP tool. A span that names the path itself does not
   count. A decision record is read by its `## Decision` alone. An option counts only when its sentence names the command that declares it, or one
@@ -209,3 +209,7 @@ rate-limited and makes a run depend on the network.
   reviewer's step that names `list review --written`, with the rule for a change with no
   second reader, and the protocol carries four procedures, which the manifest's `Protocol`
   line names.
+- 2026-11-27: `named_by` counts a function or class of any language a reader reads, and step 4
+  of the loop and the reviewer's step of the protocol no longer say Python, as
+  [Each language reads its code through one interface](../rfcs/each-language-reads-its-code-through-one-interface.md)
+  decides.

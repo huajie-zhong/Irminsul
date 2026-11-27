@@ -66,11 +66,15 @@ class KindCapabilities:
 
     `mention_patterns` find identity-shaped mentions of the kind in prose, so an explained
     inventory can report one the code does not declare. `command_path` marks a kind whose
-    identity is a command path, matched word by word after a program name.
+    identity is a command path, matched word by word after a program name. `definition`
+    marks a kind whose identity is the name of a definition in the file that declares it,
+    as an export's is: a span naming one names that definition, with its lines, wherever
+    the file's reader reads it.
     """
 
     mention_patterns: tuple[re.Pattern[str], ...] = ()
     command_path: bool = False
+    definition: bool = False
 
 
 def _rule(
@@ -213,6 +217,7 @@ CORE_EXTRACTORS: tuple[Extractor, ...] = (TypeScriptExportsExtractor(), EnvVarsE
 BUILTIN_CAPABILITIES: dict[str, KindCapabilities] = {
     "cli": KindCapabilities(command_path=True),
     "cli-options": KindCapabilities(mention_patterns=(re.compile(r"--[a-z][a-z0-9-]*"),)),
+    "exports": KindCapabilities(definition=True),
 }
 
 
@@ -303,4 +308,8 @@ def kind_capabilities(kind: str, config: IrminsulConfig) -> KindCapabilities:
     for rule in config.surface.rules:
         if rule.kind == kind and rule.mention_pattern:
             patterns.append(re.compile(rule.mention_pattern))
-    return KindCapabilities(mention_patterns=tuple(patterns), command_path=builtin.command_path)
+    return KindCapabilities(
+        mention_patterns=tuple(patterns),
+        command_path=builtin.command_path,
+        definition=builtin.definition,
+    )

@@ -96,11 +96,11 @@ def test_suggest_lists_unbound_names_with_definition_first(tmp_path: Path) -> No
 
     assert result.exit_code == 0, result.output
     rows = {row["name"]: row for row in json.loads(result.output)["unbound"]}
-    assert set(rows) == {"refreshUserSession", "session_cache"}
-    [candidate] = rows["refreshUserSession"]["candidates"]
+    assert set(rows) == {"session_cache"}
+    [candidate] = rows["session_cache"]["candidates"]
     assert candidate["path"] == "src/session.ts"
     assert candidate["definition"] is True
-    assert candidate["marker"] == "<!-- anchor: src/session.ts#refreshUserSession -->"
+    assert candidate["marker"] == "<!-- anchor: src/session.ts#session_cache -->"
 
 
 def test_suggest_reads_no_name_in_the_component_scaffolds_comment(tmp_path: Path) -> None:
@@ -129,16 +129,16 @@ def test_an_exported_name_is_resolved_not_unbound(tmp_path: Path) -> None:
 
 
 def test_an_anchor_binds_the_name(tmp_path: Path) -> None:
-    sentence = "Sessions come from `refreshUserSession()`."
+    sentence = "Sessions are kept in `session_cache`."
     unanchored = _repo(tmp_path / "before", sentence)
     result = runner.invoke(
         app, ["anchors", "--suggest", "--format", "json", "--path", str(unanchored)]
     )
-    assert [row["name"] for row in json.loads(result.output)["unbound"]] == ["refreshUserSession"]
+    assert [row["name"] for row in json.loads(result.output)["unbound"]] == ["session_cache"]
 
     root = _repo(
         tmp_path / "after",
-        f"{sentence} <!-- anchor: src/session.ts#refreshUserSession -->",
+        f"{sentence} <!-- anchor: src/session.ts#session_cache -->",
     )
     result = runner.invoke(app, ["anchors", "--suggest", "--format", "json", "--path", str(root)])
     assert json.loads(result.output)["unbound"] == []
@@ -149,7 +149,7 @@ def test_the_written_list_names_the_unbound_names_of_a_written_sentence(tmp_path
     seed_repo(root, "i")
     doc = root / "docs" / "components" / "auth.md"
     doc.write_text(
-        doc.read_text(encoding="utf-8") + "\nSessions come from `refreshUserSession()`.\n",
+        doc.read_text(encoding="utf-8") + "\nSessions are kept in `session_cache`.\n",
         encoding="utf-8",
     )
 
@@ -159,7 +159,7 @@ def test_the_written_list_names_the_unbound_names_of_a_written_sentence(tmp_path
 
     assert result.exit_code == 0, result.output
     [item] = json.loads(result.output)["items"]
-    assert item["unbound"] == ["refreshUserSession"]
+    assert item["unbound"] == ["session_cache"]
     assert "unbound-name" in item["markers"]
 
 
@@ -172,14 +172,16 @@ def test_the_unbound_advice_is_one_text_shared_by_the_name_line_and_the_legend(
     seed_repo(root, "i")
     doc = root / "docs" / "components" / "auth.md"
     doc.write_text(
-        doc.read_text(encoding="utf-8") + "\nSessions come from `refreshUserSession()`.\n",
+        doc.read_text(encoding="utf-8") + "\nSessions are kept in `session_cache`.\n",
         encoding="utf-8",
     )
 
     result = runner.invoke(app, ["list", "review", "--written", "--path", str(root)])
 
     assert result.exit_code == 0, result.output
-    name_line = next(line for line in result.output.splitlines() if "`refreshUserSession`" in line)
+    name_line = next(
+        line for line in result.output.splitlines() if line.lstrip().startswith("`session_cache`")
+    )
     legend_line = next(
         line for line in result.output.splitlines() if line.startswith("  unbound-name")
     )
@@ -188,10 +190,11 @@ def test_the_unbound_advice_is_one_text_shared_by_the_name_line_and_the_legend(
 
 
 GO = """\
+package env
+
 // Getenv retrieves the variable.
-func Getenv(key string) string
-{
-    return lookup(key)
+func Getenv(key string) string {
+	return lookup(key)
 }
 """
 
@@ -200,6 +203,8 @@ def test_a_go_anchor_hashes_the_function_not_its_doc_comment(tmp_path: Path) -> 
     (tmp_path / "env.go").write_text(GO, encoding="utf-8")
     anchor = Anchor(line=0, raw="", path="env.go", symbol="Getenv", pinned=None)
     before = resolve(tmp_path, anchor).current
+    (tmp_path / "env.go").write_text(GO.replace("retrieves", "reads"), encoding="utf-8")
+    assert resolve(tmp_path, anchor).current == before
     (tmp_path / "env.go").write_text(GO.replace("lookup(key)", "other(key)"), encoding="utf-8")
     assert resolve(tmp_path, anchor).current != before
 
@@ -371,9 +376,9 @@ def _unbound_names(root: Path) -> list[str]:
 
 
 def test_a_name_the_language_defines_is_not_unbound(tmp_path: Path) -> None:
-    root = _repo(tmp_path, f"{_BUILTIN_SENTENCE} See `refreshUserSession()`.")
+    root = _repo(tmp_path, f"{_BUILTIN_SENTENCE} See `session_cache`.")
 
-    assert _unbound_names(root) == ["refreshUserSession"]
+    assert _unbound_names(root) == ["session_cache"]
 
 
 def test_the_review_queue_does_not_flag_a_language_builtin_as_unbound(tmp_path: Path) -> None:
@@ -534,12 +539,12 @@ def test_suggest_says_so_when_no_test_names_the_definition(tmp_path: Path) -> No
 def test_suggest_without_a_doc_lists_unbound_names_and_no_test(tmp_path: Path) -> None:
     root = _lending_repo(
         tmp_path,
-        {"tests/test_loans.py": LOAN_TESTS, "src/loans/desk.ts": "function renewLoan() {}\n"},
+        {"tests/test_loans.py": LOAN_TESTS, "src/loans/desk.php": "function renewLoan() {}\n"},
         guide="The fine `late_fee()` charges is capped, and `renewLoan()` renews a loan.",
     )
     unbound = [
         f"{GUIDE}:10 `renewLoan`",
-        "  src/loans/desk.ts:1 (definition)  <!-- anchor: src/loans/desk.ts#renewLoan -->",
+        "  src/loans/desk.php:1 (definition)  <!-- anchor: src/loans/desk.php#renewLoan -->",
     ]
 
     code, plain = invoke(root, "anchors", "--suggest")

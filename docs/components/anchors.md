@@ -43,13 +43,22 @@ on every version that parses the code to the same tree, as a CI matrix needs
 A name is bound by a function, a class, or
 an assignment, so a threshold or a registry can be anchored as readily as a function,
 and a constant's hash covers its whole assignment statement: two names bound by one
-`A, B = ...` share a hash, and an edit to either re-asks both claims. In a file of a
-language no reader reads, the symbol resolves by name as a whole token, and the hash covers the
+`A, B = ...` share a hash, and an edit to either re-asks both claims. In a TypeScript,
+JavaScript, Go or Rust file it is the tree the language's grammar gives, written without
+its comments and without what a formatter chooses, such as a trailing comma
+([languages](languages.md#typescript-javascript-go-and-rust)). In each of these a symbol
+is a definition the reader finds, and no search of the text for its name stands in for
+one: a symbol the reader does not find is missing, or unreadable when the file holds
+syntax its grammar could not read, since the symbol may be in that part. In a file no
+reader reads, the symbol resolves by name as a whole token, and the hash covers the
 block that starts at the line defining it, with whitespace normalized. A marker written
 inside a code span or a fenced block is an example and is not read, so this syntax can
 be documented without the example becoming a live anchor.
-<!-- anchor: src/irminsul/anchors.py#resolve @sha256:d77621dc9f10 -->
+<!-- anchor: src/irminsul/anchors.py#resolve @sha256:cf3b307eb8a4 -->
 <!-- anchor: src/irminsul/languages/python_reader.py#_find_symbol @sha256:95c45a01a21c -->
+<!-- anchor: tests/test_languages_typescript_reader.py#test_a_pinned_function_is_clean_after_an_edit_to_its_comment @sha256:cf966b0ec2fb -->
+<!-- anchor: tests/test_languages_typescript_reader.py#test_an_anchor_to_a_local_variable_is_a_missing_symbol @sha256:a6f75928ea67 -->
+<!-- anchor: tests/test_languages_typescript_reader.py#test_an_absent_name_is_unreadable_in_a_file_that_did_not_parse @sha256:e36c635aa9d0 -->
 <!-- anchor: src/irminsul/languages/python_reader.py#_canonical @sha256:1c9d471d4bfc -->
 
 ## Binding the code a doc names
@@ -62,7 +71,7 @@ the doc binds, is unbound, unless an enabled language defines it itself, as Pyth
 and is never listed. `irminsul list review --written` shows a written sentence's
 unbound names, and `irminsul anchors --suggest` lists every one in live docs, or in one
 doc with `--doc`, with the places an anchor could point and the marker to paste. It
-writes nothing: the agent picks the file. A Python definition inside a function or a
+writes nothing: the agent picks the file. A definition inside a function or a
 block, which no anchor can name, is listed as such rather than dropped, so a name the
 code defines is never answered with "no source file contains it".
 
@@ -74,13 +83,14 @@ sentence says, where an anchor to the function is asked about on every edit to i
 ([Code is named in code spans and bound by anchors](../decisions/code-is-named-in-code-spans-and-bound-by-anchors.md)).
 A test function is a definition in a file, so an anchor names it, pins it and drifts with
 it like any other. To find one, `irminsul anchors --suggest --doc <doc>` also lists each
-code span of that doc that resolves to one Python function or class, once for each
+code span of that doc that resolves to one function or class, once for each
 definition, so two methods of one name in one file are two rows, with where it is
 defined and up to three test functions that name it, ordered by path and line, each as a
 marker to paste. `naming_tests` asks each test file's [reader](languages.md#readers) which
 of its functions are tests, for Python one whose name starts with
 `test`, at the top level of a file or in a class there, however deep the classes
-nest, in a file under
+nest, and for the other languages as [their reader](languages.md#typescript-javascript-go-and-rust)
+says, in a file under
 `paths.test_roots` that imports the defining module, which is the reading
 `Ranker.importers` makes for the [context packet](context.md#which-tests-a-source-file-gets).
 It names the definition when its body refers to it through an import of that module, in
@@ -95,7 +105,7 @@ beside `unbound`. Without `--doc` the command lists the unbound names alone.
 <!-- anchor: tests/test_binding.py#test_suggest_offers_the_test_that_calls_a_function_the_doc_names @sha256:94b5c37f7a7b -->
 <!-- anchor: tests/test_binding.py#test_suggest_offers_at_most_three_tests_by_path_and_line @sha256:5b74b5ae3195 -->
 <!-- anchor: tests/test_binding.py#test_suggest_says_so_when_no_test_names_the_definition @sha256:a96352d4b56f -->
-<!-- anchor: tests/test_binding.py#test_suggest_without_a_doc_lists_unbound_names_and_no_test @sha256:d85d40281025 -->
+<!-- anchor: tests/test_binding.py#test_suggest_without_a_doc_lists_unbound_names_and_no_test @sha256:f01f47ab26b4 -->
 <!-- anchor: tests/test_binding.py#test_suggest_lists_two_methods_of_one_name_in_one_file @sha256:80050085aed1 -->
 <!-- anchor: tests/test_binding.py#test_a_test_names_a_definition_through_an_import_of_its_module @sha256:a6e3bf78495a -->
 <!-- anchor: tests/test_binding.py#test_a_name_the_test_binds_itself_does_not_name_the_definition @sha256:ad1bee32b830 -->
@@ -172,7 +182,8 @@ finding names only the evidence that changed after the doc.
 ## Scope & Limitations
 
 Anchors are opt-in — only paragraphs that carry a marker are checked; everything else
-stays on the coarse mtime net. Outside Python a symbol resolves by name, so a name left
+stays on the coarse mtime net. In a file no reader reads, such as a config file or
+code of a language without a reader, a symbol resolves by name, so a name left
 in a string or a trailing comment still resolves, and the block hash re-flags a claim for
 any edit inside the block. `--suggest` searches the configured source roots for
 definitions, and under `--doc` the declared test roots for the tests that name them, each
@@ -202,9 +213,9 @@ object has: a test whose file imports `Answer` and reads `finding.line` is offer
 anywhere in a test's body, a function nested in it included, counts as the test's own
 throughout it, which can leave out a test that names the definition and never adds one
 that does not. The three listed are the first by path and line, which for a widely used
-class need not be the three that say most. Only Python tests under `paths.test_roots` are
-read, and with no test root declared the listing says that no test file was read. Nothing
-measures how much of a function its tests guard.
+class need not be the three that say most. Only test files under `paths.test_roots` are
+read, in a language a reader reads, and with no test root declared the listing says that no
+test file was read. Nothing measures how much of a function its tests guard.
 
 ## Implemented requirements
 
@@ -215,7 +226,7 @@ measures how much of a function its tests guard.
   <!-- anchor: tests/test_binding.py#test_suggest_offers_the_test_that_calls_a_function_the_doc_names @sha256:94b5c37f7a7b -->
   <!-- anchor: tests/test_binding.py#test_a_name_the_test_binds_itself_does_not_name_the_definition @sha256:ad1bee32b830 -->
   <!-- anchor: tests/test_binding.py#test_suggest_says_so_when_no_test_names_the_definition @sha256:a96352d4b56f -->
-  <!-- anchor: tests/test_binding.py#test_suggest_without_a_doc_lists_unbound_names_and_no_test @sha256:d85d40281025 -->
+  <!-- anchor: tests/test_binding.py#test_suggest_without_a_doc_lists_unbound_names_and_no_test @sha256:f01f47ab26b4 -->
 - **a-pin-that-no-longer-matches-its-file-is-listed#stale-pins-are-listed** — `irminsul anchors --stale` SHALL list each anchor and each claim evidence pin, in every doc or the one `--doc` names, whose target's current hash differs from its pin, each with the command that re-pins only that pin, or that pin and the other anchors of its doc that name the same target, and SHALL exit 0. (provenance: code; [RFC](../rfcs/a-pin-that-no-longer-matches-its-file-is-listed.md))
   <!-- anchor: src/irminsul/anchors.py#stale_pins @sha256:ffb7528712e8 -->
   <!-- anchor: tests/test_cli_anchors.py#test_stale_lists_a_component_claims_changed_evidence @sha256:fc748e708176 -->

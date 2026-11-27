@@ -29,7 +29,7 @@ from irminsul.anchors import Anchor, defines, definition_line, parse_anchors, re
 from irminsul.checks.globs import resolve_display_path
 from irminsul.code_references import CodeResolver
 from irminsul.languages import reader_for
-from irminsul.languages.reader import Import, References
+from irminsul.languages.reader import Import, References, dotted
 from irminsul.ranked_tests import Ranker
 
 if TYPE_CHECKING:
@@ -108,7 +108,7 @@ class Suggestions:
 
 def code_name(span: str) -> str | None:
     """The name a code span cites, when the span can only be a code name."""
-    text = span.strip()
+    text = dotted(span.strip())
     if not _NAME_RE.match(text):
         return None
     name = text.removesuffix("()")

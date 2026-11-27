@@ -19,6 +19,7 @@ from irminsul.languages.reader import (
     DefinitionKind,
     Import,
     ImportedName,
+    Memo,
     References,
 )
 
@@ -357,8 +358,19 @@ class PythonReading:
 class PythonReader:
     """Reads Python through `ast`, the parser of the interpreter running Irminsul."""
 
-    def read(self, text: str) -> PythonReading:
+    places_every_import = True
+    """A module is a file under the importing file's package or a source root, or it is not
+    this repository's."""
+
+    def read(self, text: str, memo: Memo | None = None) -> PythonReading:
         return PythonReading(PythonModule.parse(text))
+
+    def mentioned_as(self, path: Path) -> frozenset[str]:
+        """The module's name: the file's stem, or its directory's for a package's
+        `__init__.py`."""
+        if path.stem == "__init__" and path.parent.name:
+            return frozenset({path.parent.name})
+        return frozenset({path.stem})
 
 
 PYTHON_READER = PythonReader()

@@ -65,7 +65,7 @@ MARKER_MEANINGS: Final[dict[str, str]] = {
         "sentence if it is not this repository's code, leave it if no anchor can reach it"
     ),
     "names-changed-code": (
-        "a sentence naming a Python function or class this change edited, renamed or deleted; "
+        "a sentence naming a function or class this change edited, renamed or deleted; "
         "the item gives each one's file and line and says which were removed. Re-read it "
         "against the current code"
     ),
@@ -395,7 +395,7 @@ def docs_naming(
     (named path, file).
 
     A sentence counts for a path when one of its code spans names anything the queue's
-    pairing resolves to that path: a Python function or class, a command, an environment
+    pairing resolves to that path: a function or class, a command, an environment
     variable, or any other surface identity the configured extractors and rules declare
     there, such as a TypeScript export or an MCP tool. An option counts for the file of its
     command, and only when one command alone declares it: several commands declare

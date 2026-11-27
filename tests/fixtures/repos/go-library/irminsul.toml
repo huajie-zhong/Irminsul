@@ -1,0 +1,9 @@
+project_name = "go-library"
+
+[paths]
+docs_root = "docs"
+source_roots = ["internal"]
+test_roots = ["internal"]
+
+[languages]
+enabled = ["go"]

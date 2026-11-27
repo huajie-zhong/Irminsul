@@ -34,7 +34,7 @@ claims:
       - src/irminsul/context.py
       - src/irminsul/git/mtime.py
     pinned:
-      src/irminsul/context.py: sha256:024401b94890
+      src/irminsul/context.py: sha256:e6b9c0428b33
       src/irminsul/git/mtime.py: sha256:c71794836a12
 summary: What governs a path — owning doc, ranked tests, active RFCs and next commands before an edit, findings after it.
 implements:
@@ -84,8 +84,8 @@ A report's `claim_reviews` lists every claim whose `evidence` names a path in ha
 
 ## Docs that name the file's code
 
-A path packet's `named_by` names each doc with a sentence whose code span names code in a path in hand, and says how many of its sentences do: anything Irminsul resolves to that path, a Python function or class, a command, an option, an environment variable, or any other surface identity the configured extractors and rules give the path, such as a TypeScript export, an MCP tool or a name a `surface.rules` entry declares. `_named_by` asks `docs_naming`, which pairs spans as the [review queue](new-list-regen.md) does, so it reads what the queue reads, live docs, the `## Decision` of decision records and the guidance files, and it lists the owning doc beside a guide or a README that owns nothing. Each entry is the doc's path, `sentences`, the count, and `names`, the path whose code they name; the entries of one path are ordered by the count, largest first. An option counts for the file of its command, and only when one command alone declares it: option identities are not scoped by command, so a sentence that holds an option several commands declare says nothing of which file it is about, and one that names the command as well counts through the command. A span that names the file by its path does not count. An HTTP route is an identity such as `GET /items`, which a code span resolves to only through a `surface.rules.mention_pattern` declared for its kind, so without one it counts for no file. It is derived on every call, like the rest of the packet, and says nothing about whether a sentence is right: it is which docs to read before the edit, and `irminsul list review --doc <doc> --all` lists the sentences of one. Plain output lists the eight docs with the most sentences for each path and counts the rest, as it bounds the active RFCs, and the JSON lists every doc. A topic lookup and an edit's report carry no `named_by`, and a file no doc owns still has one.
-<!-- anchor: src/irminsul/context.py#_named_by @sha256:ff78dc561dc4 -->
+A path packet's `named_by` names each doc with a sentence whose code span names code in a path in hand, and says how many of its sentences do: anything Irminsul resolves to that path, a function or class, a command, an option, an environment variable, or any other surface identity the configured extractors and rules give the path, such as a TypeScript export, an MCP tool or a name a `surface.rules` entry declares. `_named_by` asks `docs_naming`, which pairs spans as the [review queue](new-list-regen.md) does, so it reads what the queue reads, live docs, the `## Decision` of decision records and the guidance files, and it lists the owning doc beside a guide or a README that owns nothing. Each entry is the doc's path, `sentences`, the count, and `names`, the path whose code they name; the entries of one path are ordered by the count, largest first. An option counts for the file of its command, and only when one command alone declares it: option identities are not scoped by command, so a sentence that holds an option several commands declare says nothing of which file it is about, and one that names the command as well counts through the command. A span that names the file by its path does not count. An HTTP route is an identity such as `GET /items`, which a code span resolves to only through a `surface.rules.mention_pattern` declared for its kind, so without one it counts for no file. It is derived on every call, like the rest of the packet, and says nothing about whether a sentence is right: it is which docs to read before the edit, and `irminsul list review --doc <doc> --all` lists the sentences of one. Plain output lists the eight docs with the most sentences for each path and counts the rest, as it bounds the active RFCs, and the JSON lists every doc. A topic lookup and an edit's report carry no `named_by`, and a file no doc owns still has one.
+<!-- anchor: src/irminsul/context.py#_named_by @sha256:06d48241ea4e -->
 <!-- anchor: src/irminsul/context.py#ContextReport.named_by @sha256:6e608a7b114b -->
 <!-- anchor: src/irminsul/context.py#NamingDoc.sentences @sha256:0c8b1ea9a90d -->
 
@@ -102,11 +102,14 @@ session: it stores no task, selection, or result for a later call to read, and e
 call re-derives what it reports from the docs, the config, and git when it runs, so the
 loop is safe to re-enter ([context keeps no session](../decisions/agents-get-stateless-read-only-queries-and-one-written-loop.md)). Git history is read once
 per graph and each call builds its own, so a commit made between two calls reaches the
-second. <!-- claim:context-is-stateless -->
+second. What a [reader](languages.md#readers) looks up on disk to place an import, a `go.mod`
+or a directory's listing, is kept on that graph's source tree in the same way.
+<!-- claim:context-is-stateless -->
 
 `tests/test_context_statelessness.py` pins the observable half of that: within one
 process, ownership moved between two calls reaches the second, a commit made between
-two calls reaches the second, and three calls leave every file in the repository
+two calls reaches the second, a `go.mod` rewritten between two calls changes which test
+the second ranks, and three calls leave every file in the repository
 byte-identical. What it cannot show is that no code path holds hidden state, so the
 contract still needs a reader when the code changes. Listing it under `owns_tests:` routes
 it to this document and makes `test-ownership` verify the file exists; nothing in Irminsul
@@ -195,7 +198,7 @@ Topic search is deterministic per-term substring matching over doc metadata, hea
 `tests/test_seeded_rot.py` makes one sentence of a fixture's docs false by changing its code and no doc, and pins how far `check --diff`, `list review --changed` and `context --after-edit` then lead a reader, for an uncommitted change in the docs' own repository: to the sentence when its paragraph is anchored to the changed code or the sentence names the changed function in a code span, in the doc that owns the file, a guide that owns nothing or a README alike; to the declaration of its claim when it carries one that cites the changed file; otherwise to its doc alone when that doc owns the changed file, and nowhere when it does not. A probe run against the fixture's code shows that each edit changes what its sentences state. Each case that stops short of the sentence is also a strict expected failure whose reason names the accepted RFC or backlog entry for that gap, so a change that closes one fails the suite until it updates the case. One case's sentence is anchored to a test of the fixture and not to its code: the edit that makes it false draws three warnings on the fixture's component doc, which owns the changed function, from `check --diff` and again from `context --after-edit`, nothing from `list review --changed`, and nothing on the sentence's own doc, since no view runs a test, and it makes that test fail, run as a probe is; the case then edits the test to pass again, and `claim-anchor/pinned-drift` points at the sentence's paragraph.
 <!-- anchor: tests/test_seeded_rot.py#CASES @sha256:efe8baa90117 -->
 
-Test ranking is evidence of relation, not of coverage: nothing runs a test, and one that imports a file or changed with it may not exercise the change in hand. Imports are read only in a language that has a [reader](languages.md#readers), so a test in any other language ranks by history alone, and the history count follows no rename and skips merge commits.
+Test ranking is evidence of relation, not of coverage: nothing runs a test, and one that imports a file or changed with it may not exercise the change in hand. Imports are read only in a language that has a [reader](languages.md#readers), and placed only as far as that reader places them, so a test in any other language, or one that reaches a file through a path alias or another crate, ranks by history alone, and the history count follows no rename and skips merge commits.
 
 Content extraction does not rank relationships, estimate tokens, perform semantic search, or persist session state; those remain separate retrieval concerns.
 
@@ -214,8 +217,8 @@ Content extraction does not rank relationships, estimate tokens, perform semanti
   <!-- anchor: src/irminsul/context.py#_bound_topic_matches @sha256:60d7090f8ddc -->
   <!-- anchor: tests/test_cli_context.py#test_context_topic_caps_only_the_matches_that_need_the_body @sha256:04ba8d67e9b5 -->
 - **a-change-re-asks-the-sentences-that-name-its-code#packet-names-docs-naming-a-file** — `irminsul context <path>` SHALL list, under `named_by`, each live doc, decision record and guidance file with a sentence whose code span names anything Irminsul resolves to code in that path, other than the path itself, with the number of such sentences, the eight docs with the most in the plain output with a count of the rest, and every doc in the JSON. An option SHALL count only when its sentence names the command that declares it, or one command alone declares it. (provenance: code; [RFC](../rfcs/a-change-re-asks-the-sentences-that-name-its-code.md))
-  <!-- anchor: src/irminsul/context.py#_named_by @sha256:ff78dc561dc4 -->
-  <!-- anchor: src/irminsul/listing/review.py#docs_naming @sha256:a2f504682ca3 -->
+  <!-- anchor: src/irminsul/context.py#_named_by @sha256:06d48241ea4e -->
+  <!-- anchor: src/irminsul/listing/review.py#docs_naming @sha256:ef7598065eb2 -->
   <!-- anchor: tests/test_cli_context.py#test_a_packet_names_the_docs_that_name_code_in_the_file @sha256:ff7117d60505 -->
   <!-- anchor: tests/test_cli_context.py#test_named_by_counts_a_typescript_export @sha256:1ef8ec6045fc -->
   <!-- anchor: tests/test_cli_context.py#test_the_plain_packet_lists_eight_docs_and_counts_the_rest @sha256:f78856282a79 -->

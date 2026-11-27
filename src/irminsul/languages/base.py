@@ -56,3 +56,6 @@ class LanguageProfile:
     defines, imports and refers to (`irminsul.languages.reader`). A name rather than the reader,
     since a profile is data and a reader is code. None where no reader reads the language yet,
     so no feature that reads code reaches its files."""
+    suffix_readers: tuple[tuple[str, str], ...] = ()
+    """Each suffix another reader than `reader` reads, with that reader's name: a dialect of
+    the language's grammar, as `.tsx` is of TypeScript's."""

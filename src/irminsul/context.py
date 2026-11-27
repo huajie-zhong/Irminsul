@@ -1057,7 +1057,7 @@ def _named_by(graph: DocGraph, paths: set[str]) -> list[NamingDoc]:
     named, then by that number, largest first, then by the doc's path.
 
     What counts is `docs_naming`'s to say: anything the review queue's pairing resolves to a
-    path, a Python function or class, a command, an option one command alone declares, an
+    path, a function or class, a command, an option one command alone declares, an
     environment variable or any other surface identity, and not the path itself.
     It is derived here on every call, like everything else in a packet. An owning doc is
     listed with the rest: the list answers "which docs speak of this file", and the owner

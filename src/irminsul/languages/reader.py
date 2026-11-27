@@ -12,10 +12,21 @@ holds the reader that name stands for: the profile is data and the reader is cod
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, MutableMapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol
+
+Memo = MutableMapping[object, object]
+"""What a reader may keep between the files of one run, such as a directory it listed. A
+run hands every reading the same one and drops it when it ends."""
+
+
+def dotted(symbol: str) -> str:
+    """A path to a definition as `Definition.symbol` spells it, whichever separator the
+    language or a doc wrote: `Desk::new` is `Desk.new`."""
+    return symbol.replace("::", ".")
+
 
 DefinitionKind = Literal["function", "type", "variable"]
 """A function, a method included; a class or another type; or a name an assignment binds
@@ -34,7 +45,9 @@ class Definition:
     line: int
     """The line that names it, such as a `def` or `class` line."""
     first: int
-    """Its first line: `line`, or the first of the decorators or attributes above it."""
+    """Its first line: `line`, or the first of the decorators or attributes above it. Where
+    a definition's meaning is its whole declaration, as a Go constant with no value of its
+    own takes the one above it in its block, `first` and `end` are the declaration's."""
     end: int
     """Its last line."""
     reachable: bool
@@ -145,8 +158,22 @@ class CodeReading(Protocol):
 class CodeReader(Protocol):
     """A language's reader: code, named by its profile."""
 
-    def read(self, text: str) -> CodeReading:
-        """`text`, a file of this language, read."""
+    @property
+    def places_every_import(self) -> bool:
+        """Whether `CodeReading.files` places every import of the language that stays in the
+        repository, so that an import it places nowhere leaves it. Only then does a file
+        with no import of another say the two are unrelated."""
+        ...
+
+    def read(self, text: str, memo: Memo | None = None) -> CodeReading:
+        """`text`, a file of this language, read. `memo` is the run's, for what the reader
+        looks up on disk to place an import."""
+        ...
+
+    def mentioned_as(self, path: Path) -> Collection[str] | None:
+        """Names of which every file that imports the file `path` spells one, such as its
+        module's, so that a file with none of them need not be read; None when nothing is
+        sure to be there."""
         ...
 
 

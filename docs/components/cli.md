@@ -104,6 +104,6 @@ The CLI holds no domain rule: what a finding is, how a change is judged and what
 ## Implemented requirements
 
 - **the-change-queue-asks-about-what-the-change-did-not-write#one-list-per-run** — `list review` given `--changed` and `--written` together SHALL exit 2 and print no queue, and given `--base-ref` with neither SHALL print the list `--changed` prints. (provenance: code; [RFC](../rfcs/the-change-queue-asks-about-what-the-change-did-not-write.md))
-  <!-- anchor: src/irminsul/cli.py#list_review @sha256:48f63f0f8194 -->
+  <!-- anchor: src/irminsul/cli.py#list_review @sha256:741bce276bac -->
   <!-- anchor: tests/test_cli_list.py#test_changed_and_written_together_exit_2_and_name_both_flags @sha256:9dff7ffbfd3a -->
   <!-- anchor: tests/test_cli_list.py#test_base_ref_alone_prints_the_list_changed_prints @sha256:6a71aefdbe15 -->

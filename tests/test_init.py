@@ -1023,8 +1023,7 @@ def test_this_repositorys_root_agents_md_carries_the_template_section() -> None:
 
 def test_the_loop_says_the_review_queue_lists_the_sentences_that_name_a_changed_function() -> None:
     """Step 4 is where an agent learns what to re-read after an edit, so it names the
-    sentences the queue lists because the change touched a Python function or class they name,
-    and says Python, since no other language's are paired."""
+    sentences the queue lists because the change touched a function or class they name."""
     from irminsul.init.command import _ACTION_REPOSITORY, render_scaffold
 
     rendered = render_scaffold(
@@ -1034,7 +1033,7 @@ def test_the_loop_says_the_review_queue_lists_the_sentences_that_name_a_changed_
     step = " ".join(rendered[start : rendered.index("\n5. ", start)].split())
 
     assert "`irminsul list review --changed`" in step
-    assert "those anywhere that name a Python function or class you changed" in step
+    assert "those anywhere that name a function or class you changed" in step
 
 
 def test_the_loop_names_what_the_change_may_have_made_stale_and_not_what_it_wrote() -> None:

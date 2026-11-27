@@ -97,8 +97,8 @@ change reads those.
 1. **List what the change wrote.** `irminsul list review --written --base-ref origin/<base>`
    lists each sentence the change added or reworded, beside the sentence it replaced, and
    each sentence it deleted. In a sentence it added or reworded, a name that binds to no
-   code is marked `unbound-name`, and one that names a Python function or class the change
-   touched is marked `names-changed-code`; a deleted sentence carries neither.
+   code is marked `unbound-name`, and one that names a function or class the change touched
+   is marked `names-changed-code`; a deleted sentence carries neither.
 2. **Read each against the code it names,** not against what the change says it does.
    Correct a sentence that is wrong. A deletion is right when what the sentence described
    is gone, or when it only repeated a query, a file or another doc.
