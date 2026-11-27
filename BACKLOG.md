@@ -774,6 +774,19 @@ the reader to `irminsul check`, which prints 0 errors, while `check --diff <base
 review, 2026-11-25). `_change_check_command` in the same file already builds the right command
 for the compared case.
 
+### `a-failed-diff-always-blames-a-ref`
+
+`resolve` (`src/irminsul/checks/change_range.py`) raises `ChangeRangeError` whenever
+`changed_since` returns nothing, and `_diff_failure_reason` then says "at least one ref could
+not be resolved in this repository" for every repository that has a commit, whatever made git
+fail (read on 2026-11-27). A reviewer's full test run on a loaded machine failed once that day
+with this message, in
+`tests/test_acknowledgement.py::test_a_reviewed_typo_fix_in_a_decision_is_info_under_its_own_code`,
+whose base is the commit the test itself made a moment before. The test passed five times
+alone and in the next full run, and the failure was not reproduced, so what failed is not
+known; the message sent its reader to a ref that existed. Carrying git's own error text in the
+message would say what failed, and finding why git failed there comes first.
+
 ### `after-edit-in-a-pre-commit-hook-reads-the-commits-index`
 
 Run from a pre-commit hook, `context --after-edit` builds its scratch checkout
