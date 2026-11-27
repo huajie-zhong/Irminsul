@@ -599,6 +599,19 @@ later import of another `late_fee`, still has its tests offered for the function
 (`src/irminsul/binding.py`). Found by a review on 2026-11-26; no test of this repository does
 it.
 
+### `python-reader-lists-a-trys-else-before-its-handlers`
+
+Python's reader says its definitions and imports are in source order, and for a `try`
+statement they are not: `_statement_bodies` (`src/irminsul/languages/python_reader.py`) yields
+the body, the `else`, the `finally` and then the handlers, so with an import on lines 2, 5, 8
+and 11 of a `try` with an `except` and an `else`, `imports()` returns lines 2, 8, 11, 5 (run on
+2026-11-27). `anchors.python_definitions` walked that way before the reader took it over.
+What depends on it today is small: the order in which `anchors --suggest` lists the
+definitions no anchor reaches, and which three it keeps, when one name is defined in both a
+handler and the `else` of one `try`. Yielding the handlers second makes the docstrings of
+`PythonReading.definitions` and `imports` true as the interface states them, and
+`docs/components/languages.md` then loses its sentence about it.
+
 ### `prose-beside-a-comment-marker-is-misread`
 
 The review queue reads no sentence on the lines of a multi-line HTML comment

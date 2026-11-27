@@ -41,4 +41,4 @@ Python's reader answers from `ast`, the parser of the interpreter running Irmins
 
 Language profiles are pure-data records with no behavioral logic; the checks that use them (`schema-leak`, the init detector) consume them generically. Profiles do not validate that source files conform to the expected language syntax.
 
-A reader is code, and only Python has one so far: a TypeScript, Go or Rust file answers none of the five questions, so nothing that reads definitions or imports reaches it. Python's reader is the running interpreter's parser, so a file written for a newer Python than the one running Irminsul may not parse, and it then defines nothing.
+A reader is code, and only Python has one so far: a TypeScript, Go or Rust file answers none of the five questions, so nothing that reads definitions or imports reaches it. Python's reader is the running interpreter's parser, so a file written for a newer Python than the one running Irminsul may not parse, and it then defines nothing. It lists what the `else` and `finally` of a `try` statement hold before what its handlers hold, so its definitions and imports are in the file's order everywhere but there.

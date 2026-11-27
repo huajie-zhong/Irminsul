@@ -264,13 +264,14 @@ class PythonReading:
 
     def definitions(self) -> tuple[Definition, ...]:
         """Every function, class and method at any depth, and each name an assignment binds
-        outside a function, in source order. A definition inside a function or a block, such
-        as an `if`, is not `reachable`, since no dotted path names it."""
+        outside a function, in source order, but for a `try` statement: what its `else` and
+        `finally` hold comes before what its handlers hold. A definition inside a function or
+        a block, such as an `if`, is not `reachable`, since no dotted path names it."""
         return tuple(self._walk.definitions)
 
     def imports(self) -> tuple[Import, ...]:
         """Every `import` and `from` import at any depth, a deferred one inside a function
-        included, in source order."""
+        included, in the order `definitions` has: source order, but for a `try` statement."""
         return tuple(self._walk.imports)
 
     def files(self, source: str, importer: Path, roots: Sequence[Path]) -> list[Path]:
