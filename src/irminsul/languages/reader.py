@@ -19,7 +19,7 @@ from typing import Literal, Protocol
 
 DefinitionKind = Literal["function", "type", "variable"]
 """A function, a method included; a class or another type; or a name an assignment binds
-outside a function, such as a constant."""
+that is not a function's local variable, such as a constant or a class attribute."""
 
 
 @dataclass(frozen=True)
@@ -111,8 +111,9 @@ class CodeReading(Protocol):
         ...
 
     def definitions(self) -> tuple[Definition, ...]:
-        """Every function, type and method in the file, and what an assignment outside a
-        function binds, in the order the file holds them, at any depth."""
+        """Every function, type and method in the file, and each name an assignment binds
+        that is not a function's local variable, in the order the file holds them, at any
+        depth."""
         ...
 
     def imports(self) -> tuple[Import, ...]:

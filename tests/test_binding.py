@@ -759,3 +759,26 @@ def test_a_name_the_test_binds_itself_does_not_name_the_definition(
     root = _lending_repo(tmp_path, {"tests/test_loans.py": test_file})
 
     assert _resolved(root)["late_fee"]["tests"] == []
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="BACKLOG.md a-file-level-rebinding-still-names-the-definition",
+)
+def test_a_name_a_later_import_rebinds_names_what_the_later_import_binds(tmp_path: Path) -> None:
+    test_file = (
+        "from loans.policy import late_fee as rule\n"
+        "from loans.policy import due_day as rule\n\n\n"
+        "def test_it() -> None:\n    assert rule(0) == 14\n"
+    )
+    root = _lending_repo(
+        tmp_path,
+        {"tests/test_loans.py": test_file},
+        guide="The fine `late_fee()` charges is owed from the day `due_day()` gives.",
+    )
+
+    resolved = _resolved(root)
+
+    assert resolved["late_fee"]["tests"] == []
+    assert [test["symbol"] for test in resolved["due_day"]["tests"]] == ["test_it"]

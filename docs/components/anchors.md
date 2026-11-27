@@ -79,7 +79,8 @@ definition, so two methods of one name in one file are two rows, with where it i
 defined and up to three test functions that name it, ordered by path and line, each as a
 marker to paste. `naming_tests` asks each test file's [reader](languages.md#readers) which
 of its functions are tests, for Python one whose name starts with
-`test`, at the top level of a file or in a class there, in a file under
+`test`, at the top level of a file or in a class there, however deep the classes
+nest, in a file under
 `paths.test_roots` that imports the defining module, which is the reading
 `Ranker.importers` makes for the [context packet](context.md#which-tests-a-source-file-gets).
 It names the definition when its body refers to it through an import of that module, in

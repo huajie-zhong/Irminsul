@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import irminsul
 from irminsul.inventory.base import SourceReader
 from irminsul.languages import PYTHON_PROFILE, READERS, languages_read, reader_for
@@ -214,6 +216,20 @@ def test_a_file_that_does_not_parse_answers_nothing_and_says_so(tmp_path: Path) 
     assert imported_files(reading, tmp_path / "a.py", [tmp_path]) == []
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="BACKLOG.md python-reader-lists-a-trys-else-before-its-handlers",
+)
+def test_what_a_try_statement_holds_is_listed_in_the_order_the_file_holds_it() -> None:
+    reading = _read(
+        "try:\n    import a\nexcept ImportError:\n    import b\n"
+        "else:\n    import c\nfinally:\n    import d\n"
+    )
+
+    assert [found.line for found in reading.imports()] == [2, 4, 6, 8]
+
+
 def test_only_the_reader_and_the_framework_extractors_import_pythons_parser() -> None:
     package = Path(irminsul.__file__).parent
 
@@ -233,7 +249,7 @@ def test_only_the_reader_and_the_framework_extractors_import_pythons_parser() ->
     }
 
 
-def test_a_revision_is_read_as_the_file_is(tmp_path: Path) -> None:
+def test_a_source_reader_keeps_one_reading_of_a_file_and_shares_its_parse(tmp_path: Path) -> None:
     path = tmp_path / "ledger.py"
     path.write_text(LEDGER, encoding="utf-8")
     source = SourceReader()

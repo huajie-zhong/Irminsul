@@ -264,7 +264,8 @@ class PythonReading:
 
     def definitions(self) -> tuple[Definition, ...]:
         """Every function, class and method at any depth, and each name an assignment binds
-        outside a function, in source order, but for a `try` statement: what its `else` and
+        that is not a function's local variable, a class attribute included, in source order,
+        but for a `try` statement: what its `else` and
         `finally` hold comes before what its handlers hold. A definition inside a function or
         a block, such as an `if`, is not `reachable`, since no dotted path names it."""
         return tuple(self._walk.definitions)

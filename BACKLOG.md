@@ -606,7 +606,8 @@ for `a`, where Python has bound `x` to `b` (run on 2026-11-27, on two lines, on 
 `;`, and across the branches of an `if`, a `try` and a `match`). The order was an accident of
 a stack walk and was kept on purpose when the module moved onto the language reader, a change
 that was to alter no output. Reading the imports first to last fixes it, once
-`python-reader-lists-a-trys-else-before-its-handlers` is fixed.
+`python-reader-lists-a-trys-else-before-its-handlers` is fixed; a strict `xfail` in
+`tests/test_binding.py` holds the gap until then.
 
 ### `python-reader-lists-a-trys-else-before-its-handlers`
 
@@ -614,12 +615,25 @@ Python's reader says its definitions and imports are in source order, and for a 
 statement they are not: `_statement_bodies` (`src/irminsul/languages/python_reader.py`) yields
 the body, the `else`, the `finally` and then the handlers, so with an import on lines 2, 5, 8
 and 11 of a `try` with an `except` and an `else`, `imports()` returns lines 2, 8, 11, 5 (run on
-2026-11-27). `anchors.python_definitions` walked that way before the reader took it over.
+2026-11-27). The walk came unchanged from the code in `src/irminsul/anchors.py` that the
+reader replaced.
 What depends on it today is small: the order in which `anchors --suggest` lists the
 definitions no anchor reaches, and which three it keeps, when one name is defined in both a
 handler and the `else` of one `try`. Yielding the handlers second makes the docstrings of
 `PythonReading.definitions` and `imports` true as the interface states them, and
-`docs/components/languages.md` then loses its sentence about it.
+`docs/components/languages.md` then loses its sentence about it. A strict `xfail` in
+`tests/test_languages_python_reader.py` holds the gap until then.
+
+### `a-redefined-class-is-reachable-and-does-not-resolve`
+
+Python's reader answers two questions about a member of a class its file defines twice,
+and the answers disagree. With `class A: pass` and then a second `class A:` holding
+`def f`, `definitions()` gives `A.f` as `reachable`, while `canonical("A.f")` is None,
+because `_find_symbol` descends into the first `A` and `_Walk` into each
+(`src/irminsul/languages/python_reader.py`, run on 2026-11-27). So `anchors --suggest`
+offers the marker `#A.f`, and pasting it reports `claim-anchor/missing-symbol`. The two
+functions disagreed the same way while they lived in `src/irminsul/anchors.py`. One walk
+should answer both; Python itself keeps the last `A`.
 
 ### `prose-beside-a-comment-marker-is-misread`
 
