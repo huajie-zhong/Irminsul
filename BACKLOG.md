@@ -107,7 +107,7 @@ come from `str.splitlines` (`:151`), which also splits on `\x0c`, `\x1c` and `â€
 Python ends no line at those characters, so a module holding a form feed parses with
 shifted line numbers and `anchors --suggest` points a candidate at the wrong line (line 13
 for a definition on line 12, re-run on 2026-10-28), while one holding `\x1c` in a string no
-longer parses and offers nothing. Reading the module through the source tree's reading of
+longer parses and offers nothing. The tree-sitter readers count lines as Python does, by line feeds, so a TypeScript, Go or Rust file holding one of those characters has the same shift. Reading the module through the source tree's reading of
 the file (`SourceReader.reading`, `src/irminsul/inventory/base.py`), as every other feature
 now does, would make suggestions agree with them.
 
@@ -633,6 +633,70 @@ because `_find_symbol` descends into the first `A` and `_Walk` into each
 offers the marker `#A.f`, and pasting it reports `claim-anchor/missing-symbol`. The two
 functions disagreed the same way while they lived in `src/irminsul/anchors.py`. One walk
 should answer both; Python itself keeps the last `A`.
+
+### `context-parses-every-file-a-reader-reads`
+
+`context <path>` builds a `CodeResolver` to name the docs that name the path's code
+(`docs_naming`, `src/irminsul/listing/review.py`), and the resolver's symbol index reads the
+definitions of every source file a reader reads (`_symbol_index`,
+`src/irminsul/code_references.py`), as `check` does. Measured on 2026-11-27: Python's `ast`
+costs about 0.7 s per MB of source and a tree-sitter reader about 0.4 s, so a TypeScript
+project of 2,100 files and 19 MB adds about 7 s to every `context` call, the command step 2 of
+the loop runs before each edit. An index built for the names a call asks about, reading only
+the files whose text holds the name, would cost what the call uses; it changes how a bare name
+is found to be unique, so it wants its own measurement of how many names one call asks.
+
+### `two-readers-of-what-typescript-exports`
+
+`TypeScriptExportsExtractor` (`src/irminsul/inventory/exports_ts.py`) finds exports with
+regular expressions, and the TypeScript reader finds the same declarations in the syntax tree
+(`src/irminsul/languages/queries/typescript.scm`). They disagree: for
+`export const a = 1, b = () => 2;` and `export default async function* walk() {}` the
+extractor gives `a` and `default`, missing `b` and the name `walk`, while the reader gives
+`a`, `b` and `walk` (run on 2026-11-27). The `exports` surface could be derived from the
+reader's definitions under an `export`, which the reader does not say today; the record
+`surface-rules-and-language-profiles-are-data` keeps surfaces as rules, so merging them is the
+owner's call.
+
+### `a-python-source-root-that-is-its-own-package`
+
+Python's reader places an absolute import under each source root
+(`PythonReading.files`, `src/irminsul/languages/python_reader.py`). With the source root
+`app`, which the init detector picks when a project's package is `app/`, the import
+`from app.models import User` in `app/views.py` is looked for at `app/app/models.py`, so the
+file `app/models.py` it does load is not found (run on 2026-11-27) and a true `depends_on`
+between two docs under `app/` is reported by `import-deps`. Python's reader says it places
+every import, which this breaks. Trying the root's parent when the root holds an
+`__init__.py` would place it; it changes which imports back a dependency, so it is a rule.
+
+### `typescript-go-and-rust-list-no-builtins`
+
+Only Python's profile lists `builtins` (`src/irminsul/languages/python.py`). Since the other
+three have readers, `CodeResolver.defines_symbol` answers for a project of theirs, so a doc
+that writes `panic()` or `make()` where no source file spells the name gets
+`code-references/unknown-symbol`, a hint with an ignore comment for its answer. Go's
+predeclared names are a closed list in its specification; Rust's prelude and JavaScript's
+globals are longer and move.
+
+### `a-rust-unit-test-is-not-offered`
+
+`anchors --suggest --doc` reads the test files under `paths.test_roots` that import a
+definition's file (`Ranker.importers`, `src/irminsul/ranked_tests.py`), and a Rust unit test
+sits in the file it tests, in `mod tests`, under no test root. The reader reads it as a test
+(`tests.caps`), an anchor can name it, and the suggestion does not offer it (2026-11-27).
+Offering it means reading a source file as its own test file and the `use super::*` of its
+`mod tests` as the file's import of itself.
+
+### `a-revision-places-imports-with-the-working-tree`
+
+A reader places a Go or Rust import through a `go.mod`, a `go.work` or a `Cargo.toml`, and a
+TypeScript or Go one through a directory's listing, each read from disk
+(`src/irminsul/languages/manifests.py`). The merge base's files are read from git
+(`SourceAtCommit`, `src/irminsul/listing/changed_code.py`), so the `new-dependency` pass reads
+a changed file's old imports against the manifests and directories of the working tree: an
+import of a file the change renamed is not found on the old side and is reported as new
+(2026-11-27, by reading; Python has the same blind spot through `owner_of`, which asks the
+disk whether a candidate exists).
 
 ### `prose-beside-a-comment-marker-is-misread`
 
