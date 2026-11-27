@@ -28,7 +28,7 @@ A claim, a doc's sentence about code, is re-asked when the code it rests on chan
 whenever its file does, and claims in component docs get asked at all. Its evidence, the
 files it rests on, may name one part of a file, which a finder for the file's type locates
 without guessing, so its pin, the hash taken at the last read, covers only that part. Two
-decisions, both answered.
+decisions were answered when it was accepted and two more before it was built.
 
 ## Problem
 
@@ -46,32 +46,34 @@ doc went unasked when their code changed on 2026-10-22.
 **A part** follows a `#`, as in `src/irminsul/cli.py#fix`, and its pin hashes only that
 part; a bare path keeps today's whole-file pin.
 
-**One finder per file type.** Python names a definition, hashed as every Python pin is;
-Markdown, a heading; TOML, YAML and JSON, a key path. An absent or ambiguous name is a
-certain finding, never a guess.
+**One finder per file type.** A file its language's reader reads names a definition, hashed
+as every pin into that language is; Markdown, a heading; TOML, YAML and JSON, a key path. An
+absent or ambiguous name is a certain finding, never a guess.
 
 **Markers**, a pair of `irminsul:part` comments, mark a part in any text file and win over a
 same-named symbol.
 
-**Other languages** gain finders through their language profile; tree-sitter, as a required
-dependency, is the recorded route.
+**Other languages** have their finder in their language's reader, which the profile names:
+Python's, and since [Each language reads its code through one interface](each-language-reads-its-code-through-one-interface.md)
+those of TypeScript, JavaScript, Go and Rust through tree-sitter. A file no reader reads has
+parts only through markers.
 
-**Anchors**, links from prose to code, use the same finders, replacing today's guess for
-non-Python symbols.
+**Anchors**, links from prose to code, use the same finders, replacing today's guess for a
+symbol in a file no reader reads.
 
 **Review** keeps a part's claim only when that part changed; re-pointing evidence that a
 rename broke needs no decision record, only a re-read.
 
 **Drift in every layer** drops the layer test, as the last step (decision 2).
 
-Not chosen: re-pinning more, Python and Markdown only, line ranges, tree-sitter now.
+Not chosen: re-pinning more, Python and Markdown only, line ranges.
 
 ## Cost and risk
 
 Five pull requests, one a migration that re-reads each narrowed claim. The main risk is
 review missing a narrowed claim, so each test first fails on a planted instance. A part that
 omits code its claim rests on under-asks it silently, so bare paths stay the default.
-Adopters' non-Python symbol anchors break until marked.
+An adopter's anchor to a symbol in a file no reader reads breaks until it is marked.
 
 ## Decisions
 
@@ -83,6 +85,28 @@ Answered by the owner on 2026-10-28:
    region that does not parse on its own does not resolve. One rule for Python pins.
 2. **Drift in every layer lands last**, after part pins exist, since part pins are what keep
    it quiet.
+
+Answered by the owner on 2026-11-27, after [Each language reads its code through one interface](each-language-reads-its-code-through-one-interface.md)
+gave TypeScript, JavaScript, Go and Rust readers and before the first task was built:
+
+3. **The file with no finder is one no reader reads.** This RFC took a TypeScript file for
+   its example of a file type without a finder, and three scenarios said a part of one is
+   unsupported. A TypeScript function is now found by its reader, so those scenarios name
+   `lib/session.rb` instead. The rule and its two codes stand: a part in a file whose type has
+   neither a finder nor a marker is unsupported, and the finding says to mark it. In a
+   language a reader reads, a part is a definition the reader finds, and a name it does not
+   find is missing. Not chosen: dropping the two `part-unsupported` codes and reporting such a
+   part as missing, which could no longer say that marking the lines is the fix.
+4. **A marked region is hashed the way a whole file of its type is.** Through the file's
+   reader where one reads it, so a comment or a change of layout does not move the pin in
+   any read language, and as text with whitespace collapsed otherwise. A Python region that
+   does not parse does not resolve, as decision 1 says. A TypeScript, JavaScript, Go or Rust
+   region always hashes, because their grammars do not know all valid code: a reader given
+   half a statement kept its hash over a comment and a layout change and moved it on a code
+   change (run on 2026-11-27). Not chosen: a region with a syntax error to its grammar does
+   not resolve in any language, which would leave valid TypeScript the grammar does not know
+   unmarkable; and whitespace-collapsed text for every file but Python's, as this RFC first
+   had it, under which a comment edit inside the region re-asks the claim.
 
 ## Design detail
 
@@ -107,10 +131,10 @@ pinned:
 
 | Files | A part names | Hashed |
 |-------|--------------|--------|
-| `.py` | a top-level definition, or a dotted `Class.member`, as anchors resolve today | `_canonical` of the definition's syntax tree, as every Python pin is hashed today, so a comment edit does not move it |
+| a file its language's reader reads: Python, TypeScript, JavaScript, Go, Rust | a definition the reader finds, by the dotted path an anchor writes | the reader's canonical text of the definition, as every pin into that language is hashed, so a comment edit does not move it |
 | `.md` | a heading, by the slug link anchors use | the heading line and the lines to the next heading of the same or higher level, whitespace collapsed |
 | `.toml`, `.yaml`, `.yml`, `.json` | a dotted key path | the value as canonical JSON: sorted keys, no whitespace |
-| any text file | a marker name | the lines between the two markers, whitespace collapsed; in a `.py` file, the dedented lines parsed and hashed through `_canonical`, and a region that does not parse does not resolve (decision 1) |
+| any text file | a marker name | the lines between the two markers, dedented and hashed the way a whole file of its type is: through the file's reader where one reads it, whitespace collapsed otherwise (decision 4); a Python region that does not parse does not resolve (decision 1) |
 
 - **Markers** `irminsul:part <name>` and `irminsul:end <name>` sit on any line, in the
   file's comment syntax. A marker wins over a same-named symbol, heading or key, because it
@@ -121,35 +145,35 @@ pinned:
   does not resolve is a certain finding naming the closest names the finder knows, so a
   renamed function is caught the way a renamed file is today.
 - **Text in, hash out**, so a finder also hashes a revision read from git.
-- **The hook.** A [language profile](../components/languages.md) may declare a finder for
-  its extensions. The Python profile declares `.py`, so the hook is used from the start.
-  Until a language has a finder, its files get parts only through markers.
+- **The hook.** A [language profile](../components/languages.md) names its language's
+  reader, and the reader's canonical text is the finder for its files: one hook serves pins
+  and parts. A file no reader reads gets parts only through markers.
 - **A marked region of a `.py` file** (decision 1). The accepted record says every Python
   pin hashes the canonical syntax tree; the marker row as drafted would hash a marked
   region of a `.py` file as whitespace-collapsed text, so a comment edit would move it.
-  - Under (a), the lines between the markers are dedented, parsed, and hashed by
-    `_canonical` in `src/irminsul/anchors.py`, as a definition is, for an anchor and a
-    claim pin alike. A region that does not parse on its own, such as half a statement,
+  - Under (a), the lines between the markers are dedented, parsed, and hashed as Python's
+    reader hashes a definition, for an anchor and a claim pin alike. A region that does not parse on its own, such as half a statement,
     does not resolve, in line with "nothing is guessed": the author learns at once, as a
     certain finding, and marks whole statements. It reuses the canonical hash.
   - Under (b), the region is hashed as whitespace-collapsed text, and the resolving record
     also qualifies the Python-pin record, a third beside the two below.
-- **tree-sitter** is the recorded route once several languages need finders, as a required
-  dependency. An optional extra would let a file resolve on one machine and fail on
+- **tree-sitter** was the recorded route once several languages needed finders, as a
+  required dependency: an optional extra would let a file resolve on one machine and fail on
   another, which `checks-are-deterministic` in [enforcement](../foundation/enforcement.md)
-  rules out. Until then, markers serve.
+  rules out. [Each language reads its code through one interface](each-language-reads-its-code-through-one-interface.md) took it, so those languages have finders
+  and markers serve the rest.
 
 ### Anchors
 
-- `_resolve_text` in `src/irminsul/anchors.py` guesses a non-Python symbol's block from a
-  whole-token match and a definition-looking line; a wrong block under-asks the anchor
-  silently, so the guess is deleted, and a symbol no marker or finder resolves is a certain
-  finding.
+- `_resolve_text` in `src/irminsul/anchors.py` guesses the block of a symbol in a file no
+  reader reads, from a whole-token match and a definition-looking line; a wrong block
+  under-asks the anchor silently, so the guess is deleted, and a symbol no marker or finder
+  resolves is a certain finding.
 - In this repository's docs, extra docs and fixture repos, every anchor that names a symbol
-  targets a `.py` file, so nothing here breaks. The only non-Python anchors are two
-  file-level ones on `docs-pr.yml.j2` templates in `docs/components/init.md`, which keep
-  their whole-text hash.
-- Only `tests/test_binding.py` exercises the guess, with TypeScript and Go files built
+  targets a file a reader reads, so nothing here breaks. The only anchors into other files
+  are two file-level ones on `docs-pr.yml.j2` templates in `docs/components/init.md`, which
+  keep their whole-text hash.
+- Only `tests/test_binding.py` exercises the guess, on a `.php` and a `.txt` file built
   inline.
 
 ### Review, the seal and the repair rule
@@ -291,11 +315,11 @@ Decision 1 (b) would add the Python-pin record as a third.
 - The repair rule lets a change delete what a governing claim names and re-point it
   without a record; the deletion shows in the diff, and review lists the claim.
 - Markers are plain text, so a marker quoted in a doc or a string counts as one.
-- An adopter's non-Python symbol anchors break until they get markers or a finder.
+- An adopter's anchor to a symbol in a file no reader reads breaks until it gets markers.
 - `context-is-stateless` stays whole-file, so drift asks it on each commit to
   `src/irminsul/context.py`, 17 from 2026-10-20 to 2026-10-27.
-- tree-sitter, when it comes, adds install weight, a cost
-  [principles](../foundation/principles.md) weighs heavily at adoption.
+- tree-sitter adds install weight, a cost [principles](../foundation/principles.md) weighs
+  heavily at adoption; [Each language reads its code through one interface](each-language-reads-its-code-through-one-interface.md) took that decision.
 
 ### Alternatives not chosen
 
@@ -305,8 +329,8 @@ Decision 1 (b) would add the Python-pin record as a third.
   `pyproject.toml#project.dependencies` is exactly the part `checks-are-deterministic`
   rests on, and markers give every other language a route without a guess.
 - **Line ranges, such as `path#L10-L40`.** Rejected: they move with every edit above them.
-- **tree-sitter now, or as an optional extra.** Rejected: no second language needs it yet,
-  and an extra makes a verdict depend on the install.
+- **tree-sitter as an optional extra.** Rejected: an extra makes a verdict depend on the
+  install.
 - **A decision record for every rename.** Rejected: the certain finding forces an edit the
   seal then refuses.
 - **Drift in every layer first.** The first draft rejected it because on 2026-10-27 it
@@ -343,7 +367,7 @@ the whole-file pin.
 - **THEN** an entry `path#seal` resolves to the marked lines
 
 #### Scenario: No finder
-- **WHEN** a claim cites `src/session.ts#fetchUserSession` and that file has no marker of that name
+- **WHEN** a claim cites `lib/session.rb#fetch_user_session` and that file has no marker of that name
 - **THEN** `irminsul check` reports `claim-provenance/evidence-part-unsupported` and exits 1
 
 ### Requirement: A matching part pin suppresses evidence drift
@@ -403,8 +427,8 @@ never by searching the text for the name, and otherwise SHALL be reported as
 `claim-anchor/part-unsupported`, a certain finding. `irminsul anchors --suggest` SHALL
 offer a `path#name` marker only where it resolves.
 
-#### Scenario: TypeScript symbol without markers
-- **WHEN** a doc anchors `src/session.ts#fetchUserSession` and the file has no marker of that name
+#### Scenario: A symbol in a file no reader reads, without markers
+- **WHEN** a doc anchors `lib/session.rb#fetch_user_session` and the file has no marker of that name
 - **THEN** `irminsul check` reports `claim-anchor/part-unsupported` and exits 1
 
 #### Scenario: File anchor on a template
@@ -412,7 +436,7 @@ offer a `path#name` marker only where it resolves.
 - **THEN** the anchor resolves to the same hash as before this change
 
 #### Scenario: Suggestion for a file without a finder
-- **WHEN** an unbound name is defined only in a TypeScript file that has no markers
+- **WHEN** an unbound name is defined only in a Ruby file that has no markers
 - **THEN** `irminsul anchors --suggest` offers the file anchor and no `path#name` marker
 
 ### Requirement: Review matches claim evidence by its path
@@ -482,8 +506,8 @@ Provenance: code
 
 ### PR 1: finders, and anchors on them
 
-- `T1` Add the finder table and the language-profile hook, with the Python profile declaring the `.py` finder; each finder hashes text, so a base revision can be compared. (req: anchors-resolve-through-part-finders)
-- `T2` Resolve anchors through the table, delete the keyword guess in `_resolve_text`, add `claim-anchor/part-unsupported`, and move the TypeScript and Go cases in `tests/test_binding.py` to markers. (req: anchors-resolve-through-part-finders)
+- `T1` Add the finders for a marker, a Markdown heading and a key path beside the one a language's reader is; each finder hashes text, so a base revision can be compared. (req: anchors-resolve-through-part-finders)
+- `T2` Resolve anchors through the finders, delete the keyword guess in `_resolve_text`, add `claim-anchor/part-unsupported`, and move the cases in `tests/test_binding.py` that exercise the guess to markers. (req: anchors-resolve-through-part-finders)
 - `T3` Offer `path#name` from `anchors --suggest` only where a finder resolves it; update `docs/components/anchors.md` and add the qualifying Status sentence to the anchors record. (req: anchors-resolve-through-part-finders)
 
 ### PR 2: claim grammar, pins, the two codes, re-pin
