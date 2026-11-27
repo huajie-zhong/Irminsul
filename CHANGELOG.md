@@ -339,10 +339,11 @@ making a feature, a refactor and an RFC-driven change in it.
   env-vars` prints what it printed.
 - A Python file saved with a UTF-8 byte order mark is parsed as the file without it. It did
   not parse, so it defined nothing, an anchor into it was `claim-anchor/unreadable`, and no
-  code span named its functions, though Python runs such a file. A surface rule and a
-  framework pack read any file without the mark too: a guard or a pattern anchored at the
-  start of a line missed line 1, so a Flask app whose import is its first line put no
-  route on the surface.
+  code span named its functions, though Python runs such a file. A surface rule, a
+  framework pack and the exports extractor read any file without the mark too: a guard or a
+  pattern anchored at the start of a line missed line 1, so a Flask app whose import is its
+  first line put no route on the surface, and an `export` on the first line of a TypeScript
+  file was not on the exports surface.
 - `import-deps` no longer reports a `depends_on` of a doc that owns a Python file with a
   syntax error, or a Python or Go file that is not UTF-8. None of that file's imports is
   read, so a missing one proves nothing: with `from billing import invoice` above a broken

@@ -683,6 +683,19 @@ member, a call or a subscript would close the first, at the cost of a pin that m
 formatter removes needless parentheses there; the tuple needs the grammar's node kinds, which
 the engine does not know.
 
+### `a-byte-order-mark-stays-in-the-text-a-file-is-read-as`
+
+`unmarked` (`src/irminsul/languages/reader.py`) drops a leading UTF-8 byte order mark for the
+readers that parse a text or anchor a pattern at the start of a line: Python's parser, the
+surface rules and packs, the exports extractor and Go's `package` clause. `SourceReader.text`
+(`src/irminsul/inventory/base.py`) still returns the mark, so three things keep it (read on
+2026-11-27): the whitespace-collapsed text a pin hashes for a file no reader reads; the lines
+the review queue compares, where adding or removing a mark shows as a change to line 1; and
+any reader added later that does not call `unmarked`. Dropping the mark once, where a file's
+text is read from disk and from a git revision, would be one place for all of them. It moves
+the pin of every marked file no reader reads once, which changes what a pin hashes, so it is
+a rule.
+
 ### `a-python-source-root-that-is-its-own-package`
 
 Python's reader places an absolute import under each source root

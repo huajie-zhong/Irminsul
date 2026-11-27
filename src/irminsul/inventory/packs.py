@@ -23,6 +23,7 @@ from irminsul.inventory.exports_ts import TypeScriptExportsExtractor
 from irminsul.inventory.http_fastapi import FastapiHttpExtractor
 from irminsul.inventory.mcp import McpToolExtractor
 from irminsul.languages import LANGUAGE_REGISTRY
+from irminsul.languages.reader import unmarked
 
 _TEMPLATE_RE = re.compile(r"\{(\d+)(?:\|(upper|lower))?(?:\?([^}]*))?\}")
 
@@ -281,8 +282,7 @@ def _extract_rule(
         text = reader.text(abs_path)
         if text is None:
             continue
-        # A byte order mark is no part of line 1, which a pattern anchored there must match.
-        text = text.removeprefix("\ufeff")
+        text = unmarked(text)
         if guard is not None and not guard.search(text):
             continue
         for lineno, line in enumerate(text.splitlines(), start=1):

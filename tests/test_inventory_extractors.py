@@ -135,6 +135,16 @@ def test_surface_rule_extractor_from_config(tmp_path: Path) -> None:
     assert ids == {"/a", "/b"}
 
 
+def test_an_export_on_the_first_line_of_a_file_saved_with_a_byte_order_mark_is_read(
+    tmp_path: Path,
+) -> None:
+    files = _files(tmp_path, "mod.ts", "\ufeffexport function foo() {}\nexport const bar = 1;\n")
+
+    found = get_extractor("exports", IrminsulConfig()).extract(files, SourceReader())
+
+    assert [(item.identity, item.line) for item in found] == [("foo", 1), ("bar", 2)]
+
+
 def test_a_rule_reads_the_first_line_of_a_file_saved_with_a_byte_order_mark(
     tmp_path: Path,
 ) -> None:

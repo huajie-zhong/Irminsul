@@ -43,7 +43,8 @@ Run `irminsul surface <kind>` to see a surface, narrowed with `--source <glob>`;
 
 ## Packs and rules
 
-A rule or a pack reads a file without the byte order mark an editor may have saved at its start, so a pattern or a guard anchored at the start of a line matches line 1 as any other.
+A rule, a pack and the exports extractor read a file without the byte order mark an editor may have saved at its start, so a pattern or a guard anchored at the start of a line matches line 1 as any other.
+<!-- anchor: tests/test_inventory_extractors.py#test_an_export_on_the_first_line_of_a_file_saved_with_a_byte_order_mark_is_read @sha256:e70f31cf6920 -->
 <!-- anchor: tests/test_inventory_extractors.py#test_a_rule_reads_the_first_line_of_a_file_saved_with_a_byte_order_mark @sha256:b8fb5d4f01d3 -->
 
 Exports and environment variables are always on, the variables read by the pattern each [language profile](languages.md) holds; framework packs add commands, long options, routes and MCP tools for the stacks they know, and `PACKS` lists them. Typer, FastAPI and MCP tools are read from the AST, and a Typer option declared once in a module-level `Annotated` alias counts for every parameter annotated with it. `command_options` reads one command's options by that same rule, which is how `code-references` knows whether a command declares an option, so an option written through an alias or by a default value is found on its command. The other packs are regular expressions guarded by an import or dependency marker, so the Click rules only read files that import Click, and they see what is written literally: a Click command named only by its function, or a cobra subcommand's parent path, is not recovered. Configuration rules under `[[surface.rules]]` add project-specific kinds in the same record the packs' own rules use ([`SurfaceRule`](config.md)).

@@ -30,6 +30,13 @@ itself, so one rule says which files are the repository's. A reading made outsid
 run finds no such key."""
 
 
+def unmarked(text: str) -> str:
+    """`text` without the UTF-8 byte order mark an editor may have saved at its start. The
+    mark is no part of line 1, so a parser that rejects it, and a pattern anchored at the
+    start of a line, read the text through this."""
+    return text.removeprefix("\ufeff")
+
+
 def dotted(symbol: str) -> str:
     """A path to a definition as `Definition.symbol` spells it, whichever separator the
     language or a doc wrote: `Desk::new` is `Desk.new`."""

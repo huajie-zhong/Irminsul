@@ -17,6 +17,7 @@ from typing import ClassVar
 
 from irminsul.inventory.base import SourceReader, SurfaceItem, dedupe
 from irminsul.languages import TYPESCRIPT_PROFILE
+from irminsul.languages.reader import unmarked
 
 _DECL_RE = re.compile(
     r"^\s*export\s+(?:declare\s+)?(?:default\s+)?(?:abstract\s+)?(?:async\s+)?"
@@ -56,6 +57,7 @@ class TypeScriptExportsExtractor:
             text = reader.text(abs_path)
             if text is None:
                 continue
+            text = unmarked(text)
             for lineno, line in enumerate(text.splitlines(), start=1):
                 decl = _DECL_RE.match(line)
                 if decl:

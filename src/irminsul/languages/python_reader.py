@@ -21,6 +21,7 @@ from irminsul.languages.reader import (
     ImportedName,
     Memo,
     References,
+    unmarked,
 )
 
 
@@ -40,7 +41,7 @@ class PythonModule:
         editor saved at its start is no part of the code, as the interpreter takes it, so it
         is dropped before the parse."""
         try:
-            return cls(ast.parse(text.removeprefix("\ufeff")))
+            return cls(ast.parse(unmarked(text)))
         except SyntaxError:
             return None
 

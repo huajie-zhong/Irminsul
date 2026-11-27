@@ -427,6 +427,19 @@ def test_a_depends_on_no_import_backs_is_reported_once_and_one_backed_is_not(
     assert finding.message == "depends_on 'desk' declared but no import relationship found"
 
 
+def test_a_package_clause_on_the_first_line_of_a_file_with_a_byte_order_mark_is_read(
+    tmp_path: Path,
+) -> None:
+    """The file's own package name is one of the names a file of the same package spells,
+    and the mark an editor saved before `package` does not hide it."""
+    write(tmp_path, "go.mod", "module example.com/shop\n")
+    plain = write(tmp_path, "cmd/tool/main.go", "package main\n")
+    marked = write(tmp_path, "cmd/other/main.go", "\ufeffpackage main\n")
+
+    assert GO_READER.mentioned_as(plain) == frozenset({"tool", "main"})
+    assert GO_READER.mentioned_as(marked) == frozenset({"other", "main"})
+
+
 def test_a_go_file_that_is_not_utf8_denies_no_dependency(tmp_path: Path) -> None:
     """The cart imports nothing, so its doc's `depends_on` is reported. Saved as Latin-1 its
     text is not read, no import of it is known, and the report goes."""

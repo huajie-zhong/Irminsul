@@ -24,7 +24,7 @@ import tree_sitter_go
 from tree_sitter import Node
 
 from irminsul.languages.manifests import go_modules, listing, nearest
-from irminsul.languages.reader import ImportedName, Memo
+from irminsul.languages.reader import ImportedName, Memo, unmarked
 from irminsul.languages.tree_sitter_reader import TreeSitterReader, node_text, query_file
 
 _VERSION_RE = re.compile(r"v\d+")
@@ -98,7 +98,7 @@ def mentioned_as(path: Path) -> frozenset[str] | None:
     itself gives. None outside any module, where nothing says what the import path is."""
     package = path.parent
     try:
-        own = _PACKAGE_RE.search(path.read_text(encoding="utf-8"))
+        own = _PACKAGE_RE.search(unmarked(path.read_text(encoding="utf-8")))
     except (OSError, UnicodeDecodeError):
         own = None
     for module, directories in go_modules(path, (), {}):
