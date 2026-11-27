@@ -605,9 +605,8 @@ Two imports from the defining module itself are read the wrong way round too.
 for `a`, where Python has bound `x` to `b` (run on 2026-11-27, on two lines, on one line with
 `;`, and across the branches of an `if`, a `try` and a `match`). The order was an accident of
 a stack walk and was kept on purpose when the module moved onto the language reader, a change
-that was to alter no output. Reading the imports first to last fixes it, once
-`python-reader-lists-a-trys-else-before-its-handlers` is fixed; a strict `xfail` in
-`tests/test_binding.py` holds the gap until then.
+that was to alter no output. Reading the imports from the first line to the last fixes it; a
+strict `xfail` in `tests/test_binding.py` holds the gap until then.
 
 ### `python-reader-lists-a-trys-else-before-its-handlers`
 
