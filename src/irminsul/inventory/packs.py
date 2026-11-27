@@ -281,6 +281,8 @@ def _extract_rule(
         text = reader.text(abs_path)
         if text is None:
             continue
+        # A byte order mark is no part of line 1, which a pattern anchored there must match.
+        text = text.removeprefix("\ufeff")
         if guard is not None and not guard.search(text):
             continue
         for lineno, line in enumerate(text.splitlines(), start=1):

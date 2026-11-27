@@ -337,9 +337,12 @@ making a feature, a refactor and an RFC-driven change in it.
 - A language profile holds the pattern that reads an environment variable in its language,
   `env_var_pattern`, where the `env-vars` extractor held one per language. `irminsul surface
   env-vars` prints what it printed.
-- A Python file saved with a UTF-8 byte order mark is read as the file without it. It did
+- A Python file saved with a UTF-8 byte order mark is parsed as the file without it. It did
   not parse, so it defined nothing, an anchor into it was `claim-anchor/unreadable`, and no
-  code span named its functions, though Python runs such a file.
+  code span named its functions, though Python runs such a file. A surface rule and a
+  framework pack read any file without the mark too: a guard or a pattern anchored at the
+  start of a line missed line 1, so a Flask app whose import is its first line put no
+  route on the surface.
 - `import-deps` no longer reports a `depends_on` of a doc that owns a Python file with a
   syntax error, or a Python or Go file that is not UTF-8. None of that file's imports is
   read, so a missing one proves nothing: with `from billing import invoice` above a broken

@@ -135,6 +135,22 @@ def test_surface_rule_extractor_from_config(tmp_path: Path) -> None:
     assert ids == {"/a", "/b"}
 
 
+def test_a_rule_reads_the_first_line_of_a_file_saved_with_a_byte_order_mark(
+    tmp_path: Path,
+) -> None:
+    """The mark an editor saved before the first character is no part of line 1, so a
+    pattern and a guard anchored at the start of a line read that line as any other."""
+    rule = SurfaceRule(
+        kind="routes", globs=("**/*.txt",), pattern=r"^ROUTE (\S+)", guard=r"^ROUTE /a"
+    )
+    ext = get_extractor("routes", IrminsulConfig(surface=SurfaceSettings(rules=[rule])))
+    assert ext is not None
+
+    found = ext.extract(_files(tmp_path, "r.txt", "\ufeffROUTE /a\nROUTE /b\n"), SourceReader())
+
+    assert [(item.identity, item.line) for item in found] == [("/a", 1), ("/b", 2)]
+
+
 _TS_SURFACE_SRC = (
     'import { Command } from "commander";\n'
     'const express = require("express");\n'
