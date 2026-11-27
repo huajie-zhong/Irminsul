@@ -14,7 +14,7 @@ from irminsul.docgraph import ChangeRange, build_graph
 from irminsul.git.changes import working_tree_changed_paths
 from irminsul.git.reader import GitReader
 
-from .conftest import commit_all, seed_repo, write_config
+from .conftest import commit_all, seed_repo, write, write_config
 
 ALPHA = "from mylib.shared import helper\n\n\ndef run() -> None:\n    helper()\n"
 BETA = "def helper() -> None:\n    pass\n"
@@ -117,3 +117,33 @@ def test_a_changed_file_that_is_not_utf8_is_silent(tmp_path: Path) -> None:
     (root / "src" / "mylib" / "alpha.py").write_bytes(b"x = '\xff\xfe'\n")
 
     assert _run(root) == []
+
+
+def test_an_import_into_another_module_of_the_repository_is_reported(tmp_path: Path) -> None:
+    """The server's `go.mod` only requires the api module, so nothing beside the server
+    says where it is: the run's listing of the source files does, and the pass reads a
+    changed file with what the run knows, as `import-deps` does."""
+    root = tmp_path / "r"
+    write(root, "services/api/go.mod", "module example.com/api\n\ngo 1.22\n")
+    write(root, "services/api/api.go", "package api\n\nfunc Version() int {\n\treturn 1\n}\n")
+    write(
+        root,
+        "server/go.mod",
+        "module example.com/server\n\ngo 1.22\n\nrequire example.com/api v1.0.0\n",
+    )
+    write(root, "server/main.go", "package main\n\nfunc main() {}\n")
+    write(root, "docs/components/api.md", _doc("api", "services/api/**"))
+    write(root, "docs/components/server.md", _doc("server", "server/**"))
+    write_config(root, source_roots=["."])
+    seed_repo(root, "base")
+    write(
+        root,
+        "server/main.go",
+        'package main\n\nimport "example.com/api"\n\nfunc main() {\n\t_ = api.Version()\n}\n',
+    )
+
+    [finding] = _run(root)
+
+    assert finding.code == CODE_UNDECLARED_NEW_DEPENDENCY
+    assert finding.doc_id == "server"
+    assert "added an import of api" in finding.message

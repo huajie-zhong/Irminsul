@@ -152,8 +152,8 @@ class CodeReading(Protocol):
         in the repository, so that an import it places nowhere leaves the repository. Only
         then does a file with no import of another say the two are unrelated. It is asked
         of a file because the answer can rest on what stands around it, as a Go file's
-        does on a `go.mod` above it, and it is no for a text that did not parse whole,
-        whose imports are not all known."""
+        does on a `go.mod` above it. A tree-sitter reader says no for a text that did not
+        parse whole, whose imports are not all known; Python's says yes for every file."""
         ...
 
     def references(self, definition: Definition) -> References:

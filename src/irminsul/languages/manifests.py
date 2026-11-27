@@ -51,18 +51,24 @@ def listing(directory: Path, memo: Memo) -> frozenset[str]:
 
 
 def nearest(start: Path, name: str, memo: Memo) -> Path | None:
-    """The closest directory at or above `start` that holds a file called `name`."""
-    key = ("nearest", os.fspath(start), name)
-    if key not in memo:
-        found: Path | None = None
-        for directory in (start, *start.parents):
-            if (directory / name).is_file():
-                found = directory
-                break
-        memo[key] = found
-    held = memo[key]
-    assert held is None or isinstance(held, Path)
-    return held
+    """The closest directory at or above `start` that holds a file called `name`, looked
+    for as far up as the filesystem goes. A run asks each directory on the way once."""
+    asked: list[Path] = []
+    found: Path | None = None
+    for directory in (start, *start.parents):
+        key = ("nearest", os.fspath(directory), name)
+        if key in memo:
+            held = memo[key]
+            assert held is None or isinstance(held, Path)
+            found = held
+            break
+        asked.append(directory)
+        if (directory / name).is_file():
+            found = directory
+            break
+    for directory in asked:
+        memo[("nearest", os.fspath(directory), name)] = found
+    return found
 
 
 def _unquoted(word: str) -> str:
@@ -100,14 +106,18 @@ def source_files(memo: Memo) -> Sequence[Path]:
 
 
 def _go_declared(roots: Sequence[Path], memo: Memo) -> dict[str, tuple[Path, ...]]:
-    """Each module the repository declares, by its path, with each directory whose `go.mod`
-    declares it: a `go.mod` among the run's source files, or the nearest above a source
-    root. A module another module only requires is found here: its code is in the
-    repository, whichever copy of it a build would fetch."""
+    """Each module the repository's Go code is in, by its path, with each directory whose
+    `go.mod` declares it: the nearest `go.mod` above each Go file among the run's source
+    files, and above each source root. A module another module only requires is found
+    here: its code is in the repository, whichever copy of it a build would fetch."""
     key = ("go.declared", *map(os.fspath, roots))
     if key not in memo:
-        homes = {path.parent for path in source_files(memo) if path.name == "go.mod"}
-        homes.update(home for root in roots if (home := nearest(root, "go.mod", memo)))
+        holding = {path.parent for path in source_files(memo) if path.suffix == ".go"}
+        homes = {
+            home
+            for directory in (*holding, *roots)
+            if (home := nearest(directory, "go.mod", memo)) is not None
+        }
         declared: dict[str, list[Path]] = {}
         for home in sorted(homes, key=lambda directory: directory.as_posix()):
             path = _go_module_path(home)

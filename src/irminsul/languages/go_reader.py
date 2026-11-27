@@ -3,10 +3,11 @@ say: what an import binds, and which files an import path names.
 
 An import path names a package, which is a directory. It is placed through the module paths
 its repository declares: the nearest `go.mod`, the local directories that file's `replace`
-lines name, the modules a `go.work` above it uses, and every other module a `go.mod` among
-the run's source files or above a source root declares. Every other path is the standard
-library's or another repository's, so under a `go.mod` this reader places every import. A
-file with none above it has no module, and nothing says where its import paths lead.
+lines name, the modules a `go.work` above it uses, and every other module that holds a Go
+file among the run's source files, by the `go.mod` nearest above it. Every other path is
+the standard library's or another repository's, so under a `go.mod` this reader places
+every import. A file with none above it has no module, and nothing says where its import
+paths lead.
 
 A file also reads every name of the other files of its package, with no import statement,
 so its `package` clause is read as an import of them: a test beside the code it tests is

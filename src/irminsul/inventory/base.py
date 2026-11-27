@@ -106,14 +106,25 @@ class SourceReader:
         key = (os.fspath(path), reader)
         if key not in self._readings:
             text = self.text(path)
-            if reader not in self._memos:
-                memo: Memo = {}
-                if self._listed is not None:
-                    memo[SOURCE_FILES] = self._listed
-                self._memos[reader] = memo
-            memo = self._memos[reader]
-            self._readings[key] = None if text is None else reader.read(text, memo)
+            self._readings[key] = None if text is None else reader.read(text, self._memo(reader))
         return self._readings[key]
+
+    def read_text(self, path: Path, text: str) -> CodeReading | None:
+        """`text` as the reader of the file `path` reads it, with what this run knows of
+        the repository: for a revision of the file, which the disk does not hold, so it is
+        not kept. None when no reader reads the file."""
+        reader = reader_for(path)
+        return None if reader is None else reader.read(text, self._memo(reader))
+
+    def _memo(self, reader: CodeReader) -> Memo:
+        """What `reader` keeps for the life of this reader of sources, with the listing of
+        the source files on offer when there is one."""
+        if reader not in self._memos:
+            memo: Memo = {}
+            if self._listed is not None:
+                memo[SOURCE_FILES] = self._listed
+            self._memos[reader] = memo
+        return self._memos[reader]
 
     def python_modules(
         self, source_files: Iterable[tuple[Path, str]]

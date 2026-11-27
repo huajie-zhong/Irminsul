@@ -76,8 +76,8 @@ TypeScript file was once written five times with five answers.
   and the reading says the rest is unknown. Python stays all or nothing.
 - **A missing import denies a dependency only where every import is placed.** A reading says
   whether every import of its file that stays in the repository is placed. A Python file's
-  is, and a Go file's under a `go.mod`, when the file parses whole. A TypeScript or a Rust
-  file's never is, since a
+  always is, and a Go file's under a `go.mod` when the file parses whole. A TypeScript or a
+  Rust file's never is, since a
   path alias, a workspace package or another crate may stand between two files. `import-deps`
   reports a `depends_on` no import backs only when the two docs own code of a language in
   common and every file the depending doc owns of each such language has its imports placed.
@@ -133,5 +133,6 @@ TypeScript file was once written five times with five answers.
   through the TSX dialect, the outcome of the measurement the RFC's third decision asked for.
   Whether every import is placed is asked of a file, not of a language: a Go file with no
   `go.mod` above it has no module to place its imports by, which the review of the change
-  found reported as a missing dependency. A file that does not parse whole places none in
-  any language, so a Python file with a syntax error no longer denies a dependency.
+  found reported as a missing dependency. A Go file that does not parse whole places none.
+  A Python file that does not parse still answers yes, as `import-deps` took it before, and
+  whether it should is a question the backlog keeps for the owner.

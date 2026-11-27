@@ -24,7 +24,7 @@ backs no edge.
 
 from __future__ import annotations
 
-from collections.abc import Collection, Sequence
+from collections.abc import Callable, Collection, Sequence
 from pathlib import Path
 from typing import ClassVar, Final
 
@@ -33,8 +33,7 @@ from irminsul.checks.change_range import after_text
 from irminsul.checks.dependency_check import SourceOwnership, resolve_ownership
 from irminsul.docgraph import ChangeRange, DocGraph, DocNode
 from irminsul.git.changes import file_at_ref
-from irminsul.languages import reader_for
-from irminsul.languages.reader import imported_files
+from irminsul.languages.reader import CodeReading, imported_files
 
 CHECK_NAME: Final = "new-dependency"
 CODE_UNDECLARED_NEW_DEPENDENCY: Final = "new-dependency/undeclared-new-dependency"
@@ -71,20 +70,25 @@ class NewDependencyPass:
 
 
 def _edges_in(
-    text: str | None, importer: Path, roots: Sequence[Path], ownership: SourceOwnership
+    text: str | None,
+    importer: Path,
+    roots: Sequence[Path],
+    ownership: SourceOwnership,
+    read: Callable[[Path, str], CodeReading | None],
 ) -> set[str]:
     """Owning doc ids the imports in `text`, read as the file `importer`, reach; none for
     a text that is missing or does not parse, or a file no reader reads.
 
     A reader lists the imports at any depth, so an import inside a function counts — which
     matters, because deferring an import is exactly how a module-level one gets avoided.
+    `read` is the run's way of reading a text as a file, so an import is placed with what
+    the run knows of the repository, as `import-deps` places one.
     """
-    reader = reader_for(importer)
-    if text is None or reader is None:
+    reading = None if text is None else read(importer, text)
+    if reading is None:
         return set()
     owners = (
-        ownership.owner_of(candidate)
-        for candidate in imported_files(reader.read(text), importer, roots)
+        ownership.owner_of(candidate) for candidate in imported_files(reading, importer, roots)
     )
     return {dep_id for dep_id in owners if dep_id is not None}
 
@@ -119,9 +123,9 @@ def run_new_dependency(graph: DocGraph, change: ChangeRange) -> list[Finding]:
             if now_text is None:
                 continue
             before_text = file_at_ref(graph.git, repo_root, change.merge_base, display)
-            new_edges = _edges_in(now_text, abs_path, roots, ownership) - _edges_in(
-                before_text, abs_path, roots, ownership
-            )
+            new_edges = _edges_in(
+                now_text, abs_path, roots, ownership, graph.source.read_text
+            ) - _edges_in(before_text, abs_path, roots, ownership, graph.source.read_text)
             new_edges -= {node.id}
             new_edges -= declared
             if new_edges:

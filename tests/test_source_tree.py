@@ -148,3 +148,30 @@ def test_a_run_walks_each_scope_once_and_parses_each_file_once(
 
     assert sorted(walks) == [["src"], ["tests"]]
     assert sorted(parsed) == sorted(["", _APP, _HELPERS])
+
+
+def test_reading_one_file_walks_no_source_root_until_a_reader_asks_what_they_hold(
+    tmp_path: Path,
+) -> None:
+    """An anchor's target is one file. Its reader is offered the walked files and asks for
+    them only to place an import, so reading the file's definitions walks nothing."""
+    write(tmp_path, "go.mod", "module example.com/lib\n\ngo 1.22\n")
+    desk = write(
+        tmp_path,
+        "desk/desk.go",
+        'package desk\n\nimport "example.com/lib/policy"\n\nfunc Fee() int {\n\treturn policy.Rate\n}\n',
+    )
+    write(tmp_path, "policy/policy.go", "package policy\n\nconst Rate = 2\n")
+    write_config(tmp_path, source_roots=["."])
+    tree = load_graph(tmp_path).source
+
+    reading = tree.reading(desk)
+    assert reading is not None
+    assert [d.symbol for d in reading.definitions()] == ["Fee"]
+    assert reading.canonical("Fee") is not None
+    assert "walk" not in vars(tree)
+
+    files = reading.files("example.com/lib/policy", desk, [tmp_path])
+
+    assert [path.relative_to(tmp_path).as_posix() for path in files] == ["policy/policy.go"]
+    assert "walk" in vars(tree)

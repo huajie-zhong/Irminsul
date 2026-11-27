@@ -721,3 +721,21 @@ def test_a_statement_reads_the_same_ended_by_a_semicolon_or_a_line_break() -> No
     two_lines = "package a\n\nfunc f() int {\n\tx := 1\n\ty := 2\n\treturn x + y\n}\n"
 
     assert _reading(SAMPLE, one_line).canonical("f") == _reading(SAMPLE, two_lines).canonical("f")
+
+
+def test_a_module_is_found_by_its_go_files_where_the_walk_lists_no_go_mod(
+    tmp_path: Path,
+) -> None:
+    """`source_includes` keeps only Go files, so the walk lists no `go.mod`. The api
+    module is found by the `go.mod` above its Go file all the same."""
+    main = _server_requiring_api(tmp_path, "services/api")
+    write_config(tmp_path, source_roots=["."], extra='source_includes = ["**/*.go"]\n')
+    tree = load_graph(tmp_path).source
+    assert not [path for path, _ in tree.files if path.name == "go.mod"]
+    reading = tree.reading(main)
+    assert reading is not None
+
+    files = reading.files("example.com/api", main, [tmp_path])
+
+    assert _relative(files, tmp_path) == ["services/api/api.go"]
+    assert run_check(DependencyCheck, tmp_path) == []

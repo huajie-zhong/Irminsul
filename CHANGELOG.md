@@ -350,9 +350,6 @@ making a feature, a refactor and an RFC-driven change in it.
   languages beside their Python, a JavaScript file each or a Rust file each, is no longer
   judged by `import-deps`: one of those files could carry the dependency through an import
   the reader does not follow. It was judged through the Python alone before.
-- `import-deps` no longer reports a `depends_on` of a doc that owns a Python file with a
-  syntax error. None of that file's imports is read, so a missing one proves nothing; before,
-  the dependency was reported as if the file imported nothing.
 - A code span that names a function or class of those languages used to be `unbound-name` in
   `list review --written` and listed by `anchors --suggest`; it now resolves, and only a
   constant or a name no reader finds is still unbound.

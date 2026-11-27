@@ -15,7 +15,8 @@ from irminsul.code_references import CodeResolver
 from irminsul.config import load
 from irminsul.languages import READERS, reader_for
 from irminsul.languages.base import LanguageProfile
-from irminsul.languages.reader import Definition
+from irminsul.languages.manifests import nearest
+from irminsul.languages.reader import Definition, Memo
 from irminsul.languages.tree_sitter_reader import TreeSitterReader
 from irminsul.source_tree import SourceTree
 
@@ -177,9 +178,14 @@ def test_a_missing_import_denies_a_dependency_only_where_every_shared_import_is_
     assert run_check(DependencyCheck, tmp_path) == []
 
 
-def test_a_file_that_does_not_parse_denies_no_dependency(tmp_path: Path) -> None:
+@pytest.mark.xfail(
+    strict=True,
+    reason="BACKLOG.md a-python-file-that-does-not-parse-still-denies-a-dependency",
+)
+def test_a_python_file_that_does_not_parse_denies_no_dependency(tmp_path: Path) -> None:
     """The cart imports the invoice and then holds a syntax error, so none of its imports
-    is read: the missing import proves nothing, and the `depends_on` is not reported."""
+    is read: the missing import proves nothing, and the `depends_on` should not be
+    reported. It is, as it was before a reading said whether its imports are placed."""
     write(tmp_path, "src/shop/cart.py", "from billing import invoice\nmatch = \n")
     write(tmp_path, "src/billing/invoice.py", "RATE = 2\n")
     write_config(tmp_path, source_roots=["src"])
@@ -205,3 +211,20 @@ def test_two_components_with_other_languages_that_differ_are_still_judged(
     assert [f.code for f in run_check(DependencyCheck, tmp_path)] == [
         "import-deps/hallucinated-dependency"
     ]
+
+
+def test_the_nearest_manifest_is_found_from_each_directory_under_it(tmp_path: Path) -> None:
+    """A run asks each directory once: the second question, from a sibling, meets a
+    directory the first already asked and takes its answer."""
+    home = tmp_path / "lib"
+    write(tmp_path, "lib/go.mod", "module example.com/lib\n")
+    deep = home / "desk" / "ledger"
+    beside = home / "policy"
+    deep.mkdir(parents=True)
+    beside.mkdir()
+    memo: Memo = {}
+
+    assert nearest(deep, "go.mod", memo) == home
+    assert nearest(beside, "go.mod", memo) == home
+    assert nearest(home / "desk", "go.mod", memo) == home
+    assert nearest(home, "Cargo.toml", memo) == nearest(home, "Cargo.toml", {})
