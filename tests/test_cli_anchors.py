@@ -700,7 +700,9 @@ def test_stale_lists_a_changed_anchor_with_its_finding(tmp_path: Path) -> None:
         "pinned": "sha256:0000deadbeef",
         "current": f"sha256:{current}",
         "reported_by": "claim-anchor/pinned-drift",
-        "re_pin": "irminsul anchors --re-pin --doc docs/components/c.md --anchor src/mod.py#alpha",
+        "re_pin": (
+            "irminsul anchors --re-pin --doc docs/components/c.md --anchor 'src/mod.py#alpha'"
+        ),
     }
     code, _ = invoke(repo, *shlex.split(str(rows[0]["re_pin"]))[1:])
     assert code == 0
@@ -762,3 +764,63 @@ def test_stale_json_has_a_version_and_one_row_per_pin(tmp_path: Path) -> None:
         ("claim-evidence", "alpha-works", "src/util.py"),
         ("claim-evidence", "beta-works", "src/other.py"),
     ]
+
+
+def test_every_evidence_file_a_drift_finding_names_is_reported_by_it(tmp_path: Path) -> None:
+    repo = _two_evidence_repo(tmp_path, util_after_doc=True)
+
+    rows = _stale(repo)
+
+    assert [(row["target"], row["reported_by"]) for row in rows] == [
+        ("src/mod.py", "claim-provenance/evidence-drift"),
+        ("src/util.py", "claim-provenance/evidence-drift"),
+    ]
+
+
+def test_reported_by_names_only_a_finding_of_an_enabled_check(tmp_path: Path) -> None:
+    """With `claim-provenance` off, `check` reports no `evidence-drift`, so no row says one."""
+    repo = _two_evidence_repo(tmp_path, util_after_doc=True)
+    write_config(repo, project_name="claims", source_roots=["src"], enabled=["claim-anchor"])
+    assert findings_of(repo, "claim-provenance/evidence-drift") == []
+
+    rows = _stale(repo)
+
+    assert [(row["target"], row["reported_by"]) for row in rows] == [
+        ("src/mod.py", None),
+        ("src/util.py", None),
+    ]
+
+
+def test_an_anchor_whose_target_no_longer_resolves_is_not_listed(tmp_path: Path) -> None:
+    """A renamed symbol or a removed file is `claim-anchor`'s certain finding, not a stale pin."""
+    repo = _two_doc_repo(tmp_path)
+    write(repo, "src/other.py", "def gamma():\n    return 1\n")
+    (repo / "src" / "mod.py").unlink()
+
+    assert _stale(repo) == []
+    assert {f["code"] for f in _anchor_findings(repo)} == {
+        "claim-anchor/missing-file",
+        "claim-anchor/missing-symbol",
+    }
+
+
+def test_the_re_pin_of_a_row_runs_as_printed_when_a_path_holds_a_space(tmp_path: Path) -> None:
+    repo = tmp_path / "spaces"
+    write_config(repo, project_name="spaces", source_roots=["src"])
+    write(repo, "src/my file.py", "LIMIT = 1\n")
+    write(
+        repo,
+        "docs/components/limits.md",
+        "---\nid: limits\ntitle: Limits\nstatus: stable\ndescribes: [src/my file.py]\n"
+        "claims:\n  - id: limit-is-one\n    state: implemented\n    kind: invariant\n"
+        "    claim: The limit is one.\n    evidence:\n      - src/my file.py\n"
+        "    pinned:\n      src/my file.py: sha256:0000\n"
+        "---\n\n# Limits\n\nThe limit is one. <!-- claim:limit-is-one -->\n",
+    )
+    (row,) = _stale(repo)
+
+    code, output = invoke(repo, *shlex.split(str(row["re_pin"]))[1:])
+
+    assert code == 0, output
+    assert "claim limit-is-one: src/my file.py" in output
+    assert _stale(repo) == []

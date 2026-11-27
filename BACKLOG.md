@@ -130,8 +130,9 @@ still writes its pins, so they lag unseen and a doc-wide re-pin acknowledges cod
 re-read. On 2026-10-28 `irminsul anchors --re-pin --all` on a clean copy of this tree moves
 three such pins in `docs/components/adoption-record.md` (two on
 `checks/diff_integrity.py`, one on `checks/pipeline.py`) while
-`irminsul check --fail-on hint,time` exits 0; the re-pin, which writes, is the only way to
-see them.
+`irminsul check --fail-on hint,time` exits 0. Until 2026-11-27 the re-pin, which writes, was
+the only way to see them; `irminsul anchors --stale` now lists them, and no check reports them
+still.
 
 A stale pin is also unreported in any layer when the doc was committed after the evidence:
 a pin that no longer matches falls back to the commit-time comparison
@@ -155,6 +156,27 @@ fallback above keeps `evidence-drift` silent (a dogfood agent, 2026-11-26). The 
 resolution is a re-pin after re-reading the merged file, and no gate says the pin needs one:
 `evidence-drift` skips a component claim, and the merge commit hides it in any layer.
 `irminsul anchors --stale` lists the pin, with no check reporting it, only when someone runs it.
+
+### `drift-findings-carry-no-subject`
+
+`claim-anchor/pinned-drift` and `claim-provenance/evidence-drift` carry no target, claim or
+evidence field: `data` and `subject` are null, and only the message names what drifted. So
+`anchors --stale` reads its `reported_by` back from the message (`_PINNED_DRIFT_RE` and
+`_EVIDENCE_DRIFT_RE` in `src/irminsul/anchors.py`), where a quoted name ends at the first `'`:
+a pin whose path or claim id holds a `'` is listed as reported by nothing although a check
+reports it, and a reworded message would do the same to every pin. Give both findings `data`
+naming the anchor target, or the claim id and each evidence path, and read that instead. It
+adds fields to what two checks report, so it is the owner's call.
+
+### `re-pin-suggestions-are-not-shell-quoted`
+
+The `--re-pin` command that `claim-provenance/evidence-drift` suggests, and the one
+`claim-anchor` suggests, write the doc path and the evidence path bare
+(`_drift_finding` in `src/irminsul/checks/claim_provenance.py`, `run` in
+`src/irminsul/checks/claim_anchor.py`). For evidence spelled `src/my file.py` the suggestion
+fails as printed with "unexpected extra argument (file.py)", and a doc path holding a space
+does the same to both. `anchors --stale` prints its `re_pin` through `shlex.quote`; the two
+suggestions should too.
 
 ### `same-tree-test-answers-two-questions`
 

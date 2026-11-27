@@ -58,7 +58,9 @@ Answered by the owner on 2026-11-27:
   `line` is the anchor marker's line, or for a claim the line of its `<!-- claim:<id> -->`
   marker in the body, or 1 when no paragraph declares it. `re_pin` is the whole command that
   re-pins only that pin: `irminsul anchors --re-pin --doc <doc> --anchor <path#symbol>`, or
-  `--claim <id> --evidence <path>`. Plain output prints one row per line and a count.
+  `--claim <id> --evidence <path>`. `--anchor` names a target, so its command also re-pins any
+  other anchor of the doc with the same `path#symbol`. Plain output prints one row per line
+  and a count.
 - **`reported_by`.** The listing runs the two checks that ask about pins, `claim-anchor` and
   `claim-provenance`, over the same graph and names the code of a finding about that doc and
   that anchor target, or that claim id and evidence path: `claim-anchor/pinned-drift` for a

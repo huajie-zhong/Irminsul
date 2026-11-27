@@ -27,6 +27,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import re
+import shlex
 from collections.abc import Callable, Collection, Iterator
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -526,7 +527,9 @@ def repin_claims(
 ANCHOR_KIND = "anchor"
 EVIDENCE_KIND = "claim-evidence"
 #: How `claim-anchor/pinned-drift` and `claim-provenance/evidence-drift` spell what they are
-#: about, read back so a stale pin can say whether a check reports it.
+#: about, read back so a stale pin can say whether a check reports it. Neither finding carries
+#: its target, claim or evidence as data, and a quoted name ends at the first `'`, so a pin
+#: whose path or claim id holds one is reported by nothing (`drift-findings-carry-no-subject`).
 _PINNED_DRIFT_RE = re.compile(r"^'(?P<target>[^']+)' changed since this claim was pinned")
 _EVIDENCE_DRIFT_RE = re.compile(
     r"^claim '(?P<claim>[^']+)' cites evidence changed after the doc[^:]*: (?P<named>.+)$"
@@ -560,13 +563,16 @@ class StalePin:
 
     @property
     def re_pin(self) -> str:
-        """The whole command that re-pins this pin and no other."""
+        """The whole command that re-pins this pin, each argument shell-quoted so it runs as
+        printed. `--anchor` names a target, so it also moves another anchor of the doc with
+        the same `path#symbol`; a claim pins each evidence path once."""
         narrow = (
-            f"--anchor {self.target}"
+            ["--anchor", self.target]
             if self.claim is None
-            else f"--claim {self.claim} --evidence {self.target}"
+            else ["--claim", self.claim, "--evidence", self.target]
         )
-        return f"irminsul anchors --re-pin --doc {self.doc} {narrow}"
+        words = ["irminsul", "anchors", "--re-pin", "--doc", self.doc, *narrow]
+        return " ".join(shlex.quote(word) for word in words)
 
     def as_json(self) -> dict[str, object]:
         return {
@@ -597,7 +603,7 @@ def stale_pins(graph: DocGraph, doc: str | None = None) -> list[StalePin]:
     from irminsul.checks.claim_anchor import ClaimAnchorCheck
     from irminsul.checks.claim_provenance import ClaimProvenanceCheck
     from irminsul.checks.globs import resolve_display_path
-    from irminsul.checks.pipeline import run_check
+    from irminsul.checks.pipeline import run_check, select_checks
 
     repo_root, config = graph.repo_root, graph.config
     if repo_root is None or config is None:
@@ -615,9 +621,17 @@ def stale_pins(graph: DocGraph, doc: str | None = None) -> list[StalePin]:
         found.extend(_stale_evidence(node, locate, hashed, graph.source))
     if not found:
         return []
-    reported = _reported_pins(
-        [*run_check(ClaimAnchorCheck, graph), *run_check(ClaimProvenanceCheck, graph)]
-    )
+    # Only the checks the configuration enables, so `reported_by` names a finding `check`
+    # reports. A baseline holds certain findings alone and both drift codes are hints, so no
+    # baseline can hide one.
+    enabled = set(select_checks(config))
+    findings = [
+        finding
+        for check in (ClaimAnchorCheck, ClaimProvenanceCheck)
+        if check.name in enabled
+        for finding in run_check(check, graph)
+    ]
+    reported = _reported_pins(findings)
     rows = [replace(pin, reported_by=reported.get(_pin_key(pin))) for pin in found]
     return sorted(rows, key=lambda pin: (pin.doc, pin.line, pin.kind, pin.target))
 
