@@ -1498,8 +1498,8 @@ def anchors_command(
             "--stale",
             help=(
                 "List every anchor and claim evidence pin whose file no longer has the "
-                "pinned hash, each with the check that reports it, if any, and the command "
-                "that re-pins only it. Writes nothing and exits 0."
+                "pinned hash, each with the enabled check that reports it, if any, and the "
+                "narrowest command that re-pins it. Writes nothing and exits 0."
             ),
         ),
     ] = False,

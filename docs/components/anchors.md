@@ -134,27 +134,34 @@ pin, and each pin of a claim's evidence whose file does. `stale_pins` reads each
 and a target that does not resolve is left to the findings that report it. A row names the
 doc and the line of the anchor marker, or of the claim's `<!-- claim:<id> -->` marker, or 1
 when no paragraph declares the claim; the pin and the current hash; and the `--re-pin`
-command narrowed to that one pin, `--anchor <path#symbol>` or `--claim <id> --evidence
-<path>`. Plain output prints one row per line and a count, and `--format json` prints
+command narrowed to that pin, each argument shell-quoted so it runs as printed:
+`--claim <id> --evidence <path>`, which moves that pin alone, or `--anchor <path#symbol>`,
+which also moves any other anchor of the doc with the same `path#symbol`, since `--anchor`
+names a target. Plain output prints one row per line and a count, and `--format json` prints
 `{"version": 1, "stale": [...]}`. It writes nothing and exits 0, since the checks are the gate
 ([Code is named in code spans and bound by anchors](../decisions/code-is-named-in-code-spans-and-bound-by-anchors.md)),
 and with `--re-pin` or `--suggest` it exits 2 and writes nothing: one action per run.
-<!-- anchor: src/irminsul/anchors.py#stale_pins @sha256:79a5be70b7f9 -->
+<!-- anchor: src/irminsul/anchors.py#stale_pins @sha256:ffb7528712e8 -->
 <!-- anchor: tests/test_cli_anchors.py#test_stale_lists_a_component_claims_changed_evidence @sha256:fc748e708176 -->
 <!-- anchor: tests/test_cli_anchors.py#test_stale_lists_nothing_when_every_pin_matches @sha256:266cf2aec24d -->
 <!-- anchor: tests/test_cli_anchors.py#test_stale_with_another_action_exits_2_and_writes_nothing @sha256:f4c0c567ab07 -->
+<!-- anchor: tests/test_cli_anchors.py#test_an_anchor_whose_target_no_longer_resolves_is_not_listed @sha256:4af54ba20883 -->
+<!-- anchor: tests/test_cli_anchors.py#test_the_re_pin_of_a_row_runs_as_printed_when_a_path_holds_a_space @sha256:b11810f0ea13 -->
 
 A pin can be stale with no check asking about it. `claim-provenance/evidence-drift` judges
 the claims of the foundation and architecture layers alone, and reads a pin that no longer
 matches as no pin, falling back to commit times, so a doc committed after its evidence hides
-it ([checks](checks.md)). Each row's `reported_by` says which: the listing runs
-`claim-anchor` and `claim-provenance` over the same graph and names `claim-anchor/pinned-drift`
-for a stale anchor, `claim-provenance/evidence-drift` for a claim's evidence that the finding
+it ([checks](checks.md)). Each row's `reported_by` says which: the listing runs whichever of
+`claim-anchor` and `claim-provenance` `checks.enabled` enables, over the same graph, so it
+names only a finding `irminsul check` reports: `claim-anchor/pinned-drift` for a stale
+anchor, `claim-provenance/evidence-drift` for each evidence file of a claim that the finding
 names, and null for a pin no finding names, such as a second stale pin of a claim whose
 finding names only the evidence that changed after the doc.
 <!-- anchor: src/irminsul/anchors.py#StalePin.reported_by @sha256:a0876d8fce1b -->
 <!-- anchor: tests/test_cli_anchors.py#test_only_the_evidence_a_drift_finding_names_is_reported_by_it @sha256:0a8f078dddec -->
-<!-- anchor: tests/test_cli_anchors.py#test_stale_lists_a_changed_anchor_with_its_finding @sha256:fc0670330775 -->
+<!-- anchor: tests/test_cli_anchors.py#test_stale_lists_a_changed_anchor_with_its_finding @sha256:88b2549e0dd3 -->
+<!-- anchor: tests/test_cli_anchors.py#test_every_evidence_file_a_drift_finding_names_is_reported_by_it @sha256:1141f4a7bfa1 -->
+<!-- anchor: tests/test_cli_anchors.py#test_reported_by_names_only_a_finding_of_an_enabled_check @sha256:cf7e9b2ad0eb -->
 
 ## Scope & Limitations
 
@@ -175,8 +182,10 @@ nothing derives that set.
 `--stale` lists pins and fails nothing: a pin it lists stays stale until someone re-reads
 the prose and re-pins it, and no gate asks whether anyone ran it. It reads only what is
 pinned, so an unpinned anchor or evidence entry is not listed, nor a pin on a path its claim
-no longer cites, which nothing reads. The MCP `anchors` tool returns `claim-anchor` findings
-and has no such listing.
+no longer cites, which nothing reads. A drift finding carries no target, claim or evidence
+field, so `reported_by` is read from its message, where a quoted name ends at the first `'`:
+a pin whose path or claim id holds one is reported by nothing. The MCP `anchors` tool
+returns `claim-anchor` findings and has no such listing.
 
 The tests `--suggest --doc` offers are found in the syntax tree, and nothing is run. A
 test that reaches the function through a helper, a fixture or the command line is not

@@ -153,8 +153,9 @@ making a feature, a refactor and an RFC-driven change in it.
 - `irminsul anchors --stale` lists every anchor and claim evidence pin whose file no longer has
   the pinned hash, in every doc or the one `--doc` names, read as `--re-pin` reads it. Each row
   gives the doc and line, the pin and the current hash, `reported_by`, the code of the
-  `claim-anchor` or `claim-provenance` finding that already asks about that pin or null, and
-  `re_pin`, the command that re-pins that pin alone; `--format json` prints
+  finding of an enabled `claim-anchor` or `claim-provenance` that already asks about that pin
+  or null, and `re_pin`, the shell-quoted command that re-pins that pin, and with `--anchor`
+  any other anchor of the doc with the same `path#symbol`; `--format json` prints
   `{"version": 1, "stale": [...]}`. It writes nothing and exits 0, and with `--re-pin` or
   `--suggest` exits 2. A stale claim pin in a component doc, or behind a later doc commit,
   which no check reports, is now seen without `--re-pin --all` rewriting it
