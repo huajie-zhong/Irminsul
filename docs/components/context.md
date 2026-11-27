@@ -14,6 +14,7 @@ depends_on:
   - docgraph
   - frontmatter
   - git
+  - languages
   - new-list-regen
   - user-errors
 owns_tests:
@@ -57,7 +58,7 @@ A doc path is its own owner, and a test file reaches every doc that lists it in 
 
 ## Which tests a source file gets
 
-A flat list of an owner's tests buries the one that exercises the file in hand, so for a source path the packet adds every test in `paths.test_roots` that imports the file, whichever doc owns it, and `Ranker.rank` orders them by evidence: tests that import the file, then tests by how many commits changed both, then the rest alphabetically. `ContextResult.test_reasons` keeps why each is named. An import is a direct import of the module, so a test that reaches it through a package re-export is not an importer. `Ranker.importers` is that reading on its own, and [`irminsul anchors --suggest --doc`](anchors.md#offering-the-test-that-asserts-a-sentence) asks it which test files to search for the tests that name a function, so the packet and the suggestion agree on which tests import a file.
+A flat list of an owner's tests buries the one that exercises the file in hand, so for a source path the packet adds every test in `paths.test_roots` that imports the file, whichever doc owns it, and `Ranker.rank` orders them by evidence: tests that import the file, then tests by how many commits changed both, then the rest alphabetically. `ContextResult.test_reasons` keeps why each is named. A test file's imports, and the files each may load, are read by the [reader](languages.md#readers) of its language, which is why this component depends on `languages`. An import is a direct import of the module, so a test that reaches it through a package re-export is not an importer. `Ranker.importers` is that reading on its own, and [`irminsul anchors --suggest --doc`](anchors.md#offering-the-test-that-asserts-a-sentence) asks it which test files to search for the tests that name a function, so the packet and the suggestion agree on which tests import a file.
 <!-- anchor: src/irminsul/ranked_tests.py#Ranker.rank @sha256:80ecdd726c83 -->
 <!-- anchor: src/irminsul/context.py#ContextResult.test_reasons @sha256:d4d118e24f76 -->
 
@@ -194,7 +195,7 @@ Topic search is deterministic per-term substring matching over doc metadata, hea
 `tests/test_seeded_rot.py` makes one sentence of a fixture's docs false by changing its code and no doc, and pins how far `check --diff`, `list review --changed` and `context --after-edit` then lead a reader, for an uncommitted change in the docs' own repository: to the sentence when its paragraph is anchored to the changed code or the sentence names the changed function in a code span, in the doc that owns the file, a guide that owns nothing or a README alike; to the declaration of its claim when it carries one that cites the changed file; otherwise to its doc alone when that doc owns the changed file, and nowhere when it does not. A probe run against the fixture's code shows that each edit changes what its sentences state. Each case that stops short of the sentence is also a strict expected failure whose reason names the accepted RFC or backlog entry for that gap, so a change that closes one fails the suite until it updates the case. One case's sentence is anchored to a test of the fixture and not to its code: the edit that makes it false draws three warnings on the fixture's component doc, which owns the changed function, from `check --diff` and again from `context --after-edit`, nothing from `list review --changed`, and nothing on the sentence's own doc, since no view runs a test, and it makes that test fail, run as a probe is; the case then edits the test to pass again, and `claim-anchor/pinned-drift` points at the sentence's paragraph.
 <!-- anchor: tests/test_seeded_rot.py#CASES @sha256:efe8baa90117 -->
 
-Test ranking is evidence of relation, not of coverage: nothing runs a test, and one that imports a file or changed with it may not exercise the change in hand. Only Python imports are read, so a test in another language ranks by history alone, and the history count follows no rename and skips merge commits.
+Test ranking is evidence of relation, not of coverage: nothing runs a test, and one that imports a file or changed with it may not exercise the change in hand. Imports are read only in a language that has a [reader](languages.md#readers), so a test in any other language ranks by history alone, and the history count follows no rename and skips merge commits.
 
 Content extraction does not rank relationships, estimate tokens, perform semantic search, or persist session state; those remain separate retrieval concerns.
 

@@ -25,11 +25,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from irminsul.checks.dependency_check import imported_paths
 from irminsul.checks.globs import resolve_display_path
 from irminsul.declared_tests import classify_test_reference, governed_as_test
 from irminsul.docgraph import DocGraph, DocNode
 from irminsul.git.mtime import git_root_for
+from irminsul.languages import reader_for
+from irminsul.languages.reader import imported_files
 
 _COMMIT_ID_RE = re.compile(r"[0-9a-f]{40,64}")
 #: Commits changing more files than this are left out of the co-change count: an initial
@@ -115,39 +116,38 @@ class Ranker:
     def importers(self, subjects: Sequence[str]) -> dict[str, list[str]]:
         """Each subject's importing tests, by the display path the test walk gives them.
 
-        A subject is a source file by its display path, and an importing test is a Python
-        file under the declared test roots that imports the subject's module directly. A
-        test file that does not parse is skipped.
+        A subject is a source file by its display path, and an importing test is a file
+        under the declared test roots, of a language a reader reads, that imports the
+        subject's module directly, as that reader resolves an import to files. A test
+        file that does not parse imports nothing.
         """
         graph = self._graph
         config = graph.config
         assert config is not None and graph.repo_root is not None
         found: dict[str, list[str]] = {subject: [] for subject in subjects}
-        python = [subject for subject in subjects if subject.endswith(".py")]
-        if not python:
+        read = [subject for subject in subjects if reader_for(subject) is not None]
+        if not read:
             return found
-        targets = {_key(self._absolute(subject)): subject for subject in python}
-        names = "|".join(sorted({re.escape(_module_name(subject)) for subject in python}))
+        targets = {_key(self._absolute(subject)): subject for subject in read}
+        names = "|".join(sorted({re.escape(_module_name(subject)) for subject in read}))
         # A file importing a module spells its name as a whole identifier, so this cheap
         # test leaves the parse to the few files that could.
         mentions = re.compile(rf"\b(?:{names})\b")
+        roots = [graph.repo_root / root for root in config.paths.source_roots]
         for abs_path, display in graph.source.test_walk.files:
-            if PurePosixPath(display).suffix != ".py":
+            if reader_for(display) is None:
                 continue
             if not governed_as_test(display, config, in_test_root=True):
                 continue
             text = graph.source.text(abs_path)
             if text is None or mentions.search(text) is None:
                 continue
-            module = graph.source.module(abs_path)
-            if module is None:
+            reading = graph.source.reading(abs_path)
+            if reading is None:
                 continue
             if (imported := self._imports.get(display)) is None:
                 imported = self._imports[display] = frozenset(
-                    _key(path)
-                    for path in imported_paths(
-                        module, abs_path, config.paths.source_roots, graph.repo_root
-                    )
+                    _key(path) for path in imported_files(reading, abs_path, roots)
                 )
             for key, subject in targets.items():
                 if key in imported:

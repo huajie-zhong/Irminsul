@@ -3,12 +3,14 @@ id: surface-rules-and-language-profiles-are-data
 title: Surface rules and language profiles are data
 status: stable
 describes: []
-summary: Code surfaces come from built-in framework packs and project rules that share one record, checks read a kind's capabilities rather than its name, and a language profile is the one list of its language's files.
+summary: Code surfaces come from built-in framework packs and project rules that share one record, checks read a kind's capabilities rather than its name, and a language profile is the one list of its language's files and names the reader that reads their code.
 governs:
   - src/irminsul/inventory/**
   - src/irminsul/surface.py
   - src/irminsul/languages/**
-  - src/irminsul/checks/dependency_check.py#IMPORT_LANGUAGE
+  - "!src/irminsul/languages/python_reader.py#_canonical"
+  - "!src/irminsul/languages/python_reader.py#_find_symbol"
+  - "!src/irminsul/languages/python_reader.py#PythonReading.canonical"
   - src/irminsul/config.py#_with_surface_rules
   - surface.rules
   - frameworks
@@ -53,8 +55,15 @@ TypeScript file was once written five times with five answers.
   language, such as `go.mod` or `Cargo.toml`, and detection and the code-or-no-code test read
   them. `package.json` belongs to every JavaScript project, so TypeScript also needs a
   `tsconfig.json` or a `.ts` file.
-- **`import-deps` names its language** in `IMPORT_LANGUAGE`, in `checks/dependency_check.py`:
-  Python. The reader is not a profile field, because a profile is data.
+- **A profile names its language's reader, which is code.** `LanguageProfile.reader` is a name
+  that `READERS` in `src/irminsul/languages/__init__.py` maps to the reader, so the profile
+  stays data. For a file's text a reader answers what it defines and on which lines, what it
+  imports and which repository files an import may load, what a definition's body refers to,
+  the canonical text a pin hashes, and which definitions are tests. A feature that reads code
+  asks the reader of the file's language and names no language, so `import-deps` reads every
+  language whose reader answers imports. Python's reader is its own parser, `ast`. TypeScript,
+  Go and Rust are read through tree-sitter, a required dependency (accepted, not yet
+  implemented), and until then Python is the one language with a reader.
 
 ## Alternatives Considered
 
@@ -74,9 +83,9 @@ TypeScript file was once written five times with five answers.
   only by its function.
 - An `env-vars` inventory item that only a `.rb` file reads is `inventory-drift/item-not-found`.
 - **Known limits.** The lift of a base's old table lives in `parse_snapshot` and goes once no
-  base a run can meet predates the rename. `anchors`, `binding`, `ranked_tests`, `import-deps`
-  and the `uniqueness` skip list still test Python's suffix themselves, where they parse Python
-  or name its files.
+  base a run can meet predates the rename. The `uniqueness` skip list still names Python's
+  files itself, and the cheap test `ranked_tests` makes before it reads a test file's imports,
+  whether the file mentions the module's name, knows a Python package's `__init__.py`.
 
 ## Changes
 
@@ -84,3 +93,8 @@ TypeScript file was once written five times with five answers.
   a profile stays data and names its language's reader, which is code; Python's reader is its
   own parser and TypeScript's, Go's and Rust's are tree-sitter, a required dependency; and
   `import-deps` reads every language whose reader answers imports.
+- 2026-11-27: The interface and Python's reader are implemented and stated in the Decision: a
+  profile names its reader, and anchor pins, the definitions and tests `anchors --suggest`
+  offers, the pairing of a code span with a function, the test ranking and both import checks
+  read through it, so `IMPORT_LANGUAGE` is gone. No Python pin moved. The tree-sitter readers
+  are not built yet.

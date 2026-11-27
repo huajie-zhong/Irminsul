@@ -17,22 +17,24 @@ so an undeclared edge that already existed stays silent and no tree needs migrat
 reports only edges between two *owned* modules, because an unowned file has no doc to
 declare anything. And it is a hint, so it never fails a run on its own.
 
-It inherits `import-deps`' reach: a module path is resolved under `source_roots`, and a
-file of another language, or one that is not UTF-8, backs no edge.
+It inherits `import-deps`' reach: an import is resolved to files by its language's reader,
+under `source_roots`, and a file of a language no reader reads, or one that is not UTF-8,
+backs no edge.
 """
 
 from __future__ import annotations
 
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from pathlib import Path
 from typing import ClassVar, Final
 
 from irminsul.checks.base import Answer, Finding, FindingClass, Severity
 from irminsul.checks.change_range import after_text
-from irminsul.checks.dependency_check import SourceOwnership, imported_paths, resolve_ownership
+from irminsul.checks.dependency_check import SourceOwnership, resolve_ownership
 from irminsul.docgraph import ChangeRange, DocGraph, DocNode
 from irminsul.git.changes import file_at_ref
-from irminsul.inventory.base import PythonModule
+from irminsul.languages import reader_for
+from irminsul.languages.reader import imported_files
 
 CHECK_NAME: Final = "new-dependency"
 CODE_UNDECLARED_NEW_DEPENDENCY: Final = "new-dependency/undeclared-new-dependency"
@@ -69,26 +71,22 @@ class NewDependencyPass:
 
 
 def _edges_in(
-    module: PythonModule | None,
-    importer: Path,
-    source_roots: list[str],
-    repo_root: Path,
-    ownership: SourceOwnership,
+    text: str | None, importer: Path, roots: Sequence[Path], ownership: SourceOwnership
 ) -> set[str]:
-    """Owning doc ids the imports in `module`, read as the file `importer`, reach; none
-    for a module that did not parse.
+    """Owning doc ids the imports in `text`, read as the file `importer`, reach; none for
+    a text that is missing or does not parse, or a file no reader reads.
 
-    `imported_paths` walks the whole AST, so an import inside a function counts — which
+    A reader lists the imports at any depth, so an import inside a function counts — which
     matters, because deferring an import is exactly how a module-level one gets avoided.
     """
-    out: set[str] = set()
-    if module is None:
-        return out
-    for candidate in imported_paths(module, importer, source_roots, repo_root):
-        dep_id = ownership.owner_of(candidate)
-        if dep_id is not None:
-            out.add(dep_id)
-    return out
+    reader = reader_for(importer)
+    if text is None or reader is None:
+        return set()
+    owners = (
+        ownership.owner_of(candidate)
+        for candidate in imported_files(reader.read(text), importer, roots)
+    )
+    return {dep_id for dep_id in owners if dep_id is not None}
 
 
 def run_new_dependency(graph: DocGraph, change: ChangeRange) -> list[Finding]:
@@ -103,14 +101,14 @@ def run_new_dependency(graph: DocGraph, change: ChangeRange) -> list[Finding]:
         return []
 
     repo_root = graph.repo_root
-    source_roots = graph.config.paths.source_roots
+    roots = [repo_root / root for root in graph.config.paths.source_roots]
     ownership = resolve_ownership(graph)
     changed = change.changed
 
     gained: dict[str, tuple[DocNode, set[str]]] = {}
     for node in graph.nodes.values():
         declared = set(node.frontmatter.depends_on)
-        for abs_path in ownership.doc_py_files.get(node.id, []):
+        for abs_path in ownership.doc_code_files.get(node.id, []):
             try:
                 display = abs_path.resolve().relative_to(repo_root.resolve()).as_posix()
             except ValueError:
@@ -120,12 +118,9 @@ def run_new_dependency(graph: DocGraph, change: ChangeRange) -> list[Finding]:
             now_text = after_text(graph.git, repo_root, change.head, display)
             if now_text is None:
                 continue
-            now = PythonModule.parse(now_text)
-            before = PythonModule.parse(
-                file_at_ref(graph.git, repo_root, change.merge_base, display) or ""
-            )
-            new_edges = _edges_in(now, abs_path, source_roots, repo_root, ownership) - _edges_in(
-                before, abs_path, source_roots, repo_root, ownership
+            before_text = file_at_ref(graph.git, repo_root, change.merge_base, display)
+            new_edges = _edges_in(now_text, abs_path, roots, ownership) - _edges_in(
+                before_text, abs_path, roots, ownership
             )
             new_edges -= {node.id}
             new_edges -= declared

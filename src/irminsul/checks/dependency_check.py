@@ -1,84 +1,39 @@
 """DependencyCheck — verify `depends_on` declarations match actual import relationships.
 
-Only applies to `IMPORT_LANGUAGE`'s source files. Uses `ast.parse` to extract imports and
-resolves module paths to file paths via source_roots. Flags hallucinated deps:
-`depends_on` declared but with no import relationship found. The reverse direction
-(imports not declared) is intentionally not flagged: `depends_on` is
-curated intent, not a complete projection of the import graph. A doc that mixes Python
-with another language is read through its Python alone, so a dependency only its other
-code backs is still reported.
+A file's imports are read by its language's reader (`irminsul.languages`), which also says
+which repository files each may load, so only a file of a language that has a reader backs
+a dependency. Flags hallucinated deps: `depends_on` declared but with no import
+relationship found. The reverse direction (imports not declared) is intentionally not
+flagged: `depends_on` is curated intent, not a complete projection of the import graph. A
+doc that mixes a language a reader reads with one none does is read through the first
+alone, so a dependency only its other code backs is still reported.
 """
 
 from __future__ import annotations
 
-import ast
 import os
 from dataclasses import dataclass, field
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import ClassVar
 
 from irminsul.checks.base import Answer, Finding, FindingClass, Severity
 from irminsul.docgraph import DocGraph
-from irminsul.inventory.base import PythonModule
-from irminsul.languages import PYTHON_PROFILE
+from irminsul.languages import languages_read, reader_for
+from irminsul.languages.reader import imported_files
 
-IMPORT_LANGUAGE = PYTHON_PROFILE
-"""The one language whose imports are read. A file of another language is a relationship
-the check cannot see, so a doc that owns none of this language's files is not judged."""
-
-
-def imported_paths(
-    module: PythonModule, importer: Path, source_roots: list[str], repo_root: Path
-) -> list[Path]:
-    """Candidate files the imports in `module` may load, at any depth in the tree.
-
-    `from pkg import b` may load the submodule `pkg.b` as well as a name defined in
-    `pkg`, so both are candidates, and a relative import resolves against `importer`'s
-    own package. Reading only `pkg`, or only absolute imports, would miss a dependency the
-    code plainly has.
-    """
-    roots = [repo_root / root for root in source_roots]
-    out: list[Path] = []
-    for node in module.nodes:
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                for base in roots:
-                    out.extend(_module_files(base, alias.name.split(".")))
-        elif isinstance(node, ast.ImportFrom):
-            parts = node.module.split(".") if node.module else []
-            if node.level:
-                package = importer.parent
-                for _ in range(node.level - 1):
-                    package = package.parent
-                bases = [package]
-            elif parts:
-                bases = roots
-            else:
-                continue
-            names = [alias.name for alias in node.names if alias.name != "*"]
-            for base in bases:
-                out.extend(_module_files(base, parts))
-                for name in names:
-                    out.extend(_module_files(base, [*parts, name]))
-    return out
-
-
-def _module_files(base: Path, parts: list[str]) -> list[Path]:
-    """The two files that can hold the module `parts` names under `base`."""
-    if not parts:
-        return [base / "__init__.py"]
-    target = base.joinpath(*parts)
-    return [target.with_suffix(".py"), target / "__init__.py"]
+_LANGUAGES_READ = " or ".join(languages_read())
 
 
 @dataclass(frozen=True)
 class SourceOwnership:
-    """Which doc owns each configured source file, and each doc's Python files."""
+    """Which doc owns each configured source file, and each doc's files a reader reads."""
 
     file_to_doc: dict[Path, str]
     """Resolved absolute path → owning doc id."""
-    doc_py_files: dict[str, list[Path]]
-    """Doc id → the Python files it owns, so a second pass need not re-match globs."""
+    doc_code_files: dict[str, list[Path]]
+    """Doc id → the files it owns whose language has a reader, so a second pass need not
+    re-match globs. A file of any other language is a relationship the import checks cannot
+    see, so a doc that owns none of these is not judged."""
     real_paths: dict[str, Path | None] = field(default_factory=dict, repr=False, compare=False)
     """As-written path → resolved path, `None` for a path that names nothing.
 
@@ -108,11 +63,11 @@ def resolve_ownership(graph: DocGraph) -> SourceOwnership:
     owns this file?" has one answer for both.
     """
     if graph.config is None or graph.repo_root is None:
-        return SourceOwnership(file_to_doc={}, doc_py_files={})
+        return SourceOwnership(file_to_doc={}, doc_code_files={})
 
     claims_by_file = graph.claims
     by_real: dict[Path, list[tuple[str, tuple[int, int, int]]]] = {}
-    doc_py_files: dict[str, list[Path]] = {
+    doc_code_files: dict[str, list[Path]] = {
         node.id: [] for node in graph.nodes.values() if node.frontmatter.describes
     }
     real_paths: dict[str, Path | None] = {}
@@ -125,16 +80,16 @@ def resolve_ownership(graph: DocGraph) -> SourceOwnership:
         if real is None:
             real = real_paths[os.fspath(abs_path)] = abs_path.resolve()
         by_real.setdefault(real, []).extend((node.id, score) for node, _, score in claims)
-        if PurePosixPath(display).suffix in IMPORT_LANGUAGE.suffixes:
+        if reader_for(display) is not None:
             for doc_id in dict.fromkeys(node.id for node, _, _ in claims):
-                doc_py_files[doc_id].append(abs_path)
+                doc_code_files[doc_id].append(abs_path)
 
     file_to_doc: dict[Path, str] = {}
     for file_path, file_claims in by_real.items():
         top_score = max(c[1] for c in file_claims)
         file_to_doc[file_path] = min(c[0] for c in file_claims if c[1] == top_score)
     return SourceOwnership(
-        file_to_doc=file_to_doc, doc_py_files=doc_py_files, real_paths=real_paths
+        file_to_doc=file_to_doc, doc_code_files=doc_code_files, real_paths=real_paths
     )
 
 
@@ -147,8 +102,8 @@ class DependencyCheck:
     explanations: ClassVar[dict[str, str]] = {
         CODE_HALLUCINATED_DEPENDENCY: (
             "A `depends_on` entry is declared but no import relationship backs it in "
-            f"code. Only {IMPORT_LANGUAGE.name} imports are read, so a doc or dependency "
-            f"that owns no {IMPORT_LANGUAGE.name} file is not judged. Remove the stale "
+            f"code. Only {_LANGUAGES_READ} imports are read, so a doc or dependency "
+            f"that owns no {_LANGUAGES_READ} file is not judged. Remove the stale "
             "declaration, or verify the doc claiming the dependent module actually covers "
             "the right files."
         ),
@@ -167,30 +122,31 @@ class DependencyCheck:
         if graph.config is None or graph.repo_root is None:
             return []
 
-        source_roots = graph.config.paths.source_roots
+        roots = [graph.repo_root / root for root in graph.config.paths.source_roots]
         ownership = resolve_ownership(graph)
-        doc_py_files = ownership.doc_py_files
+        code_files = ownership.doc_code_files
 
         out: list[Finding] = []
         for node in graph.nodes.values():
-            # Only Python imports are read, so a doc that owns no Python file, or a
-            # dependency that owns none, is a relationship this check cannot see; judging
-            # it would report every true `depends_on` of such a doc as hallucinated.
-            py_files = doc_py_files.get(node.id, [])
-            if not py_files:
+            # Imports are read only where a language has a reader, so a doc that owns no
+            # such file, or a dependency that owns none, is a relationship this check cannot
+            # see; judging it would report every true `depends_on` of such a doc as
+            # hallucinated.
+            files = code_files.get(node.id, [])
+            if not files:
                 continue
 
             actual_deps: set[str] = set()
-            for abs_path in py_files:
-                module = graph.source.module(abs_path)
-                if module is None:
+            for abs_path in files:
+                reading = graph.source.reading(abs_path)
+                if reading is None:
                     continue
-                for candidate in imported_paths(module, abs_path, source_roots, graph.repo_root):
+                for candidate in imported_files(reading, abs_path, roots):
                     dep_id = ownership.owner_of(candidate)
                     if dep_id and dep_id != node.id:
                         actual_deps.add(dep_id)
 
-            declared_deps = {dep for dep in node.frontmatter.depends_on if doc_py_files.get(dep)}
+            declared_deps = {dep for dep in node.frontmatter.depends_on if code_files.get(dep)}
 
             # Intent-only: flag a declared dependency that has no actual
             # import (a hallucinated/stale declaration), but never the reverse —

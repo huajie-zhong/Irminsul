@@ -18,7 +18,6 @@ governs:
   - src/irminsul/fix.py
   - src/irminsul/source_tree.py
   - src/irminsul/checks/dependency_check.py
-  - "!src/irminsul/checks/dependency_check.py#IMPORT_LANGUAGE"
   - src/irminsul/checks/new_dependency.py
   - src/irminsul/cli.py#_failing_classes
   - src/irminsul/cli.py#explain_command
