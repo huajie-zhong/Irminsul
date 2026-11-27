@@ -709,6 +709,30 @@ def test_stale_lists_a_changed_anchor_with_its_finding(tmp_path: Path) -> None:
     assert [row["target"] for row in _stale(repo)] == ["src/other.py#beta"]
 
 
+def test_anchors_that_share_a_target_are_each_listed_with_one_re_pin(tmp_path: Path) -> None:
+    """Two paragraphs of one doc anchor the same definition: the listing shows both, their
+    command is the same, and running it re-pins both, since `--anchor` names a target."""
+    repo = _two_doc_repo(tmp_path)
+    doc = repo / "docs" / "components" / "d.md"
+    doc.write_text(
+        doc.read_text(encoding="utf-8")
+        + "\nBeta also does another thing.\n"
+        + "<!-- anchor: src/other.py#beta @sha256:0000deadbeef -->\n",
+        encoding="utf-8",
+    )
+
+    rows = _stale(repo, "--doc", "d")
+
+    assert [(row["target"], row["line"]) for row in rows] == [
+        ("src/other.py#beta", _line_of(repo, "docs/components/d.md", "<!-- anchor:")),
+        ("src/other.py#beta", len(doc.read_text(encoding="utf-8").splitlines())),
+    ]
+    assert rows[0]["re_pin"] == rows[1]["re_pin"]
+    code, _ = invoke(repo, *shlex.split(str(rows[0]["re_pin"]))[1:])
+    assert code == 0
+    assert _stale(repo, "--doc", "d") == []
+
+
 def test_only_the_evidence_a_drift_finding_names_is_reported_by_it(tmp_path: Path) -> None:
     """Both of a claim's pins are stale, and `evidence-drift` names only the file that changed
     after the doc, so only that row is reported by it."""
