@@ -1492,13 +1492,24 @@ def anchors_command(
             ),
         ),
     ] = False,
+    stale: Annotated[
+        bool,
+        typer.Option(
+            "--stale",
+            help=(
+                "List every anchor and claim evidence pin whose file no longer has the "
+                "pinned hash, each with the check that reports it, if any, and the command "
+                "that re-pins only it. Writes nothing and exits 0."
+            ),
+        ),
+    ] = False,
     doc: Annotated[
         str | None,
         typer.Option(
             "--doc",
             help=(
-                "Only this doc, by id or repo-relative path, for --suggest or --re-pin. "
-                "--suggest then offers tests as well."
+                "Only this doc, by id or repo-relative path, for --suggest, --stale or "
+                "--re-pin. --suggest then offers tests as well."
             ),
         ),
     ] = None,
@@ -1539,16 +1550,20 @@ def anchors_command(
     fmt: FormatOpt = OutputFormat.plain,
     path: PathOpt = Path("."),
 ) -> None:
-    """Report or re-pin anchored prose claims, or suggest anchors for unbound code names.
+    """Report or re-pin anchored prose claims, list the pins that no longer match, or
+    suggest anchors for unbound code names.
 
     Re-pinning is a deliberate acknowledgement that you re-read the prose and it is
     still true; it is never done automatically by `irminsul fix`. `--doc` alone re-pins
     every drifted pin in the doc and names each one it moves; `--claim` and `--anchor`
-    re-pin only what you re-read.
+    re-pin only what you re-read. `--stale` lists every pin that no longer matches its
+    file, including the claim evidence pins no check asks about, and fails nothing.
     """
     from irminsul.checks.claim_anchor import ClaimAnchorCheck
     from irminsul.checks.pipeline import run_check
 
+    if stale and (re_pin or suggest):
+        raise UserError("--stale lists and writes nothing; run --re-pin or --suggest on its own")
     if re_pin and suggest:
         raise UserError("--re-pin and --suggest are mutually exclusive")
     scope = RepinScope(frozenset(claim or ()), frozenset(evidence or ()), frozenset(anchor or ()))
@@ -1573,6 +1588,10 @@ def anchors_command(
         _suggest_anchors(repo_root, config, graph, doc=wanted, fmt=fmt)
         return
 
+    if stale:
+        _list_stale(graph, doc=wanted, fmt=fmt)
+        return
+
     if re_pin:
         # Re-pinning asserts "I re-read this prose and it is still true", which nobody
         # can honestly say about a whole repository at once, so the sweep is opt-in.
@@ -1590,6 +1609,26 @@ def anchors_command(
     for finding in findings:
         _print_finding(finding)
     typer.echo(f"{len(findings)} anchor finding(s)")
+
+
+def _list_stale(graph: DocGraph, *, doc: str | None, fmt: OutputFormat) -> None:
+    """Print `stale_pins`: one row per line and a count, or the JSON report."""
+    import json
+
+    from irminsul.anchors import stale_pins
+
+    pins = stale_pins(graph, doc)
+    if fmt == OutputFormat.json:
+        typer.echo(json.dumps({"version": 1, "stale": [pin.as_json() for pin in pins]}, indent=2))
+        return
+    for pin in pins:
+        reported = f"reported by {pin.reported_by}" if pin.reported_by else "no check reports it"
+        typer.echo(
+            f"{pin.doc}:{pin.line} {pin.label} (pinned {pin.pinned}, now {pin.current}; "
+            f"{reported}): {pin.re_pin}"
+        )
+    reported_count = sum(1 for pin in pins if pin.reported_by)
+    typer.echo(f"{len(pins)} stale pin(s), {reported_count} reported by a check")
 
 
 def _repin_scope_problem(scope: RepinScope, *, re_pin: bool, doc: str | None) -> str | None:

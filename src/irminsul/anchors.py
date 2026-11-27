@@ -17,8 +17,9 @@ name (a definition keyword or an assignment, else its first mention outside a co
 the decorator lines above it, and the lines indented under it. A marker inside a code
 span or a fenced block is an example, not an anchor.
 
-This module is pure parsing/resolution/hashing; the check and the CLI command build
-on it.
+This module is parsing, resolution and hashing, which the check and the CLI command build
+on, and the two readings of every pin in a doc that act on them: the re-pin, which writes,
+and the stale listing, which writes nothing.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ import ast
 import hashlib
 import re
 from collections.abc import Callable, Collection, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -36,6 +37,8 @@ from irminsul.frontmatter import Claim
 from irminsul.frontmatter_edit import set_claim_pins, strip_claim_pins
 
 if TYPE_CHECKING:
+    from irminsul.checks.base import Finding
+    from irminsul.docgraph import DocGraph, DocNode
     from irminsul.inventory.base import SourceReader
 
 ANCHOR_RE = re.compile(
@@ -518,3 +521,192 @@ def repin_claims(
                 written.append(f"claim {claim.id}: {path}{dropped}")
         pins[claim.id] = claim_pins
     return (set_claim_pins(text, pins) if written else text), written
+
+
+ANCHOR_KIND = "anchor"
+EVIDENCE_KIND = "claim-evidence"
+#: How `claim-anchor/pinned-drift` and `claim-provenance/evidence-drift` spell what they are
+#: about, read back so a stale pin can say whether a check reports it.
+_PINNED_DRIFT_RE = re.compile(r"^'(?P<target>[^']+)' changed since this claim was pinned")
+_EVIDENCE_DRIFT_RE = re.compile(
+    r"^claim '(?P<claim>[^']+)' cites evidence changed after the doc[^:]*: (?P<named>.+)$"
+)
+_QUOTED_RE = re.compile(r"'([^']+)'")
+
+
+@dataclass(frozen=True)
+class StalePin:
+    """A pin that no longer matches what it pins: an anchor whose target resolves and hashes
+    differently, or a claim's evidence file that does."""
+
+    doc: str
+    line: int
+    kind: str
+    """`anchor` or `claim-evidence`."""
+    target: str
+    """`path#symbol` for an anchor, the evidence path as the claim spells it for a claim."""
+    claim: str | None
+    pinned: str
+    current: str
+    reported_by: str | None = None
+    """The code of the finding that already asks about this pin, or None when none does."""
+
+    @property
+    def label(self) -> str:
+        """How a re-pin names the pin it moves: `anchor <target>`, `claim <id>: <evidence>`."""
+        if self.claim is None:
+            return f"anchor {self.target}"
+        return f"claim {self.claim}: {self.target}"
+
+    @property
+    def re_pin(self) -> str:
+        """The whole command that re-pins this pin and no other."""
+        narrow = (
+            f"--anchor {self.target}"
+            if self.claim is None
+            else f"--claim {self.claim} --evidence {self.target}"
+        )
+        return f"irminsul anchors --re-pin --doc {self.doc} {narrow}"
+
+    def as_json(self) -> dict[str, object]:
+        return {
+            "doc": self.doc,
+            "line": self.line,
+            "kind": self.kind,
+            "target": self.target,
+            "claim": self.claim,
+            "pinned": self.pinned,
+            "current": self.current,
+            "reported_by": self.reported_by,
+            "re_pin": self.re_pin,
+        }
+
+
+def stale_pins(graph: DocGraph, doc: str | None = None) -> list[StalePin]:
+    """Every anchor and claim evidence pin in the graph's docs, or in the one at the
+    repo-relative path `doc`, whose target's current hash differs from its pin, by doc and
+    line. Nothing is written.
+
+    Each is read through `resolve` and `file_pin`, as a re-pin reads it. A target that does
+    not resolve is left to the findings that report it, and a pin on a path its claim no
+    longer cites is not read, as nothing else reads it. `reported_by` names the
+    `claim-anchor` or `claim-provenance` finding about the same pin in a run of those checks
+    over `graph`: an `evidence-drift` finding names only the evidence that changed after the
+    doc, in the layers it judges, so a stale pin it does not name is reported by nothing.
+    """
+    from irminsul.checks.claim_anchor import ClaimAnchorCheck
+    from irminsul.checks.claim_provenance import ClaimProvenanceCheck
+    from irminsul.checks.globs import resolve_display_path
+    from irminsul.checks.pipeline import run_check
+
+    repo_root, config = graph.repo_root, graph.config
+    if repo_root is None or config is None:
+        return []
+
+    def locate(spelling: str) -> Path | None:
+        return resolve_display_path(repo_root, config.paths.source_roots, spelling)
+
+    hashed: dict[Path, str | None] = {}
+    found: list[StalePin] = []
+    for node in sorted(graph.nodes.values(), key=lambda n: n.path.as_posix()):
+        if doc is not None and node.path.as_posix() != doc:
+            continue
+        found.extend(_stale_anchors(repo_root, node, graph.source))
+        found.extend(_stale_evidence(node, locate, hashed, graph.source))
+    if not found:
+        return []
+    reported = _reported_pins(
+        [*run_check(ClaimAnchorCheck, graph), *run_check(ClaimProvenanceCheck, graph)]
+    )
+    rows = [replace(pin, reported_by=reported.get(_pin_key(pin))) for pin in found]
+    return sorted(rows, key=lambda pin: (pin.doc, pin.line, pin.kind, pin.target))
+
+
+def _stale_anchors(repo_root: Path, node: DocNode, reader: SourceReader) -> Iterator[StalePin]:
+    for anchor in parse_anchors(node.body):
+        if anchor.pinned is None:
+            continue
+        resolution = resolve(repo_root, anchor, reader)
+        if resolution.status != "ok" or resolution.current in (None, anchor.pinned):
+            continue
+        match = ANCHOR_RE.match(anchor.raw)
+        algo = match["algo"] if match is not None else _ALGO
+        yield StalePin(
+            doc=node.path.as_posix(),
+            line=node.file_line(anchor.line),
+            kind=ANCHOR_KIND,
+            target=anchor.target,
+            claim=None,
+            pinned=f"{algo}:{anchor.pinned}",
+            current=f"{_ALGO}:{resolution.current}",
+        )
+
+
+def _stale_evidence(
+    node: DocNode,
+    locate: Callable[[str], Path | None],
+    hashed: dict[Path, str | None],
+    reader: SourceReader,
+) -> Iterator[StalePin]:
+    for claim in node.frontmatter.claims:
+        for evidence in claim.evidence:
+            pin = claim.pinned.get(evidence)
+            target = locate(evidence) if pin is not None else None
+            if pin is None or target is None:
+                continue
+            if target not in hashed:
+                hashed[target] = file_pin(target, reader)
+            current = hashed[target]
+            if current is None or current == pin:
+                continue
+            yield StalePin(
+                doc=node.path.as_posix(),
+                line=_claim_marker_line(node, claim.id),
+                kind=EVIDENCE_KIND,
+                target=evidence,
+                claim=claim.id,
+                pinned=pin,
+                current=current,
+            )
+
+
+def _claim_marker_line(node: DocNode, claim_id: str) -> int:
+    """The file line of the first `<!-- claim:<id> -->` marker in the body, or 1 when no
+    paragraph declares the claim."""
+    marker = re.compile(rf"<!--\s*claim:{re.escape(claim_id)}\s*-->")
+    fence = FenceTracker()
+    for lineno, line in enumerate(node.body.splitlines(), start=1):
+        if fence.consume(line):
+            continue
+        if marker.search(_mask_code_spans(line)):
+            return node.file_line(lineno)
+    return 1
+
+
+def _pin_key(pin: StalePin) -> tuple[str, ...]:
+    if pin.claim is None:
+        return (ANCHOR_KIND, pin.doc, str(pin.line), pin.target)
+    return (EVIDENCE_KIND, pin.doc, pin.claim, pin.target)
+
+
+def _reported_pins(findings: list[Finding]) -> dict[tuple[str, ...], str]:
+    """The pins the drift findings among `findings` ask about, each with the finding's code:
+    an anchor by its doc, line and target, a claim's evidence by its doc, claim and path."""
+    from irminsul.checks.claim_anchor import CODE_PINNED_DRIFT
+    from irminsul.checks.claim_provenance import CODE_EVIDENCE_DRIFT
+
+    out: dict[tuple[str, ...], str] = {}
+    for finding in findings:
+        if finding.path is None:
+            continue
+        doc = finding.path.as_posix()
+        if finding.code == CODE_PINNED_DRIFT and finding.line is not None:
+            anchor = _PINNED_DRIFT_RE.match(finding.message)
+            if anchor is not None:
+                out[(ANCHOR_KIND, doc, str(finding.line), anchor["target"])] = finding.code
+        elif finding.code == CODE_EVIDENCE_DRIFT:
+            drift = _EVIDENCE_DRIFT_RE.match(finding.message)
+            if drift is not None:
+                for path in _QUOTED_RE.findall(drift["named"]):
+                    out[(EVIDENCE_KIND, doc, drift["claim"], path)] = finding.code
+    return out
