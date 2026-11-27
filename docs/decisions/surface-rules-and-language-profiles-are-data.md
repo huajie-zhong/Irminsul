@@ -77,3 +77,10 @@ TypeScript file was once written five times with five answers.
   base a run can meet predates the rename. `anchors`, `binding`, `ranked_tests`, `import-deps`
   and the `uniqueness` skip list still test Python's suffix themselves, where they parse Python
   or name its files.
+
+## Changes
+
+- 2026-11-27: Accepted [Each language reads its code through one interface](../rfcs/each-language-reads-its-code-through-one-interface.md):
+  a profile stays data and names its language's reader, which is code; Python's reader is its
+  own parser and TypeScript's, Go's and Rust's are tree-sitter, a required dependency; and
+  `import-deps` reads every language whose reader answers imports.
