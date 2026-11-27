@@ -8,7 +8,7 @@ affects:
   - anchors
   - cli
 resolved_by: docs/decisions/code-is-named-in-code-spans-and-bound-by-anchors.md
-summary: "`irminsul anchors --stale` lists every anchor and claim evidence pin, in any doc, whose file no longer has the pinned hash, with the command that re-pins only that one, and fails nothing."
+summary: "`irminsul anchors --stale` lists every anchor and claim evidence pin, in any doc, whose file no longer has the pinned hash, with the command that re-pins only that one or the anchors that share its target, and fails nothing."
 required_updates: []
 weight: small
 ---
@@ -23,7 +23,8 @@ about it judges two layers of docs only, and skips a pin whose doc was committed
 file, a rule the accepted RFC on naming a part of evidence keeps. On 2026-11-26 nine such
 pins sat in component docs, and two reviewers each wrote a script to find them. This [RFC](../GLOSSARY.md#rfc) adds a read-only listing of every pin that no longer matches, so an
 agent can see them and re-read each one, without changing what any check reports. The owner
-chose this over changing the check on 2026-11-27, and answered its three decisions the same day.
+chose this over changing the check on 2026-11-27, answered its three decisions the same day,
+and added a fourth after a review of the build.
 
 ## Decisions
 
@@ -36,6 +37,12 @@ Answered by the owner on 2026-11-27:
 3. **It lists every stale pin**, anchors and claim evidence alike, each saying whether a check
    already reports it, so one place answers what is stale. Not chosen: only the pins no check
    reports, which would send an agent to two commands.
+
+Added by the owner on 2026-11-27, after a review of the build:
+
+4. **Anchors in one doc that name the same target share one re-pin command**, which re-pins
+   them together, and the listing shows each of them. Not chosen: a new way to choose one
+   anchor of a doc by its line, a second change to the command for a rare case.
 
 ## Design detail
 
@@ -58,8 +65,9 @@ Answered by the owner on 2026-11-27:
   `line` is the anchor marker's line, or for a claim the line of its `<!-- claim:<id> -->`
   marker in the body, or 1 when no paragraph declares it. `re_pin` is the whole command that
   re-pins only that pin: `irminsul anchors --re-pin --doc <doc> --anchor <path#symbol>`, or
-  `--claim <id> --evidence <path>`. `--anchor` names a target, so its command also re-pins any
-  other anchor of the doc with the same `path#symbol`. Plain output prints one row per line
+  `--claim <id> --evidence <path>`, each argument shell-quoted. `--anchor` names a target, so
+  its command also re-pins any other anchor of the doc with the same `path#symbol`, which the
+  listing shows as its own row (decision 4). Plain output prints one row per line
   and a count.
 - **`reported_by`.** The listing runs the two checks that ask about pins, `claim-anchor` and
   `claim-provenance`, over the same graph and names the code of a finding about that doc and
@@ -94,7 +102,8 @@ Provenance: code
 
 `irminsul anchors --stale` SHALL list each anchor and each claim evidence pin, in every doc or
 the one `--doc` names, whose target's current hash differs from its pin, each with the
-command that re-pins only that pin, and SHALL exit 0.
+command that re-pins only that pin, or that pin and the other anchors of its doc that name the
+same target, and SHALL exit 0.
 
 #### Scenario: A component claim's evidence changed
 - **WHEN** a component doc's claim pins `src/loans/policy.py` and that file has changed since, with the doc committed after it
