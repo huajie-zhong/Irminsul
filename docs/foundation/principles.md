@@ -64,6 +64,10 @@ What Irminsul therefore checks:
 - **Structure of the doc graph.** Coverage, orphans, layering, uniqueness, glossary. These are facts about the documentation *system*, underivable from any single source file.
 - **The boundary itself.** A doc names the code it means in code spans, and an `inventory:` entry checks a list it curates against the code, so a derivable fact is linked or derived rather than copied ([Derive facts and leave meaning to the reader](../decisions/derive-facts-and-leave-meaning-to-the-reader.md)). Keeping each fact in its category is arguably Irminsul's highest-leverage role.
 
+## Read code through the language interface
+
+A feature that reads code reads it through the language interface, so it reaches every language Irminsul reads, and a language is added in one place ([Surface rules and language profiles are data](../decisions/surface-rules-and-language-profiles-are-data.md)).
+
 ## Goals
 
 - **Mechanical enforcement of structural invariants.** A check that depends on human attention will fail eventually. CI either accepts a PR or doesn't.

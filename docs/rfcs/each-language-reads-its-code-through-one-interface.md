@@ -10,6 +10,7 @@ affects:
   - new-list-regen
   - context
   - checks
+  - surface
 resolved_by: docs/decisions/surface-rules-and-language-profiles-are-data.md
 summary: "Every feature that asks what a file defines, on which lines, what it imports or what a function body refers to asks one interface, which Python answers through its own parser and TypeScript, Go and Rust through tree-sitter, so a feature reaches every language and a language is added in one place."
 required_updates: []

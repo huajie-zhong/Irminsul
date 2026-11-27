@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import irminsul
 from irminsul.inventory.base import SourceReader
 from irminsul.languages import PYTHON_PROFILE, READERS, languages_read, reader_for
 from irminsul.languages.python_reader import PYTHON_READER, PythonReading
@@ -211,6 +212,25 @@ def test_a_file_that_does_not_parse_answers_nothing_and_says_so(tmp_path: Path) 
     assert reading.tests() == ()
     assert reading.canonical() is None and reading.canonical("late_fee") is None
     assert imported_files(reading, tmp_path / "a.py", [tmp_path]) == []
+
+
+def test_only_the_reader_and_the_framework_extractors_import_pythons_parser() -> None:
+    package = Path(irminsul.__file__).parent
+
+    importing = {
+        path.relative_to(package).as_posix()
+        for path in package.rglob("*.py")
+        if any(found.source == "ast" for found in _read(path.read_text("utf-8")).imports())
+    }
+
+    assert importing == {
+        "checks/glossary.py",
+        "inventory/cli_options.py",
+        "inventory/cli_typer.py",
+        "inventory/http_fastapi.py",
+        "inventory/mcp.py",
+        "languages/python_reader.py",
+    }
 
 
 def test_a_revision_is_read_as_the_file_is(tmp_path: Path) -> None:

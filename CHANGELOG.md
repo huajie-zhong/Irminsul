@@ -286,6 +286,17 @@ making a feature, a refactor and an RFC-driven change in it.
   boolean. The per-task `source_evidence`, `changed_tests` and `review_clue` fields and the
   summary's `with_source_evidence` and `with_changed_tests` counts are gone.
 
+**Reading code.**
+- A language's code is read through one interface. A language profile names its reader, and
+  every feature that asks what a file defines, on which lines, what it imports, what a function's
+  body refers to, which functions are tests or which text a pin hashes asks that reader, where
+  each used to parse Python itself: anchor pins, the definitions and tests `anchors --suggest`
+  offers, the function a code span is paired with, the tests `context` ranks by their imports,
+  `import-deps` and the new-dependency pass. Python's reader is its own parser, so no output
+  changes and no pin moves. A TypeScript, Go or Rust file still has no reader, so these features
+  do not reach it yet
+  ([Each language reads its code through one interface](docs/rfcs/each-language-reads-its-code-through-one-interface.md)).
+
 **Upgrading.**
 - A claim that cites a doc as evidence is now judged on that doc's words, with its pins left out,
   so re-pinning an anchor in the doc no longer re-asks the claim. Once after upgrading, a claim
