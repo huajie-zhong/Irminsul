@@ -3,7 +3,7 @@ id: a-pin-that-no-longer-matches-its-file-is-listed
 title: "A pin that no longer matches its file is listed"
 status: stable
 describes: []
-rfc_state: accepted
+rfc_state: implemented
 affects:
   - anchors
   - cli
