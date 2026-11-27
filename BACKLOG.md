@@ -683,21 +683,6 @@ member, a call or a subscript would close the first, at the cost of a pin that m
 formatter removes needless parentheses there; the tuple needs the grammar's node kinds, which
 the engine does not know.
 
-### `a-python-file-that-does-not-parse-still-denies-a-dependency`
-
-`import-deps` reports a `depends_on` no import backs only where every import of the depending
-doc's files is placed, which a reading says of its file
-(`CodeReading.places_every_import`, `src/irminsul/languages/reader.py`). A tree-sitter reading
-says no for a file that did not parse whole. Python's says yes for every file
-(`PythonReading.places_every_import`, `src/irminsul/languages/python_reader.py`), also one
-with a syntax error, none of whose imports is read: with
-`from billing import invoice` above a broken line in the one file `shop` owns, the true
-`depends_on: billing` is reported as hallucinated (run on 2026-11-27, and so on main before the
-question was asked of a file). Answering `self.parsed` closes it and is one line; it changes
-what a check reports for a Python project, so it is the owner's call.
-`tests/test_languages_tree_sitter.py::test_a_python_file_that_does_not_parse_denies_no_dependency`
-holds the case as a strict `xfail`.
-
 ### `a-python-source-root-that-is-its-own-package`
 
 Python's reader places an absolute import under each source root

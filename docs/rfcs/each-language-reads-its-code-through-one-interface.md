@@ -153,10 +153,9 @@ Answered by the owner on 2026-11-27, while the tree-sitter readers were built:
    no search of the text for the name. Not chosen: keeping the search until the part markers
    of `claim-evidence-names-a-part` exist, which would have kept every such anchor resolving.
 9. **`import-deps` reports a missing import only where every import is placed.** A reading
-   says whether every import of its file is placed: a Python file's always is, and a Go
-   file's under a `go.mod` when the file parses whole; a TypeScript or a Rust file's never
-   is, since a path alias or another
-   crate may stand between two files. A `depends_on` is judged only between docs whose common
+   says whether every import of its file is placed: a Python file's is, and a Go file's
+   under a `go.mod`, when the file parses whole; a TypeScript or a Rust file's never is,
+   since a path alias or another crate may stand between two files. A `depends_on` is judged only between docs whose common
    languages have every import of the depending doc's files placed. Not chosen: judging every
    language with a reader, which would report true dependencies with no way to answer.
 10. **For TypeScript, every named function a test file defines is offered as a test**, as the

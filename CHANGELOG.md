@@ -324,6 +324,10 @@ making a feature, a refactor and an RFC-driven change in it.
     answers each definition and import around it.
   - A function in a block or in an object literal is not something an anchor or a code span can
     name, and `anchors --suggest` lists it as out of reach.
+- `import-deps` no longer reports a `depends_on` of a doc that owns a Python file with a
+  syntax error. None of that file's imports is read, so a missing one proves nothing: with
+  `from billing import invoice` above a broken line, the true `depends_on: billing` was
+  reported as hallucinated.
 - tree-sitter is a required dependency: `tree-sitter` 0.26.0 with the TypeScript, Go and Rust
   grammars, each pinned to one version because a pin hashes the tree it gives. They ship
   wheels for CPython on Linux, macOS and Windows; on musl ARM64, PyPy or a free-threaded

@@ -278,9 +278,9 @@ class PythonReading:
 
     def places_every_import(self, importer: Path) -> bool:
         """A module is a file under the importing file's package or a source root, or it is
-        not this repository's. It is yes for a text that does not parse too, whose imports
-        are not read: what a missing import denied before this was asked of a file."""
-        return True
+        not this repository's. A text that does not parse has no import read, so none is
+        placed."""
+        return self.parsed
 
     def files(self, source: str, importer: Path, roots: Sequence[Path]) -> list[Path]:
         """The `.py` file and the package `__init__.py` that can hold the module `source`

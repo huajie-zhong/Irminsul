@@ -178,14 +178,9 @@ def test_a_missing_import_denies_a_dependency_only_where_every_shared_import_is_
     assert run_check(DependencyCheck, tmp_path) == []
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BACKLOG.md a-python-file-that-does-not-parse-still-denies-a-dependency",
-)
 def test_a_python_file_that_does_not_parse_denies_no_dependency(tmp_path: Path) -> None:
     """The cart imports the invoice and then holds a syntax error, so none of its imports
-    is read: the missing import proves nothing, and the `depends_on` should not be
-    reported. It is, as it was before a reading said whether its imports are placed."""
+    is read: the missing import proves nothing, and the `depends_on` is not reported."""
     write(tmp_path, "src/shop/cart.py", "from billing import invoice\nmatch = \n")
     write(tmp_path, "src/billing/invoice.py", "RATE = 2\n")
     write_config(tmp_path, source_roots=["src"])
