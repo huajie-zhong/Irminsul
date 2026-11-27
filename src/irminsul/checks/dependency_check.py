@@ -114,7 +114,7 @@ class DependencyCheck:
             "code. It is judged only where an import would have shown it: the two docs "
             "own code of a language in common, and every import of this doc's files of each "
             "such language can be placed. Where a path alias, another package or a missing "
-            "manifest may stand between two files, or one of the files does not parse, a "
+            "manifest may stand between two files, or one of its files does not parse, a "
             "missing import proves nothing and the entry is not judged. Remove the stale "
             "declaration, or verify the doc "
             "claiming the dependent module actually covers the right files."

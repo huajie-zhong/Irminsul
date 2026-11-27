@@ -233,6 +233,9 @@ test file was read. Nothing measures how much of a function its tests guard.
   <!-- anchor: tests/test_binding.py#test_a_name_the_test_binds_itself_does_not_name_the_definition @sha256:ad1bee32b830 -->
   <!-- anchor: tests/test_binding.py#test_suggest_says_so_when_no_test_names_the_definition @sha256:a96352d4b56f -->
   <!-- anchor: tests/test_binding.py#test_suggest_without_a_doc_lists_unbound_names_and_no_test @sha256:f01f47ab26b4 -->
+  <!-- anchor: tests/test_languages_typescript_reader.py#test_suggest_offers_the_test_function_that_calls_late_fee @sha256:296622051fe4 -->
+  <!-- anchor: tests/test_languages_go_reader.py#test_suggest_offers_the_test_that_calls_late_fee_for_the_guide_sentence @sha256:697d9eb5462f -->
+  <!-- anchor: tests/test_languages_rust_reader.py#test_suggest_offers_the_integration_test_that_calls_the_function_a_guide_names @sha256:6ed061e33ad5 -->
 - **a-pin-that-no-longer-matches-its-file-is-listed#stale-pins-are-listed** — `irminsul anchors --stale` SHALL list each anchor and each claim evidence pin, in every doc or the one `--doc` names, whose target's current hash differs from its pin, each with the command that re-pins only that pin, or that pin and the other anchors of its doc that name the same target, and SHALL exit 0. (provenance: code; [RFC](../rfcs/a-pin-that-no-longer-matches-its-file-is-listed.md))
   <!-- anchor: src/irminsul/anchors.py#stale_pins @sha256:ffb7528712e8 -->
   <!-- anchor: tests/test_cli_anchors.py#test_stale_lists_a_component_claims_changed_evidence @sha256:fc748e708176 -->

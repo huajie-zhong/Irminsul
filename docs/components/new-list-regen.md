@@ -118,6 +118,9 @@ A check that judges the manifest's prose reads it through `without_generated_reg
   <!-- anchor: tests/test_review_changed_code.py#test_deleting_the_function_below_one_does_not_touch_the_one_above @sha256:40021132186f -->
   <!-- anchor: tests/test_review_changed_code.py#test_a_command_whose_function_changed_queues_no_sentence_that_names_it @sha256:d239d1d4297f -->
   <!-- anchor: tests/test_review_changed_code.py#test_a_file_that_is_named_and_edited_queues_no_sentence_that_names_it @sha256:9e98fda5ed20 -->
+  <!-- anchor: tests/test_languages_typescript_reader.py#test_an_edit_to_a_function_queues_the_guide_that_names_it @sha256:4b306ec38aad -->
+  <!-- anchor: tests/test_languages_go_reader.py#test_editing_late_fee_queues_the_guide_sentence_that_names_it @sha256:fb87b87862c3 -->
+  <!-- anchor: tests/test_languages_rust_reader.py#test_an_edit_to_a_rust_function_queues_the_guide_that_names_it @sha256:8dee1f2e01b6 -->
 - **the-change-queue-asks-about-what-the-change-did-not-write#change-queue-holds-no-written-sentence** — `list review --changed` SHALL queue no `edited` item and no `removed-sentence` item, and SHALL queue every other item as it does without this change. (provenance: code; [RFC](../rfcs/the-change-queue-asks-about-what-the-change-did-not-write.md))
   <!-- anchor: src/irminsul/listing/review.py#build_review @sha256:b68ad280167f -->
   <!-- anchor: tests/test_list_review.py#test_a_reworded_sentence_queues_its_docs_summary_and_no_edit @sha256:918a135bffac -->

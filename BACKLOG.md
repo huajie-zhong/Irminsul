@@ -683,6 +683,16 @@ member, a call or a subscript would close the first, at the cost of a pin that m
 formatter removes needless parentheses there; the tuple needs the grammar's node kinds, which
 the engine does not know.
 
+### `a-python-file-with-a-byte-order-mark-defines-nothing`
+
+`SourceReader.text` (`src/irminsul/inventory/base.py`) reads a file as UTF-8 and keeps a
+leading U+FEFF, and Python's parser rejects it in a string, so a Python file an editor saved
+with a byte order mark does not parse: its reading defines nothing, an anchor into it is
+`claim-anchor/unreadable`, and no span names its functions, though Python runs the file. The
+TypeScript, Go and Rust readers read the same mark and answer (each run on 2026-11-27 over a
+one-function file). Dropping one leading U+FEFF before Python's parse moves no line and no
+pin of a file that parses today.
+
 ### `a-python-source-root-that-is-its-own-package`
 
 Python's reader places an absolute import under each source root
@@ -745,9 +755,12 @@ needs the same is added to each:
 - `_LAUNCHERS` and `_invoked_program` (`src/irminsul/checks/inventory_drift.py`) see through
   `uv`, `npx`, `poetry` and `python -m`, and not through `cargo run` or `go run`.
 
-A profile field for each would put them where a language is added. The first two moves
-change no output; the last three would change what `anchors --suggest` and `inventory-drift`
-report for Go and Rust, so they are rules.
+`ledger.pyi` is still a code name to `code_name`, since Python's profile lists `.py` alone
+while `OMISSION_SKIP` knows `*.pyi` for Python's. A profile field for each list would put it
+where a language is added, and moving one changes no output. Adding what Go and Rust lack,
+their standard-library modules, Go's program names and the `cargo run` and `go run`
+launchers, changes what `anchors --suggest`, `list review --written`, `code-references` and
+`inventory-drift` report for them, so each of those is a rule.
 
 ### `prose-beside-a-comment-marker-is-misread`
 

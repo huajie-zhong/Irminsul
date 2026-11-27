@@ -162,8 +162,8 @@ making a feature, a refactor and an RFC-driven change in it.
   ([A pin that no longer matches its file is listed](docs/rfcs/a-pin-that-no-longer-matches-its-file-is-listed.md)).
 - `anchors --suggest --doc <doc>` also lists each code span of that doc that resolves to one
   function or class, once for each definition, with where it is defined and up to three
-  test functions that name it, each as an anchor marker ready to paste: a function its language's reader calls a test, in Python one whose name
-  starts with `test`, in a file under `paths.test_roots` that imports the defining
+  test functions that name it, each as an anchor marker ready to paste: a function its language's reader calls a test, in Python one whose
+  name starts with `test`, in a file under `paths.test_roots` that imports the defining
   module, whose body refers to the definition through an import of that module. A parameter, a
   fixture or a local variable spelled like the definition does not count, and a method counts
   as an attribute of its name in a test whose imports reach its class or its module. A name no
