@@ -5,12 +5,13 @@ A paragraph can pin itself to a specific code symbol with an inline marker:
     <!-- anchor: src/irminsul/cli.py#check @sha256:1a2b3c -->
 
 `file#symbol` is hand-written; the `@<algo>:<hash>` pin is written and refreshed by
-the re-pin command, never by hand. In a Python file the hash is taken over the **syntax
-tree** of the symbol's definition — a function or class with its docstring, or the whole
-assignment statement that binds a constant — written out by `_canonical` as node types and
-fields, without positions. Formatting and comment churn do not trip it, only a real change
-to the code the claim describes does, and every Python version that parses the code to the
-same tree gives the same hash. In any other text
+the re-pin command, never by hand. In a file whose language has a reader
+(`irminsul.languages`) the hash is taken over the canonical text that reader gives for the
+symbol's definition. For Python that is its **syntax tree** — a function or class with its
+docstring, or the whole assignment statement that binds a constant — written out as node
+types and fields, without positions. Formatting and comment churn do not trip it, only a
+real change to the code the claim describes does, and every Python version that parses the
+code to the same tree gives the same hash. In any other text
 file the symbol resolves when its name appears as a whole token, and the hash is taken
 over the block that defines it, with whitespace normalized: the line that defines the
 name (a definition keyword or an assignment, else its first mention outside a comment),
@@ -24,7 +25,6 @@ and the stale listing, which writes nothing.
 
 from __future__ import annotations
 
-import ast
 import hashlib
 import re
 import shlex
@@ -93,127 +93,17 @@ def parse_anchors(body: str) -> list[Anchor]:
     return anchors
 
 
-def _target_names(target: ast.expr) -> Iterator[str]:
-    """The plain names one assignment target binds, unpacking tuples and lists.
-
-    An attribute or subscript target is deliberately not a definition: `cfg.limit = 5`
-    mentions `cfg` without binding it, so anchoring `#cfg` to that line would pin a claim
-    to a statement that does not define what it names.
-    """
-    if isinstance(target, ast.Name):
-        yield target.id
-    elif isinstance(target, ast.Starred):
-        yield from _target_names(target.value)
-    elif isinstance(target, ast.Tuple | ast.List):
-        for element in target.elts:
-            yield from _target_names(element)
-
-
-def _defines(node: ast.stmt, name: str) -> bool:
-    """Whether this statement is the definition of `name` in its own scope."""
-    if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
-        return node.name == name
-    if isinstance(node, ast.AnnAssign):
-        return name in _target_names(node.target)
-    if isinstance(node, ast.Assign):
-        return any(name in _target_names(target) for target in node.targets)
-    return False
-
-
-def _find_symbol(tree: ast.Module, symbol: str) -> ast.AST | None:
-    """Resolve a name bound at the top level, or a dotted `Class.member`.
-
-    A name is bound by a function, a class, or an assignment, so a threshold or a registry
-    can be anchored as readily as a function. Only a class opens a scope to descend into:
-    an assignment binds no members, so `LIMIT.attr` resolves to nothing rather than to the
-    statement that binds `LIMIT`.
-    """
-    parts = symbol.split(".")
-    scope: list[ast.stmt] = tree.body
-    node: ast.AST | None = None
-    for part in parts:
-        node = next((child for child in scope if _defines(child, part)), None)
-        if node is None:
-            return None
-        scope = node.body if isinstance(node, ast.ClassDef) else []
-    return node
-
-
-@dataclass(frozen=True)
-class PythonDefinition:
-    symbol: str
-    """The dotted path from the module to the definition, such as `Store.flush`."""
-    line: int
-    reachable: bool
-    """Whether an anchor can name it: only classes enclose it, so `_find_symbol` descends."""
-
-
-def python_definitions(tree: ast.Module, name: str) -> list[PythonDefinition]:
-    """Every statement in `tree` that defines `name`, in source order, however deeply
-    nested — except an assignment inside a function, which is a local variable rather
-    than anything a doc would name."""
-    out: list[PythonDefinition] = []
-    definitions = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-
-    def walk(body: list[ast.stmt], scope: list[str], reachable: bool, local: bool) -> None:
-        for node in body:
-            if _defines(node, name) and (isinstance(node, definitions) or not local):
-                out.append(PythonDefinition(".".join([*scope, name]), node.lineno, reachable))
-            if isinstance(node, ast.ClassDef):
-                walk(node.body, [*scope, node.name], reachable, False)
-            elif isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
-                walk(node.body, [*scope, node.name], False, True)
-            else:
-                for inner in _statement_bodies(node):
-                    walk(inner, scope, False, local)
-
-    walk(tree.body, [], True, False)
-    return out
-
-
-def _statement_bodies(node: ast.stmt) -> Iterator[list[ast.stmt]]:
-    for field_name in ("body", "orelse", "finalbody"):
-        value = getattr(node, field_name, None)
-        if isinstance(value, list) and all(isinstance(item, ast.stmt) for item in value):
-            yield value
-    for handler in getattr(node, "handlers", []):
-        yield handler.body
-    for case in getattr(node, "cases", []):
-        yield case.body
-
-
 def _hash(source: str) -> str:
     return hashlib.sha256(source.encode("utf-8")).hexdigest()[:_HASH_LEN]
-
-
-def _canonical(value: object) -> str:
-    """A syntax tree, or a field of one, as text that depends on nothing but the tree: each
-    node's type and fields, never its position, and no field that is None or empty, so a
-    field a newer Python adds does not move the hash of code that leaves it unset.
-
-    Not `ast.unparse`, whose printing of one tree changes between patch releases. A leaf is
-    written with `ascii` rather than `repr`, which escapes a character or not by the
-    interpreter's Unicode version."""
-    if isinstance(value, list):
-        return "[" + ",".join(_canonical(item) for item in value) + "]"
-    if not isinstance(value, ast.AST):
-        return ascii(value)
-    fields: list[str] = []
-    for name, field in ast.iter_fields(value):
-        if isinstance(value, ast.JoinedStr):
-            # 3.12.3 parses `f"{x:{w}}"` with an empty literal closing the format spec,
-            # which later releases do not; it prints nothing either way.
-            field = [p for p in field if not (isinstance(p, ast.Constant) and p.value == "")]
-        if field is not None and field != []:
-            fields.append(f"{name}={_canonical(field)}")
-    return f"{type(value).__name__}({','.join(fields)})"
 
 
 def resolve(repo_root: Path, anchor: Anchor, reader: SourceReader | None = None) -> Resolution:
     """Resolve an anchor's target and compute its current normalized hash.
 
     `reader` is the snapshot to read the target from; a caller with a graph passes
-    `graph.source`, so a file is parsed once however many anchors name it."""
+    `graph.source`, so a file is parsed once however many anchors name it. A file whose
+    language has a reader is hashed over the canonical text that reader gives for the
+    symbol, or for the whole file; any other is resolved and hashed as text."""
     from irminsul.inventory.base import SourceReader
 
     reader = reader or SourceReader()
@@ -224,21 +114,17 @@ def resolve(repo_root: Path, anchor: Anchor, reader: SourceReader | None = None)
     if text is None:
         return Resolution("unreadable")
 
-    if target.suffix != ".py":
+    reading = reader.reading(target)
+    if reading is None:
         if target.suffix == ".md" and anchor.symbol is None:
             text = without_pins(text)
         return _resolve_text(text, anchor.symbol)
-    module = reader.module(target)
-    if module is None:
+    if not reading.parsed:
         return Resolution("unreadable")
-    tree = module.tree
-
-    if anchor.symbol is None:
-        return Resolution("ok", _hash(_canonical(tree)))
-    node = _find_symbol(tree, anchor.symbol)
-    if node is None:
+    canonical = reading.canonical(anchor.symbol)
+    if canonical is None:
         return Resolution("missing_symbol")
-    return Resolution("ok", _hash(_canonical(node)))
+    return Resolution("ok", _hash(canonical))
 
 
 def without_pins(text: str) -> str:

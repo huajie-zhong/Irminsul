@@ -6,35 +6,30 @@ anchor in the doc binds it, the name is unbound. Deciding which file the doc mea
 judgment, so this module only finds unbound names and ranks the files that contain them;
 an agent chooses one and writes the anchor.
 
-A name that does resolve, to one Python function or class, can be bound to more than its
+A name that does resolve, to one function or class, can be bound to more than its
 definition: a sentence that says what the code does is best anchored to the test that
 asserts it. So this module also finds the test functions that name such a definition. Which
 of them asserts the sentence is again a judgment, made by seeing the test fail.
+
+What a file defines, which of its functions are tests, and what a test's body and imports
+refer to are each asked of the reader of the file's language (`irminsul.languages`).
 """
 
 from __future__ import annotations
 
-import ast
 import os
 import re
 import sys
-from collections.abc import Collection, Iterable, Iterator
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from irminsul.anchors import (
-    Anchor,
-    defines,
-    definition_line,
-    parse_anchors,
-    python_definitions,
-    resolve,
-)
-from irminsul.checks.dependency_check import imported_paths
+from irminsul.anchors import Anchor, defines, definition_line, parse_anchors, resolve
 from irminsul.checks.globs import resolve_display_path
 from irminsul.code_references import CodeResolver
-from irminsul.inventory.base import PythonModule
+from irminsul.languages import reader_for
+from irminsul.languages.reader import Import, References
 from irminsul.ranked_tests import Ranker
 
 if TYPE_CHECKING:
@@ -108,7 +103,7 @@ class Suggestions:
     candidates: list[Candidate]
     """Markers that resolve: definitions, or mentions when nothing defines the name."""
     unreachable: list[Candidate]
-    """Python definitions inside a function or a block, which no anchor can name."""
+    """Definitions a reader found inside a function or a block, which no anchor can name."""
 
 
 def code_name(span: str) -> str | None:
@@ -172,10 +167,11 @@ def load_sources(tree: SourceTree) -> Sources:
 def suggest(repo_root: Path, sources: Sources, name: str) -> Suggestions:
     """Where an anchor for `name` could point, definitions first.
 
-    A Python definition is found in the syntax tree, so a class member is offered under
-    its dotted path. Another language resolves by text, so there the line that looks
-    like a definition is offered, else the first mention. Mentions are offered only when
-    nothing defines the name: a file that merely names it is the wrong place to bind.
+    In a file whose language has a reader, a definition is what that reader finds, so a
+    class member is offered under its dotted path, and a file that does not parse offers
+    nothing. Any other file resolves by text, so there the line that looks like a
+    definition is offered, else the first mention. Mentions are offered only when nothing
+    defines the name: a file that merely names it is the wrong place to bind.
     """
     leaf = name.rsplit(".", 1)[-1]
     token = re.compile(rf"(?<![\w$]){re.escape(leaf)}(?![\w$])")
@@ -185,14 +181,12 @@ def suggest(repo_root: Path, sources: Sources, name: str) -> Suggestions:
     for display, lines in sources:
         if not any(token.search(line) for line in lines):
             continue
-        if display.endswith(".py"):
-            try:
-                tree = ast.parse("\n".join(lines))
-            except SyntaxError:
-                continue
-            for found in python_definitions(tree, leaf):
-                candidate = Candidate(display, found.line, True, found.symbol)
-                (definitions if found.reachable else unreachable).append(candidate)
+        code_reader = reader_for(display)
+        if code_reader is not None:
+            for found in code_reader.read("\n".join(lines)).definitions():
+                if found.name == leaf:
+                    candidate = Candidate(display, found.line, True, found.symbol)
+                    (definitions if found.reachable else unreachable).append(candidate)
             continue
         anchor = Anchor(line=0, raw="", path=display, symbol=name, pinned=None)
         if resolve(repo_root, anchor).status != "ok":
@@ -224,9 +218,9 @@ class CandidateTest:
 
 @dataclass(frozen=True)
 class Definition:
-    """A Python function or class a doc names: the display path of the file that defines
-    it, the line of its definition there, and its bare name. Two methods of one name in one
-    file differ by their line."""
+    """A function or class a doc names: the display path of the file that defines it, the
+    line of its definition there, and its bare name. Two methods of one name in one file
+    differ by their line."""
 
     path: str
     line: int
@@ -234,7 +228,7 @@ class Definition:
 
 
 def named_definition(span: str, resolver: CodeResolver) -> Definition | None:
-    """The one Python function or class a code span resolves to, or None.
+    """The one function or class a code span resolves to, or None.
 
     A span a surface resolves, such as a command or an option, names that surface and not
     a definition, and a name two definitions share resolves to neither.
@@ -243,14 +237,6 @@ def named_definition(span: str, resolver: CodeResolver) -> Definition | None:
         if ref.kind == "symbol" and ref.line is not None:
             return Definition(ref.defined_at, ref.line, ref.identity)
     return None
-
-
-_Function = ast.FunctionDef | ast.AsyncFunctionDef
-_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
-_Import = ast.Import | ast.ImportFrom
-#: The nodes that bind the name they carry: a nested definition, an `except ... as` name,
-#: and a `match` capture.
-_Binder = _Function | ast.ClassDef | ast.ExceptHandler | ast.MatchAs | ast.MatchStar
 
 
 @dataclass(frozen=True)
@@ -280,224 +266,135 @@ class _Imports:
         )
 
 
-@dataclass(frozen=True)
-class _TestFunction:
-    """One test function, read once for every definition it may name."""
-
-    test: CandidateTest
-    loads: frozenset[str]
-    """The bare names its body reads."""
-    attributes: frozenset[tuple[str | None, str]]
-    """Each attribute its body reads, with the dotted name it is read from, or None when it
-    is read from anything else, such as a call's result."""
-    rebound: frozenset[str]
-    """The names it binds itself: a parameter, a fixture, an assignment, a loop or `with`
-    target, a nested definition. A bare use of one is of its own value."""
-    imports: tuple[ast.Import | ast.ImportFrom, ...]
-    """The import statements in its body, which bind for it alone."""
-
-
 def _key(path: Path) -> str:
     return os.path.normcase(os.path.normpath(os.fspath(path)))
 
 
-def _dotted(node: ast.expr) -> str | None:
-    """`a.b.c` for a chain of attributes that starts at a bare name, else None."""
-    parts: list[str] = []
-    while isinstance(node, ast.Attribute):
-        parts.append(node.attr)
-        node = node.value
-    if not isinstance(node, ast.Name):
-        return None
-    return ".".join([node.id, *reversed(parts)])
-
-
-def _scope_nodes(nodes: Iterable[ast.AST]) -> Iterator[ast.AST]:
-    """Every node of one scope: a function, class or lambda in it is yielded, not entered."""
-    stack = list(nodes)
-    while stack:
-        node = stack.pop()
-        yield node
-        if not isinstance(node, _SCOPES):
-            stack.extend(ast.iter_child_nodes(node))
-
-
-def _test_functions(
-    body: list[ast.stmt], scope: tuple[str, ...] = ()
-) -> Iterator[tuple[str, _Function]]:
-    """Each function whose name starts with `test`, with the dotted path an anchor names it
-    by: one at the top level of `body` or in a class there, at any depth of classes. One
-    inside a function or a block is left out, as no anchor reaches it."""
-    for node in body:
-        if isinstance(node, _Function):
-            if node.name.startswith("test"):
-                yield ".".join([*scope, node.name]), node
-        elif isinstance(node, ast.ClassDef):
-            yield from _test_functions(node.body, (*scope, node.name))
-
-
-def _read_function(display: str, symbol: str, function: _Function) -> _TestFunction:
-    """What one test function's body reads and binds. A name bound anywhere in the body,
-    a function nested in it included, counts as bound for the whole of it: that can miss a
-    test, and never offers one that does not name the definition."""
-    loads: set[str] = set()
-    attributes: set[tuple[str | None, str]] = set()
-    rebound = {node.arg for node in ast.walk(function.args) if isinstance(node, ast.arg)}
-    imports: list[ast.Import | ast.ImportFrom] = []
-    for statement in function.body:
-        for node in ast.walk(statement):
-            if isinstance(node, ast.Name):
-                (loads if isinstance(node.ctx, ast.Load) else rebound).add(node.id)
-            elif isinstance(node, ast.Attribute):
-                attributes.add((_dotted(node.value), node.attr))
-            elif isinstance(node, ast.arg):
-                rebound.add(node.arg)
-            elif isinstance(node, _Binder):
-                if node.name:
-                    rebound.add(node.name)
-            elif isinstance(node, ast.MatchMapping):
-                # `case {**rest}:` binds `rest`, which the node carries as a plain string.
-                if node.rest:
-                    rebound.add(node.rest)
-            elif isinstance(node, _Import):
-                imports.append(node)
-    return _TestFunction(
-        CandidateTest(display, function.lineno, symbol),
-        frozenset(loads),
-        frozenset(attributes),
-        frozenset(rebound),
-        tuple(imports),
-    )
-
-
 class _TestReader:
-    """The test files of one graph, each read at most once, and what their imports bind."""
+    """The test files of one graph, each read at most once by its language's reader, and
+    what their imports bind."""
 
     def __init__(self, graph: DocGraph) -> None:
         assert graph.config is not None and graph.repo_root is not None
         self._source = graph.source
-        self._roots = graph.config.paths.source_roots
+        self._source_roots = graph.config.paths.source_roots
         self._repo_root = graph.repo_root
+        self._roots = [graph.repo_root / root for root in self._source_roots]
         self._test_files = {display: path for path, display in graph.source.test_walk.files}
         self._source_files = {display: path for path, display in graph.source.files}
-        self._functions: dict[str, list[_TestFunction]] = {}
+        self._functions: dict[str, list[tuple[CandidateTest, References]]] = {}
         self._file_imports: dict[tuple[str, str], _Imports] = {}
 
     def module_key(self, definition: Definition) -> str:
-        """The file that defines `definition`, spelled as `_loads` spells a file, which is
+        """The file that defines `definition`, spelled as `imports` spells a file, which is
         how `Ranker.importers` spells it too."""
-        path = resolve_display_path(self._repo_root, self._roots, definition.path)
+        path = resolve_display_path(self._repo_root, self._source_roots, definition.path)
         return _key(path if path is not None else self._repo_root / definition.path)
 
     def owner(self, definition: Definition) -> str | None:
         """The class whose body defines `definition`, or None for one at the top level."""
         path = self._source_files.get(definition.path)
-        module = self._source.module(path) if path is not None else None
-        for node in module.tree.body if module is not None else []:
-            if isinstance(node, ast.ClassDef) and any(
-                isinstance(member, _Function | ast.ClassDef)
-                and member.lineno == definition.line
-                and member.name == definition.name
-                for member in node.body
-            ):
-                return node.name
-        return None
+        reading = self._source.reading(path) if path is not None else None
+        if reading is None:
+            return None
+        return next(
+            (
+                found.holder
+                for found in reading.definitions()
+                if (found.line, found.name) == (definition.line, definition.name)
+            ),
+            None,
+        )
 
-    def functions(self, display: str) -> list[_TestFunction]:
-        """The test functions of one test file; none when it does not parse."""
+    def functions(self, display: str) -> list[tuple[CandidateTest, References]]:
+        """The test functions of one test file, each with what its body refers to and
+        binds; none when it does not parse."""
         if display not in self._functions:
-            module = self._source.module(self._test_files[display])
+            reading = self._source.reading(self._test_files[display])
             self._functions[display] = (
                 []
-                if module is None
+                if reading is None
                 else [
-                    _read_function(display, symbol, function)
-                    for symbol, function in _test_functions(module.tree.body)
+                    (CandidateTest(display, test.line, test.symbol), reading.references(test))
+                    for test in reading.tests()
                 ]
             )
         return self._functions[display]
 
     def file_imports(self, display: str, module_key: str) -> _Imports:
         """What the imports of a test file outside every function and class bind of the
-        module in the file `module_key`."""
+        module in the file `module_key`. They are read from the last line to the first, so
+        of two that bind one name the first in the file is kept, where Python keeps the
+        last."""
         key = (display, module_key)
         if key not in self._file_imports:
-            module = self._source.module(self._test_files[display])
-            statements = [
-                node
-                for node in _scope_nodes(module.tree.body if module is not None else [])
-                if isinstance(node, _Import)
-            ]
-            self._file_imports[key] = self.imports(statements, display, module_key)
+            reading = self._source.reading(self._test_files[display])
+            imports = reading.imports() if reading is not None else ()
+            outside = sorted(
+                (found for found in imports if not found.scope), key=lambda found: found.line
+            )
+            self._file_imports[key] = self.imports(reversed(outside), display, module_key)
         return self._file_imports[key]
 
-    def imports(
-        self, statements: Iterable[ast.Import | ast.ImportFrom], display: str, module_key: str
-    ) -> _Imports:
-        """What `statements`, import statements of the test file `display`, bind of the
-        module in the file `module_key`, read as `imported_paths` reads an import."""
+    def imports(self, imports: Iterable[Import], display: str, module_key: str) -> _Imports:
+        """What `imports`, imports of the test file `display`, bind of the module in the
+        file `module_key`, each resolved to files by the file's reader, as `imported_files`
+        resolves an import."""
         names: dict[str, str] = {}
         star = False
         modules: set[str] = set()
         others: set[str] = set()
         importer = self._test_files[display]
-        for node in statements:
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    if module_key in self._loads(ast.Import(names=[alias]), importer):
-                        modules.add(alias.asname or alias.name)
+        reading = self._source.reading(importer)
+        if reading is None:
+            return _Imports(names, star, frozenset(), frozenset())
+        files = reading.files
+
+        def is_the_module(source: str) -> bool:
+            return any(_key(path) == module_key for path in files(source, importer, self._roots))
+
+        for found in imports:
+            from_the_module = is_the_module(found.source)
+            for name in found.names:
+                if name.name is None:
+                    if from_the_module:
+                        modules.add(name.reached_as)
                     else:
-                        others.add(alias.asname or alias.name.split(".", 1)[0])
-                continue
-            bare = ast.ImportFrom(module=node.module, names=[], level=node.level)
-            from_the_module = module_key in self._loads(bare, importer)
-            for alias in node.names:
-                local = alias.asname or alias.name
-                if from_the_module and alias.name == "*":
+                        others.add(name.local)
+                elif from_the_module and name.name == "*":
                     star = True
                 elif from_the_module:
-                    names[local] = alias.name
-                elif module_key in self._loads(
-                    ast.ImportFrom(module=node.module, names=[alias], level=node.level), importer
-                ):
-                    modules.add(local)
-                elif alias.name != "*":
-                    others.add(local)
+                    names[name.local] = name.name
+                elif name.source is not None and is_the_module(name.source):
+                    modules.add(name.reached_as)
+                elif name.name != "*":
+                    others.add(name.local)
         return _Imports(names, star, frozenset(modules), frozenset(others))
 
-    def _loads(self, statement: ast.Import | ast.ImportFrom, importer: Path) -> set[str]:
-        """The files one import statement may load."""
-        module = PythonModule(ast.Module(body=[statement], type_ignores=[]))
-        return {
-            _key(path) for path in imported_paths(module, importer, self._roots, self._repo_root)
-        }
 
-
-def _names(function: _TestFunction, imports: _Imports, name: str, owner: str | None) -> bool:
-    """Whether a test function's body refers to a definition through `imports`, what its
-    file and its own body import of the defining module.
+def _names(refs: References, imports: _Imports, name: str, owner: str | None) -> bool:
+    """Whether a test function, whose body refers to and binds `refs`, refers to a
+    definition through `imports`, what its file and its own body import of the defining
+    module.
 
     A function or class at the top level of its module is referred to by a name imported
     from the module, under an alias too, that the test does not bind itself, or as an
     attribute of an expression that is the module. A method is referred to by an attribute
-    of its name, in a test whose imports reach its class or its module: the syntax tree
-    does not say what class the object it is read from has, so that much stays a reading
-    by name.
+    of its name, in a test whose imports reach its class or its module: a reader does not
+    say what class the object it is read from has, so that much stays a reading by name.
     """
     if owner is not None:
         reaches = imports.star or owner in imports.names.values() or bool(imports.modules)
-        return reaches and any(attribute == name for _, attribute in function.attributes)
-    shadowed = function.rebound | (imports.others - set(imports.names))
+        return reaches and any(attribute == name for _, attribute in refs.attributes)
+    shadowed = refs.bound | (imports.others - set(imports.names))
     bound = {local for local, original in imports.names.items() if original == name}
     if imports.star:
         bound.add(name)
-    if function.loads & (bound - shadowed):
+    if refs.names & (bound - shadowed):
         return True
     return any(
-        attribute == name
-        and value in imports.modules
-        and value.split(".", 1)[0] not in function.rebound
-        for value, attribute in function.attributes
+        attribute == name and value in imports.modules and value.split(".", 1)[0] not in refs.bound
+        for value, attribute in refs.attributes
         if value is not None
     )
 
@@ -507,14 +404,14 @@ def naming_tests(
 ) -> dict[Definition, list[CandidateTest]]:
     """The test functions that name each of `definitions`, at most three, by path and line.
 
-    A test function is a function whose name starts with `test`, in a Python file under
-    `paths.test_roots` that imports the defining module, which is the reading
-    `Ranker.importers` makes for the context packet. It names the definition when its body
-    refers to it through the imports of its file or its own body, as `_names` reads them,
-    so a parameter, a fixture or a local variable that is merely spelled the same names
-    nothing. That is a reading of the syntax tree and runs nothing: a test that reaches the
-    code through a helper, a fixture or a command line is not found. A test file that does
-    not parse is skipped.
+    A test function is one its file's reader says is a test, for Python a function whose
+    name starts with `test`, in a file under `paths.test_roots` that imports the defining
+    module, which is the reading `Ranker.importers` makes for the context packet. It names
+    the definition when its body refers to it through the imports of its file or its own
+    body, as `_names` reads them, so a parameter, a fixture or a local variable that is
+    merely spelled the same names nothing. That is a reading of the code and runs nothing:
+    a test that reaches the code through a helper, a fixture or a command line is not
+    found. A test file that does not parse is skipped.
     """
     reader = _TestReader(graph)
     importers = Ranker(graph).importers(sorted({definition.path for definition in definitions}))
@@ -525,12 +422,12 @@ def naming_tests(
         found: list[CandidateTest] = []
         for display in importers[definition.path]:
             of_the_file = reader.file_imports(display, module_key)
-            for function in reader.functions(display):
+            for test, refs in reader.functions(display):
                 imports = of_the_file
-                if function.imports:
-                    imports = imports.within(reader.imports(function.imports, display, module_key))
-                if _names(function, imports, definition.name, owner):
-                    found.append(function.test)
+                if refs.imports:
+                    imports = imports.within(reader.imports(refs.imports, display, module_key))
+                if _names(refs, imports, definition.name, owner):
+                    found.append(test)
         found.sort(key=lambda test: (test.path, test.line))
         out[definition] = found[:_SUGGESTION_LIMIT]
     return out

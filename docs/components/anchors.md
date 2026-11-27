@@ -10,6 +10,7 @@ depends_on:
   - context
   - docgraph
   - frontmatter
+  - languages
   - surface
 owns_tests:
   - tests/test_binding.py
@@ -30,8 +31,10 @@ one: "did *this symbol* change since this paragraph was last verified?"
 ## How it stays precise
 
 A paragraph carries an inline marker naming a file and (optionally) a symbol, plus a
-content hash. In a Python file the hash is taken over the **syntax tree** of the symbol's
-definition, not its raw text: `_canonical` writes out each node's type and fields, never
+content hash. `resolve` asks the [reader](languages.md#readers) of the file's language for
+the canonical text of the symbol's definition and hashes that, which is why this component
+depends on `languages`. In a Python file it is the
+**syntax tree** of the definition, not its raw text: `_canonical` writes out each node's type and fields, never
 its position, so reformatting or editing comments does not trip the claim, while a
 docstring edit or any other real change to the code does. That text depends on the tree
 alone, not on how an interpreter prints code, so a pin written on one Python version holds
@@ -40,14 +43,14 @@ on every version that parses the code to the same tree, as a CI matrix needs
 A name is bound by a function, a class, or
 an assignment, so a threshold or a registry can be anchored as readily as a function,
 and a constant's hash covers its whole assignment statement: two names bound by one
-`A, B = ...` share a hash, and an edit to either re-asks both claims. In a file of any
-other language the symbol resolves by name as a whole token, and the hash covers the
+`A, B = ...` share a hash, and an edit to either re-asks both claims. In a file of a
+language no reader reads, the symbol resolves by name as a whole token, and the hash covers the
 block that starts at the line defining it, with whitespace normalized. A marker written
 inside a code span or a fenced block is an example and is not read, so this syntax can
 be documented without the example becoming a live anchor.
-<!-- anchor: src/irminsul/anchors.py#resolve @sha256:c3f4df66e0c1 -->
-<!-- anchor: src/irminsul/anchors.py#_find_symbol @sha256:95c45a01a21c -->
-<!-- anchor: src/irminsul/anchors.py#_canonical @sha256:1c9d471d4bfc -->
+<!-- anchor: src/irminsul/anchors.py#resolve @sha256:d77621dc9f10 -->
+<!-- anchor: src/irminsul/languages/python_reader.py#_find_symbol @sha256:95c45a01a21c -->
+<!-- anchor: src/irminsul/languages/python_reader.py#_canonical @sha256:1c9d471d4bfc -->
 
 ## Binding the code a doc names
 
@@ -74,13 +77,14 @@ it like any other. To find one, `irminsul anchors --suggest --doc <doc>` also li
 code span of that doc that resolves to one Python function or class, once for each
 definition, so two methods of one name in one file are two rows, with where it is
 defined and up to three test functions that name it, ordered by path and line, each as a
-marker to paste. `naming_tests` reads a test function as one whose name starts with
-`test`, at the top level of a file or in a class there, in a Python file under
+marker to paste. `naming_tests` asks each test file's [reader](languages.md#readers) which
+of its functions are tests, for Python one whose name starts with
+`test`, at the top level of a file or in a class there, in a file under
 `paths.test_roots` that imports the defining module, which is the reading
 `Ranker.importers` makes for the [context packet](context.md#which-tests-a-source-file-gets).
 It names the definition when its body refers to it through an import of that module, in
-the file or in the test's own body, each import read by `imported_paths` as the
-[import checks](checks.md) read it (`_names`): a function or class at the top level of its
+the file or in the test's own body, each import resolved to files by that reader as the
+[import checks](checks.md) resolve it (`_names`): a function or class at the top level of its
 module by a name imported from it, under an alias too, that the test does not bind itself
 as a parameter, a fixture or a local variable, or as an attribute of a name bound to the
 module itself; a method by an attribute of its name, in a test whose imports reach its
@@ -206,7 +210,7 @@ measures how much of a function its tests guard.
 - **acknowledge-a-reviewed-co-change-or-evidence-drift#re-pin-writes-claim-pins** — `irminsul anchors --re-pin --doc <doc>` SHALL write the current normalized hash of every evidence file of every claim in that doc, and SHALL drop a pin on a path the claim no longer cites. (provenance: code; [RFC](../rfcs/acknowledge-a-reviewed-co-change-or-evidence-drift.md))
   <!-- anchor: src/irminsul/anchors.py#repin_claims @sha256:b7fbcd86889c -->
 - **a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts#suggest-offers-the-tests-of-a-definition** — `irminsul anchors --suggest --doc <doc>` SHALL list each code span of that doc that resolves to one Python function or class, with up to three test functions, in files under the configured test roots that import the defining module, whose body names that definition through the file's imports, each as an anchor marker ready to paste. A name the test binds itself SHALL NOT count as naming the definition. Without `--doc` it SHALL list what it lists today. (provenance: code; [RFC](../rfcs/a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts.md))
-  <!-- anchor: src/irminsul/binding.py#naming_tests @sha256:ba5b26e133c5 -->
+  <!-- anchor: src/irminsul/binding.py#naming_tests @sha256:a48e8aeceb91 -->
   <!-- anchor: tests/test_binding.py#test_suggest_offers_the_test_that_calls_a_function_the_doc_names @sha256:94b5c37f7a7b -->
   <!-- anchor: tests/test_binding.py#test_a_name_the_test_binds_itself_does_not_name_the_definition @sha256:ad1bee32b830 -->
   <!-- anchor: tests/test_binding.py#test_suggest_says_so_when_no_test_names_the_definition @sha256:a96352d4b56f -->

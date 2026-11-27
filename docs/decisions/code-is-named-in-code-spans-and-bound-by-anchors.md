@@ -7,6 +7,9 @@ summary: A code span is a literal mention checked against the tree, a bare `.md`
 governs:
   - src/irminsul/anchors.py
   - src/irminsul/binding.py
+  - src/irminsul/languages/python_reader.py#_canonical
+  - src/irminsul/languages/python_reader.py#_find_symbol
+  - src/irminsul/languages/python_reader.py#PythonReading.canonical
   - src/irminsul/code_references.py
   - src/irminsul/checks/code_references.py
   - src/irminsul/checks/code_spans.py
@@ -78,7 +81,8 @@ paragraphs, which trains a reader to re-pin without reading.
   at the top level or as `Class.member`. Another text file resolves a symbol whose every dotted
   part appears as a whole token, and pins the whitespace-normalized block at its defining line.
   A file anchor pins the whole file. A span resolves with or without a trailing `()`.
-- **A Python pin hashes `_canonical` of the tree** in `src/irminsul/anchors.py`: each node's
+- **A Python pin hashes `_canonical` of the tree**, the canonical text Python's reader gives
+  in `src/irminsul/languages/python_reader.py`: each node's
   type name and its fields from `ast.iter_fields`, nodes and lists recursively, leaves through
   `ascii`. Positions are never written, a field that is `None` or `[]` is left out, and an
   empty literal inside an f-string is dropped. The pin is the first 12 hex digits of the
@@ -103,7 +107,7 @@ paragraphs, which trains a reader to re-pin without reading.
   the syntax tree under the dotted path an anchor accepts; one inside a function or block is
   listed as out of reach rather than dropped; a file that only mentions the name is offered
   only when nothing defines it. The agent chooses and writes the anchor.
-  <!-- anchor: src/irminsul/binding.py#suggest @sha256:c38ecde76ec0 -->
+  <!-- anchor: src/irminsul/binding.py#suggest @sha256:56aa1c362862 -->
 - **A sentence about behaviour is best anchored to the test that asserts it.** A test
   function is a symbol, so an anchor names it, pins it and drifts with it like any other. The
   paragraph is then asked about when that test changes, and the test fails when the code stops
@@ -241,3 +245,7 @@ paragraphs, which trains a reader to re-pin without reading.
 - 2026-11-27: The stale listing is implemented and stated in the Decision: `anchors --stale`
   lists every anchor and claim evidence pin that no longer matches its file, each with the
   finding that already reports it, if any, and the re-pin of that pin alone, and exits 0.
+- 2026-11-27: The language interface is implemented for Python: a pin hashes the canonical
+  text the reader of the file's language gives, which for Python is `_canonical` of the tree as
+  before, now in `src/irminsul/languages/python_reader.py` with the resolution of a symbol, and
+  `anchors --suggest` reads definitions and tests through that reader. No pin moved.

@@ -74,7 +74,7 @@ The review queue and `anchors --suggest` ask `CodeResolver.resolve` whether a co
 names a definition, and its symbol index (`_symbol_index`,
 `src/irminsul/code_references.py:96`) holds only functions and classes, at the top level
 and one class deep. Anchors resolve a name through `_find_symbol`
-(`src/irminsul/anchors.py:117`), which also accepts an assignment. With `MAX_SIZE = 5` in
+(`src/irminsul/languages/python_reader.py`), which also accepts an assignment. With `MAX_SIZE = 5` in
 `src/m.py`, `<!-- anchor: src/m.py#MAX_SIZE -->` resolves, while a span `MAX_SIZE` resolves
 to nothing, is listed as `unbound` by `list review --written`, and is never paired with its
 definition; `anchors --suggest` then offers that very anchor (re-run on 2026-10-28). One
@@ -107,9 +107,9 @@ come from `str.splitlines` (`:151`), which also splits on `\x0c`, `\x1c` and `â€
 Python ends no line at those characters, so a module holding a form feed parses with
 shifted line numbers and `anchors --suggest` points a candidate at the wrong line (line 13
 for a definition on line 12, re-run on 2026-10-28), while one holding `\x1c` in a string no
-longer parses and offers nothing. Reading the module through the source tree's
-`PythonModule` (`src/irminsul/inventory/base.py:62`), as every other reader now does, would
-make suggestions agree with them.
+longer parses and offers nothing. Reading the module through the source tree's reading of
+the file (`SourceReader.reading`, `src/irminsul/inventory/base.py`), as every other feature
+now does, would make suggestions agree with them.
 
 ### `suggest-matches-the-last-name-part`
 
@@ -598,6 +598,15 @@ imports `late_fee` and then rebinds it at file level, by `def late_fee`, an assi
 later import of another `late_fee`, still has its tests offered for the function
 (`src/irminsul/binding.py`). Found by a review on 2026-11-26; no test of this repository does
 it.
+
+Two imports from the defining module itself are read the wrong way round too.
+`_TestReader.file_imports` reads a file's imports from the last line to the first, so after
+`from pkg.m import a as x` and `from pkg.m import b as x` a test that calls `x()` is offered
+for `a`, where Python has bound `x` to `b` (run on 2026-11-27, on two lines, on one line with
+`;`, and across the branches of an `if`, a `try` and a `match`). The order was an accident of
+a stack walk and was kept on purpose when the module moved onto the language reader, a change
+that was to alter no output. Reading the imports first to last fixes it, once
+`python-reader-lists-a-trys-else-before-its-handlers` is fixed.
 
 ### `python-reader-lists-a-trys-else-before-its-handlers`
 
