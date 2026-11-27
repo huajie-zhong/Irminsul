@@ -13,6 +13,7 @@ from irminsul.checks.base import Answer, Finding, FindingClass, Severity
 from irminsul.config import IrminsulConfig
 from irminsul.docgraph import DocGraph
 from irminsul.git.mtime import git_root_for
+from irminsul.languages import LANGUAGE_REGISTRY
 
 
 @dataclass(frozen=True)
@@ -436,9 +437,15 @@ def excluded_by_config(config: IrminsulConfig, display: str) -> bool:
 
 
 def _is_excluded(parts: tuple[str, ...]) -> bool:
-    if any(part.startswith(".") or part == "__pycache__" for part in parts):
+    """Whether a path under a source root is hidden, or is what a language's tools wrote
+    there: under one of a profile's `cache_dirs`, or with one of its `compiled_suffixes`."""
+    if any(part.startswith(".") for part in parts):
         return True
-    return PurePosixPath(parts[-1]).suffix in {".pyc", ".pyo"}
+    suffix = PurePosixPath(parts[-1]).suffix
+    return any(
+        suffix in profile.compiled_suffixes or any(part in profile.cache_dirs for part in parts)
+        for profile in LANGUAGE_REGISTRY.values()
+    )
 
 
 CODE_MISSING_SOURCE_ROOT = "globs/missing-source-root"

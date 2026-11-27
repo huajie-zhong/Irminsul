@@ -19,6 +19,9 @@ TYPESCRIPT_PROFILE = LanguageProfile(
         r"process\.env\.([A-Za-z_]\w*)|process\.env\[\s*['\"](\w+)['\"]\s*\]"
     ),
     fence_labels=("typescript", "ts", "tsx", "javascript", "js"),
+    unclaimed_files=("*.d.ts",),
+    dependency_dirs=("node_modules",),
+    launchers=("npx", "pnpm", "yarn", "npm"),
     suffixes=(".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"),
     markers=("package.json",),
     confirmed_by=("tsconfig.json", "**/*.ts"),

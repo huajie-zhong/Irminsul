@@ -733,34 +733,25 @@ import of a file the change renamed is not found on the old side and is reported
 (2026-11-27, by reading; Python has the same blind spot through `owner_of`, which asks the
 disk whether a candidate exists).
 
-### `a-languages-tools-and-skipped-files-are-listed-outside-its-profile`
+### `python-standard-library-and-program-manifests-are-listed-outside-a-profile`
 
-A language's reader, its files' suffixes and its environment variable pattern are its
-profile's, so the features that read code and the `env-vars` surface reach a language
-registered there with nothing else edited. Five lists outside `src/irminsul/languages/` still
-name a language's files or tools themselves (read on 2026-11-27), so a new language that
-needs the same is added to each:
+A language's reader, its files' suffixes, its environment variable pattern and what each
+check leaves out or looks past for it are its profile's, so no check names a language. Two
+lists outside `src/irminsul/languages/` still do (read on 2026-11-27), and neither is a
+check's:
 
-- `OMISSION_SKIP` (`src/irminsul/checks/uniqueness.py`): the files `uniqueness` does not ask
-  a doc to claim, Python's `__init__.py`, `__main__.py`, `conftest.py`, `_version.py` and
-  `*.pyi`, and TypeScript's `*.d.ts`.
-- `_is_excluded` (`src/irminsul/checks/globs.py`) keeps `__pycache__` and `.pyc` and `.pyo`
-  files out of the source walk, and `_SKIPPED_DIRS` (`src/irminsul/checks/file_paths.py`)
-  keeps `node_modules` and `__pycache__` out of the file index.
 - `_NOT_OURS` (`src/irminsul/binding.py`): Python's standard-library modules, so `os.path` is
   no code name while Go's `fmt.Println` and Rust's `std::fs` are, and each is listed as an
   unbound name (`code_name` run on 2026-11-27).
 - `program_names` (`src/irminsul/inventory/programs.py`) reads a project's program names from
   `pyproject.toml`, `package.json` and `Cargo.toml`, and from nothing for Go.
-- `_LAUNCHERS` and `_invoked_program` (`src/irminsul/checks/inventory_drift.py`) see through
-  `uv`, `npx`, `poetry` and `python -m`, and not through `cargo run` or `go run`.
 
 `ledger.pyi` is still a code name to `code_name`, since Python's profile lists `.py` alone
-while `OMISSION_SKIP` knows `*.pyi` for Python's. A profile field for each list would put it
-where a language is added, and moving one changes no output. Adding what Go and Rust lack,
-their standard-library modules, Go's program names and the `cargo run` and `go run`
-launchers, changes what `anchors --suggest`, `list review --written`, `code-references` and
-`inventory-drift` report for them, so each of those is a rule.
+among its suffixes and `*.pyi` among its `unclaimed_files`. And the profile's `launchers` and
+`interpreter` list what the checks knew before the move: Go and Rust have none, so
+`inventory-drift` does not look past `cargo run` or `go run`. Moving either list changes no
+output. Adding what Go and Rust lack changes what `anchors --suggest`, `list review
+--written`, `code-references` and `inventory-drift` report for them, so each is a rule.
 
 ### `prose-beside-a-comment-marker-is-misread`
 

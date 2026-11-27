@@ -76,8 +76,9 @@ queue, the packet's tests, the suggested tests and `import-deps` reach TypeScrip
 when this lands, `import-deps` as far as decision 9 lets it.
 
 **Adding a language** is a profile, a grammar package and a query file, with a fixture that
-tests the queries. The environment variable pattern moves into the profile, so a language's
-facts are in one place.
+tests the queries, and code beside them for what a query cannot say of its imports and its
+tests. The environment variable pattern moves into the profile, with what each check leaves
+out or looks past for a language, so no check names one.
 
 **What it leaves out.** Framework surfaces stay as the record decides: syntax-tree
 extractors for Typer, FastAPI and an MCP server, rules for the rest. An import is resolved to
@@ -155,9 +156,12 @@ Answered by the owner on 2026-11-27, while the tree-sitter readers were built:
 9. **`import-deps` reports a missing import only where every import is placed.** A reading
    says whether every import of its file is placed: a Python file's is, and a Go file's
    under a `go.mod`, when the file parses whole; a TypeScript or a Rust file's never is,
-   since a path alias or another crate may stand between two files. A `depends_on` is judged only between docs whose common
-   languages have every import of the depending doc's files placed. Not chosen: judging every
-   language with a reader, which would report true dependencies with no way to answer.
+   since a path alias or another crate may stand between two files. A `depends_on` is judged
+   only between docs whose common languages have every import of the depending doc's files
+   placed. Not chosen: judging every language with a reader, which would report true
+   dependencies with no way to answer. The owner added later that day, after the readers had
+   merged, that a Python file which does not parse or is not UTF-8 places none, where it had
+   still denied a dependency.
 10. **For TypeScript, every named function a test file defines is offered as a test**, as the
     design detail below says; the reader knows a test file by the test call it holds. Not
     chosen: offering none, since such a function is often a helper.

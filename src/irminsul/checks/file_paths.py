@@ -13,7 +13,19 @@ from irminsul.languages import LANGUAGE_REGISTRY
 
 _EXTENSION_RE = re.compile(r"\.[A-Za-z0-9]+")
 _CONFIG_SUFFIXES = frozenset({".md", ".toml", ".yml", ".yaml", ".json"})
-_SKIPPED_DIRS = frozenset({".git", "node_modules", "__pycache__"})
+
+
+def _skipped(directory: Path) -> bool:
+    """Whether the file index leaves `directory` out: git's own, one a language's tools write
+    to or install other projects' code in, or an installed environment, each as a profile
+    lists it."""
+    name = directory.name
+    return name == ".git" or any(
+        name in profile.cache_dirs
+        or name in profile.dependency_dirs
+        or any((directory / marker).exists() for marker in profile.environment_markers)
+        for profile in LANGUAGE_REGISTRY.values()
+    )
 
 
 def path_suffixes(enabled_languages: Iterable[str]) -> frozenset[str]:
@@ -97,11 +109,7 @@ class FileIndex:
         directories, which is how a generated file git ignores is found."""
         self._walked = True
         for directory, names, files in os.walk(self._root):
-            names[:] = [
-                n
-                for n in names
-                if n not in _SKIPPED_DIRS and not (Path(directory) / n / "pyvenv.cfg").exists()
-            ]
+            names[:] = [n for n in names if not _skipped(Path(directory) / n)]
             base = Path(directory).relative_to(self._root).as_posix()
             for name in files:
                 self._add(name if base == "." else f"{base}/{name}")

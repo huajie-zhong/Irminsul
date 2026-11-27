@@ -147,6 +147,9 @@ The rules `rfc-lifecycle`, `rfc-follow-through` and `change-binding` share with 
 
 A run walks each scope once — the configured source roots, and the declared test roots under the same policy — and every check reads that walk from the graph's [source tree](docgraph.md) rather than walking for itself. Ownership has one matcher too: `claims_for` in `checks/uniqueness.py` matches `describes` patterns against files and scores their [specificity](../GLOSSARY.md#specificity) for `uniqueness`, both import checks, `co-change`, `context`, and the owner moves `diff-integrity` and `list review` compare across refs.
 
+No check names a language. What the source walk leaves out of a language's tools, the files `uniqueness` asks no doc to claim, the installed code the file index leaves out and the launchers `inventory-drift` looks past are each a list of the language's [profile](languages.md), read from the registry, so a language registered there is known to every check with none edited.
+<!-- anchor: tests/test_languages.py#test_no_check_holds_a_name_a_profile_lists @sha256:29c2646a5de0 -->
+
 ## Scope & Limitations
 
 Checks do not apply fixes; `irminsul fix` remediates. They do not evaluate prose quality or writing style, and they do not modify source files or docs. Neither the source walk nor the doc walk follows a directory symlink.

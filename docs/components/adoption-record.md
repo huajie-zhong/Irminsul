@@ -29,7 +29,7 @@ claims:
       - src/irminsul/checks/owned_tests.py
     pinned:
       src/irminsul/adoption.py: sha256:172d868df4d6
-      src/irminsul/checks/uniqueness.py: sha256:e22fea2887c0
+      src/irminsul/checks/uniqueness.py: sha256:c922d35c0349
       src/irminsul/checks/owned_tests.py: sha256:0643881c0a53
   - id: adoption-record-only-shrinks
     state: implemented
@@ -62,7 +62,7 @@ claims:
       - src/irminsul/checks/adoption_record.py
     pinned:
       src/irminsul/adoption.py: sha256:172d868df4d6
-      src/irminsul/checks/uniqueness.py: sha256:e22fea2887c0
+      src/irminsul/checks/uniqueness.py: sha256:c922d35c0349
       src/irminsul/checks/adoption_record.py: sha256:210962a2c53c
   - id: adopting-obligations-are-complete
     state: implemented

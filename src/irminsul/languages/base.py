@@ -57,6 +57,33 @@ class LanguageProfile:
     matched. None where the profile has no pattern, so its files put no variable on that
     surface.
     """
+    unclaimed_files: tuple[str, ...] = ()
+    """Gitignore-style patterns naming files of this language that no doc is asked to claim,
+    such as Python's `__init__.py`: noise from a doc-coverage standpoint, which `uniqueness`
+    reports none of as undocumented. Test files are not listed here; `test_patterns` names
+    them, and the test policy answers for them.
+    """
+    cache_dirs: tuple[str, ...] = ()
+    """Names of the directories the language's tools write their own output to, such as
+    Python's `__pycache__`. The source walk and the file index leave them out."""
+    compiled_suffixes: tuple[str, ...] = ()
+    """Suffixes, with the dot, of the files the language's tools compile its source into, such
+    as `.pyc`. The source walk leaves them out."""
+    dependency_dirs: tuple[str, ...] = ()
+    """Names of the directories that hold other projects' code this one installed, such as
+    `node_modules`. The file index leaves them out."""
+    environment_markers: tuple[str, ...] = ()
+    """File names that make the directory holding one an installed environment, as
+    `pyvenv.cfg` makes a Python virtual environment. The file index leaves such a directory
+    out."""
+    launchers: tuple[str, ...] = ()
+    """Commands of the language's tools that run another command, such as `uv` and `npx`:
+    `inventory-drift` looks past one for the program a documented command line runs."""
+    interpreter: re.Pattern[str] | None = None
+    """What the whole name of the language's interpreter looks like, as `python3.12` and `py`
+    are Python's. `inventory-drift` reads a command line that starts with one as running the
+    module after `-m`, or the script the interpreter is given. None where the language's
+    programs are not run through one."""
     path_separator: str = "."
     """What the language writes between the parts of a path to a definition, as Rust writes
     `Desk::new`. A doc may write a path that way where the language is enabled."""

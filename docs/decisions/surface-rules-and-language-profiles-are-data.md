@@ -51,7 +51,9 @@ TypeScript file was once written five times with five answers.
   `LanguageProfile.suffixes`; the TypeScript profile lists JavaScript's with its own,
   `.ts .tsx .mts .cts .js .jsx .mjs .cjs`. A profile also holds the pattern that reads an
   environment variable in those files, which the `env-vars` surface matches, so that
-  extractor names no language. Profiles exist for Python, TypeScript, Go and Rust;
+  extractor names no language, and what a check leaves out or looks past for the language:
+  the files no doc is asked to claim, what its tools write and install, and its launchers
+  and interpreter. No check names a language. Profiles exist for Python, TypeScript, Go and Rust;
   a language without one, such as Ruby, is read by none, and a project needing one of its
   surfaces declares a `surface.rules` rule.
 - **`markers` and `confirmed_by` drive `init`.** A profile lists the root files that show its
@@ -104,9 +106,9 @@ TypeScript file was once written five times with five answers.
   only by its function.
 - An `env-vars` inventory item that only a `.rb` file reads is `inventory-drift/item-not-found`.
 - **Known limits.** The lift of a base's old table lives in `parse_snapshot` and goes once no
-  base a run can meet predates the rename. The `uniqueness` skip list still names Python's
-  files itself, as the source walk, the program names and the launchers each still name a
-  language's files and tools themselves.
+  base a run can meet predates the rename. Python's standard-library modules and the
+  manifests a project's program names are read from are still listed outside a profile, in
+  `src/irminsul/binding.py` and `src/irminsul/inventory/programs.py`.
 - An exact pin on tree-sitter and its grammars conflicts with another tool in the same
   environment that needs another version of them, and where no wheel exists, installing
   Irminsul compiles C code.
@@ -146,3 +148,8 @@ TypeScript file was once written five times with five answers.
 - 2026-11-27: The pattern that reads an environment variable is a field of the language's
   profile, `env_var_pattern`, where the `env-vars` extractor held one pattern per language
   and joined them to the profiles by suffix. The surface prints what it printed.
+- 2026-11-27: What four checks listed of a language is its profile's, as the owner decided
+  that day before the RFC was sealed: the files `uniqueness` asks no doc to claim, what the
+  source walk and the file index leave out, and the launchers and the interpreter
+  `inventory-drift` looks past. Each check reads the registry and reports what it reported,
+  and the known limit on the `uniqueness` skip list is gone.

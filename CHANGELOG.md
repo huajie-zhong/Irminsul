@@ -328,6 +328,12 @@ making a feature, a refactor and an RFC-driven change in it.
 - A file named with a suffix a language profile lists is never read as a code name.
   `ledger.mts` and `types.cts` were, and `anchors --suggest` listed them as unbound names,
   because it kept a list of suffixes of its own that missed them.
+- A language profile lists what the checks leave out or look past for its language: the
+  files no doc is asked to claim, the directories and compiled files its tools write, the
+  directories of installed code and the file that marks an installed environment, and its
+  launchers and interpreter. `uniqueness`, the source walk, the file index and
+  `inventory-drift` read them there, where each kept a list of Python's and Node's, and
+  report what they reported.
 - A language profile holds the pattern that reads an environment variable in its language,
   `env_var_pattern`, where the `env-vars` extractor held one per language. `irminsul surface
   env-vars` prints what it printed.

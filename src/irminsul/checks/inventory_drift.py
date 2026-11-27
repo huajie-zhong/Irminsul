@@ -24,6 +24,7 @@ from irminsul.frontmatter import InventoryEntry
 from irminsul.frontmatter_edit import remove_inventory_item
 from irminsul.inventory import KNOWN_KINDS_TEXT, SurfaceItem, get_extractor, kind_capabilities
 from irminsul.inventory.programs import program_names
+from irminsul.languages import LANGUAGE_REGISTRY
 
 
 def _foreign_head(text: str, programs: tuple[str, ...]) -> str | None:
@@ -55,27 +56,9 @@ def _foreign_head(text: str, programs: tuple[str, ...]) -> str | None:
     return None if invoked is None or invoked in programs else invoked
 
 
-#: Commands that run *another* command, so the program being invoked is further along.
-_LAUNCHERS: Final = frozenset(
-    {
-        "uv",
-        "uvx",
-        "npx",
-        "pipx",
-        "poetry",
-        "pdm",
-        "hatch",
-        "rye",
-        "pnpm",
-        "yarn",
-        "npm",
-        "sudo",
-        "env",
-        "time",
-        "nice",
-        "xargs",
-    }
-)
+#: Commands of the shell that run *another* command, so the program being invoked is further
+#: along. A language's own, such as its package manager's, are its profile's `launchers`.
+_LAUNCHERS: Final = frozenset({"sudo", "env", "time", "nice", "xargs"})
 #: Words a launcher puts between itself and the program.
 _LAUNCHER_VERBS: Final = frozenset({"run", "exec", "--"})
 
@@ -96,11 +79,17 @@ def _invoked_program(tokens: list[str]) -> str | None:
     `None` when the line runs nothing identifiable. Deliberately shallow — only the spellings
     this project's own documentation uses — rather than an attempt to understand shell.
     """
+    profiles = LANGUAGE_REGISTRY.values()
+    launchers = _LAUNCHERS.union(*(profile.launchers for profile in profiles))
     index = 0
     while index < len(tokens):
         head = _basename(tokens[index])
-        if head.startswith("python") or head == "py":
-            # `python -m irminsul check`, and `py -3.12 -m irminsul check`.
+        if any(
+            profile.interpreter is not None and profile.interpreter.fullmatch(head)
+            for profile in profiles
+        ):
+            # An interpreter runs the module `-m` names, past its own flags, or the script
+            # it is given.
             for offset in range(index + 1, len(tokens)):
                 token = tokens[offset]
                 if token == "-m" and offset + 1 < len(tokens):
@@ -108,7 +97,7 @@ def _invoked_program(tokens: list[str]) -> str | None:
                 if not token.startswith("-"):
                     return _basename(token)
             return head
-        if head in _LAUNCHERS:
+        if head in launchers:
             index += 1
             while index < len(tokens) and (
                 tokens[index].startswith("-") or tokens[index] in _LAUNCHER_VERBS
