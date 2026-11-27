@@ -693,15 +693,18 @@ file no reader reads; which line the text route takes to define a name there (`d
 `definition_line`, `src/irminsul/anchors.py`), for an anchor and for `anchors --suggest`, so
 that with `RATE=5` on line 1 of a marked file and `RATE=6` below, the anchor `#RATE` pins the
 second (a reviewer's run on 2026-11-27); and the lines the review queue compares, where
-adding or removing a mark shows as a change to line 1. Dropping the mark where
-`SourceReader.text` and a git revision's text are read would be one place for those three.
+adding or removing a mark shows as a change to line 1. Dropping the mark in one helper
+that `SourceReader.text` and `SourceAtCommit.text` (`src/irminsul/listing/changed_code.py`),
+which reads a git revision, both read through would close those three.
 It moves the pin of every marked file no reader reads once, which changes what a pin hashes,
 so it is a rule.
 
-Two more keep it and are read on their own. A manifest saved with a mark is not read: a
-marked `go.mod` gives no module path (`src/irminsul/languages/manifests.py`) and a marked
-`package.json` no program names (`src/irminsul/inventory/programs.py`), each in a reviewer's
-run on 2026-11-27; whether `go` or `npm` accept such a file was not checked. And a reader
+Two more keep it and are read on their own. A manifest saved with a mark is misread: a
+marked `go.mod` whose first line is `module` gives no module path
+(`src/irminsul/languages/manifests.py`), and a marked `package.json`, `pyproject.toml` or
+`Cargo.toml` no program names (`src/irminsul/inventory/programs.py`), the first two in a
+reviewer's run on 2026-11-27 and the TOML files because `tomllib` rejects the mark; whether
+`go`, `npm` or `cargo` accept such a file was not checked. And a reader
 added later can read the disk itself, as Go's `mentioned_as` does, and must call `unmarked`.
 
 ### `a-python-source-root-that-is-its-own-package`
