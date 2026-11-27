@@ -19,7 +19,7 @@ A pin records what a file looked like when someone last re-read the sentence tha
 it. Today a claim's pin can stop matching its file and nobody is told: the check that asks
 about it judges two layers of docs only, and skips a pin whose doc was committed after the
 file, a rule the accepted RFC on naming a part of evidence keeps. On 2026-11-26 nine such
-pins sat in component docs, and two reviewers each wrote a script to find them. This adds a read-only listing of every pin that no longer matches, so an
+pins sat in component docs, and two reviewers each wrote a script to find them. This [RFC](../GLOSSARY.md#rfc) adds a read-only listing of every pin that no longer matches, so an
 agent can see them and re-read each one, without changing what any check reports. The owner
 chose this over changing the check on 2026-11-27; three decisions remain.
 
@@ -61,16 +61,18 @@ chose this over changing the check on 2026-11-27; three decisions remain.
   `--claim <id> --evidence <path>`. Plain output prints one row per line and a count.
 - **`reported_by`.** The listing runs the two checks that ask about pins, `claim-anchor` and
   `claim-provenance`, over the same graph and names the code of a finding about that doc and
-  that anchor target or claim id: `claim-anchor/pinned-drift` for a stale anchor, and
-  `claim-provenance/evidence-drift` for a claim's evidence when that check reports it, which
-  depends on the doc's layer and on commit times. Otherwise it is null.
+  that anchor target, or that claim id and evidence path: `claim-anchor/pinned-drift` for a
+  stale anchor, and `claim-provenance/evidence-drift` for a claim's evidence when that check
+  names that file, which depends on the doc's layer and on commit times. A second stale pin
+  of the same claim that the finding does not name is not reported. Otherwise it is null.
 - **Flags.** `--stale` takes `--doc` and `--format`. With `--re-pin` or `--suggest` it exits 2:
   one action per run.
-- **Measured** with a script doing the same reading of claim evidence pins: 38 on main, of
-  which 12 were stale before the re-pins of 2026-11-26 (three in architecture and foundation
-  docs, reported once a squash merge made them newer than their docs) and 9 after them, all in
-  component docs and none reported. Re-reading and re-pinning on 2026-11-27 leaves none, so
-  the listing starts empty on this repository.
+- **Measured** with a script doing the same reading of claim evidence pins: 38 on main. On
+  2026-11-26, 12 were stale (three in architecture and foundation docs, reported once a squash
+  merge made them newer than their docs), 9 after those three were re-pinned, all in component
+  docs and none reported, and 3 after six more were re-read and re-pinned that day.
+  Re-pinning those three on 2026-11-27 leaves none, so the listing starts empty on this
+  repository.
 - **Out of scope.** The MCP `anchors` tool returns `claim-anchor` findings and does not gain the
   listing; `affects` names no MCP change.
 - **Not chosen.** Changing `evidence-drift` to report a stale pin whatever the commit times:
