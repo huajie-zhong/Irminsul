@@ -30,6 +30,7 @@ from irminsul.frontmatter import (
     StatusEnum,
 )
 from irminsul.frontmatter_edit import list_adder, setter
+from irminsul.parts import split_part
 
 CODE_STATUS_NOT_STABLE = "rfc-follow-through/status-not-stable"
 CODE_MISSING_SECTION = "rfc-follow-through/missing-section"
@@ -367,7 +368,7 @@ class RfcFollowThroughCheck:
             if claim.state != ClaimStateEnum.planned:
                 continue
             for evidence in claim.evidence:
-                match = rfc_path_re.search(evidence)
+                match = rfc_path_re.search(split_part(evidence)[0])
                 rfc = graph.by_path.get(Path(match.group(0))) if match else None
                 state = rfc.frontmatter.rfc_state if rfc is not None else None
                 # A `planned` claim stays true while its RFC is accepted but not yet built.

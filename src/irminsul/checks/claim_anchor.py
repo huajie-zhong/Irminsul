@@ -12,8 +12,8 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from irminsul.anchors import parse_anchors, resolve
-from irminsul.checks.base import Answer, Finding, FindingClass, Severity, did_you_mean
+from irminsul.anchors import parse_anchors, resolve, shell_word
+from irminsul.checks.base import Answer, Finding, FindingClass, Severity, closest
 from irminsul.docgraph import DocGraph
 
 CODE_MISSING_FILE = "claim-anchor/missing-file"
@@ -96,7 +96,10 @@ class ClaimAnchorCheck:
             for anchor in parse_anchors(node.body):
                 resolution = resolve(graph.repo_root, anchor, graph.source)
                 target = anchor.target
-                re_pin = f"irminsul anchors --re-pin --doc {node.path.as_posix()} --anchor {target}"
+                re_pin = (
+                    f"irminsul anchors --re-pin --doc {shell_word(node.path.as_posix())} "
+                    f"--anchor {shell_word(target)}"
+                )
 
                 if resolution.status == "missing_file":
                     out.append(
@@ -116,7 +119,7 @@ class ClaimAnchorCheck:
                     )
                 elif resolution.status == "missing_symbol":
                     symbol = anchor.symbol or ""
-                    closest = did_you_mean(symbol, resolution.known)
+                    nearest = closest(symbol, resolution.known)
                     reason = f": {resolution.why}" if resolution.why else ""
                     out.append(
                         Finding(
@@ -125,7 +128,7 @@ class ClaimAnchorCheck:
                             severity=Severity.error,
                             message=(
                                 f"anchor symbol '{symbol}' not found in "
-                                f"'{anchor.path}'{reason}{closest}"
+                                f"'{anchor.path}'{reason}{nearest}"
                             ),
                             path=node.path,
                             doc_id=node.id,
@@ -146,7 +149,7 @@ class ClaimAnchorCheck:
                                 f"anchor part '{anchor.symbol}' cannot be found in "
                                 f"'{anchor.path}': no finder reads this type of file and "
                                 f"no `irminsul:part {anchor.symbol}` marker is in it"
-                                f"{did_you_mean(anchor.symbol or '', resolution.known)}"
+                                f"{closest(anchor.symbol or '', resolution.known)}"
                             ),
                             path=node.path,
                             doc_id=node.id,

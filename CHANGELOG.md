@@ -351,6 +351,34 @@ making a feature, a refactor and an RFC-driven change in it.
     file of several YAML documents does not resolve.
   - `anchors --suggest` offers `path#name` only where it resolves; for a name that only a
     file no reader reads spells, it offers the file.
+- A claim's evidence entry may name a part of its file, `path#part`, found as an anchor's
+  part is
+  ([Claim evidence names a part](docs/rfcs/claim-evidence-names-a-part.md), its tasks T4 to T7):
+  - Its pin is keyed by the entry as the claim writes it and covers that part alone, so a
+    claim that cites `src/irminsul/cli.py#fix` is not asked again when another function of
+    that file changes. A part with no pin is still asked about as its whole file is: the
+    narrowing takes effect at the re-pin.
+  - `claim-provenance/evidence-part-missing`, a certain finding, reports a part its file's
+    finder does not know, with the closest names it does know, so a renamed function is
+    caught as a renamed file is. `claim-provenance/evidence-part-unsupported`, also certain,
+    reports a part of a file whose type has no finder and that holds no marker for it.
+    An entry reported for either is not also reported as drifted.
+  - `claim-provenance/evidence-unreadable`, a hint, reports an entry whose file could not
+    be read: a part of a Python file with a syntax error, of a key file that does not parse
+    or of a JSON object that writes a key twice, and a pinned whole file with no hash to
+    compare. A pinned whole file like that was reported as `evidence-drift`, where its doc
+    is judged for drift, with a suggested re-pin that exited 0 having moved nothing; it is
+    now judged for no drift, and the hint, answered by fixing the file or by marking the
+    lines, is reported in every layer, a draft and a doc newer than the file included.
+  - `anchors --re-pin --evidence` takes an entry as the claim spells it, part included, and
+    a bare path selects every entry of that file. A re-pin of a claim drops a pin on a
+    spelling the claim no longer cites, also when `--evidence` narrowed it to another entry.
+  - `claim-anchor/missing-symbol` and `part-unsupported` name the closest names in the same
+    way, where they named one only when it was nearly the same.
+  - The command an `evidence-drift` or a `claim-anchor` finding prints quotes each argument
+    that needs it, so in a POSIX shell and in PowerShell 7 it runs as printed for a path
+    with a space, a word with an apostrophe and a key written `tool."a.b"`. Windows
+    PowerShell 5.1 still drops the double quotes of such a key.
 - A language profile lists what the checks leave out or look past for its language: the
   files no doc is asked to claim, the directories and compiled files its tools write, the
   directories of installed code and the file that marks an installed environment, and its

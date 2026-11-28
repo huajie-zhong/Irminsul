@@ -183,9 +183,11 @@ def test_an_uncommitted_edit_to_a_named_doc_counts_as_following_through(tmp_path
     assert stale in [f.code for f in _findings(root, now=later, committed_only=True)]
 
 
-def test_a_planned_claim_citing_a_resolved_rfc_is_reported_once(tmp_path: Path) -> None:
+@pytest.mark.parametrize("entry", ["docs/rfcs/0001-done.md", "docs/rfcs/0001-done.md#notes.md"])
+def test_a_planned_claim_citing_a_resolved_rfc_is_reported_once(tmp_path: Path, entry: str) -> None:
     """`claim-provenance` reported the same claim as `planned-claim-resolved`, beside this
-    check's `stale-claim`."""
+    check's `stale-claim`. The RFC an entry cites is read from its path, so a part of the
+    RFC, even one whose name ends as a doc's does, leads to the same RFC."""
     from irminsul.checks.claim_provenance import ClaimProvenanceCheck
 
     repo = tmp_path / "r"
@@ -194,13 +196,14 @@ def test_a_planned_claim_citing_a_resolved_rfc_is_reported_once(tmp_path: Path) 
     write_config(repo)
     (repo / "docs" / "rfcs" / "0001-done.md").write_text(
         "---\nid: 0001-done\ntitle: Done\nstatus: stable\nrfc_state: implemented\n"
-        "resolved_by: docs/foundation/principles.md\n---\n\n# Done\n",
+        "resolved_by: docs/foundation/principles.md\n---\n\n# Done\n\n"
+        "<!-- irminsul:part notes.md -->\nNotes.\n<!-- irminsul:end notes.md -->\n",
         encoding="utf-8",
     )
     (repo / "docs" / "foundation" / "principles.md").write_text(
         "---\nid: principles\ntitle: Principles\nstatus: stable\nclaims:\n"
         "  - id: shipped\n    state: planned\n    kind: feature\n"
-        "    claim: The feature ships.\n    evidence:\n      - docs/rfcs/0001-done.md\n"
+        f"    claim: The feature ships.\n    evidence:\n      - {entry}\n"
         "---\n\n# Principles\n\nThe feature ships. <!-- claim:shipped -->\n",
         encoding="utf-8",
     )

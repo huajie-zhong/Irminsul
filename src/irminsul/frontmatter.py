@@ -164,13 +164,15 @@ class Claim(BaseModel):
     claim: str = Field(min_length=1)
     evidence: list[str] = Field(min_length=1)
     pinned: dict[str, str] = Field(default_factory=dict)
-    """Each evidence file's normalized hash when the claim was last checked against it.
+    """Each evidence entry's normalized hash when the claim was last checked against it,
+    keyed by the entry as `evidence` writes it: the hash of the part an entry `path#part`
+    names, and of the whole file for a bare path.
 
-    Written by `anchors --re-pin`, never by hand. While a file still has the hash it was
-    pinned at, a commit to it does not re-ask the claim. Deliberately unvalidated beyond
-    its shape: a pin that matches nothing only stops suppressing drift, while a schema
-    error here would unparse the doc and so put it out of reach of the re-pin that
-    repairs it.
+    Written by `anchors --re-pin`, never by hand. While what an entry names still has the
+    hash it was pinned at, a commit to its file does not re-ask the claim. Deliberately
+    unvalidated beyond its shape: a pin that matches nothing only stops suppressing drift,
+    while a schema error here would unparse the doc and so put it out of reach of the
+    re-pin that repairs it.
     """
 
     @model_validator(mode="after")

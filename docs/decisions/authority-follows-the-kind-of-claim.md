@@ -57,9 +57,11 @@ foundation and architecture layers.
   repo-relative and fits the claim's `state`, reports a `<!-- claim:<id> -->` marker naming no
   declared claim, and reports evidence that changed after the doc as `evidence-drift`. An
   anchor pins its symbol's hash, and only a person re-pins it.
-- **A pin acknowledges evidence drift.** While a file keeps its pinned hash `evidence-drift`
-  skips it; once the hash differs the commit-time comparison applies, so a pin only ever
-  removes drift.
+- **A pin acknowledges evidence drift.** While what an evidence entry names, its file or the
+  part of it the entry is written with, keeps its pinned hash `evidence-drift` skips it; once
+  the hash differs the commit-time comparison of the file applies, so a pin only ever removes
+  drift. An entry with no hash to compare, because its part is not in its file or its file
+  could not be read, is reported for that and judged for no drift.
 - **Evidence drift is judged in every layer** (accepted, not yet implemented), landing after
   part pins exist.
 - **A divergence goes to a reader.** `list review --changed` queues each claim other than a
@@ -144,3 +146,9 @@ foundation and architecture layers.
 - 2026-11-26: That is implemented and stated in the Decision: a deleted sentence is a
   `removed-sentence` item of `list review --written`, and `list review --changed` no longer
   lists it.
+- 2026-11-27: An evidence entry may name a part of its file, tasks T4 to T7 of
+  [Claim evidence names a part](../rfcs/claim-evidence-names-a-part.md), so the Decision says
+  a pin holds while what its entry names keeps the pinned hash, the file or that part of it.
+- 2026-11-28: The owner's fifth answer to that RFC, so the Decision says an entry with no hash
+  to compare is reported for that, as a part that is not there or as evidence that could not
+  be read, where it said every entry whose hash differs is judged by its file's commit.

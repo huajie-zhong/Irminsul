@@ -577,6 +577,27 @@ def test_the_claim_anchor_suggestion_re_pins_only_the_anchor_it_reports(
     assert _anchor_findings(repo) == []
 
 
+def test_the_claim_anchor_suggestion_runs_as_printed_for_a_key_with_a_quoted_segment(
+    tmp_path: Path,
+) -> None:
+    """A shell takes the quotes of `tool."a.b"` away, so the command quotes the target it
+    names, and read as a shell reads it, it pins that anchor."""
+    repo = anchor_repo(tmp_path)
+    write(repo, "src/conf.toml", '[tool]\n"a.b" = 1\n')
+    doc = repo / "docs" / "components" / "c.md"
+    doc.write_text(
+        doc.read_text(encoding="utf-8").replace(
+            "src/mod.py#alpha -->", 'src/conf.toml#tool."a.b" -->'
+        ),
+        encoding="utf-8",
+    )
+    (finding,) = _anchor_findings(repo)
+
+    assert finding["code"] == "claim-anchor/unpinned"
+    assert _run_suggested(repo, finding["suggestion"]) == 0
+    assert _anchor_findings(repo) == []
+
+
 def _stale(repo: Path, *args: str) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = invoke_json(repo, "anchors", "--stale", *args)["stale"]
     return rows

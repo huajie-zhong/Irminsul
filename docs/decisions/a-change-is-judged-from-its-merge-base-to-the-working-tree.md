@@ -20,6 +20,9 @@ governs:
 
 Accepted, 2026-10-28. Resolves
 [Acknowledge a reviewed co-change or evidence drift](../rfcs/acknowledge-a-reviewed-co-change-or-evidence-drift.md).
+Its sentence that a pin covers a whole file is qualified by
+[Claim evidence names a part](../rfcs/claim-evidence-names-a-part.md):
+an evidence entry may name a part of its file, and its pin then covers that part.
 
 ## Context
 
@@ -114,8 +117,9 @@ comment can answer them: `co-change/unreflected-change` and `claim-provenance/ev
   under `--source-diff`.
 - Widening `source_roots` while deleting an owner is `diff-integrity/adoption-exception-revived`.
 - Acknowledging is easier than editing; acknowledging before re-reading is one of the moves the
-  root `AGENTS.md` names as making the tree less true. A pin covers a whole file, so narrowing
-  the evidence is the remedy for a busy one.
+  root `AGENTS.md` names as making the tree less true. A pin covers what its entry names, a
+  whole file for a bare path, so narrowing the evidence to a part is the remedy for a busy
+  file.
 - A hint about a whole doc rather than a line has no ignore comment to answer it: a trailer
   answers `co-change`, and a re-pin answers `evidence-drift`.
 - A trailer's path and subject cannot contain whitespace, so a file with a space in its path

@@ -58,6 +58,14 @@ class Part:
     """What kept a name the file holds from resolving, such as two headings that share it."""
 
 
+def split_part(spelling: str) -> tuple[str, str | None]:
+    """The path and the part an entry `path#part` names, split at its first `#`; the part
+    is None for a bare path. Whatever reads only where the entry leads, as its existence
+    and its owner are read, reads the path."""
+    path, marked, part = spelling.partition("#")
+    return path, part if marked else None
+
+
 def find_part(
     suffix: str, text: str, name: str, reading: CodeReading | None, written: Written
 ) -> Part:
@@ -193,6 +201,9 @@ def _keyed(suffix: str, text: str, name: str) -> Part:
         known = tuple(_path([*walked, key]) for key in keys)
         if isinstance(value, dict) and len(keys) != len(value):
             return Part("missing", known=known, why="two keys there are written alike")
+        if not isinstance(value, dict):
+            holder = f"`{_path(walked)}`" if walked else "the file's top level"
+            return Part("missing", why=f"{holder} holds no keys to pass through")
         if segment not in keys:
             return Part("missing", known=known)
         value = value[keys[segment]]
