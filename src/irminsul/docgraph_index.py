@@ -627,9 +627,12 @@ def section_lines(
     lines = body.splitlines()
     for index, heading in enumerate(headings):
         if accepts(heading):
-            end = next(
-                (h.line - 1 for h in headings[index + 1 :] if h.level <= heading.level),
-                len(lines),
-            )
-            return lines[heading.line : end]
+            return lines[heading.line : section_end(headings, index, len(lines))]
     return None
+
+
+def section_end(headings: list[Heading], index: int, last: int) -> int:
+    """The index of the line after the section of `headings[index]`: where the next heading
+    of its level or a higher one starts, or `last` when none follows."""
+    level = headings[index].level
+    return next((h.line - 1 for h in headings[index + 1 :] if h.level <= level), last)

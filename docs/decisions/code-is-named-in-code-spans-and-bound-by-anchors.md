@@ -102,7 +102,8 @@ paragraphs, which trains a reader to re-pin without reading.
   formatter chooses: line breaks, a trailing comma, and what the language's query file marks,
   such as a statement's semicolon, a string's quote and the parentheses around a wrapped
   expression. A rewrite that changes a token, such as parentheses added around an arrow
-  function's parameter, still moves the pin. A decorator, an
+  function's parameter, still moves the pin. Code the grammar could not read is hashed with
+  its text. A decorator, an
   attribute and the signatures of an overload are part of the definition under them. A symbol
   that several definitions share hashes them all.
 - **What a pin covers does not change.** A docstring edit drifts a Python pin; a comment or a
@@ -128,7 +129,7 @@ paragraphs, which trains a reader to re-pin without reading.
   listed as out of reach rather than dropped; a file that only mentions the name is offered
   only when nothing defines it, and a file no reader reads is offered whole unless a marker,
   a heading or a key in it has the name. The agent chooses and writes the anchor.
-  <!-- anchor: src/irminsul/binding.py#suggest @sha256:4eb7b8a8c5ab -->
+  <!-- anchor: src/irminsul/binding.py#suggest @sha256:2c337b2f69f9 -->
 - **A sentence about behaviour is best anchored to the test that asserts it.** A test
   function is a symbol, so an anchor names it, pins it and drifts with it like any other. The
   paragraph is then asked about when that test changes, and the test fails when the code stops
@@ -213,8 +214,8 @@ paragraphs, which trains a reader to re-pin without reading.
 
 - A renamed symbol in any language fails `claim-anchor` wherever a doc bound it, and a renamed
   file named in a code span is reported.
-- The text-block hash is coarse: an edit inside the block re-asks the claim even when behaviour
-  did not change.
+- A whole file no reader reads, and a marked region of one, is hashed as text: an edit
+  inside it re-asks the claim even when behaviour did not change.
 - Binding is incremental, and a name defined only inside a function stays unbound with the
   suggestion saying why.
 - An anchor to a test that does not assert its sentence looks like protection and is none.
@@ -288,3 +289,6 @@ paragraphs, which trains a reader to re-pin without reading.
   owner gave that day are in the RFC as decisions 3 and 4: the file with no finder is one no
   reader reads, since TypeScript, JavaScript, Go and Rust have readers, and a marked region
   is hashed the way a whole file of its type is. Claim evidence does not name parts yet.
+  The review of the change found that the tree-sitter readers left what a grammar could not
+  read out of a pin's text, with the comments, so half a statement hashed to an empty tree
+  and no edit moved its pin; that code is hashed now, which the second answer rests on.

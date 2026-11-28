@@ -71,21 +71,28 @@ nothing else: no search of the text for the name stands in for one ([Claim evide
 hashes, so a revision read from git is found the same way.
 
 - **A pair of markers, in any text file.** The lines between `irminsul:part <name>` and
-  `irminsul:end <name>`, each written in a comment of the file, are the part `name`. Markers
+  `irminsul:end <name>`, each written in a comment of the file, are the part `name`. A
+  marker's name is every character up to the next space, as an anchor's is, without the end
+  of the comment where that touches it. Markers
   win over a definition, a heading or a key of the same name, because they are the author
   saying where the part is. The region is dedented and hashed the way a whole file of its
   type is: through the file's reader where one reads it, so a comment or a change of layout
   does not move the pin, and as text with whitespace collapsed otherwise. A Python region
   that does not parse on its own does not resolve; a TypeScript, JavaScript, Go or Rust
-  region always hashes, as a whole file of theirs does.
+  region always hashes, as a whole file of theirs does, with the code its grammar could not
+  read in the hash, so that half a statement still follows a change to its code.
 - **A definition**, in a file its language's reader reads, as above.
-- **A heading's section, in Markdown.** The name is the heading's slug as a link fragment
-  spells it, and the part is the heading line and the lines down to the next heading of its
-  level or a higher one, hashed without its pins and with whitespace collapsed.
+- **A heading's section, in Markdown.** The name is the slug of the heading's text, as a
+  link to the first heading of that text spells it, and the part is the heading line and the
+  lines down to the next heading of its level or a higher one, hashed without its pins and
+  with whitespace collapsed. The numbered fragment a second heading of one text gets names
+  nothing: it moves when a heading is added above.
 - **A key, in TOML, YAML or JSON.** The name is a dotted key path through mappings, a
   segment that holds a dot written in double quotes, and the part is the value as canonical
   JSON, so reordering the keys of a table, reformatting it or editing another key does not
-  move the pin. A list is hashed whole.
+  move the pin. A list is hashed whole. A YAML key that is `true` or `null` is spelled so.
+  A file the finder cannot answer for is `claim-anchor/unreadable`: one its parser rejects,
+  one whose value holds itself, and a JSON object that writes a key twice.
 
 A name that is absent or ambiguous does not resolve: a part marked twice or never closed, a
 slug two headings share, a key in a file of several YAML documents. That is
@@ -96,7 +103,7 @@ the lines or to anchor the whole file. `anchors --suggest` offers `path#name` on
 resolves, and otherwise the file, as a mention; for a dotted name, only a file that spells
 each of its parts.
 <!-- anchor: tests/test_binding.py#test_a_file_that_holds_only_the_last_word_of_a_dotted_name_is_no_mention @sha256:c374b15fa838 -->
-<!-- anchor: src/irminsul/parts.py#find_part @sha256:ba32c028efc9 -->
+<!-- anchor: src/irminsul/parts.py#find_part @sha256:f885a5e5c2ca -->
 <!-- anchor: tests/test_binding.py#test_a_symbol_in_a_file_no_reader_reads_is_unsupported_without_markers @sha256:837deb964faf -->
 <!-- anchor: tests/test_binding.py#test_a_marked_region_of_a_file_no_reader_reads_is_the_part @sha256:f5fca8bcd203 -->
 <!-- anchor: tests/test_binding.py#test_a_file_level_anchor_on_a_file_no_reader_reads_keeps_its_hash @sha256:18dd96d25f8a -->
@@ -109,6 +116,10 @@ each of its parts.
 <!-- anchor: tests/test_parts.py#test_pyproject_dependencies_ignores_another_table_and_follows_a_new_dependency @sha256:edf77adc59ab -->
 <!-- anchor: tests/test_parts.py#test_key_hash_ignores_the_order_of_keys_in_a_table @sha256:78681f137ff0 -->
 <!-- anchor: tests/test_parts.py#test_yaml_file_with_several_documents_does_not_resolve @sha256:93780bc31a71 -->
+<!-- anchor: tests/test_parts.py#test_region_of_half_a_statement_hashes_and_follows_its_code_outside_python @sha256:efac540a3c6b -->
+<!-- anchor: tests/test_parts.py#test_a_marker_names_what_an_anchor_can_write_and_nothing_shorter @sha256:693b03c23246 -->
+<!-- anchor: tests/test_parts.py#test_a_key_file_a_finder_cannot_write_is_unreadable_and_stops_no_run @sha256:1983c4943653 -->
+<!-- anchor: tests/test_binding.py#test_suggest_offers_a_marked_part_of_a_file_a_reader_reads @sha256:ee02aa4b3210 -->
 <!-- anchor: tests/test_parts.py#test_missing_symbol_offers_the_closest_known_name @sha256:afaa67c9c0c8 -->
 
 ## Binding the code a doc names

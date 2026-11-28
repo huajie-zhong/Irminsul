@@ -12,8 +12,15 @@ import re
 from typing import Literal
 
 _FENCE_RE = re.compile(r"^\s*(?P<marker>`{3,}|~{3,})(?P<info>.*)$")
+_CODE_SPAN_RE = re.compile(r"(`+)(.+?)\1")
 
 LineKind = Literal["outside", "marker", "content"]
+
+
+def mask_code_spans(line: str) -> str:
+    """The line with every inline code span blanked, keeping positions: a marker written in
+    one is an example, as one inside a fence is."""
+    return _CODE_SPAN_RE.sub(lambda match: " " * len(match.group(0)), line)
 
 
 class FenceTracker:

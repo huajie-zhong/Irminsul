@@ -22,7 +22,7 @@ import re
 import sys
 from collections.abc import Collection, Iterable
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
 from irminsul.anchors import Anchor, parse_anchors, resolve
@@ -30,6 +30,7 @@ from irminsul.checks.globs import resolve_display_path
 from irminsul.code_references import CodeResolver
 from irminsul.languages import LANGUAGE_REGISTRY, reader_for
 from irminsul.languages.reader import Import, References, dotted
+from irminsul.parts import markers
 from irminsul.ranked_tests import Ranker
 
 if TYPE_CHECKING:
@@ -194,8 +195,12 @@ def suggest(repo_root: Path, sources: Sources, name: str) -> Suggestions:
             continue
         code_reader = reader_for(display)
         if code_reader is not None:
-            for found in code_reader.read("\n".join(lines)).definitions():
-                if found.name == leaf:
+            text = "\n".join(lines)
+            marked = markers(PurePosixPath(display).suffix, text).get(name)
+            if marked is not None:
+                definitions.append(Candidate(display, marked, True))
+            for found in code_reader.read(text).definitions():
+                if found.name == leaf and not (marked and found.symbol == name):
                     candidate = Candidate(display, found.line, True, found.symbol)
                     (definitions if found.reachable else unreachable).append(candidate)
             continue

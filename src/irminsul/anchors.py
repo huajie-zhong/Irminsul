@@ -34,7 +34,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from irminsul.fences import FenceTracker
+from irminsul.fences import FenceTracker, mask_code_spans
 from irminsul.frontmatter import Claim
 from irminsul.frontmatter_edit import set_claim_pins, strip_claim_pins
 from irminsul.parts import find_part
@@ -49,7 +49,6 @@ ANCHOR_RE = re.compile(
     r"<!--\s*anchor:\s*(?P<path>[^\s#@]+)(?:#(?P<symbol>[^\s@]+))?"
     r"(?:\s+@(?P<algo>[a-z0-9]+):(?P<hash>[0-9a-f]+))?\s*-->"
 )
-_CODE_SPAN_RE = re.compile(r"(`+)(.+?)\1")
 _BLOCK_LINE_LIMIT = 200
 _HASH_LEN = 12
 _ALGO = "sha256"
@@ -89,7 +88,7 @@ def parse_anchors(body: str) -> list[Anchor]:
     for lineno, line in enumerate(body.splitlines(), start=1):
         if fence.consume(line):
             continue
-        for match in ANCHOR_RE.finditer(_mask_code_spans(line)):
+        for match in ANCHOR_RE.finditer(mask_code_spans(line)):
             anchors.append(
                 Anchor(
                     line=lineno,
@@ -222,11 +221,6 @@ def _normalize_whitespace(text: str) -> str:
     return " ".join(text.split())
 
 
-def _mask_code_spans(line: str) -> str:
-    """The line with every inline code span blanked, keeping positions."""
-    return _CODE_SPAN_RE.sub(lambda m: " " * len(m.group(0)), line)
-
-
 def _format_marker(anchor: Anchor, digest: str) -> str:
     return f"<!-- anchor: {anchor.target} @{_ALGO}:{digest} -->"
 
@@ -306,7 +300,7 @@ def repin_text(
             out_lines.append(line)
             continue
 
-        masked = _mask_code_spans(line)
+        masked = mask_code_spans(line)
 
         def replace(match: re.Match[str], masked: str = masked) -> str:
             if masked[match.start()] != "<":
@@ -548,7 +542,7 @@ def _claim_marker_line(node: DocNode, claim_id: str) -> int:
     for lineno, line in enumerate(node.body.splitlines(), start=1):
         if fence.consume(line):
             continue
-        if marker.search(_mask_code_spans(line)):
+        if marker.search(mask_code_spans(line)):
             return node.file_line(lineno)
     return 1
 

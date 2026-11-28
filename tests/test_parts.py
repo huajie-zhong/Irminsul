@@ -285,15 +285,32 @@ def test_edit_outside_a_region_never_changes_its_hash(
     assert _digest(tmp_path, rel, moved, "seal") == base
 
 
-@pytest.mark.parametrize("rel", ["m.ts", "m.js", "m.go", "m.rs"])
-def test_region_of_half_a_statement_still_hashes_outside_python(tmp_path: Path, rel: str) -> None:
+HALF_STATEMENTS = [
+    pytest.param("m.ts", "if (ready) {", "if (done) {", id="typescript-if"),
+    pytest.param("m.ts", "return {\n  fee: 5,", "return {\n  fee: 50,", id="typescript-object"),
+    pytest.param(
+        "m.js", "module.exports = {\n  fee: 5,", "module.exports = {\n  fee: 50,", id="js"
+    ),
+    pytest.param("m.go", "if ready {", "if done {", id="go-if"),
+    pytest.param("m.go", "limits := []int{\n\t5,", "limits := []int{\n\t50,", id="go-list"),
+    pytest.param("m.rs", "if ready {", "if done {", id="rust-if"),
+    pytest.param("m.rs", "Some(x) => x + 1,", "Some(x) => x * 9,", id="rust-arm"),
+]
+
+
+@pytest.mark.parametrize(("rel", "half", "edited"), HALF_STATEMENTS)
+def test_region_of_half_a_statement_hashes_and_follows_its_code_outside_python(
+    tmp_path: Path, rel: str, half: str, edited: str
+) -> None:
     """In a TypeScript, JavaScript, Go or Rust file a marked region always hashes, even when
-    it is the first half of a statement."""
+    it is half a statement the grammar cannot read: a comment added to it leaves the hash,
+    and a change to its code moves it."""
     head = {"m.go": "package main\n", "m.rs": "use std::fmt;\n"}.get(rel, "")
-    opener = "if (x) {" if rel in ("m.ts", "m.js") else "if x {"
-    resolution = _resolve(tmp_path, rel, _region_file(head, "// ", opener), "seal")
-    assert resolution.status == "ok"
-    assert resolution.current is not None
+    base = _digest(tmp_path, rel, _region_file(head, "// ", half), "seal")
+
+    commented = _region_file(head, "// ", f"// a note\n{half}")
+    assert _digest(tmp_path, rel, commented, "seal") == base
+    assert _digest(tmp_path, rel, _region_file(head, "// ", edited), "seal") != base
 
 
 def test_python_region_of_half_a_statement_does_not_resolve(tmp_path: Path) -> None:
@@ -365,9 +382,11 @@ def test_marker_inside_an_inline_code_span_marks_nothing(tmp_path: Path) -> None
     """In Markdown, a marker inside an inline code span is an example: the part does not
     resolve."""
     text = (
-        "# Doc\n\nWrite `<!-- irminsul:part demo -->` and `<!-- irminsul:end demo -->` to mark.\n"
+        "# Doc\n\nOpen with `<!-- irminsul:part demo -->`.\n\nwords between\n\n"
+        "Close with `<!-- irminsul:end demo -->`.\n"
     )
     assert _resolve(tmp_path, "d.md", text, "demo").status == "missing_symbol"
+    assert _digest(tmp_path, "d.md", text.replace("`", ""), "demo")
 
 
 def test_fenced_example_of_a_name_does_not_make_a_real_pair_ambiguous(tmp_path: Path) -> None:
@@ -885,3 +904,94 @@ def test_missing_symbol_for_an_ambiguous_heading_says_why(tmp_path: Path) -> Non
     missing = [f for f in findings if f.code == CODE_MISSING_SYMBOL]
     assert len(missing) == 1
     assert resolution.why in missing[0].message
+
+
+@pytest.mark.parametrize("name", ["valid?", "save!", "Session#fetch", "a/b", "build:prod", "a--b"])
+def test_a_marker_names_what_an_anchor_can_write_and_nothing_shorter(
+    tmp_path: Path, name: str
+) -> None:
+    """A marker's name is every character up to the next space, as an anchor's is, so the
+    part the finding says to mark is the part the marker names, and a shorter name the
+    marker only starts with is not marked."""
+    text = f"a\n# irminsul:part {name}\nb\n# irminsul:end {name}\nc\n"
+
+    assert _digest(tmp_path, "lib/m.rb", text, name)
+    assert _again(tmp_path, "lib/m.rb", name[:1]).status == "unsupported"
+
+
+@pytest.mark.parametrize(
+    ("open_", "close"), [("<!--", "-->"), ("/*", "*/"), ("<!-- ", " -->"), ("/* ", " */")]
+)
+def test_the_end_of_a_comment_that_touches_a_marker_is_no_part_of_its_name(
+    tmp_path: Path, open_: str, close: str
+) -> None:
+    text = f"a\n{open_}irminsul:part seal{close}\nb\n{open_}irminsul:end seal{close}\nc\n"
+    spaced = "a\n/* irminsul:part seal */\nb\n/* irminsul:end seal */\nc\n"
+
+    assert _digest(tmp_path, "m.css", text, "seal") == _digest(tmp_path, "m.css", spaced, "seal")
+
+
+def test_a_longer_word_that_ends_in_the_markers_word_is_no_marker(tmp_path: Path) -> None:
+    text = "a\n# myirminsul:part seal\nb\n# myirminsul:end seal\nc\n"
+
+    assert _resolve(tmp_path, "lib/m.rb", text, "seal").status == "unsupported"
+
+
+def test_unsupported_part_offers_the_closest_marker_the_file_has(tmp_path: Path) -> None:
+    """A part of a file with no finder is looked for among its markers alone, so a marker
+    of nearly that name is what the finding offers."""
+    text = "a\n# irminsul:part fetch_session\nb\n# irminsul:end fetch_session\nc\n"
+
+    [finding] = _anchor_findings(tmp_path, "lib/m.rb", text, "fetch_sesion")
+
+    assert finding.code == CODE_PART_UNSUPPORTED
+    assert "did you mean 'fetch_session'?" in finding.message
+
+
+CYCLE = "defaults: &d\n  retries: 3\n  again: *d\nname: desk\n"
+
+
+@pytest.mark.parametrize(
+    ("rel", "text", "part"),
+    [
+        pytest.param("c.yaml", CYCLE, "defaults", id="yaml-value-that-holds-itself"),
+        pytest.param("c.json", '{"name": "desk", "big": ' + "9" * 5000 + "}", "name", id="json"),
+        pytest.param("c.yaml", "name: desk\nbig: " + "9" * 5000 + "\n", "name", id="yaml"),
+        pytest.param("c.toml", 'name = "desk"\nbig = ' + "9" * 5000 + "\n", "name", id="toml"),
+        pytest.param("c.json", '{"name": "desk", "name": "loans"}', "name", id="json-key-twice"),
+    ],
+)
+def test_a_key_file_a_finder_cannot_write_is_unreadable_and_stops_no_run(
+    tmp_path: Path, rel: str, text: str, part: str
+) -> None:
+    """A value that holds itself, a number too long to read and a key written twice are each
+    a file the finder cannot answer for: the part is unreadable, a hint, and the check goes
+    on."""
+    assert _resolve(tmp_path, rel, text, part).status == "unreadable"
+    assert [finding.code for finding in _anchor_findings(tmp_path, rel, text, part)] == [
+        "claim-anchor/unreadable"
+    ]
+
+
+def test_a_yaml_key_that_is_true_or_null_is_spelled_as_json_writes_it(tmp_path: Path) -> None:
+    text = "true: 1\n~: 2\n3: 4\nplain: 5\n"
+
+    assert {
+        part: _resolve(tmp_path, "c.yaml", text, part).status for part in ("true", "null", "3")
+    } == {
+        "true": "ok",
+        "null": "ok",
+        "3": "ok",
+    }
+    assert _resolve(tmp_path, "c.yaml", text, "True").status == "missing_symbol"
+
+
+def test_a_line_separator_inside_a_paragraph_does_not_cut_a_section_short(tmp_path: Path) -> None:
+    """Markdown ends a line at a line feed or a carriage return alone, so a line separator
+    character in the text above a section leaves the section where its heading is."""
+    text = "# Doc\nfirst\u2028second\n## Alpha\none\ntwo\n## Beta\nthree\n"
+    base = _digest(tmp_path, "d.md", text, "alpha")
+
+    assert _digest(tmp_path, "d.md", text.replace("two", "2"), "alpha") != base
+    assert _digest(tmp_path, "d.md", text.replace("second", "2nd"), "alpha") == base
+    assert _digest(tmp_path, "d.md", text.replace("three", "3"), "alpha") == base

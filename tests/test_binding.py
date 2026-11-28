@@ -442,6 +442,26 @@ def test_suggest_offers_the_file_where_no_finder_reads_the_name(tmp_path: Path) 
     ]
 
 
+def test_suggest_offers_a_marked_part_of_a_file_a_reader_reads(tmp_path: Path) -> None:
+    """No definition is named `sealedBox`, and two markers name those lines so: the part
+    resolves, so it is offered, at the line of its opening marker."""
+    write_config(tmp_path, source_roots=["src"])
+    write(
+        tmp_path,
+        "src/vault.py",
+        "LIMIT = 5\n# irminsul:part sealedBox\nKEYS = {}\nLOCKS = {}\n# irminsul:end sealedBox\n",
+    )
+    write_doc(
+        tmp_path, "docs/components/vault.md", doc_id="vault", body="`sealedBox` holds the keys.\n"
+    )
+
+    [row] = invoke_json(tmp_path, "anchors", "--suggest")["unbound"]
+
+    assert [(found["line"], found["marker"]) for found in row["candidates"]] == [
+        (2, "<!-- anchor: src/vault.py#sealedBox -->")
+    ]
+
+
 def test_suggest_offers_a_marked_part_by_its_name(tmp_path: Path) -> None:
     root = _ruby_repo(tmp_path, MARKED_RUBY, "`fetch_user_session()` looks a session up by id.\n")
 

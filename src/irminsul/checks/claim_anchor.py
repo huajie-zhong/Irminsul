@@ -146,6 +146,7 @@ class ClaimAnchorCheck:
                                 f"anchor part '{anchor.symbol}' cannot be found in "
                                 f"'{anchor.path}': no finder reads this type of file and "
                                 f"no `irminsul:part {anchor.symbol}` marker is in it"
+                                f"{did_you_mean(anchor.symbol or '', resolution.known)}"
                             ),
                             path=node.path,
                             doc_id=node.id,

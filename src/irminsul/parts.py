@@ -19,20 +19,22 @@ import json
 import re
 import textwrap
 import tomllib
+import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from ruamel.yaml.error import YAMLError
 
-from irminsul.docgraph_index import Heading, headings_of, parse_markdown
-from irminsul.fences import FenceTracker
+from irminsul.docgraph_index import headings_of, parse_markdown, section_end
+from irminsul.fences import FenceTracker, mask_code_spans
 from irminsul.frontmatter import safe_yaml
 from irminsul.frontmatter_edit import split_frontmatter
 from irminsul.languages.reader import CodeReading, unmarked
 
-_MARKER_RE = re.compile(r"irminsul:(?P<kind>part|end)[ \t]+(?P<name>[\w.$]+(?:-[\w.$]+)*)")
-_CODE_SPAN_RE = re.compile(r"(`+)(.+?)\1")
+_MARKER_RE = re.compile(r"(?<![\w$])irminsul:(?P<kind>part|end)[ \t]+(?P<name>\S+)")
+_COMMENT_END_RE = re.compile(r"(?:-->|\*/)$")
+_NEWLINE_RE = re.compile(r"\r\n?|\n")
 _SEGMENT_RE = re.compile(r'"([^"]*)"|([^."]+)')
 _MARKDOWN = (".md",)
 _KEYED = (".toml", ".yaml", ".yml", ".json")
@@ -68,8 +70,7 @@ def find_part(
     no part of its first line, a heading or a key included.
     """
     text = unmarked(text)
-    markdown = suffix in _MARKDOWN
-    marked = _marked(text, name, skip_examples=markdown)
+    marked = _marked(suffix, text, name)
     if marked is not None:
         if marked.status != "ok" or marked.text is None:
             return marked
@@ -79,40 +80,51 @@ def find_part(
         return Part("ok", region)
     if reading is not None:
         return _defined(reading, name)
-    if markdown:
+    if suffix in _MARKDOWN:
         return _section(text, name, written)
     if suffix in _KEYED:
         return _keyed(suffix, text, name)
-    return Part("unsupported", known=marker_names(text))
+    return Part("unsupported", known=tuple(markers(suffix, text)))
 
 
-def marker_names(text: str, *, skip_examples: bool = False) -> tuple[str, ...]:
-    """Each name a `irminsul:part` marker opens in `text`, in the order they open."""
-    names = [name for kind, name, _ in _markers(text, skip_examples) if kind == "part"]
-    return tuple(dict.fromkeys(names))
+def markers(suffix: str, text: str) -> dict[str, int]:
+    """Each name an `irminsul:part` marker opens in a file of this suffix, with the line of
+    the first marker that opens it, in the order they open."""
+    opened: dict[str, int] = {}
+    for kind, name, index in _markers(suffix, unmarked(text)):
+        if kind == "part":
+            opened.setdefault(name, index + 1)
+    return opened
 
 
-def _markers(text: str, skip_examples: bool) -> list[tuple[str, str, int]]:
-    """Each marker as its kind, its name and the index of its line. In Markdown a marker in
-    a fenced block or a code span is an example, as an anchor marker there is."""
+def _markers(suffix: str, text: str) -> list[tuple[str, str, int]]:
+    """Each marker as its kind, its name and the index of its line. A name is the run of
+    characters after the marker's word, without the end of the comment it is written in when
+    that touches it. In Markdown a marker in a fenced block or a code span is an example, as
+    an anchor marker there is; in any other file a marker is plain text wherever it stands.
+    """
     found: list[tuple[str, str, int]] = []
+    markdown = suffix in _MARKDOWN
     fence = FenceTracker()
     for index, line in enumerate(text.splitlines()):
-        if skip_examples:
+        if markdown:
             if fence.consume(line):
                 continue
-            line = _CODE_SPAN_RE.sub(lambda match: " " * len(match.group(0)), line)
-        found.extend((match["kind"], match["name"], index) for match in _MARKER_RE.finditer(line))
+            line = mask_code_spans(line)
+        for match in _MARKER_RE.finditer(line):
+            name = _COMMENT_END_RE.sub("", match["name"])
+            if name:
+                found.append((match["kind"], name, index))
     return found
 
 
-def _marked(text: str, name: str, *, skip_examples: bool) -> Part | None:
+def _marked(suffix: str, text: str, name: str) -> Part | None:
     """The lines between the two markers of `name`, as they stand; None when no marker
     names it, and a part that does not resolve when it is marked twice, never closed or
     closed before it opens."""
-    markers = _markers(text, skip_examples)
-    opens = [index for kind, marked, index in markers if kind == "part" and marked == name]
-    ends = [index for kind, marked, index in markers if kind == "end" and marked == name]
+    found = _markers(suffix, text)
+    opens = [index for kind, marked, index in found if kind == "part" and marked == name]
+    ends = [index for kind, marked, index in found if kind == "end" and marked == name]
     if not opens and not ends:
         return None
     if len(opens) > 1:
@@ -139,7 +151,9 @@ def _defined(reading: CodeReading, name: str) -> Part:
 
 def _section(text: str, name: str, written: Written) -> Part:
     """The section of the one heading whose slug is `name`: its line and the lines down to
-    the next heading of its level or a higher one."""
+    the next heading of its level or a higher one. The slug is the heading's own, not the
+    numbered fragment a link gives the second heading of one text, which moves when a
+    heading is added above it."""
     try:
         _, body = split_frontmatter(text)
     except ValueError:
@@ -151,41 +165,43 @@ def _section(text: str, name: str, written: Written) -> Part:
         return Part("missing", known=known)
     if len(matches) > 1:
         return Part("missing", known=known, why=f"{len(matches)} headings share the slug")
-    heading = headings[matches[0]]
-    lines = body.splitlines()
-    end = _section_end(headings[matches[0] + 1 :], heading, len(lines))
-    return Part("ok", written("\n".join(lines[heading.line - 1 : end])))
-
-
-def _section_end(later: list[Heading], heading: Heading, last: int) -> int:
-    return next((other.line - 1 for other in later if other.level <= heading.level), last)
+    # The parser's lines, which end at a line feed or a carriage return and nowhere else.
+    lines = _NEWLINE_RE.split(body)
+    first = headings[matches[0]].line - 1
+    return Part(
+        "ok", written("\n".join(lines[first : section_end(headings, matches[0], len(lines))]))
+    )
 
 
 def _keyed(suffix: str, text: str, name: str) -> Part:
     """The value at the dotted key path `name`, written as canonical JSON. The path passes
     through mappings only, so a list is hashed whole; a segment that holds a dot is written
-    in double quotes."""
+    in double quotes. A file its parser rejects, or whose value cannot be written, as one
+    that holds itself cannot, is unreadable."""
     try:
         data = _load(suffix, text)
-    except (tomllib.TOMLDecodeError, json.JSONDecodeError, YAMLError, RecursionError):
+    except (ValueError, YAMLError, RecursionError):
         return Part("unreadable")
     if data is _SEVERAL:
         return Part("missing", why="the file holds several YAML documents")
     segments = _segments(name)
     if segments is None:
         return Part("missing", why="it is not a dotted key path")
-    value: object = data
+    value: Any = data
     walked: list[str] = []
     for segment in segments:
-        keys = {str(key): key for key in value} if isinstance(value, dict) else {}
+        keys = {_key(key): key for key in value} if isinstance(value, dict) else {}
         known = tuple(_path([*walked, key]) for key in keys)
         if isinstance(value, dict) and len(keys) != len(value):
             return Part("missing", known=known, why="two keys there are written alike")
         if segment not in keys:
             return Part("missing", known=known)
-        value = value[keys[segment]]  # type: ignore[index]
+        value = value[keys[segment]]
         walked.append(segment)
-    return Part("ok", json.dumps(_plain(value), sort_keys=True, separators=(",", ":")))
+    try:
+        return Part("ok", json.dumps(_plain(value), sort_keys=True, separators=(",", ":")))
+    except (ValueError, RecursionError):
+        return Part("unreadable")
 
 
 _SEVERAL = object()
@@ -195,9 +211,19 @@ def _load(suffix: str, text: str) -> object:
     if suffix == ".toml":
         return tomllib.loads(text)
     if suffix == ".json":
-        return json.loads(text)
-    documents = list(safe_yaml().load_all(text))
+        return json.loads(text, object_pairs_hook=_once)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        documents = list(safe_yaml().load_all(text))
     return _SEVERAL if len(documents) > 1 else (documents[0] if documents else {})
+
+
+def _once(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """A JSON object, refused when it writes a key twice, as TOML and YAML refuse one."""
+    table = dict(pairs)
+    if len(table) != len(pairs):
+        raise ValueError("a key is written twice")
+    return table
 
 
 def _segments(name: str) -> list[str] | None:
@@ -221,11 +247,21 @@ def _path(segments: list[str]) -> str:
     return ".".join(f'"{segment}"' if "." in segment else segment for segment in segments)
 
 
+def _key(key: object) -> str:
+    """A key as a path spells it: a YAML `true` or `null` key as JSON writes the value."""
+    if isinstance(key, str):
+        return key
+    return json.dumps(key) if key is None or isinstance(key, bool) else str(key)
+
+
 def _plain(value: object) -> object:
     """`value` as JSON can write it, so two files that say the same thing are written alike
     whichever of the three formats holds them."""
     if isinstance(value, dict):
-        return {str(key): _plain(item) for key, item in value.items()}
+        table = {_key(key): _plain(item) for key, item in value.items()}
+        if len(table) != len(value):
+            raise ValueError("two keys are written alike")
+        return table
     if isinstance(value, (list, tuple)):
         return [_plain(item) for item in value]
     if isinstance(value, (set, frozenset)):

@@ -437,7 +437,11 @@ class TreeSitterReading:
                 out.append(item)
                 continue
             node, field = item
-            if node.id in marked["layout"] or (node.is_extra and node.id not in kept):
+            if node.id in marked["layout"]:
+                continue
+            if node.is_extra and not node.is_error and node.id not in kept:
+                # A comment. What the grammar could not read is extra to it too, and stays
+                # in: code is there, and a change to it is a change.
                 continue
             if node.id in marked["transparent"]:
                 stack.extend((child, field) for child in reversed(node.named_children))

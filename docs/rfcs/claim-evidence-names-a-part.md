@@ -73,7 +73,8 @@ Not chosen: re-pinning more, Python and Markdown only, line ranges.
 Five pull requests, one a migration that re-reads each narrowed claim. The main risk is
 review missing a narrowed claim, so each test first fails on a planted instance. A part that
 omits code its claim rests on under-asks it silently, so bare paths stay the default.
-An adopter's anchor to a symbol in a file no reader reads breaks until it is marked.
+An adopter's anchor to a symbol in a file no reader reads is unsupported until it is marked,
+unless the file is one the heading or the key finder reads.
 
 ## Decisions
 
@@ -101,9 +102,9 @@ gave TypeScript, JavaScript, Go and Rust readers and before the first task was b
    reader where one reads it, so a comment or a change of layout does not move the pin in
    any read language, and as text with whitespace collapsed otherwise. A Python region that
    does not parse does not resolve, as decision 1 says. A TypeScript, JavaScript, Go or Rust
-   region always hashes, because their grammars do not know all valid code: a reader given
-   half a statement kept its hash over a comment and a layout change and moved it on a code
-   change (run on 2026-11-27). Not chosen: a region with a syntax error to its grammar does
+   region always hashes, because their grammars do not know all valid code: what a grammar
+   cannot read is hashed with its text, so half a statement keeps its hash over a comment and
+   moves it on a code change. Not chosen: a region with a syntax error to its grammar does
    not resolve in any language, which would leave valid TypeScript the grammar does not know
    unmarkable; and whitespace-collapsed text for every file but Python's, as this RFC first
    had it, under which a comment edit inside the region re-asks the claim.
@@ -315,7 +316,8 @@ Decision 1 (b) would add the Python-pin record as a third.
 - The repair rule lets a change delete what a governing claim names and re-point it
   without a record; the deletion shows in the diff, and review lists the claim.
 - Markers are plain text, so a marker quoted in a doc or a string counts as one.
-- An adopter's anchor to a symbol in a file no reader reads breaks until it gets markers.
+- An adopter's anchor to a symbol in a file no reader reads is unsupported until it gets
+  markers, unless the file is one the heading or the key finder reads.
 - `context-is-stateless` stays whole-file, so drift asks it on each commit to
   `src/irminsul/context.py`, 17 from 2026-10-20 to 2026-10-27.
 - tree-sitter adds install weight, a cost [principles](../foundation/principles.md) weighs

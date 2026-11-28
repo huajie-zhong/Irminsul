@@ -333,13 +333,15 @@ making a feature, a refactor and an RFC-driven change in it.
   ([Claim evidence names a part](docs/rfcs/claim-evidence-names-a-part.md), its first tasks):
   - In any text file, the lines between `irminsul:part <name>` and `irminsul:end <name>`,
     each in a comment, are the part `name`, and win over a definition, a heading or a key of
-    that name. The region is hashed the way a whole file of its type is: through the file's
+    that name. A name is every character up to the next space, so `valid?` and `Session#fetch`
+    can be marked. The region is hashed the way a whole file of its type is: through the file's
     reader where one reads it, with whitespace collapsed otherwise.
   - In Markdown, `doc.md#slug` is the section of the one heading with that slug, down to the
     next heading of its level or a higher one.
   - In TOML, YAML and JSON, `pyproject.toml#project.dependencies` is the value at that key
     path as canonical JSON, so reordering or reformatting the file, or editing another key,
-    does not move the pin.
+    does not move the pin. A file its parser rejects, one whose value holds itself, and a
+    JSON object that writes a key twice are `claim-anchor/unreadable`.
   - `claim-anchor/part-unsupported`, a certain finding, reports a part of a file whose type
     has no finder and that holds no marker of that name. `claim-anchor/missing-symbol` names
     the closest name the finder knows and says why a part marked twice, a shared slug or a
@@ -348,7 +350,10 @@ making a feature, a refactor and an RFC-driven change in it.
     file no reader reads spells, it offers the file.
 - A pin on a whole Go file no longer moves when the file's final newline is added or taken
   away: the token of no text that Go's grammar puts where a text ends without one is left
-  out of what a pin hashes, as other layout is.
+  out of what a pin hashes, as other layout is. And code a grammar could not read is part of
+  what a pin hashes: it was left out with the comments, so a whole file of TypeScript,
+  JavaScript, Go or Rust kept its pin whatever changed inside the part its grammar could not
+  read. A pin on a whole file that holds such a part moves once.
 - A language profile lists what the checks leave out or look past for its language: the
   files no doc is asked to claim, the directories and compiled files its tools write, the
   directories of installed code and the file that marks an installed environment, and its

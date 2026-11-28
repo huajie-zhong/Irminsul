@@ -66,6 +66,27 @@ def test_each_language_names_its_reader_and_a_dialect_by_suffix() -> None:
     assert reader_for("src/fees.rb") is None
 
 
+UNREADABLE = [
+    pytest.param("typescript", "export const fees = {\n  late: 5,", "late: 5", "late: 50", id="ts"),
+    pytest.param("go", "package desk\n\nfunc Fee() int {\n\tif late {", "late", "lost", id="go"),
+    pytest.param("rust", "fn fee() -> u32 {\n    if late {", "late", "lost", id="rust"),
+]
+
+
+@pytest.mark.parametrize(("language", "text", "old", "new"), UNREADABLE)
+def test_code_the_grammar_could_not_read_is_in_what_a_pin_hashes(
+    language: str, text: str, old: str, new: str
+) -> None:
+    """A text that breaks off halfway is still code: a change to it changes the text a pin
+    hashes, and a comment added to it does not."""
+    reader = READERS[language]
+    whole = reader.read(text)
+
+    assert not whole.parsed
+    assert reader.read(text.replace(old, new)).canonical() != whole.canonical()
+    assert reader.read(text + " // a note").canonical() == whole.canonical()
+
+
 def test_a_typescript_function_is_found_with_its_lines() -> None:
     fee = _named("src/fees.ts", FEES_TS, "lateFee")
 
