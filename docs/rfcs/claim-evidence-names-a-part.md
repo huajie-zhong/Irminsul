@@ -109,6 +109,22 @@ gave TypeScript, JavaScript, Go and Rust readers and before the first task was b
    unmarkable; and whitespace-collapsed text for every file but Python's, as this RFC first
    had it, under which a comment edit inside the region re-asks the claim.
 
+Answered by the owner on 2026-11-28, when the review of the second pull request found a case
+no requirement spoke of:
+
+5. **Evidence that could not be read is a hint that names the cause.** A Python file with a
+   syntax error, a key file that does not parse, or a JSON object that writes a key twice is
+   not read, so nothing can say whether a part of it is there. Such an entry is
+   `claim-provenance/evidence-unreadable`, a hint, as an anchor to such a file is
+   `claim-anchor/unreadable`: it is not reported missing, since the part may be in what was
+   not read, and it is judged for no drift, since the re-pin a drift finding asks for could
+   move nothing. A pinned whole file with no hash to compare is the same case. An unpinned
+   whole file is judged by its commit, which needs no reading. The answer is to fix the file.
+   Not chosen: reporting the part missing, as the requirement on a part that does not
+   resolve first read, which would make a certain finding state what is not known; and
+   leaving the entry to the drift finding, whose suggested re-pin exits 0 having moved
+   nothing.
+
 ## Design detail
 
 ### Grammar and pins
@@ -304,6 +320,9 @@ Two accepted records each have one bullet this changes:
 and [a pin covers a whole file](../decisions/a-change-is-judged-from-its-merge-base-to-the-working-tree.md).
 Their other bullets hold, so, as [A gate file is sealed, not scored](a-gate-file-is-sealed-not-scored.md)
 did, the resolving record qualifies each bullet and each Status line gains a sentence.
+A third record, [authority follows the kind of claim](../decisions/authority-follows-the-kind-of-claim.md),
+says what a pin acknowledges: its bullet said a file keeps its pinned hash and says what the
+entry names does, with a line in its Changes.
 Decision 1 (b) would add the Python-pin record as a third.
 
 ### Cost and risk in detail
@@ -394,7 +413,11 @@ Provenance: code
 
 When an entry's file exists and its part does not resolve, `claim-provenance` SHALL report
 `claim-provenance/evidence-part-missing`, a certain finding naming the closest names the
-finder knows in that file, and `evidence-drift` SHALL NOT also report the entry.
+finder knows in that file, and `evidence-drift` SHALL NOT also report the entry. Where the
+file could not be read, so that the part can be neither found nor ruled out, or a pinned
+whole file has no hash to compare, it SHALL instead report
+`claim-provenance/evidence-unreadable`, a hint, and neither `evidence-part-missing` nor
+`evidence-drift` SHALL report the entry.
 
 #### Scenario: Renamed function
 - **WHEN** a claim cites `src/irminsul/checks/pipeline.py#effective_class` and the function is renamed `finding_class`
@@ -403,6 +426,10 @@ finder knows in that file, and `evidence-drift` SHALL NOT also report the entry.
 #### Scenario: Shared heading slug
 - **WHEN** two headings in the cited Markdown file share the cited slug
 - **THEN** `evidence-part-missing` is reported and says the slug is ambiguous
+
+#### Scenario: File that does not parse
+- **WHEN** a claim cites `src/irminsul/cli.py#fix`, pinned, and a commit leaves a syntax error in another function of that file
+- **THEN** `irminsul check` reports `evidence-unreadable` for the entry, neither `evidence-part-missing` nor `evidence-drift`, and exits 0
 
 ### Requirement: Re-pin writes a pin per part
 ID: re-pin-writes-part-pins
@@ -515,7 +542,7 @@ Provenance: code
 ### PR 2: claim grammar, pins, the two codes, re-pin
 
 - `T4` Split evidence at its first `#`, resolve the part, read the path alone for existence, state and ownership, and add `evidence-part-unsupported`. (req: evidence-names-a-part)
-- `T5` Add `evidence-part-missing` with its did-you-mean, and skip an unresolved part in the drift scan. (req: missing-part-is-certain)
+- `T5` Add `evidence-part-missing` with its did-you-mean and `evidence-unreadable`, and skip an entry reported for either in the drift scan. (req: missing-part-is-certain)
 - `T6` Key pins by the full spelling and skip a matching part pin in `evidence-drift`; add the qualifying Status sentence to the record that introduced pins. (req: part-pin-suppresses-drift)
 - `T7` Accept a part in `--evidence`, select every part for a bare path, and update `docs/components/frontmatter.md` and the CLI help. (req: re-pin-writes-part-pins)
 

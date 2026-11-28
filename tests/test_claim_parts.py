@@ -7,6 +7,8 @@ import re
 import shlex
 from pathlib import Path
 
+import pytest
+
 from irminsul.anchors import file_pin
 from irminsul.checks.claim_provenance import ClaimProvenanceCheck
 from irminsul.frontmatter import read_frontmatter
@@ -23,6 +25,8 @@ from .conftest import (
 )
 
 DOC = "docs/foundation/enforcement.md"
+DRIFT = "claim-provenance/evidence-drift"
+UNREADABLE = "claim-provenance/evidence-unreadable"
 PIPELINE = """\
 def apply_classes(findings):
     return [effective_class(finding) for finding in findings]
@@ -417,19 +421,53 @@ def test_a_narrow_re_pin_also_drops_a_pin_on_a_spelling_the_claim_no_longer_cite
     assert set(_pinned(root)) == {"src/cli.py#fix"}
 
 
-def test_a_part_of_a_file_that_does_not_parse_keeps_its_pin_and_is_judged_by_its_file(
+def test_a_part_of_a_file_that_does_not_parse_is_unreadable_and_keeps_its_pin(
     tmp_path: Path,
 ) -> None:
-    """Python cannot read the file, so the part may be there or not: no finding says it is
-    missing, the re-pin leaves the pin, and the entry is asked about as its file is."""
+    """Python cannot read the file, so the part may be there or not. The entry is a hint
+    that names the cause: no finding says the part is missing, none asks for a re-pin that
+    could move nothing, the re-pin leaves the pin, and the hint goes when the file parses."""
     root = _repo(tmp_path, {"src/cli.py": CLI}, ["src/cli.py#fix"])
     before = _pinned(root)
     _edit(root, "src/cli.py", "def check(path):", "def check(path:")
 
-    assert _codes(root) == ["claim-provenance/evidence-drift"]
-    code, plain = invoke(root, "anchors", "--re-pin", "--doc", DOC)
-    assert code == 0, plain
+    [(code, message)] = _findings(root)
+
+    assert code == UNREADABLE
+    assert "evidence 'src/cli.py#fix'" in message
+    assert "its part 'fix' cannot be looked for" in message
+    assert invoke(root, "check")[0] == 0
+    assert invoke(root, "check", "--fail-on", "hint")[0] == 1
+    exit_code, plain = invoke(root, "anchors", "--re-pin", "--doc", DOC)
+    assert exit_code == 0, plain
     assert _pinned(root) == before
+
+    _edit(root, "src/cli.py", "def check(path:", "def check(path):", day=3)
+
+    assert _codes(root) == []
+
+
+@pytest.mark.parametrize(("pin", "code"), [(True, UNREADABLE), (False, DRIFT)])
+def test_a_whole_file_that_does_not_parse_is_unreadable_only_where_a_pin_needs_its_hash(
+    tmp_path: Path, pin: bool, code: str
+) -> None:
+    """A pin is compared with the file's hash, which a file Python cannot read has none of;
+    an entry with no pin is judged by its file's commit alone and needs no reading."""
+    root = _repo(tmp_path, {"src/cli.py": CLI}, ["src/cli.py"], pin=pin)
+    _edit(root, "src/cli.py", "def check(path):", "def check(path:")
+
+    assert _codes(root) == [code]
+
+
+def test_a_key_is_unreadable_while_its_file_writes_another_key_twice(tmp_path: Path) -> None:
+    """Which of two values a key written twice holds is not said, so the file is not read
+    and no key of it is looked for, the one the claim cites included."""
+    conf = '{"a": {"x": 1}, "b": 2}\n'
+    files = {"src/conf.json": conf, "src/cli.py": CLI}
+    root = _repo(tmp_path, files, ["src/cli.py", "src/conf.json#a"])
+    _edit(root, "src/conf.json", '"b": 2', '"b": 2, "b": 3')
+
+    assert _codes(root) == [UNREADABLE]
 
 
 def test_a_part_of_a_directory_is_unsupported(tmp_path: Path) -> None:

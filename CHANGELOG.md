@@ -363,6 +363,12 @@ making a feature, a refactor and an RFC-driven change in it.
     caught as a renamed file is. `claim-provenance/evidence-part-unsupported`, also certain,
     reports a part of a file whose type has no finder and that holds no marker for it.
     An entry reported for either is not also reported as drifted.
+  - `claim-provenance/evidence-unreadable`, a hint, reports an entry whose file could not
+    be read: a part of a Python file with a syntax error, of a key file that does not parse
+    or of a JSON object that writes a key twice, and a pinned whole file with no hash to
+    compare. Such an entry was reported as `evidence-drift`, where its doc is judged for
+    drift, with a suggested re-pin that exited 0 having moved nothing; it is now judged
+    for no drift, and the hint, answered by fixing the file, is reported in every layer.
   - `anchors --re-pin --evidence` takes an entry as the claim spells it, part included, and
     a bare path selects every entry of that file. A re-pin of a claim drops a pin on a
     spelling the claim no longer cites, also when `--evidence` narrowed it to another entry.

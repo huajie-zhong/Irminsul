@@ -232,10 +232,16 @@ judged for no drift: `claim-provenance/evidence-part-missing` where the file's f
 no such name, with the closest names it does know and the reason when the name is ambiguous,
 and `claim-provenance/evidence-part-unsupported` where the file's type has no finder and no
 marker names the part. A part of a file that could not be read whole is neither, since the
-part may be in what was not read; without a hash it is asked about as its file is.
+part may be in what was not read: it is `claim-provenance/evidence-unreadable`, a hint that
+names the entry and is answered by fixing the file, as `claim-anchor/unreadable` is for an
+anchor. A pinned whole file that could not be read is the same hint, since its pin has no
+hash to be compared with, and an unpinned one is judged by its commit, which needs no
+reading. An entry reported unreadable is judged for no drift, because the re-pin a drift
+finding asks for could move nothing (`_unread`).
 <!-- anchor: tests/test_claim_parts.py#test_a_renamed_function_is_a_missing_part_that_names_the_closest_and_asks_no_drift @sha256:61af15666047 -->
 <!-- anchor: tests/test_claim_parts.py#test_a_part_of_a_file_no_finder_reads_is_unsupported_and_fails_the_run @sha256:8d8c5e4ece56 -->
-<!-- anchor: tests/test_claim_parts.py#test_a_part_of_a_file_that_does_not_parse_keeps_its_pin_and_is_judged_by_its_file @sha256:d9b8683ff86c -->
+<!-- anchor: tests/test_claim_parts.py#test_a_part_of_a_file_that_does_not_parse_is_unreadable_and_keeps_its_pin @sha256:12c26182d0b7 -->
+<!-- anchor: tests/test_claim_parts.py#test_a_whole_file_that_does_not_parse_is_unreadable_only_where_a_pin_needs_its_hash @sha256:9f7688d44eb4 -->
 
 ## Listing the pins that no longer match
 

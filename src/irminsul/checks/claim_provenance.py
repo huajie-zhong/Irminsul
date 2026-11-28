@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
 
-from irminsul.anchors import Resolution, file_pin, resolve_evidence, shell_word
+from irminsul.anchors import Resolution, pin_of, resolve_evidence, shell_word
 from irminsul.checks.base import (
     Answer,
     CheckFlag,
@@ -55,6 +55,7 @@ CODE_EVIDENCE_NOT_REPO_RELATIVE = "claim-provenance/evidence-not-repo-relative"
 CODE_EVIDENCE_PATH_MISSING = "claim-provenance/evidence-path-missing"
 CODE_EVIDENCE_PART_MISSING = "claim-provenance/evidence-part-missing"
 CODE_EVIDENCE_PART_UNSUPPORTED = "claim-provenance/evidence-part-unsupported"
+CODE_EVIDENCE_UNREADABLE = "claim-provenance/evidence-unreadable"
 CODE_EVIDENCE_STATE_MISMATCH = "claim-provenance/evidence-state-mismatch"
 CODE_UNKNOWN_CLAIM_REF = "claim-provenance/unknown-claim-ref"
 CODE_EVIDENCE_DRIFT = "claim-provenance/evidence-drift"
@@ -87,9 +88,7 @@ class _Entry:
     @property
     def pin(self) -> str | None:
         """The part's current pin, None for a bare path or a part with no hash."""
-        if self.found is None or self.found.status != "ok":
-            return None
-        return f"sha256:{self.found.current}"
+        return None if self.found is None else pin_of(self.found)
 
 
 class ClaimProvenanceCheck:
@@ -120,6 +119,15 @@ class ClaimProvenanceCheck:
             "lines the claim rests on with `irminsul:part <name>` and `irminsul:end <name>` "
             "in comments of the file, or cite the whole file by dropping `#<name>`."
         ),
+        CODE_EVIDENCE_UNREADABLE: (
+            "A claim's evidence entry names a part of a file that could not be read "
+            "whole, or pins a whole file that could not: a Python file with a syntax "
+            "error, a TOML, YAML or JSON file that does not parse, a JSON object that "
+            "writes one key twice, or text that cannot be decoded. The part may be in "
+            "what was not read, so it is not reported missing, and with no hash to "
+            "compare the entry is not judged for drift and a re-pin leaves its pin. Fix "
+            "the file so it can be read; the entry is judged again once it is."
+        ),
         CODE_EVIDENCE_STATE_MISMATCH: (
             "A claim has no evidence appropriate for its declared state (planned, "
             "implemented, available, enabled, external). Add evidence of the right kind, "
@@ -143,11 +151,15 @@ class ClaimProvenanceCheck:
         CODE_EVIDENCE_PATH_MISSING: FindingClass.certain,
         CODE_EVIDENCE_PART_MISSING: FindingClass.certain,
         CODE_EVIDENCE_PART_UNSUPPORTED: FindingClass.certain,
+        CODE_EVIDENCE_UNREADABLE: FindingClass.hint,
         CODE_EVIDENCE_STATE_MISMATCH: FindingClass.certain,
         CODE_UNKNOWN_CLAIM_REF: FindingClass.certain,
         CODE_EVIDENCE_DRIFT: FindingClass.hint,
     }
     answers: ClassVar[dict[str, Answer]] = {
+        CODE_EVIDENCE_UNREADABLE: Answer.fix(
+            "fix the evidence file so it can be read: its syntax, or a key it writes twice"
+        ),
         CODE_EVIDENCE_DRIFT: Answer.pin(
             "re-read the claim against the evidence it names, then run `irminsul anchors "
             "--re-pin --doc <doc> --claim <id> --evidence <entry>`"
@@ -159,18 +171,18 @@ class ClaimProvenanceCheck:
             return []
 
         out: list[Finding] = []
-        pins: dict[Path, str | None] = {}
+        wholes: dict[Path, Resolution] = {}
         for node in certain_audit_nodes(graph):
             claim_ids = {claim.id for claim in node.frontmatter.claims}
             resolved = self._resolve_node_evidence(graph, node)
-            out.extend(self._validate_evidence(graph, node, resolved))
+            out.extend(self._validate_evidence(graph, node, resolved, wholes))
             out.extend(self._validate_body_claim_refs(node, claim_ids))
             if not _is_protected_claim_node(node, graph):
                 continue
             # Drift is a hint about finished prose, which a draft is not yet. A planned claim
             # citing a resolved RFC is `rfc-follow-through`'s `stale-claim`.
             if node.frontmatter.status == StatusEnum.stable:
-                out.extend(self._scan_evidence_drift(graph, node, resolved, pins))
+                out.extend(self._scan_evidence_drift(graph, node, resolved, wholes))
 
         return out
 
@@ -197,8 +209,31 @@ class ClaimProvenanceCheck:
             for evidence in claim.evidence
         }
 
+    def _whole(self, graph: DocGraph, file: Path, wholes: dict[Path, Resolution]) -> Resolution:
+        """What the whole of `file` resolves to, read once a run: several claims pin the
+        same file."""
+        if file not in wholes:
+            wholes[file] = resolve_evidence(file, None, graph.source)
+        return wholes[file]
+
+    def _unread(
+        self, graph: DocGraph, entry: _Entry, pinned: bool, wholes: dict[Path, Resolution]
+    ) -> bool:
+        """Whether the entry needs a reading its file did not give: a part, which must be
+        looked for, of a file its finder could not read whole, or a pinned whole file with
+        no hash to compare. An unpinned whole file is judged by its commit and needs none."""
+        if entry.file is None:
+            return False
+        if entry.found is not None:
+            return entry.found.status == "unreadable"
+        return pinned and self._whole(graph, entry.file, wholes).status == "unreadable"
+
     def _validate_evidence(
-        self, graph: DocGraph, node: DocNode, resolved: dict[str, _Entry]
+        self,
+        graph: DocGraph,
+        node: DocNode,
+        resolved: dict[str, _Entry],
+        wholes: dict[Path, Resolution],
     ) -> list[Finding]:
         assert graph.config is not None
         assert graph.repo_root is not None
@@ -250,6 +285,8 @@ class ClaimProvenanceCheck:
                     continue
                 if entry.unresolved:
                     out.append(self._part_finding(node, claim.id, evidence, entry))
+                elif self._unread(graph, entry, evidence in claim.pinned, wholes):
+                    out.append(self._unreadable_finding(node, claim.id, evidence, entry))
 
             if not self._has_state_appropriate_evidence(graph, claim.state, evidence_refs):
                 out.append(
@@ -267,6 +304,34 @@ class ClaimProvenanceCheck:
                     )
                 )
         return out
+
+    def _unreadable_finding(
+        self, node: DocNode, claim_id: str, evidence: str, entry: _Entry
+    ) -> Finding:
+        """The hint for an entry whose file could not be read: nothing can say whether its
+        part is there, or whether the file still has its pinned hash, so no other finding
+        speaks of the entry and this one names the cause."""
+        cannot = (
+            "its pin cannot be compared"
+            if entry.part is None
+            else f"its part '{entry.part}' cannot be looked for"
+        )
+        return Finding(
+            check=self.name,
+            code=CODE_EVIDENCE_UNREADABLE,
+            severity=Severity.warning,
+            message=(
+                f"claim '{claim_id}' evidence '{evidence}' names a file that could not be "
+                f"read or parsed, so {cannot}"
+            ),
+            path=node.path,
+            doc_id=node.id,
+            suggestion=(
+                "fix the file so it can be read, such as a syntax error or a key written "
+                "twice; the entry is judged again once it is, and until then a re-pin "
+                "leaves its pin"
+            ),
+        )
 
     def _part_finding(self, node: DocNode, claim_id: str, evidence: str, entry: _Entry) -> Finding:
         """The certain finding for an entry whose part is not in its file. A part of a file
@@ -382,7 +447,7 @@ class ClaimProvenanceCheck:
         graph: DocGraph,
         node: DocNode,
         resolved: dict[str, _Entry],
-        pins: dict[Path, str | None],
+        wholes: dict[Path, Resolution],
     ) -> list[Finding]:
         """A claim whose evidence was committed after the doc, unless the claim pins that
         entry and what it names still has the pinned hash: the part, for an entry that
@@ -392,9 +457,9 @@ class ClaimProvenanceCheck:
         changed, the pin was written in an older format, or the doc was updated beside the
         evidence without a re-pin, falls back to the commit-time comparison of the entry's
         file, so pinning never reports more than not pinning would, and a part with no pin
-        is asked about as its whole file is. An entry whose part is not in its file is
-        reported for that and judged for no drift. `pins` memoizes each whole file's hash
-        for the run: several claims cite the same file.
+        is asked about as its whole file is. An entry whose part is not in its file, or
+        whose file could not be read where the entry needs it read, is reported for that
+        and judged for no drift.
         """
         assert graph.repo_root is not None
 
@@ -409,10 +474,13 @@ class ClaimProvenanceCheck:
                 if evidence_abs is None or entry.unresolved:
                     continue
                 pin = claim.pinned.get(evidence)
+                if self._unread(graph, entry, pin is not None, wholes):
+                    continue
                 if pin is not None:
-                    if entry.part is None and evidence_abs not in pins:
-                        pins[evidence_abs] = file_pin(evidence_abs, graph.source)
-                    current = pins[evidence_abs] if entry.part is None else entry.pin
+                    whole = entry.part is None
+                    current = (
+                        pin_of(self._whole(graph, evidence_abs, wholes)) if whole else entry.pin
+                    )
                     if current == pin:
                         continue
                 evidence_time = last_commit_time_any_repo(graph.git, evidence_abs, graph.repo_root)

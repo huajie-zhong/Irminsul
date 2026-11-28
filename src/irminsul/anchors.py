@@ -195,7 +195,12 @@ def file_pin(
     hashes any doc a file-level anchor names, so a re-pin of the doc, which rewrites only
     pins, does not re-ask the claims that cite it.
     """
-    resolution = resolve_evidence(target, part, reader)
+    return pin_of(resolve_evidence(target, part, reader))
+
+
+def pin_of(resolution: Resolution) -> str | None:
+    """`<algo>:<hash>` of what resolved, the form a pin is written in, or None where
+    nothing did."""
     return f"{_ALGO}:{resolution.current}" if resolution.status == "ok" else None
 
 

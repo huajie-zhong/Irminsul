@@ -168,6 +168,10 @@ paragraphs, which trains a reader to re-pin without reading.
     markers in any text file. A marker wins over a same-named symbol, heading or key. A name
     that is ambiguous, unclosed or absent does not resolve, and an entry that does not
     resolve is certain.
+  - An entry whose file could not be read, so that its part can be neither found nor ruled
+    out or its whole-file pin has no hash to compare, is `claim-provenance/evidence-unreadable`,
+    a hint, as an anchor to such a file is `claim-anchor/unreadable`: it is not reported
+    missing and is judged for no drift, and the answer is to fix the file.
   - A marked region is hashed the way a whole file of its type is, so in a language a reader
     reads a comment edit does not re-ask it; a marked Python region that does not parse on its
     own does not resolve.
@@ -302,3 +306,6 @@ paragraphs, which trains a reader to re-pin without reading.
   its file is `claim-provenance/evidence-part-missing` or `evidence-part-unsupported`, both
   certain. `context`, `list review` and the seals of `diff-integrity` still match an entry by
   its whole spelling, which the RFC's next tasks change.
+- 2026-11-28: The owner's fifth answer to that RFC: evidence that could not be read is
+  `claim-provenance/evidence-unreadable`, a hint, where it was left to `evidence-drift`, whose
+  suggested re-pin could move nothing. The Decision's bullet on parts says so.

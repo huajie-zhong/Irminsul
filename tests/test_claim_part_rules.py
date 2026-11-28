@@ -32,6 +32,7 @@ DOC = "docs/foundation/enforcement.md"
 DRIFT = "claim-provenance/evidence-drift"
 PART_MISSING = "claim-provenance/evidence-part-missing"
 PART_UNSUPPORTED = "claim-provenance/evidence-part-unsupported"
+UNREADABLE = "claim-provenance/evidence-unreadable"
 PATH_MISSING = "claim-provenance/evidence-path-missing"
 NOT_REPO_RELATIVE = "claim-provenance/evidence-not-repo-relative"
 STATE_MISMATCH = "claim-provenance/evidence-state-mismatch"
@@ -416,14 +417,46 @@ def test_an_ambiguous_part_is_missing_and_the_message_says_why(
     ],
     ids=["python", "toml", "json", "yaml"],
 )
-def test_a_part_of_a_file_that_could_not_be_read_whole_is_not_reported_as_absent(
+def test_a_part_of_a_file_that_could_not_be_read_whole_is_unreadable_and_not_absent(
     tmp_path: Path, files_part: tuple[str, str, str]
 ) -> None:
     """The name may be in what did not parse, so no finding says it is missing or
-    unsupported."""
+    unsupported: one hint says the file could not be read, and names the entry."""
     rel, text, part = files_part
 
-    assert _lone(tmp_path, {rel: text}, f"{rel}#{part}") == []
+    [finding] = _lone(tmp_path, {rel: text}, f"{rel}#{part}")
+
+    assert finding.code == UNREADABLE
+    assert f"'{rel}#{part}'" in finding.message
+
+
+@pytest.mark.parametrize(
+    ("doc", "status"),
+    [
+        (DOC, "stable"),
+        (DOC, "draft"),
+        ("docs/components/enforcement.md", "stable"),
+    ],
+)
+def test_evidence_that_could_not_be_read_is_reported_in_every_doc_and_asks_no_drift(
+    tmp_path: Path, doc: str, status: str
+) -> None:
+    """Like a part that is not there, a part that cannot be looked for is reported
+    wherever the claim is, and where drift is judged the entry raises none: the claim's
+    other entry, whose file changed too, is the only one asked about."""
+    claim = _Claim("a", ("src/cli.py#fix", "lib/util.py"), pin="all")
+    root = _build(
+        tmp_path, {"src/cli.py": CLI, "lib/util.py": UTIL}, [claim], doc=doc, status=status
+    )
+    _edit(root, "src/cli.py", "def check(path):", "def check(path:")
+    _edit(root, "lib/util.py", "value + 1", "value + 2")
+    judged = doc == DOC and status == "stable"
+
+    findings = _run(root)
+
+    assert sorted(f.code for f in findings) == sorted([UNREADABLE, *([DRIFT] if judged else [])])
+    drift = [f.message for f in findings if f.code == DRIFT]
+    assert all("lib/util.py" in message and "src/cli.py" not in message for message in drift)
 
 
 @pytest.mark.parametrize(
