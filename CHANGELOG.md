@@ -335,8 +335,9 @@ making a feature, a refactor and an RFC-driven change in it.
   ([Claim evidence names a part](docs/rfcs/claim-evidence-names-a-part.md), its first tasks):
   - In any text file, the lines between `irminsul:part <name>` and `irminsul:end <name>`,
     each in a comment, are the part `name`, and win over a definition, a heading or a key of
-    that name. A name is every character up to the next space, so `valid?` and `Session#fetch`
-    can be marked, without the `-->`, `*/` or `#}` of a comment that touches it. The region is hashed the way a whole file of its type is: through the file's
+    that name. A name is every character up to the next space, so `valid?` and
+    `Session#fetch` can be marked, without the `-->`, `*/` or `#}` of a comment that
+    touches it. The region is hashed the way a whole file of its type is: through the file's
     reader where one reads it, with whitespace collapsed otherwise.
   - In Markdown, `doc.md#slug` is the section of the one heading with that slug, down to the
     next heading of its level or a higher one.

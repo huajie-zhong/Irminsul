@@ -636,8 +636,10 @@ def section_lines(
 
 def body_lines(body: str) -> list[str]:
     """The lines of a body as the Markdown parser numbers them: one ends at a line feed or
-    a carriage return and nowhere else, so a heading's `line` indexes this list."""
-    return _NEWLINE_RE.split(body)
+    a carriage return and nowhere else, so a heading's `line` indexes this list. A body that
+    ends at a line break has no line after it."""
+    lines = _NEWLINE_RE.split(body)
+    return lines[:-1] if lines[-1] == "" else lines
 
 
 def section_end(headings: list[Heading], index: int, last: int) -> int:

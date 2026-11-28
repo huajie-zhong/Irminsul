@@ -102,8 +102,9 @@ knows. A part of a file whose type has no finder, with no marker of that name, i
 `claim-anchor/part-unsupported`: the name may stand in the file, and the answer is to mark
 the lines or to anchor the whole file. `anchors --suggest` offers `path#name` only where it
 resolves, and otherwise the file, as a mention; for a dotted name, only a file that spells
-each of its parts. Markers that do not pair name no part and still take their name from a
-definition below them, so neither is offered.
+each of its parts. Markers that name no part, because they do not pair or their lines do
+not parse, still take their name from a definition of that name anywhere in the file, so
+neither is offered.
 <!-- anchor: tests/test_binding.py#test_suggest_offers_no_part_that_would_not_resolve @sha256:59c58e9a9af8 -->
 <!-- anchor: tests/test_binding.py#test_a_file_that_holds_only_the_last_word_of_a_dotted_name_is_no_mention @sha256:c374b15fa838 -->
 <!-- anchor: src/irminsul/parts.py#find_part @sha256:f885a5e5c2ca -->
