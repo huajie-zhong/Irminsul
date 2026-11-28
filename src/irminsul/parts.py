@@ -58,6 +58,14 @@ class Part:
     """What kept a name the file holds from resolving, such as two headings that share it."""
 
 
+def split_part(spelling: str) -> tuple[str, str | None]:
+    """The path and the part an entry `path#part` names, split at its first `#`; the part
+    is None for a bare path. Whatever reads only where the entry leads, as its existence
+    and its owner are read, reads the path."""
+    path, marked, part = spelling.partition("#")
+    return path, part if marked else None
+
+
 def find_part(
     suffix: str, text: str, name: str, reading: CodeReading | None, written: Written
 ) -> Part:

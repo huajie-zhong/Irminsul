@@ -37,7 +37,7 @@ from typing import TYPE_CHECKING
 from irminsul.fences import FenceTracker, mask_code_spans
 from irminsul.frontmatter import Claim
 from irminsul.frontmatter_edit import set_claim_pins, strip_claim_pins
-from irminsul.parts import find_part
+from irminsul.parts import find_part, split_part
 
 if TYPE_CHECKING:
     from irminsul.checks.base import Finding
@@ -163,17 +163,28 @@ def without_pins(text: str) -> str:
     return strip_claim_pins(unpinned)
 
 
-def file_pin(target: Path, reader: SourceReader | None = None) -> str | None:
-    """`<algo>:<hash>` of a whole file, normalized as a file-level anchor's hash is, or
-    None when it is not a readable file.
+def resolve_evidence(
+    target: Path, part: str | None, reader: SourceReader | None = None
+) -> Resolution:
+    """What a claim's evidence entry resolves to: the whole file `target`, or the part of
+    it the entry names, found as an anchor's part is."""
+    anchor = Anchor(line=0, raw="", path=target.name, symbol=part, pinned=None)
+    return resolve(target.parent, anchor, reader)
+
+
+def file_pin(
+    target: Path, reader: SourceReader | None = None, part: str | None = None
+) -> str | None:
+    """`<algo>:<hash>` of a whole file, or of the part `part` of it, normalized as an
+    anchor's hash is, or None when it is not a readable file or holds no such part.
 
     A claim pins its evidence with this, so a formatting-only commit to the evidence does
-    not re-ask a claim someone already re-read. A doc is hashed without its pins, as
-    `resolve` hashes any doc a file-level anchor names, so a re-pin of the doc, which
-    rewrites only pins, does not re-ask the claims that cite it.
+    not re-ask a claim someone already re-read, and one that names a part is not re-asked
+    by a change elsewhere in the file. A doc is hashed without its pins, as `resolve`
+    hashes any doc a file-level anchor names, so a re-pin of the doc, which rewrites only
+    pins, does not re-ask the claims that cite it.
     """
-    anchor = Anchor(line=0, raw="", path=target.name, symbol=None, pinned=None)
-    resolution = resolve(target.parent, anchor, reader)
+    resolution = resolve_evidence(target, part, reader)
     return f"{_ALGO}:{resolution.current}" if resolution.status == "ok" else None
 
 
@@ -230,7 +241,8 @@ class RepinScope:
     """The pins one re-pin may move. With no selector, every pin in the doc.
 
     `claims` and `anchors` select by claim id and by anchor target. `evidence` narrows the
-    selected claims to the evidence files it names, for every selected claim alike.
+    selected claims to the evidence entries it names, for every selected claim alike: an
+    entry by its spelling, `path#part` included, and every entry of a file by its bare path.
     """
 
     claims: frozenset[str] = frozenset()
@@ -248,6 +260,7 @@ def unknown_selectors(body: str, claims: list[Claim], scope: RepinScope) -> list
     claim_ids = {claim.id for claim in claims}
     targets = {anchor.target for anchor in parse_anchors(body)}
     cited = {path for claim in claims if claim.id in scope.claims for path in claim.evidence}
+    files = {split_part(entry)[0] for entry in cited}
 
     def known(names: set[str]) -> str:
         return ", ".join(sorted(names)) or "none"
@@ -256,7 +269,7 @@ def unknown_selectors(body: str, claims: list[Claim], scope: RepinScope) -> list
         out.append(f"--claim: no claim with id {claim_id} (the doc has: {known(claim_ids)})")
     for target in sorted(scope.anchors - targets):
         out.append(f"--anchor: no anchor {target} (the doc has: {known(targets)})")
-    for path in sorted(scope.evidence - cited):
+    for path in sorted(scope.evidence - cited - files):
         out.append(f"--evidence: no selected claim cites {path} (they cite: {known(cited)})")
     return out
 
@@ -337,35 +350,39 @@ def repin_claims(
     only: Collection[str] | None = None,
     only_evidence: Collection[str] = (),
 ) -> tuple[str, list[str]]:
-    """Pin every evidence file of every claim in one doc to its current hash, or only the
-    claims `only` names, and within them only the evidence `only_evidence` names.
+    """Pin every evidence entry of every claim in one doc to its current hash, or only the
+    claims `only` names, and within them only the evidence `only_evidence` names: an entry
+    by its spelling, or every entry of a file by the file's bare path.
 
     Returns (new_text, a `claim <id>: <evidence>` label for each pin written or dropped).
-    `locate` resolves an evidence spelling to a file. Evidence that is not a readable file
-    keeps the pin it had, if any: the check reports a missing path on its own. A pin on a
-    path the claim no longer cites is dropped, since nothing reads it; with
-    `only_evidence`, every pin it does not name is left as it is.
+    A pin is keyed by the entry as the claim writes it, and hashes the part the entry names
+    or the whole file. `locate` resolves an entry's path to a file. An entry whose file is
+    not readable, or whose part does not resolve, keeps the pin it had, if any: the check
+    reports it on its own. A pin on a spelling the claim no longer cites is dropped, since
+    nothing reads it; with `only_evidence`, the pin of every other entry is left as it is.
     """
     written: list[str] = []
     pins: dict[str, dict[str, str]] = {}
-    hashed: dict[Path, str | None] = {}
+    hashed: dict[tuple[Path, str | None], str | None] = {}
     for claim in claims:
         if only is not None and claim.id not in only:
             continue
         claim_pins: dict[str, str] = {}
         for evidence in claim.evidence:
-            if only_evidence and evidence not in only_evidence:
+            path, part = split_part(evidence)
+            if only_evidence and evidence not in only_evidence and path not in only_evidence:
                 continue
-            target = locate(evidence)
-            if target is not None and target not in hashed:
-                hashed[target] = file_pin(target)
-            fresh = hashed[target] if target is not None else None
+            target = locate(path)
+            if target is not None and (target, part) not in hashed:
+                hashed[target, part] = file_pin(target, part=part)
+            fresh = hashed[target, part] if target is not None else None
             if fresh is not None:
                 claim_pins[evidence] = fresh
             elif evidence in claim.pinned:
                 claim_pins[evidence] = claim.pinned[evidence]
         if only_evidence:
-            claim_pins = {**claim.pinned, **claim_pins}
+            kept = {entry: claim.pinned[entry] for entry in claim.evidence if entry in claim.pinned}
+            claim_pins = {**kept, **claim_pins}
         for path in [*claim_pins, *(path for path in claim.pinned if path not in claim_pins)]:
             if claim_pins.get(path) != claim.pinned.get(path):
                 dropped = " (dropped)" if path not in claim_pins else ""
@@ -462,7 +479,7 @@ def stale_pins(graph: DocGraph, doc: str | None = None) -> list[StalePin]:
     def locate(spelling: str) -> Path | None:
         return resolve_display_path(repo_root, config.paths.source_roots, spelling)
 
-    hashed: dict[Path, str | None] = {}
+    hashed: dict[tuple[Path, str | None], str | None] = {}
     found: list[StalePin] = []
     for node in sorted(graph.nodes.values(), key=lambda n: n.path.as_posix()):
         if doc is not None and node.path.as_posix() != doc:
@@ -509,18 +526,19 @@ def _stale_anchors(repo_root: Path, node: DocNode, reader: SourceReader) -> Iter
 def _stale_evidence(
     node: DocNode,
     locate: Callable[[str], Path | None],
-    hashed: dict[Path, str | None],
+    hashed: dict[tuple[Path, str | None], str | None],
     reader: SourceReader,
 ) -> Iterator[StalePin]:
     for claim in node.frontmatter.claims:
         for evidence in claim.evidence:
             pin = claim.pinned.get(evidence)
-            target = locate(evidence) if pin is not None else None
+            path, part = split_part(evidence)
+            target = locate(path) if pin is not None else None
             if pin is None or target is None:
                 continue
-            if target not in hashed:
-                hashed[target] = file_pin(target, reader)
-            current = hashed[target]
+            if (target, part) not in hashed:
+                hashed[target, part] = file_pin(target, reader, part)
+            current = hashed[target, part]
             if current is None or current == pin:
                 continue
             yield StalePin(

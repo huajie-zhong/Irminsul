@@ -25,6 +25,16 @@ def did_you_mean(name: str, choices: Iterable[str], *, limit: int = 1) -> str:
     return f" (did you mean {quoted}?)"
 
 
+def closest(name: str, choices: Iterable[str], *, limit: int = 3) -> str:
+    """` (closest: 'x', 'y')` for the `limit` of `choices` most like `name`, however unlike
+    they are, or "" when there is none: for a name that must be one of them, such as a part
+    of a file, where the nearest that exist are what the reader picks from."""
+    matches = difflib.get_close_matches(name, list(choices), n=limit, cutoff=0.0)
+    if not matches:
+        return ""
+    return " (closest: " + ", ".join(f"'{match}'" for match in matches) + ")"
+
+
 class Severity(StrEnum):
     error = "error"
     warning = "warning"

@@ -57,9 +57,10 @@ foundation and architecture layers.
   repo-relative and fits the claim's `state`, reports a `<!-- claim:<id> -->` marker naming no
   declared claim, and reports evidence that changed after the doc as `evidence-drift`. An
   anchor pins its symbol's hash, and only a person re-pins it.
-- **A pin acknowledges evidence drift.** While a file keeps its pinned hash `evidence-drift`
-  skips it; once the hash differs the commit-time comparison applies, so a pin only ever
-  removes drift.
+- **A pin acknowledges evidence drift.** While what an evidence entry names, its file or the
+  part of it the entry is written with, keeps its pinned hash `evidence-drift` skips it; once
+  the hash differs the commit-time comparison of the file applies, so a pin only ever removes
+  drift.
 - **Evidence drift is judged in every layer** (accepted, not yet implemented), landing after
   part pins exist.
 - **A divergence goes to a reader.** `list review --changed` queues each claim other than a

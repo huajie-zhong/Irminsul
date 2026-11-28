@@ -1532,8 +1532,9 @@ def anchors_command(
         typer.Option(
             "--evidence",
             help=(
-                "With --claim, re-pin only this evidence file, as the claim spells it. "
-                "Applies to every --claim given. Repeatable."
+                "With --claim, re-pin only this evidence entry, as the claim spells it, "
+                "path#part included; a bare path selects every entry of that file. Applies "
+                "to every --claim given. Repeatable."
             ),
         ),
     ] = None,

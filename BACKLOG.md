@@ -300,7 +300,9 @@ and was re-asked six times on 2026-10-21 and 2026-10-22, and re-pinned four more
 the PR 12a and 12b lanes on 2026-10-28. Re-asking that often trains a reader to re-pin
 without reading. Let evidence name a section or a definition and pin only that part; the
 accepted RFC `claim-evidence-names-a-part`, resolved into
-`code-is-named-in-code-spans-and-bound-by-anchors`, does it and is not yet implemented. The
+`code-is-named-in-code-spans-and-bound-by-anchors`, does it: an entry can be written
+`path#part` since 2026-11-27, and the claims named here are narrowed by the RFC's tasks T11
+to T13, which are not built yet. The
 second reset hit it again on 2026-10-29: retargeting one link in `checks.md` re-asked that
 claim, and a help-string edit in the `refs` fix re-asked three claims citing `cli.py`. The
 dogfood fix lanes the same night re-pinned the three `cli.py` claims once per lane and again at

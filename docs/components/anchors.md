@@ -15,6 +15,8 @@ depends_on:
   - surface
 owns_tests:
   - tests/test_binding.py
+  - tests/test_claim_part_rules.py
+  - tests/test_claim_parts.py
   - tests/test_cli_anchors.py
   - tests/test_parts.py
 summary: Anchored prose claims pinned to code.
@@ -124,7 +126,7 @@ neither is offered.
 <!-- anchor: tests/test_parts.py#test_a_marker_names_what_an_anchor_can_write_and_nothing_shorter @sha256:2a338dabfd2b -->
 <!-- anchor: tests/test_parts.py#test_a_key_file_a_finder_cannot_write_is_unreadable_and_stops_no_run @sha256:1983c4943653 -->
 <!-- anchor: tests/test_binding.py#test_suggest_offers_a_marked_part_of_a_file_a_reader_reads @sha256:ee02aa4b3210 -->
-<!-- anchor: tests/test_parts.py#test_missing_symbol_offers_the_closest_known_name @sha256:afaa67c9c0c8 -->
+<!-- anchor: tests/test_parts.py#test_missing_symbol_offers_the_closest_known_name @sha256:1dcbfd8a1440 -->
 
 ## Binding the code a doc names
 
@@ -192,10 +194,13 @@ sentence is false and sees that test fail, the second step of
 The pin is a deliberate acknowledgement, not an automatic one: refreshing it with
 `irminsul anchors --re-pin` is how an author says "I re-read this and it is still
 true." Nothing rewrites a pin silently, because that would rubber-stamp the very
-staleness the anchor exists to catch. The same command pins each evidence file of every
-claim in the doc under the claim's `pinned`, with the hash a file-level anchor would
-take, so `claim-provenance/evidence-drift` does not re-ask a re-read claim over a
-formatting-only commit; a pin only ever removes drift. A doc cited as evidence is hashed with
+staleness the anchor exists to catch. The same command pins each evidence entry of every
+claim in the doc under the claim's `pinned`, keyed by the entry as the claim writes it,
+with the hash an anchor of that spelling would take: a file-level one for a bare path, and
+for `path#part` the hash of that part, found by the [finders](#parts-of-a-file) above. So
+`claim-provenance/evidence-drift` does not re-ask a re-read claim over a formatting-only
+commit, nor one that names a part over a change elsewhere in its file; a pin only ever
+removes drift. A doc cited as evidence is hashed with
 its own pins left out (`file_pin`, through `without_pins`), so re-pinning an anchor in that
 doc does not re-ask the claims citing it, while a change to its words still does.
 
@@ -203,12 +208,29 @@ The acknowledgement is per document, so `--re-pin` requires `--doc <id|path>`: n
 re-reads a whole repository at once, and `--all` is for the rare case that is really what
 happened, such as a formatting-only sweep or a move to a new pin format. A re-read is rarely of a whole doc either, so
 `--claim` and `--anchor` narrow a re-pin to what was re-read, `--evidence` narrows a claim
-to one of its evidence files, and the `evidence-drift` and `claim-anchor` suggestions print
-that narrow form. An `evidence-drift` finding names every evidence file of its claim that
+to one of its evidence entries, by the entry's spelling, or to every entry of one file by
+the file's bare path, and the `evidence-drift` and `claim-anchor` suggestions print
+that narrow form. An `evidence-drift` finding names every evidence entry of its claim that
 changed after the doc, and its suggestion gives each one `--evidence`, so a pin of the claim's
 other evidence that no longer matches, which the finding did not ask about, is left for its
 own re-read. A `--doc` or a selector that names
-nothing exits 2 and writes nothing, because re-pinning nothing would read as success.
+nothing exits 2 and writes nothing, because re-pinning nothing would read as success. An
+entry whose part does not resolve, or whose file cannot be read, keeps the pin it had, and a
+pin on a spelling the claim no longer cites is dropped by any re-pin of the claim, since
+nothing reads it.
+
+An entry that names a part which is not in its file is a certain finding of its own and is
+judged for no drift: `claim-provenance/evidence-part-missing` where the file's finder knows
+no such name, with the closest names it does know and the reason when the name is ambiguous,
+and `claim-provenance/evidence-part-unsupported` where the file's type has no finder and no
+marker names the part. A part of a file that could not be read whole is neither, since the
+part may be in what was not read; without a hash it is asked about as its file is.
+<!-- anchor: tests/test_claim_parts.py#test_a_change_to_another_part_of_the_file_does_not_ask_a_pinned_part_again @sha256:86581bdd3cdf -->
+<!-- anchor: tests/test_claim_parts.py#test_a_bare_path_selects_every_part_of_that_file_and_no_other @sha256:edc7f7ffdd7c -->
+<!-- anchor: tests/test_claim_parts.py#test_a_re_pin_follows_a_renamed_part_and_drops_the_pin_of_the_old_spelling @sha256:11899126ba21 -->
+<!-- anchor: tests/test_claim_parts.py#test_a_renamed_function_is_a_missing_part_that_names_the_closest_and_asks_no_drift @sha256:61af15666047 -->
+<!-- anchor: tests/test_claim_parts.py#test_a_part_of_a_file_no_finder_reads_is_unsupported_and_fails_the_run @sha256:8d8c5e4ece56 -->
+<!-- anchor: tests/test_claim_parts.py#test_a_part_of_a_file_that_does_not_parse_keeps_its_pin_and_is_judged_by_its_file @sha256:d9b8683ff86c -->
 <!-- anchor: src/irminsul/anchors.py#repin_doc @sha256:a335249a82a0 -->
 <!-- anchor: tests/test_cli_anchors.py#test_the_evidence_drift_suggestion_re_pins_only_the_evidence_it_names @sha256:4de675f9c06d -->
 
@@ -216,19 +238,19 @@ nothing exits 2 and writes nothing, because re-pinning nothing would read as suc
 
 `irminsul anchors --stale` lists every pin that no longer matches what it pins, in every doc
 or the one `--doc` names: each anchor whose target resolves and hashes differently from its
-pin, and each pin of a claim's evidence whose file does. `stale_pins` reads each through
+pin, and each pin of a claim's evidence entry whose file, or whose part of it, does. `stale_pins` reads each through
 `resolve` and `file_pin`, as `--re-pin` reads it, so nothing a re-pin just wrote is listed,
 and a target that does not resolve is left to the findings that report it. A row names the
 doc and the line of the anchor marker, or of the claim's `<!-- claim:<id> -->` marker, or 1
 when no paragraph declares the claim; the pin and the current hash; and the `--re-pin`
 command narrowed to that pin, each argument shell-quoted so it runs as printed:
-`--claim <id> --evidence <path>`, which moves that pin alone, or `--anchor <path#symbol>`,
+`--claim <id> --evidence <entry>`, the entry as the claim spells it, which moves that pin alone, or `--anchor <path#symbol>`,
 which also moves any other anchor of the doc with the same `path#symbol`, since `--anchor`
 names a target. Plain output prints one row per line and a count, and `--format json` prints
 `{"version": 1, "stale": [...]}`. It writes nothing and exits 0, since the checks are the gate
 ([Code is named in code spans and bound by anchors](../decisions/code-is-named-in-code-spans-and-bound-by-anchors.md)),
 and with `--re-pin` or `--suggest` it exits 2 and writes nothing: one action per run.
-<!-- anchor: src/irminsul/anchors.py#stale_pins @sha256:ffb7528712e8 -->
+<!-- anchor: src/irminsul/anchors.py#stale_pins @sha256:448cc3c96bb2 -->
 <!-- anchor: tests/test_cli_anchors.py#test_stale_lists_a_component_claims_changed_evidence @sha256:fc748e708176 -->
 <!-- anchor: tests/test_cli_anchors.py#test_stale_lists_nothing_when_every_pin_matches @sha256:266cf2aec24d -->
 <!-- anchor: tests/test_cli_anchors.py#test_stale_with_another_action_exits_2_and_writes_nothing @sha256:f4c0c567ab07 -->
@@ -291,7 +313,7 @@ test file was read. Nothing measures how much of a function its tests guard.
 ## Implemented requirements
 
 - **acknowledge-a-reviewed-co-change-or-evidence-drift#re-pin-writes-claim-pins** — `irminsul anchors --re-pin --doc <doc>` SHALL write the current normalized hash of every evidence file of every claim in that doc, and SHALL drop a pin on a path the claim no longer cites. (provenance: code; [RFC](../rfcs/acknowledge-a-reviewed-co-change-or-evidence-drift.md))
-  <!-- anchor: src/irminsul/anchors.py#repin_claims @sha256:b7fbcd86889c -->
+  <!-- anchor: src/irminsul/anchors.py#repin_claims @sha256:e1ea7c3193df -->
 - **a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts#suggest-offers-the-tests-of-a-definition** — `irminsul anchors --suggest --doc <doc>` SHALL list each code span of that doc that resolves to one function or class, with up to three test functions, in files under the configured test roots that import the defining module, whose body names that definition through the file's imports, each as an anchor marker ready to paste. A name the test binds itself SHALL NOT count as naming the definition. Without `--doc` it SHALL list what it lists today. The function or class and its tests are of any language a reader reads: the RFC offered Python's alone, and [Each language reads its code through one interface](../rfcs/each-language-reads-its-code-through-one-interface.md) widened it. (provenance: code; [RFC](../rfcs/a-sentence-about-behaviour-is-anchored-to-the-test-that-asserts.md))
   <!-- anchor: src/irminsul/binding.py#naming_tests @sha256:a48e8aeceb91 -->
   <!-- anchor: tests/test_binding.py#test_suggest_offers_the_test_that_calls_a_function_the_doc_names @sha256:94b5c37f7a7b -->
@@ -302,7 +324,7 @@ test file was read. Nothing measures how much of a function its tests guard.
   <!-- anchor: tests/test_languages_go_reader.py#test_suggest_offers_the_test_that_calls_late_fee_for_the_guide_sentence @sha256:697d9eb5462f -->
   <!-- anchor: tests/test_languages_rust_reader.py#test_suggest_offers_the_integration_test_that_calls_the_function_a_guide_names @sha256:6ed061e33ad5 -->
 - **a-pin-that-no-longer-matches-its-file-is-listed#stale-pins-are-listed** — `irminsul anchors --stale` SHALL list each anchor and each claim evidence pin, in every doc or the one `--doc` names, whose target's current hash differs from its pin, each with the command that re-pins only that pin, or that pin and the other anchors of its doc that name the same target, and SHALL exit 0. (provenance: code; [RFC](../rfcs/a-pin-that-no-longer-matches-its-file-is-listed.md))
-  <!-- anchor: src/irminsul/anchors.py#stale_pins @sha256:ffb7528712e8 -->
+  <!-- anchor: src/irminsul/anchors.py#stale_pins @sha256:448cc3c96bb2 -->
   <!-- anchor: tests/test_cli_anchors.py#test_stale_lists_a_component_claims_changed_evidence @sha256:fc748e708176 -->
   <!-- anchor: tests/test_cli_anchors.py#test_stale_lists_nothing_when_every_pin_matches @sha256:266cf2aec24d -->
   <!-- anchor: tests/test_cli_anchors.py#test_stale_with_another_action_exits_2_and_writes_nothing @sha256:f4c0c567ab07 -->

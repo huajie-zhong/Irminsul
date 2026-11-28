@@ -865,22 +865,23 @@ def test_whole_file_anchor_of_an_unread_file_ignores_indentation_only(tmp_path: 
 
 
 def test_missing_symbol_offers_the_closest_known_name(tmp_path: Path) -> None:
-    """For a name one letter off a definition, `claim-anchor/missing-symbol` says "did you mean"
-    and names that definition."""
+    """For a name one letter off a definition, `claim-anchor/missing-symbol` names the closest
+    names the file defines, that definition first."""
     text = "def fetch_user_session(id):\n    return id\n\n\ndef unrelated():\n    return 1\n"
     findings = _anchor_findings(tmp_path, "src/m.py", text, "fetch_user_sesion")
     missing = [f for f in findings if f.code == CODE_MISSING_SYMBOL]
     assert len(missing) == 1
-    assert "did you mean 'fetch_user_session'" in missing[0].message
+    assert "(closest: 'fetch_user_session', 'unrelated')" in missing[0].message
 
 
 def test_missing_symbol_offers_the_closest_heading_slug(tmp_path: Path) -> None:
-    """For a slug one letter off a heading's, the finding says "did you mean" with that slug."""
+    """For a slug one letter off a heading's, the finding names the closest slugs, that one
+    first."""
     text = "# Notes\n\n## Retention Policy\n\nkeep it\n\n## Other Matters\n\nmore\n"
     findings = _anchor_findings(tmp_path, "notes.md", text, "retention-polcy")
     missing = [f for f in findings if f.code == CODE_MISSING_SYMBOL]
     assert len(missing) == 1
-    assert "did you mean 'retention-policy'" in missing[0].message
+    assert "(closest: 'retention-policy'," in missing[0].message
 
 
 def test_missing_symbol_for_an_unclosed_part_says_why(tmp_path: Path) -> None:
@@ -954,7 +955,7 @@ def test_unsupported_part_offers_the_closest_marker_the_file_has(tmp_path: Path)
     [finding] = _anchor_findings(tmp_path, "lib/m.rb", text, "fetch_sesion")
 
     assert finding.code == CODE_PART_UNSUPPORTED
-    assert "did you mean 'fetch_session'?" in finding.message
+    assert "(closest: 'fetch_session')" in finding.message
 
 
 CYCLE = "defaults: &d\n  retries: 3\n  again: *d\nname: desk\n"

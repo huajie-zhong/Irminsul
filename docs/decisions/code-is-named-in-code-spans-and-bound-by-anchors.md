@@ -157,9 +157,11 @@ paragraphs, which trains a reader to re-pin without reading.
   <!-- anchor: tests/test_binding.py#test_suggest_offers_the_test_that_calls_a_function_the_doc_names @sha256:94b5c37f7a7b -->
 - **Framework extractors stay** as precision for the kinds they know, such as an option checked
   against its own command.
-- **Claim evidence names a part of a file** (accepted, not yet implemented; anchors do):
-  - An evidence entry may name a part as `path#part`, one part per entry, and its pin covers
-    only that part.
+- **Claim evidence names a part of a file**, as an anchor does. The review queue and the
+  seals do not read a part yet (accepted, not yet implemented):
+  - An evidence entry may name a part as `path#part`, split at its first `#`, one part per
+    entry, and its pin, keyed by the entry as written, covers only that part. Whatever reads
+    only where the entry leads reads the path.
   - A finder chosen by the file's type locates the part without guessing: a definition in a
     file its language's reader reads, a heading's section in Markdown, a dotted key in TOML,
     YAML and JSON, and the lines between `irminsul:part <name>` and `irminsul:end <name>`
@@ -293,3 +295,10 @@ paragraphs, which trains a reader to re-pin without reading.
   The review of the change found that the tree-sitter readers left what a grammar could not
   read out of a pin's text, with the comments, so half a statement hashed to an empty tree
   and no edit moved its pin; that code is hashed now, which the second answer rests on.
+- 2026-11-27: Claim evidence names a part, tasks T4 to T7 of
+  [Claim evidence names a part](../rfcs/claim-evidence-names-a-part.md):
+  an entry `path#part` is found by the same finders, pinned by its own spelling, and re-pinned
+  by it or, with its file's bare path, with every entry of that file. A part that is not in
+  its file is `claim-provenance/evidence-part-missing` or `evidence-part-unsupported`, both
+  certain. `context`, `list review` and the seals of `diff-integrity` still match an entry by
+  its whole spelling, which the RFC's next tasks change.

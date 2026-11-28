@@ -351,6 +351,23 @@ making a feature, a refactor and an RFC-driven change in it.
     file of several YAML documents does not resolve.
   - `anchors --suggest` offers `path#name` only where it resolves; for a name that only a
     file no reader reads spells, it offers the file.
+- A claim's evidence entry may name a part of its file, `path#part`, found as an anchor's
+  part is
+  ([Claim evidence names a part](docs/rfcs/claim-evidence-names-a-part.md), its tasks T4 to T7):
+  - Its pin is keyed by the entry as the claim writes it and covers that part alone, so a
+    claim that cites `src/irminsul/cli.py#fix` is not asked again when another function of
+    that file changes. A part with no pin is still asked about as its whole file is: the
+    narrowing takes effect at the re-pin.
+  - `claim-provenance/evidence-part-missing`, a certain finding, reports a part its file's
+    finder does not know, with the closest names it does know, so a renamed function is
+    caught as a renamed file is. `claim-provenance/evidence-part-unsupported`, also certain,
+    reports a part of a file whose type has no finder and that holds no marker for it.
+    An entry reported for either is not also reported as drifted.
+  - `anchors --re-pin --evidence` takes an entry as the claim spells it, part included, and
+    a bare path selects every entry of that file. A re-pin of a claim drops a pin on a
+    spelling the claim no longer cites, also when `--evidence` narrowed it to another entry.
+  - `claim-anchor/missing-symbol` and `part-unsupported` name the closest names in the same
+    way, where they named one only when it was nearly the same.
 - A language profile lists what the checks leave out or look past for its language: the
   files no doc is asked to claim, the directories and compiled files its tools write, the
   directories of installed code and the file that marks an installed environment, and its
