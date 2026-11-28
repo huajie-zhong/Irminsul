@@ -112,7 +112,7 @@ def _trailing(children: Sequence[Node], index: int) -> bool:
     child = children[index]
     if child.is_named or child.type != ",":
         return False
-    after = next((c for c in children[index + 1 :] if not c.is_extra), None)
+    after = next((c for c in children[index + 1 :] if not c.is_extra or c.is_error), None)
     return after is None or (not after.is_named and after.type != ",")
 
 

@@ -320,7 +320,9 @@ making a feature, a refactor and an RFC-driven change in it.
     on `exports`, `module.exports` or a prototype. Its pin hashes the definition's syntax
     tree, so a comment, a change of line breaks or indentation, or a trailing comma no longer
     moves it, and a decorator, an attribute or an overload's signature above the definition is
-    part of it.
+    part of it. A whole file's pin leaves out its final newline as it does other layout, and
+    code the grammar could not read is hashed with its text, so a change inside it moves the
+    pin.
   - A file that holds syntax the grammar does not know, as some valid TypeScript does, still
     answers each definition and import around it.
   - A function in a block or in an object literal is not something an anchor or a code span can
@@ -334,7 +336,7 @@ making a feature, a refactor and an RFC-driven change in it.
   - In any text file, the lines between `irminsul:part <name>` and `irminsul:end <name>`,
     each in a comment, are the part `name`, and win over a definition, a heading or a key of
     that name. A name is every character up to the next space, so `valid?` and `Session#fetch`
-    can be marked. The region is hashed the way a whole file of its type is: through the file's
+    can be marked, without the `-->`, `*/` or `#}` of a comment that touches it. The region is hashed the way a whole file of its type is: through the file's
     reader where one reads it, with whitespace collapsed otherwise.
   - In Markdown, `doc.md#slug` is the section of the one heading with that slug, down to the
     next heading of its level or a higher one.
@@ -348,12 +350,6 @@ making a feature, a refactor and an RFC-driven change in it.
     file of several YAML documents does not resolve.
   - `anchors --suggest` offers `path#name` only where it resolves; for a name that only a
     file no reader reads spells, it offers the file.
-- A pin on a whole Go file no longer moves when the file's final newline is added or taken
-  away: the token of no text that Go's grammar puts where a text ends without one is left
-  out of what a pin hashes, as other layout is. And code a grammar could not read is part of
-  what a pin hashes: it was left out with the comments, so a whole file of TypeScript,
-  JavaScript, Go or Rust kept its pin whatever changed inside the part its grammar could not
-  read. A pin on a whole file that holds such a part moves once.
 - A language profile lists what the checks leave out or look past for its language: the
   files no doc is asked to claim, the directories and compiled files its tools write, the
   directories of installed code and the file that marks an installed environment, and its

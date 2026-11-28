@@ -88,6 +88,9 @@ def build_inbound_strong(nodes: dict[str, DocNode]) -> dict[str, set[str]]:
 _MARKDOWN = MarkdownIt("commonmark")
 
 
+_NEWLINE_RE = re.compile(r"\r\n?|\n")
+
+
 def parse_markdown(text: str) -> list[Token]:
     """CommonMark tokens of `text`; every reader of a doc body parses through here."""
     return _MARKDOWN.parse(text)
@@ -624,11 +627,17 @@ def section_lines(
     markers around it, so a line that only looks like a heading inside a fence or a comment
     does not end it. Fences and comments stay in the lines.
     """
-    lines = body.splitlines()
+    lines = body_lines(body)
     for index, heading in enumerate(headings):
         if accepts(heading):
             return lines[heading.line : section_end(headings, index, len(lines))]
     return None
+
+
+def body_lines(body: str) -> list[str]:
+    """The lines of a body as the Markdown parser numbers them: one ends at a line feed or
+    a carriage return and nowhere else, so a heading's `line` indexes this list."""
+    return _NEWLINE_RE.split(body)
 
 
 def section_end(headings: list[Heading], index: int, last: int) -> int:

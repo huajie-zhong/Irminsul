@@ -26,15 +26,14 @@ from typing import Any, Literal
 
 from ruamel.yaml.error import YAMLError
 
-from irminsul.docgraph_index import headings_of, parse_markdown, section_end
+from irminsul.docgraph_index import body_lines, headings_of, parse_markdown, section_end
 from irminsul.fences import FenceTracker, mask_code_spans
 from irminsul.frontmatter import safe_yaml
 from irminsul.frontmatter_edit import split_frontmatter
 from irminsul.languages.reader import CodeReading, unmarked
 
 _MARKER_RE = re.compile(r"(?<![\w$])irminsul:(?P<kind>part|end)[ \t]+(?P<name>\S+)")
-_COMMENT_END_RE = re.compile(r"(?:-->|\*/)$")
-_NEWLINE_RE = re.compile(r"\r\n?|\n")
+_COMMENT_END_RE = re.compile(r"(?:-->|\*/|#\})$")
 _SEGMENT_RE = re.compile(r'"([^"]*)"|([^."]+)')
 _MARKDOWN = (".md",)
 _KEYED = (".toml", ".yaml", ".yml", ".json")
@@ -100,8 +99,9 @@ def markers(suffix: str, text: str) -> dict[str, int]:
 def _markers(suffix: str, text: str) -> list[tuple[str, str, int]]:
     """Each marker as its kind, its name and the index of its line. A name is the run of
     characters after the marker's word, without the end of the comment it is written in when
-    that touches it. In Markdown a marker in a fenced block or a code span is an example, as
-    an anchor marker there is; in any other file a marker is plain text wherever it stands.
+    that touches it, `-->`, `*/` or `#}`. In Markdown a marker in a fenced block or a code
+    span is an example, as an anchor marker there is; in any other file a marker is plain
+    text wherever it stands.
     """
     found: list[tuple[str, str, int]] = []
     markdown = suffix in _MARKDOWN
@@ -165,8 +165,7 @@ def _section(text: str, name: str, written: Written) -> Part:
         return Part("missing", known=known)
     if len(matches) > 1:
         return Part("missing", known=known, why=f"{len(matches)} headings share the slug")
-    # The parser's lines, which end at a line feed or a carriage return and nowhere else.
-    lines = _NEWLINE_RE.split(body)
+    lines = body_lines(body)
     first = headings[matches[0]].line - 1
     return Part(
         "ok", written("\n".join(lines[first : section_end(headings, matches[0], len(lines))]))
@@ -200,11 +199,17 @@ def _keyed(suffix: str, text: str, name: str) -> Part:
         walked.append(segment)
     try:
         return Part("ok", json.dumps(_plain(value), sort_keys=True, separators=(",", ":")))
+    except _Alike:
+        return Part("missing", why="two keys in it are written alike")
     except (ValueError, RecursionError):
         return Part("unreadable")
 
 
 _SEVERAL = object()
+
+
+class _Alike(ValueError):
+    """Two keys of one table are spelled alike, as the number `1` and the text `"1"` are."""
 
 
 def _load(suffix: str, text: str) -> object:
@@ -260,7 +265,7 @@ def _plain(value: object) -> object:
     if isinstance(value, dict):
         table = {_key(key): _plain(item) for key, item in value.items()}
         if len(table) != len(value):
-            raise ValueError("two keys are written alike")
+            raise _Alike
         return table
     if isinstance(value, (list, tuple)):
         return [_plain(item) for item in value]

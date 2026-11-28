@@ -69,8 +69,26 @@ def test_each_language_names_its_reader_and_a_dialect_by_suffix() -> None:
 UNREADABLE = [
     pytest.param("typescript", "export const fees = {\n  late: 5,", "late: 5", "late: 50", id="ts"),
     pytest.param("go", "package desk\n\nfunc Fee() int {\n\tif late {", "late", "lost", id="go"),
-    pytest.param("rust", "fn fee() -> u32 {\n    if late {", "late", "lost", id="rust"),
+    pytest.param("rust", "const LIMITS: [u32; 2] = [\n    late,", "late", "lost", id="rust"),
 ]
+COMMAS = [
+    pytest.param("typescript", "f(a, @@@)", "f(a @@@)", id="ts"),
+    pytest.param(
+        "go", "package desk\n\nvar x = f(a, @@@)", "package desk\n\nvar x = f(a @@@)", id="go"
+    ),
+    pytest.param("rust", "fn f() { g(a, @@@) }", "fn f() { g(a @@@) }", id="rust"),
+]
+
+
+@pytest.mark.parametrize(("language", "with_comma", "without"), COMMAS)
+def test_a_comma_before_code_the_grammar_could_not_read_is_no_trailing_comma(
+    language: str, with_comma: str, without: str
+) -> None:
+    """A trailing comma is layout because nothing follows it but the closing token; code the
+    grammar could not read follows this one, so it stays in what a pin hashes."""
+    reader = READERS[language]
+
+    assert reader.read(with_comma).canonical() != reader.read(without).canonical()
 
 
 @pytest.mark.parametrize(("language", "text", "old", "new"), UNREADABLE)

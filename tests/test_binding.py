@@ -462,6 +462,36 @@ def test_suggest_offers_a_marked_part_of_a_file_a_reader_reads(tmp_path: Path) -
     ]
 
 
+BROKEN_MARKERS = [
+    pytest.param("# irminsul:part seal\nKEYS = {}\n", id="never-closed"),
+    pytest.param(
+        "# irminsul:part seal\nA = 1\n# irminsul:end seal\n"
+        "# irminsul:part seal\nB = 2\n# irminsul:end seal\n",
+        id="marked-twice",
+    ),
+    pytest.param("# irminsul:end seal\nKEYS = {}\n# irminsul:part seal\n", id="closed-first"),
+    pytest.param("# irminsul:part seal\nif KEYS:\n# irminsul:end seal\n", id="does-not-parse"),
+]
+
+
+@pytest.mark.parametrize("marked", BROKEN_MARKERS)
+def test_suggest_offers_no_part_that_would_not_resolve(tmp_path: Path, marked: str) -> None:
+    """Markers that do not pair, or lines between them that do not parse, name no part, and
+    they still take the name from the function below them: `path#seal` resolves to nothing,
+    so nothing is offered for it."""
+    from irminsul.binding import load_sources, suggest
+
+    write_config(tmp_path, source_roots=["src"])
+    write(tmp_path, "src/vault.py", f"{marked}\n\ndef seal():\n    return 1\n")
+    anchor = Anchor(line=0, raw="", path="src/vault.py", symbol="seal", pinned=None)
+    sources = load_sources(SourceTree(tmp_path, load(tmp_path / "irminsul.toml")))
+
+    found = suggest(tmp_path, sources, "seal")
+
+    assert resolve(tmp_path, anchor).status in ("missing_symbol", "unreadable")
+    assert found.candidates == [] and found.unreachable == []
+
+
 def test_suggest_offers_a_marked_part_by_its_name(tmp_path: Path) -> None:
     root = _ruby_repo(tmp_path, MARKED_RUBY, "`fetch_user_session()` looks a session up by id.\n")
 

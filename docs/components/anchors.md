@@ -72,8 +72,8 @@ hashes, so a revision read from git is found the same way.
 
 - **A pair of markers, in any text file.** The lines between `irminsul:part <name>` and
   `irminsul:end <name>`, each written in a comment of the file, are the part `name`. A
-  marker's name is every character up to the next space, as an anchor's is, without the end
-  of the comment where that touches it. Markers
+  marker's name is every character up to the next space, without the end of a comment
+  that touches it, `-->`, `*/` or `#}`. Markers
   win over a definition, a heading or a key of the same name, because they are the author
   saying where the part is. The region is dedented and hashed the way a whole file of its
   type is: through the file's reader where one reads it, so a comment or a change of layout
@@ -92,7 +92,8 @@ hashes, so a revision read from git is found the same way.
   JSON, so reordering the keys of a table, reformatting it or editing another key does not
   move the pin. A list is hashed whole. A YAML key that is `true` or `null` is spelled so.
   A file the finder cannot answer for is `claim-anchor/unreadable`: one its parser rejects,
-  one whose value holds itself, and a JSON object that writes a key twice.
+  one whose value holds itself, and a JSON object that writes a key twice. Two keys of one
+  table that are written alike, as the number `1` and the text `"1"` are, name nothing.
 
 A name that is absent or ambiguous does not resolve: a part marked twice or never closed, a
 slug two headings share, a key in a file of several YAML documents. That is
@@ -101,7 +102,9 @@ knows. A part of a file whose type has no finder, with no marker of that name, i
 `claim-anchor/part-unsupported`: the name may stand in the file, and the answer is to mark
 the lines or to anchor the whole file. `anchors --suggest` offers `path#name` only where it
 resolves, and otherwise the file, as a mention; for a dotted name, only a file that spells
-each of its parts.
+each of its parts. Markers that do not pair name no part and still take their name from a
+definition below them, so neither is offered.
+<!-- anchor: tests/test_binding.py#test_suggest_offers_no_part_that_would_not_resolve @sha256:59c58e9a9af8 -->
 <!-- anchor: tests/test_binding.py#test_a_file_that_holds_only_the_last_word_of_a_dotted_name_is_no_mention @sha256:c374b15fa838 -->
 <!-- anchor: src/irminsul/parts.py#find_part @sha256:f885a5e5c2ca -->
 <!-- anchor: tests/test_binding.py#test_a_symbol_in_a_file_no_reader_reads_is_unsupported_without_markers @sha256:837deb964faf -->
@@ -117,7 +120,7 @@ each of its parts.
 <!-- anchor: tests/test_parts.py#test_key_hash_ignores_the_order_of_keys_in_a_table @sha256:78681f137ff0 -->
 <!-- anchor: tests/test_parts.py#test_yaml_file_with_several_documents_does_not_resolve @sha256:93780bc31a71 -->
 <!-- anchor: tests/test_parts.py#test_region_of_half_a_statement_hashes_and_follows_its_code_outside_python @sha256:efac540a3c6b -->
-<!-- anchor: tests/test_parts.py#test_a_marker_names_what_an_anchor_can_write_and_nothing_shorter @sha256:693b03c23246 -->
+<!-- anchor: tests/test_parts.py#test_a_marker_names_what_an_anchor_can_write_and_nothing_shorter @sha256:2a338dabfd2b -->
 <!-- anchor: tests/test_parts.py#test_a_key_file_a_finder_cannot_write_is_unreadable_and_stops_no_run @sha256:1983c4943653 -->
 <!-- anchor: tests/test_binding.py#test_suggest_offers_a_marked_part_of_a_file_a_reader_reads @sha256:ee02aa4b3210 -->
 <!-- anchor: tests/test_parts.py#test_missing_symbol_offers_the_closest_known_name @sha256:afaa67c9c0c8 -->

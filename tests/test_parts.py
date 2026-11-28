@@ -914,13 +914,22 @@ def test_a_marker_names_what_an_anchor_can_write_and_nothing_shorter(
     part the finding says to mark is the part the marker names, and a shorter name the
     marker only starts with is not marked."""
     text = f"a\n# irminsul:part {name}\nb\n# irminsul:end {name}\nc\n"
+    shorter = [name[:length] for length in range(1, len(name))]
 
     assert _digest(tmp_path, "lib/m.rb", text, name)
-    assert _again(tmp_path, "lib/m.rb", name[:1]).status == "unsupported"
+    assert {_again(tmp_path, "lib/m.rb", part).status for part in shorter} == {"unsupported"}
 
 
 @pytest.mark.parametrize(
-    ("open_", "close"), [("<!--", "-->"), ("/*", "*/"), ("<!-- ", " -->"), ("/* ", " */")]
+    ("open_", "close"),
+    [
+        ("<!--", "-->"),
+        ("/*", "*/"),
+        ("{#", "#}"),
+        ("<!-- ", " -->"),
+        ("/* ", " */"),
+        ("{# ", " #}"),
+    ],
 )
 def test_the_end_of_a_comment_that_touches_a_marker_is_no_part_of_its_name(
     tmp_path: Path, open_: str, close: str
@@ -971,6 +980,27 @@ def test_a_key_file_a_finder_cannot_write_is_unreadable_and_stops_no_run(
     assert [finding.code for finding in _anchor_findings(tmp_path, rel, text, part)] == [
         "claim-anchor/unreadable"
     ]
+
+
+def test_two_keys_written_alike_do_not_resolve_on_the_path_or_inside_the_value(
+    tmp_path: Path,
+) -> None:
+    """The number `1` and the text `"1"` are one spelling, so a path through them names
+    neither, and a table that holds both cannot be written as the value of the key above."""
+    text = "limits:\n  1: five\n  '1': six\nname: desk\n"
+
+    for part in ("limits.1", "limits"):
+        found = _resolve(tmp_path, "c.yaml", text, part)
+        assert (found.status, "written alike" in (found.why or "")) == ("missing_symbol", True)
+    assert _resolve(tmp_path, "c.yaml", text, "name").status == "ok"
+
+
+def test_a_yaml_file_that_names_two_values_alike_is_read_without_a_warning(tmp_path: Path) -> None:
+    """The parser warns when one anchor name marks two values; the file still says what
+    each key holds, and a warning is no part of a check's output."""
+    text = "first: &same 1\nsecond: &same 2\n"
+
+    assert _digest(tmp_path, "c.yaml", text, "first") != _digest(tmp_path, "c.yaml", text, "second")
 
 
 def test_a_yaml_key_that_is_true_or_null_is_spelled_as_json_writes_it(tmp_path: Path) -> None:

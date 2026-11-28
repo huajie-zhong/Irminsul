@@ -176,8 +176,10 @@ def suggest(repo_root: Path, sources: Sources, name: str) -> Suggestions:
 
     In a file whose language has a reader, a definition is what that reader finds, so a
     class member is offered under its dotted path, and a file that does not parse offers
-    nothing. In any other file that spells the name, a part of that name is offered where
-    a marker, a heading or a key names one, and otherwise the file itself, as a mention:
+    nothing; a part two markers name there is offered where it resolves, and a definition a
+    marker shadows is not. In any other file that spells the name, a part of that name is
+    offered where a marker, a heading or a key names one, and otherwise the file itself, as
+    a mention:
     nothing there is known to define the name, so `path#name` would not resolve. Mentions
     are offered only when nothing defines the name: a file that merely names it is the
     wrong place to bind.
@@ -193,19 +195,20 @@ def suggest(repo_root: Path, sources: Sources, name: str) -> Suggestions:
     for display, lines in sources:
         if not any(token.search(line) for line in lines):
             continue
+        anchor = Anchor(line=0, raw="", path=display, symbol=name, pinned=None)
         code_reader = reader_for(display)
         if code_reader is not None:
             text = "\n".join(lines)
-            marked = markers(PurePosixPath(display).suffix, text).get(name)
-            if marked is not None:
-                definitions.append(Candidate(display, marked, True))
+            # A marker takes its name from a definition, whether its pair is sound or not.
+            marked = markers(PurePosixPath(display).suffix, text)
+            if name in marked and resolve(repo_root, anchor).status == "ok":
+                definitions.append(Candidate(display, marked[name], True))
             for found in code_reader.read(text).definitions():
-                if found.name == leaf and not (marked and found.symbol == name):
+                if found.name == leaf and found.symbol not in marked:
                     candidate = Candidate(display, found.line, True, found.symbol)
                     (definitions if found.reachable else unreachable).append(candidate)
             continue
         line = next(index for index, text in enumerate(lines, 1) if token.search(text))
-        anchor = Anchor(line=0, raw="", path=display, symbol=name, pinned=None)
         if resolve(repo_root, anchor).status == "ok":
             definitions.append(Candidate(display, line, True))
         elif all(any(part.search(text) for text in lines) for part in holders):

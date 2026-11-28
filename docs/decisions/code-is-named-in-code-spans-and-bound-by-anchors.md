@@ -129,7 +129,7 @@ paragraphs, which trains a reader to re-pin without reading.
   listed as out of reach rather than dropped; a file that only mentions the name is offered
   only when nothing defines it, and a file no reader reads is offered whole unless a marker,
   a heading or a key in it has the name. The agent chooses and writes the anchor.
-  <!-- anchor: src/irminsul/binding.py#suggest @sha256:2c337b2f69f9 -->
+  <!-- anchor: src/irminsul/binding.py#suggest @sha256:4f51656c281c -->
 - **A sentence about behaviour is best anchored to the test that asserts it.** A test
   function is a symbol, so an anchor names it, pins it and drifts with it like any other. The
   paragraph is then asked about when that test changes, and the test fails when the code stops
