@@ -368,6 +368,9 @@ making a feature, a refactor and an RFC-driven change in it.
     spelling the claim no longer cites, also when `--evidence` narrowed it to another entry.
   - `claim-anchor/missing-symbol` and `part-unsupported` name the closest names in the same
     way, where they named one only when it was nearly the same.
+  - The command an `evidence-drift` or a `claim-anchor` finding prints quotes each argument
+    that needs it, so it runs as printed for a path with a space and for a key written
+    `tool."a.b"`, as the command `anchors --stale` prints already did.
 - A language profile lists what the checks leave out or look past for its language: the
   files no doc is asked to claim, the directories and compiled files its tools write, the
   directories of installed code and the file that marks an installed environment, and its

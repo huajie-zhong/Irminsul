@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from irminsul.anchors import parse_anchors, resolve
+from irminsul.anchors import parse_anchors, resolve, shell_word
 from irminsul.checks.base import Answer, Finding, FindingClass, Severity, closest
 from irminsul.docgraph import DocGraph
 
@@ -96,7 +96,10 @@ class ClaimAnchorCheck:
             for anchor in parse_anchors(node.body):
                 resolution = resolve(graph.repo_root, anchor, graph.source)
                 target = anchor.target
-                re_pin = f"irminsul anchors --re-pin --doc {node.path.as_posix()} --anchor {target}"
+                re_pin = (
+                    f"irminsul anchors --re-pin --doc {shell_word(node.path.as_posix())} "
+                    f"--anchor {shell_word(target)}"
+                )
 
                 if resolution.status == "missing_file":
                     out.append(

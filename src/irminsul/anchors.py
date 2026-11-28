@@ -101,6 +101,17 @@ def parse_anchors(body: str) -> list[Anchor]:
     return anchors
 
 
+_PLAIN_WORD_RE = re.compile(r"[\w@%+=:,./-][\w@%+=:,./#-]*")
+
+
+def shell_word(word: str) -> str:
+    """`word` as a shell reads it back whole: itself where nothing in it is special, a `#`
+    after its first character included, and quoted otherwise, as a key written
+    `tool."a.b"` or a path with a space must be. The command a finding suggests is built
+    of these, so it runs as printed and reads as it always did where nothing needs quoting."""
+    return word if _PLAIN_WORD_RE.fullmatch(word) else shlex.quote(word)
+
+
 def _hash(source: str) -> str:
     return hashlib.sha256(source.encode("utf-8")).hexdigest()[:_HASH_LEN]
 
@@ -430,9 +441,11 @@ class StalePin:
 
     @property
     def re_pin(self) -> str:
-        """The whole command that re-pins this pin, each argument shell-quoted so it runs as
-        printed. `--anchor` names a target, so it also moves another anchor of the doc with
-        the same `path#symbol`; a claim pins each evidence path once."""
+        """The whole command that re-pins this pin, each argument shell-quoted so it runs
+        as printed. `--anchor` names a target, so it also moves another
+        anchor of the doc with the same `path#symbol`. `--evidence` with an entry that
+        names a part moves that pin alone; with a bare path it moves every entry of that
+        file, so the pins of a claim that cites a file whole and by a part move together."""
         narrow = (
             ["--anchor", self.target]
             if self.claim is None

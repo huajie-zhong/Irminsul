@@ -18,18 +18,28 @@ from irminsul.docgraph import DocGraph, DocNode
 
 def did_you_mean(name: str, choices: Iterable[str], *, limit: int = 1) -> str:
     """` (did you mean 'x'?)` for the `limit` closest of `choices`, or "" when none is close."""
-    matches = difflib.get_close_matches(name, list(choices), n=limit)
+    matches = _nearest(name, choices, limit, 0.6)
     if not matches:
         return ""
     quoted = " or ".join(f"'{match}'" for match in matches)
     return f" (did you mean {quoted}?)"
 
 
+def _nearest(name: str, choices: Iterable[str], limit: int, cutoff: float) -> list[str]:
+    """The `limit` of `choices` most like `name` and at least `cutoff` like it, the likest
+    first and names equally like in their own order, so the list is the same on every run."""
+    scored = [
+        (difflib.SequenceMatcher(None, name, choice).ratio(), choice) for choice in set(choices)
+    ]
+    kept = sorted((-score, choice) for score, choice in scored if score >= cutoff)
+    return [choice for _, choice in kept[:limit]]
+
+
 def closest(name: str, choices: Iterable[str], *, limit: int = 3) -> str:
     """` (closest: 'x', 'y')` for the `limit` of `choices` most like `name`, however unlike
     they are, or "" when there is none: for a name that must be one of them, such as a part
     of a file, where the nearest that exist are what the reader picks from."""
-    matches = difflib.get_close_matches(name, list(choices), n=limit, cutoff=0.0)
+    matches = _nearest(name, choices, limit, 0.0)
     if not matches:
         return ""
     return " (closest: " + ", ".join(f"'{match}'" for match in matches) + ")"

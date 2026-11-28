@@ -169,10 +169,10 @@ class Claim(BaseModel):
     names, and of the whole file for a bare path.
 
     Written by `anchors --re-pin`, never by hand. While what an entry names still has the
-    hash it was pinned at, a commit to its file does not re-ask the claim. Deliberately unvalidated beyond
-    its shape: a pin that matches nothing only stops suppressing drift, while a schema
-    error here would unparse the doc and so put it out of reach of the re-pin that
-    repairs it.
+    hash it was pinned at, a commit to its file does not re-ask the claim. Deliberately
+    unvalidated beyond its shape: a pin that matches nothing only stops suppressing drift,
+    while a schema error here would unparse the doc and so put it out of reach of the
+    re-pin that repairs it.
     """
 
     @model_validator(mode="after")

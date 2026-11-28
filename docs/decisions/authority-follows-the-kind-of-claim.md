@@ -145,3 +145,6 @@ foundation and architecture layers.
 - 2026-11-26: That is implemented and stated in the Decision: a deleted sentence is a
   `removed-sentence` item of `list review --written`, and `list review --changed` no longer
   lists it.
+- 2026-11-27: An evidence entry may name a part of its file, tasks T4 to T7 of
+  [Claim evidence names a part](../rfcs/claim-evidence-names-a-part.md), so the Decision says
+  a pin holds while what its entry names keeps the pinned hash, the file or that part of it.

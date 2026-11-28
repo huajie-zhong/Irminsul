@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
 
-from irminsul.anchors import Resolution, file_pin, resolve_evidence
+from irminsul.anchors import Resolution, file_pin, resolve_evidence, shell_word
 from irminsul.checks.base import (
     Answer,
     CheckFlag,
@@ -59,6 +59,7 @@ CODE_EVIDENCE_STATE_MISMATCH = "claim-provenance/evidence-state-mismatch"
 CODE_UNKNOWN_CLAIM_REF = "claim-provenance/unknown-claim-ref"
 CODE_EVIDENCE_DRIFT = "claim-provenance/evidence-drift"
 
+_READ_AS = " (an entry is a path up to its first `#`, here '{path}')"
 _UNRESOLVED = ("missing_symbol", "unsupported", "missing_file")
 """What a part that names nothing resolves as: a name its file's finder does not know, a
 part of a file whose type has no finder, and a part of what is no file."""
@@ -230,7 +231,14 @@ class ClaimProvenanceCheck:
                             check=self.name,
                             code=CODE_EVIDENCE_PATH_MISSING,
                             severity=Severity.error,
-                            message=f"claim '{claim.id}' evidence path does not exist: '{evidence}'",
+                            message=(
+                                f"claim '{claim.id}' evidence path does not exist: '{evidence}'"
+                                + (
+                                    ""
+                                    if entry.part is None
+                                    else _READ_AS.format(path=split_part(evidence)[0])
+                                )
+                            ),
                             path=node.path,
                             doc_id=node.id,
                             suggestion=(
@@ -269,6 +277,8 @@ class ClaimProvenanceCheck:
         path = entry.path.as_posix()
         if found.status == "missing_symbol":
             reason = f": {found.why}" if found.why else ""
+            if not part:
+                reason = ": the entry ends at its `#` and names no part"
             return Finding(
                 check=self.name,
                 code=CODE_EVIDENCE_PART_MISSING,
@@ -436,7 +446,7 @@ class ClaimProvenanceCheck:
                 " and since it was pinned" if len(drifted) == 1 else " and since they were pinned"
             )
         named = ", ".join(f"'{path}'" for path, _ in drifted)
-        evidence = "".join(f" --evidence {path}" for path, _ in drifted)
+        evidence = "".join(f" --evidence {shell_word(path)}" for path, _ in drifted)
         return Finding(
             check=self.name,
             code=CODE_EVIDENCE_DRIFT,
@@ -447,8 +457,8 @@ class ClaimProvenanceCheck:
             suggestion=(
                 "Review the claim against the evidence named and update the doc if it changed "
                 "the claim's truth; if it still holds, record that with "
-                f"`irminsul anchors --re-pin --doc {node.path.as_posix()} "
-                f"--claim {claim_id}{evidence}`"
+                f"`irminsul anchors --re-pin --doc {shell_word(node.path.as_posix())} "
+                f"--claim {shell_word(claim_id)}{evidence}`"
             ),
         )
 

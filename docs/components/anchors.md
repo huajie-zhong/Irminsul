@@ -99,7 +99,7 @@ hashes, so a revision read from git is found the same way.
 
 A name that is absent or ambiguous does not resolve: a part marked twice or never closed, a
 slug two headings share, a key in a file of several YAML documents. That is
-`claim-anchor/missing-symbol`, whose message says why and names the closest name the finder
+`claim-anchor/missing-symbol`, whose message says why and names the closest names the finder
 knows. A part of a file whose type has no finder, with no marker of that name, is
 `claim-anchor/part-unsupported`: the name may stand in the file, and the answer is to mark
 the lines or to anchor the whole file. `anchors --suggest` offers `path#name` only where it
@@ -203,6 +203,7 @@ commit, nor one that names a part over a change elsewhere in its file; a pin onl
 removes drift. A doc cited as evidence is hashed with
 its own pins left out (`file_pin`, through `without_pins`), so re-pinning an anchor in that
 doc does not re-ask the claims citing it, while a change to its words still does.
+<!-- anchor: tests/test_claim_parts.py#test_a_change_to_another_part_of_the_file_does_not_ask_a_pinned_part_again @sha256:86581bdd3cdf -->
 
 The acknowledgement is per document, so `--re-pin` requires `--doc <id|path>`: nobody
 re-reads a whole repository at once, and `--all` is for the rare case that is really what
@@ -210,7 +211,9 @@ happened, such as a formatting-only sweep or a move to a new pin format. A re-re
 `--claim` and `--anchor` narrow a re-pin to what was re-read, `--evidence` narrows a claim
 to one of its evidence entries, by the entry's spelling, or to every entry of one file by
 the file's bare path, and the `evidence-drift` and `claim-anchor` suggestions print
-that narrow form. An `evidence-drift` finding names every evidence entry of its claim that
+that narrow form, quoting (`shell_word`) an argument a shell would otherwise split or take
+the quotes from, such as a key written `tool."a.b"`, so the command runs as printed. An
+`evidence-drift` finding names every evidence entry of its claim that
 changed after the doc, and its suggestion gives each one `--evidence`, so a pin of the claim's
 other evidence that no longer matches, which the finding did not ask about, is left for its
 own re-read. A `--doc` or a selector that names
@@ -218,6 +221,11 @@ nothing exits 2 and writes nothing, because re-pinning nothing would read as suc
 entry whose part does not resolve, or whose file cannot be read, keeps the pin it had, and a
 pin on a spelling the claim no longer cites is dropped by any re-pin of the claim, since
 nothing reads it.
+<!-- anchor: src/irminsul/anchors.py#repin_doc @sha256:a335249a82a0 -->
+<!-- anchor: tests/test_cli_anchors.py#test_the_evidence_drift_suggestion_re_pins_only_the_evidence_it_names @sha256:4de675f9c06d -->
+<!-- anchor: tests/test_claim_parts.py#test_the_drift_command_for_a_key_with_a_quoted_segment_runs_as_printed @sha256:fc434aed7b4a -->
+<!-- anchor: tests/test_claim_parts.py#test_a_bare_path_selects_every_part_of_that_file_and_no_other @sha256:edc7f7ffdd7c -->
+<!-- anchor: tests/test_claim_parts.py#test_a_re_pin_follows_a_renamed_part_and_drops_the_pin_of_the_old_spelling @sha256:11899126ba21 -->
 
 An entry that names a part which is not in its file is a certain finding of its own and is
 judged for no drift: `claim-provenance/evidence-part-missing` where the file's finder knows
@@ -225,14 +233,9 @@ no such name, with the closest names it does know and the reason when the name i
 and `claim-provenance/evidence-part-unsupported` where the file's type has no finder and no
 marker names the part. A part of a file that could not be read whole is neither, since the
 part may be in what was not read; without a hash it is asked about as its file is.
-<!-- anchor: tests/test_claim_parts.py#test_a_change_to_another_part_of_the_file_does_not_ask_a_pinned_part_again @sha256:86581bdd3cdf -->
-<!-- anchor: tests/test_claim_parts.py#test_a_bare_path_selects_every_part_of_that_file_and_no_other @sha256:edc7f7ffdd7c -->
-<!-- anchor: tests/test_claim_parts.py#test_a_re_pin_follows_a_renamed_part_and_drops_the_pin_of_the_old_spelling @sha256:11899126ba21 -->
 <!-- anchor: tests/test_claim_parts.py#test_a_renamed_function_is_a_missing_part_that_names_the_closest_and_asks_no_drift @sha256:61af15666047 -->
 <!-- anchor: tests/test_claim_parts.py#test_a_part_of_a_file_no_finder_reads_is_unsupported_and_fails_the_run @sha256:8d8c5e4ece56 -->
 <!-- anchor: tests/test_claim_parts.py#test_a_part_of_a_file_that_does_not_parse_keeps_its_pin_and_is_judged_by_its_file @sha256:d9b8683ff86c -->
-<!-- anchor: src/irminsul/anchors.py#repin_doc @sha256:a335249a82a0 -->
-<!-- anchor: tests/test_cli_anchors.py#test_the_evidence_drift_suggestion_re_pins_only_the_evidence_it_names @sha256:4de675f9c06d -->
 
 ## Listing the pins that no longer match
 
@@ -244,7 +247,9 @@ and a target that does not resolve is left to the findings that report it. A row
 doc and the line of the anchor marker, or of the claim's `<!-- claim:<id> -->` marker, or 1
 when no paragraph declares the claim; the pin and the current hash; and the `--re-pin`
 command narrowed to that pin, each argument shell-quoted so it runs as printed:
-`--claim <id> --evidence <entry>`, the entry as the claim spells it, which moves that pin alone, or `--anchor <path#symbol>`,
+`--claim <id> --evidence <entry>`, the entry as the claim spells it, which moves that pin alone
+for an entry that names a part and, for a bare path, every entry of that file, so no command
+moves the whole-file pin alone where a claim cites one file whole and by a part, or `--anchor <path#symbol>`,
 which also moves any other anchor of the doc with the same `path#symbol`, since `--anchor`
 names a target. Plain output prints one row per line and a count, and `--format json` prints
 `{"version": 1, "stale": [...]}`. It writes nothing and exits 0, since the checks are the gate
@@ -263,7 +268,7 @@ matches as no pin, falling back to commit times, so a doc committed after its ev
 it ([checks](checks.md)). Each row's `reported_by` says which: the listing runs whichever of
 `claim-anchor` and `claim-provenance` `checks.enabled` enables, over the same graph, so it
 names only a finding `irminsul check` reports: `claim-anchor/pinned-drift` for a stale
-anchor, `claim-provenance/evidence-drift` for each evidence file of a claim that the finding
+anchor, `claim-provenance/evidence-drift` for each evidence entry of a claim that the finding
 names, and null for a pin no finding names, such as a second stale pin of a claim whose
 finding names only the evidence that changed after the doc.
 <!-- anchor: src/irminsul/anchors.py#StalePin.reported_by @sha256:a0876d8fce1b -->

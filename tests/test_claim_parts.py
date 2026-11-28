@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import datetime as _dt
+import re
+import shlex
 from pathlib import Path
 
 from irminsul.anchors import file_pin
@@ -311,6 +313,44 @@ def test_the_drift_suggestion_re_pins_the_part_it_names(tmp_path: Path) -> None:
     assert after["src/cli.py#fix"] == _pin(root, "src/cli.py#fix") != before["src/cli.py#fix"]
     assert after["src/cli.py#check"] == before["src/cli.py#check"]
     assert _codes(root) == []
+
+
+def test_the_drift_command_for_a_key_with_a_quoted_segment_runs_as_printed(
+    tmp_path: Path,
+) -> None:
+    """The key `a.b` of the table `tool` is written `tool."a.b"`. A shell would take those
+    quotes away, so the command the finding prints quotes the entry, and run through a
+    shell's reading it names the entry and clears the drift."""
+    key = 'src/conf.toml#tool."a.b"'
+    conf = '[tool]\n"a.b" = 1\nother = 2\n'
+    root = _repo(tmp_path, {"src/conf.toml": conf, "src/cli.py": CLI}, ["src/cli.py", key])
+    _edit(root, "src/conf.toml", '"a.b" = 1', '"a.b" = 7')
+    graph = load_graph(root, now=_dt.date(2025, 2, 1))
+
+    [finding] = ClaimProvenanceCheck().run(graph)
+
+    command = re.search(r"`irminsul ([^`]+)`", finding.suggestion or "")
+    assert command is not None, finding.suggestion
+    code, plain = invoke(root, *shlex.split(command.group(1)))
+    assert code == 0, plain
+    assert _pinned(root)[key] == _pin(root, key)
+
+
+def test_an_entry_that_names_no_file_or_no_part_says_how_it_was_read(tmp_path: Path) -> None:
+    """An entry is a path up to its first `#`. One whose path leads nowhere is missing as a
+    path, and says which path was read; one that ends at its `#` names no part."""
+    root = _repo(
+        tmp_path, {"src/cli.py": CLI}, ["src/cli.py", "src/gone.py#fix", "src/cli.py#"], pin=False
+    )
+
+    found = dict(_findings(root))
+
+    assert set(found) == {
+        "claim-provenance/evidence-path-missing",
+        "claim-provenance/evidence-part-missing",
+    }
+    assert "here 'src/gone.py'" in found["claim-provenance/evidence-path-missing"]
+    assert "names no part" in found["claim-provenance/evidence-part-missing"]
 
 
 def test_a_bare_path_selects_every_part_of_that_file_and_no_other(tmp_path: Path) -> None:

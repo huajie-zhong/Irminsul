@@ -201,6 +201,8 @@ def _keyed(suffix: str, text: str, name: str) -> Part:
         known = tuple(_path([*walked, key]) for key in keys)
         if isinstance(value, dict) and len(keys) != len(value):
             return Part("missing", known=known, why="two keys there are written alike")
+        if not isinstance(value, dict):
+            return Part("missing", why=f"`{_path(walked)}` holds no keys to pass through")
         if segment not in keys:
             return Part("missing", known=known)
         value = value[keys[segment]]

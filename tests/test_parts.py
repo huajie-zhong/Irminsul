@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from irminsul.anchors import Anchor, Resolution, resolve
-from irminsul.checks.base import Severity
+from irminsul.checks.base import Severity, closest
 from irminsul.checks.claim_anchor import (
     CODE_MISSING_SYMBOL,
     CODE_PART_UNSUPPORTED,
@@ -1002,6 +1002,28 @@ def test_a_yaml_file_that_names_two_values_alike_is_read_without_a_warning(tmp_p
     text = "first: &same 1\nsecond: &same 2\n"
 
     assert _digest(tmp_path, "c.yaml", text, "first") != _digest(tmp_path, "c.yaml", text, "second")
+
+
+def test_a_path_that_goes_past_a_list_says_what_holds_no_keys(tmp_path: Path) -> None:
+    text = "limits:\n  daily:\n    - 5\n    - 6\n"
+
+    found = _resolve(tmp_path, "c.yaml", text, "limits.daily.0")
+
+    assert (found.status, found.why) == (
+        "missing_symbol",
+        "`limits.daily` holds no keys to pass through",
+    )
+
+
+def test_the_closest_names_are_the_likest_first_and_in_one_order_on_every_run() -> None:
+    """Names equally like the one asked for are listed in their own order, so a finding's
+    message is the same whichever order a file's names were read in."""
+    names = ["zeta", "abd", "abc", "abe"]
+
+    assert closest("ab", names) == " (closest: 'abc', 'abd', 'abe')"
+    assert closest("ab", reversed(names)) == closest("ab", names)
+    assert closest("abd", names) == " (closest: 'abd', 'abc', 'abe')"
+    assert closest("ab", []) == ""
 
 
 def test_a_yaml_key_that_is_true_or_null_is_spelled_as_json_writes_it(tmp_path: Path) -> None:

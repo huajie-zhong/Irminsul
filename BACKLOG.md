@@ -168,16 +168,6 @@ reports it, and a reworded message would do the same to every pin. Give both fin
 naming the anchor target, or the claim id and each evidence path, and read that instead. It
 adds fields to what two checks report, so it is the owner's call.
 
-### `re-pin-suggestions-are-not-shell-quoted`
-
-The `--re-pin` command that `claim-provenance/evidence-drift` suggests, and the one
-`claim-anchor` suggests, write the doc path and the evidence path bare
-(`_drift_finding` in `src/irminsul/checks/claim_provenance.py`, `run` in
-`src/irminsul/checks/claim_anchor.py`). For evidence spelled `src/my file.py` the suggestion
-fails as printed with "unexpected extra argument (file.py)", and a doc path holding a space
-does the same to both. `anchors --stale` prints its `re_pin` through `shlex.quote`; the two
-suggestions should too.
-
 ### `same-tree-test-answers-two-questions`
 
 `base_is_the_working_tree` (`src/irminsul/delta.py`) decides both whether `check --delta` would
