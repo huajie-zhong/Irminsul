@@ -202,7 +202,8 @@ def _keyed(suffix: str, text: str, name: str) -> Part:
         if isinstance(value, dict) and len(keys) != len(value):
             return Part("missing", known=known, why="two keys there are written alike")
         if not isinstance(value, dict):
-            return Part("missing", why=f"`{_path(walked)}` holds no keys to pass through")
+            holder = f"`{_path(walked)}`" if walked else "the file's top level"
+            return Part("missing", why=f"{holder} holds no keys to pass through")
         if segment not in keys:
             return Part("missing", known=known)
         value = value[keys[segment]]

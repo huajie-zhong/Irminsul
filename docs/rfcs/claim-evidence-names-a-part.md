@@ -320,10 +320,12 @@ Two accepted records each have one bullet this changes:
 and [a pin covers a whole file](../decisions/a-change-is-judged-from-its-merge-base-to-the-working-tree.md).
 Their other bullets hold, so, as [A gate file is sealed, not scored](a-gate-file-is-sealed-not-scored.md)
 did, the resolving record qualifies each bullet and each Status line gains a sentence.
-A third record, [authority follows the kind of claim](../decisions/authority-follows-the-kind-of-claim.md),
-says what a pin acknowledges: its bullet said a file keeps its pinned hash and says what the
-entry names does, with a line in its Changes.
 Decision 1 (b) would add the Python-pin record as a third.
+
+Building the second pull request reworded a bullet of one more record,
+[authority follows the kind of claim](../decisions/authority-follows-the-kind-of-claim.md),
+which says what a pin acknowledges: it said a file keeps its pinned hash and says what the
+entry names does, with lines in its Changes.
 
 ### Cost and risk in detail
 
@@ -397,7 +399,8 @@ Provenance: code
 
 When an evidence entry's current hash equals its pin, keyed by the entry as written,
 `evidence-drift` SHALL NOT report that entry; otherwise the entry SHALL be judged by the
-commit-time comparison of its file.
+commit-time comparison of its file, unless `missing-part-is-certain` reports it, whose
+entries are judged for no drift.
 
 #### Scenario: Another part of the file changed
 - **WHEN** a claim cites `src/irminsul/cli.py#fix`, pinned at its current hash, and a commit after the doc changes only `check` in `cli.py`

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from irminsul.anchors import file_pin
+from irminsul.anchors import file_pin, shell_word
 from irminsul.checks.claim_provenance import ClaimProvenanceCheck
 from irminsul.frontmatter import read_frontmatter
 
@@ -340,6 +340,29 @@ def test_the_drift_command_for_a_key_with_a_quoted_segment_runs_as_printed(
     assert _pinned(root)[key] == _pin(root, key)
 
 
+@pytest.mark.parametrize("word", ["src/cli.py#fix", "docs/a-b_c.md", "x:y", "-x", "a@b=c,d"])
+def test_a_word_no_shell_misreads_is_printed_as_it_is(word: str) -> None:
+    assert shell_word(word) == word
+
+
+@pytest.mark.parametrize(
+    "word", ['src/conf.toml#tool."a.b"', "my doc.md", "@splat", "=cmd", ",x", "#lead", "a$b", ""]
+)
+def test_a_word_a_shell_would_misread_is_put_in_single_quotes(word: str) -> None:
+    """A space, a quote, a `$`, and at the start of a word a `#`, and the `@`, `=` and `,`
+    that PowerShell and zsh give a meaning."""
+    assert shell_word(word) == f"'{word}'"
+    assert shlex.split(shell_word(word)) == [word]
+
+
+def test_a_word_with_an_apostrophe_is_put_in_double_quotes_where_they_expand_nothing() -> None:
+    """PowerShell reads the POSIX spelling of an apostrophe as three words, and every shell
+    reads double quotes; a word they would expand something in keeps the POSIX spelling."""
+    assert shell_word("it's mine") == '"it' + "'" + 's mine"'
+    assert shlex.split(shell_word("it's $x")) == ["it's $x"]
+    assert not shell_word("it's $x").startswith('"')
+
+
 def test_an_entry_that_names_no_file_or_no_part_says_how_it_was_read(tmp_path: Path) -> None:
     """An entry is a path up to its first `#`. One whose path leads nowhere is missing as a
     path, and says which path was read; one that ends at its `#` names no part."""
@@ -354,7 +377,22 @@ def test_an_entry_that_names_no_file_or_no_part_says_how_it_was_read(tmp_path: P
         "claim-provenance/evidence-part-missing",
     }
     assert "here 'src/gone.py'" in found["claim-provenance/evidence-path-missing"]
-    assert "names no part" in found["claim-provenance/evidence-part-missing"]
+    assert found["claim-provenance/evidence-part-missing"] == (
+        "claim 'hints-advise' evidence 'src/cli.py#' ends at its `#` and names no part of "
+        "'src/cli.py'"
+    )
+
+
+def test_an_entry_with_no_part_is_missing_in_a_file_no_finder_reads_too(tmp_path: Path) -> None:
+    """No name is offered as the closest to none, and no marker is asked for a part with
+    no name."""
+    files = {"src/cli.py": CLI, "lib/session.rb": "def fetch\nend\n"}
+    root = _repo(tmp_path, files, ["src/cli.py", "lib/session.rb#"], pin=False)
+
+    [(code, message)] = _findings(root)
+
+    assert code == "claim-provenance/evidence-part-missing"
+    assert "closest" not in message and "irminsul:part" not in message
 
 
 def test_a_bare_path_selects_every_part_of_that_file_and_no_other(tmp_path: Path) -> None:

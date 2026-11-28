@@ -60,7 +60,8 @@ foundation and architecture layers.
 - **A pin acknowledges evidence drift.** While what an evidence entry names, its file or the
   part of it the entry is written with, keeps its pinned hash `evidence-drift` skips it; once
   the hash differs the commit-time comparison of the file applies, so a pin only ever removes
-  drift.
+  drift. An entry with no hash to compare, because its part is not in its file or its file
+  could not be read, is reported for that and judged for no drift.
 - **Evidence drift is judged in every layer** (accepted, not yet implemented), landing after
   part pins exist.
 - **A divergence goes to a reader.** `list review --changed` queues each claim other than a
@@ -148,3 +149,6 @@ foundation and architecture layers.
 - 2026-11-27: An evidence entry may name a part of its file, tasks T4 to T7 of
   [Claim evidence names a part](../rfcs/claim-evidence-names-a-part.md), so the Decision says
   a pin holds while what its entry names keeps the pinned hash, the file or that part of it.
+- 2026-11-28: The owner's fifth answer to that RFC, so the Decision says an entry with no hash
+  to compare is reported for that, as a part that is not there or as evidence that could not
+  be read, where it said every entry whose hash differs is judged by its file's commit.

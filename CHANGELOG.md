@@ -366,17 +366,19 @@ making a feature, a refactor and an RFC-driven change in it.
   - `claim-provenance/evidence-unreadable`, a hint, reports an entry whose file could not
     be read: a part of a Python file with a syntax error, of a key file that does not parse
     or of a JSON object that writes a key twice, and a pinned whole file with no hash to
-    compare. Such an entry was reported as `evidence-drift`, where its doc is judged for
-    drift, with a suggested re-pin that exited 0 having moved nothing; it is now judged
-    for no drift, and the hint, answered by fixing the file, is reported in every layer.
+    compare. A pinned whole file like that was reported as `evidence-drift`, where its doc
+    is judged for drift, with a suggested re-pin that exited 0 having moved nothing; it is
+    now judged for no drift, and the hint, answered by fixing the file or by marking the
+    lines, is reported in every layer, a draft and a doc newer than the file included.
   - `anchors --re-pin --evidence` takes an entry as the claim spells it, part included, and
     a bare path selects every entry of that file. A re-pin of a claim drops a pin on a
     spelling the claim no longer cites, also when `--evidence` narrowed it to another entry.
   - `claim-anchor/missing-symbol` and `part-unsupported` name the closest names in the same
     way, where they named one only when it was nearly the same.
   - The command an `evidence-drift` or a `claim-anchor` finding prints quotes each argument
-    that needs it, so it runs as printed for a path with a space and for a key written
-    `tool."a.b"`, as the command `anchors --stale` prints already did.
+    that needs it, so in a POSIX shell and in PowerShell 7 it runs as printed for a path
+    with a space, a word with an apostrophe and a key written `tool."a.b"`. Windows
+    PowerShell 5.1 still drops the double quotes of such a key.
 - A language profile lists what the checks leave out or look past for its language: the
   files no doc is asked to claim, the directories and compiled files its tools write, the
   directories of installed code and the file that marks an installed environment, and its

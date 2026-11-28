@@ -710,6 +710,24 @@ def test_an_entry_with_no_pin_is_judged_by_its_file_and_a_pinned_one_beside_it_i
     assert "src/cli.py#fix" not in finding.message
 
 
+def test_the_drift_command_runs_as_printed_for_a_doc_with_a_space_and_a_claim_with_an_apostrophe(
+    tmp_path: Path,
+) -> None:
+    """Every word of the command is quoted where it needs it, the doc's path and the
+    claim's id as the entry is: read as a shell reads it, the command moves the pin."""
+    doc = "docs/foundation/hints advise.md"
+    root = _build(tmp_path, {BASE: PIPELINE}, [_Claim("it's", (BASE,), pin="all")], doc=doc)
+    _edit(root, BASE, "list(findings)", "sorted(findings)")
+
+    [finding] = [found for found in _run(root) if found.code == DRIFT]
+    code, plain = invoke(root, *_suggested(finding))
+
+    assert code == 0, plain
+    read = read_frontmatter((root / doc).read_text(encoding="utf-8"))
+    assert read is not None
+    assert read[0]["claims"][0]["pinned"] == {BASE: _pin(root, BASE)}
+
+
 def test_a_bare_entry_and_a_part_entry_of_one_file_have_two_pins_and_two_verdicts(
     tmp_path: Path,
 ) -> None:

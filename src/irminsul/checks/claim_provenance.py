@@ -121,12 +121,15 @@ class ClaimProvenanceCheck:
         ),
         CODE_EVIDENCE_UNREADABLE: (
             "A claim's evidence entry names a part of a file that could not be read "
-            "whole, or pins a whole file that could not: a Python file with a syntax "
-            "error, a TOML, YAML or JSON file that does not parse, a JSON object that "
-            "writes one key twice, or text that cannot be decoded. The part may be in "
+            "whole, or pins a whole file that could not: a Python file the running Python "
+            "cannot parse, a TOML, YAML or JSON file that does not parse, a JSON object "
+            "that writes one key twice, or text that cannot be decoded. The part may be in "
             "what was not read, so it is not reported missing, and with no hash to "
             "compare the entry is not judged for drift and a re-pin leaves its pin. Fix "
-            "the file so it can be read; the entry is judged again once it is."
+            "the file so it can be read; the entry is judged again once it is. Where the "
+            "file is right as it is, such as JSON with comments, mark the lines the claim "
+            "rests on with `irminsul:part <name>` and `irminsul:end <name>`, which are "
+            "found without parsing the file."
         ),
         CODE_EVIDENCE_STATE_MISMATCH: (
             "A claim has no evidence appropriate for its declared state (planned, "
@@ -158,7 +161,9 @@ class ClaimProvenanceCheck:
     }
     answers: ClassVar[dict[str, Answer]] = {
         CODE_EVIDENCE_UNREADABLE: Answer.fix(
-            "fix the evidence file so it can be read: its syntax, or a key it writes twice"
+            "fix the evidence file so it can be read: its syntax, or a key it writes "
+            "twice; where the file is right as it is, mark the lines the claim rests on "
+            "with `irminsul:part <name>` and `irminsul:end <name>`"
         ),
         CODE_EVIDENCE_DRIFT: Answer.pin(
             "re-read the claim against the evidence it names, then run `irminsul anchors "
@@ -329,7 +334,8 @@ class ClaimProvenanceCheck:
             suggestion=(
                 "fix the file so it can be read, such as a syntax error or a key written "
                 "twice; the entry is judged again once it is, and until then a re-pin "
-                "leaves its pin"
+                "leaves its pin. Where the file is right as it is, mark the lines with "
+                "`irminsul:part <name>` and `irminsul:end <name>` and cite that name"
             ),
         )
 
@@ -340,10 +346,21 @@ class ClaimProvenanceCheck:
         assert entry.found is not None
         part, found = entry.part or "", entry.found
         path = entry.path.as_posix()
+        if not part:
+            return Finding(
+                check=self.name,
+                code=CODE_EVIDENCE_PART_MISSING,
+                severity=Severity.error,
+                message=(
+                    f"claim '{claim_id}' evidence '{evidence}' ends at its `#` and names no "
+                    f"part of '{path}'"
+                ),
+                path=node.path,
+                doc_id=node.id,
+                suggestion="name a part after the `#`, or cite the whole file by dropping it",
+            )
         if found.status == "missing_symbol":
             reason = f": {found.why}" if found.why else ""
-            if not part:
-                reason = ": the entry ends at its `#` and names no part"
             return Finding(
                 check=self.name,
                 code=CODE_EVIDENCE_PART_MISSING,

@@ -212,7 +212,10 @@ happened, such as a formatting-only sweep or a move to a new pin format. A re-re
 to one of its evidence entries, by the entry's spelling, or to every entry of one file by
 the file's bare path, and the `evidence-drift` and `claim-anchor` suggestions print
 that narrow form, quoting (`shell_word`) an argument a shell would otherwise split or take
-the quotes from, such as a key written `tool."a.b"`, so the command runs as printed. An
+the quotes from, such as a key written `tool."a.b"`, so the command runs as printed in a
+POSIX shell and in PowerShell 7. Windows PowerShell 5.1 takes the double quotes out of an
+argument it passes on, and a word with an apostrophe beside a `$`, a backtick, a double
+quote, a backslash or a `!` is quoted for a POSIX shell alone. An
 `evidence-drift` finding names every evidence entry of its claim that
 changed after the doc, and its suggestion gives each one `--evidence`, so a pin of the claim's
 other evidence that no longer matches, which the finding did not ask about, is left for its

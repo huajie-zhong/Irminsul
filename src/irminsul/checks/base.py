@@ -29,7 +29,7 @@ def _nearest(name: str, choices: Iterable[str], limit: int, cutoff: float) -> li
     """The `limit` of `choices` most like `name` and at least `cutoff` like it, the likest
     first and names equally like in their own order, so the list is the same on every run."""
     scored = [
-        (difflib.SequenceMatcher(None, name, choice).ratio(), choice) for choice in set(choices)
+        (difflib.SequenceMatcher(None, choice, name).ratio(), choice) for choice in set(choices)
     ]
     kept = sorted((-score, choice) for score, choice in scored if score >= cutoff)
     return [choice for _, choice in kept[:limit]]

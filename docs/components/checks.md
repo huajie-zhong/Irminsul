@@ -175,6 +175,10 @@ Two limits are deliberate, because each is a wide net on a finding that does not
 - **acknowledge-a-reviewed-co-change-or-evidence-drift#acknowledgement-needs-reason** — A trailer without a reason, naming no doc, or naming a doc `co-change` does not warn on SHALL acknowledge nothing and SHALL be reported as an info finding. (provenance: code; [RFC](../rfcs/acknowledge-a-reviewed-co-change-or-evidence-drift.md))
   <!-- anchor: src/irminsul/checks/acknowledgement.py#parse @sha256:50dbb5f28023 -->
 - **acknowledge-a-reviewed-co-change-or-evidence-drift#pin-suppresses-drift** — When a claim records a pin for an evidence file and the file's current normalized hash equals it, `evidence-drift` SHALL NOT report that file; when they differ, the file SHALL be judged by the commit-time comparison, as one without a pin is. (provenance: code; [RFC](../rfcs/acknowledge-a-reviewed-co-change-or-evidence-drift.md))
+  One case is no longer as this says: a pinned file that could not be read has no hash, and is
+  `evidence-unreadable` and judged for no drift, by the fifth decision of
+  [Claim evidence names a part](../rfcs/claim-evidence-names-a-part.md#decisions), whose
+  finalization replaces this requirement.
   <!-- anchor: src/irminsul/checks/claim_provenance.py#ClaimProvenanceCheck._scan_evidence_drift @sha256:e4ad2b3d8595 -->
 - **a-gate-file-is-sealed-not-scored#gate-file-change-is-certain** — Under `--diff <base>`, when the merge base holds an Irminsul config or a baseline, `diff-integrity` SHALL report `diff-integrity/gate-file-changed` as a certain finding for each file under `.github/workflows/`, and each `action.yml` or `action.yaml`, that mentions `irminsul` at the base or at the head and differs between them. (provenance: code; [RFC](../rfcs/a-gate-file-is-sealed-not-scored.md)) <!-- irminsul:ignore code-references reason="the alternative spelling GitHub accepts, which this repository does not use" -->
   <!-- anchor: src/irminsul/checks/diff_integrity.py#_changed_gate_files @sha256:e41a6042bed4 -->

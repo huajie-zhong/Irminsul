@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from irminsul.anchors import Anchor, Resolution, resolve
-from irminsul.checks.base import Severity, closest
+from irminsul.checks.base import Severity, closest, did_you_mean
 from irminsul.checks.claim_anchor import (
     CODE_MISSING_SYMBOL,
     CODE_PART_UNSUPPORTED,
@@ -1013,6 +1013,26 @@ def test_a_path_that_goes_past_a_list_says_what_holds_no_keys(tmp_path: Path) ->
         "missing_symbol",
         "`limits.daily` holds no keys to pass through",
     )
+
+
+def test_a_path_into_a_file_whose_top_level_holds_no_keys_says_so(tmp_path: Path) -> None:
+    found = _resolve(tmp_path, "c.json", "[1, 2]\n", "limits")
+
+    assert (found.status, found.why) == (
+        "missing_symbol",
+        "the file's top level holds no keys to pass through",
+    )
+
+
+def test_a_name_is_offered_once_and_a_name_just_like_enough_is_still_offered() -> None:
+    """A file that holds a name twice offers it once, and `did_you_mean` offers a name
+    that is exactly as like as it asks a name to be: three of five letters, twice over."""
+    assert closest("ab", ["abc", "abc", "abd"]) == " (closest: 'abc', 'abd')"
+    # Likeness is not the same both ways round: each choice is measured against the name,
+    # as `difflib.get_close_matches` measures it, and the other way these two swap.
+    assert closest("b-aaac", ["aaab--", "abaa--ab"]) == " (closest: 'abaa--ab', 'aaab--')"
+    assert did_you_mean("abcde", ["abcxy"]) == " (did you mean 'abcxy'?)"
+    assert did_you_mean("abcde", ["abxyz"]) == ""
 
 
 def test_the_closest_names_are_the_likest_first_and_in_one_order_on_every_run() -> None:

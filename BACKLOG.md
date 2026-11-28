@@ -279,6 +279,32 @@ finalized at `62d5eab`, where its work landed, after `a-topic-search-reads-doc-b
 landed on top of it. Implementing and finalizing an RFC in one pull request, the rule of the
 root `AGENTS.md` since that day, avoids it for an RFC not yet built.
 
+### `a-printed-command-is-quoted-by-two-rules`
+
+Three commands are printed to be run as they stand, and two rules quote them. The
+`--re-pin` that `claim-provenance/evidence-drift` and `claim-anchor` suggest is built by
+`shell_word` (`src/irminsul/anchors.py`), which leaves a word bare where nothing in it is
+special, `path#part` included, single-quotes the rest, and double-quotes a word with an
+apostrophe. The one `anchors --stale` prints (`StalePin.re_pin`, same file) quotes every
+word with `shlex.quote`. Run on 2026-11-28 through Git Bash, PowerShell 7.6 and Windows
+PowerShell 5.1 with a script that prints its arguments:
+
+- `shlex.quote` writes `it's` as `'it'"'"'s'`, which both PowerShells read as three
+  arguments, so a `--stale` row for a doc or a claim id with an apostrophe does not run
+  there. `shell_word` writes `"it's"`, which all three read whole.
+- Windows PowerShell 5.1 passes `'src/conf.toml#tool."a.b"'` on as
+  `src/conf.toml#tool.a.b`: no spelling of a key with a quoted segment runs in it and in
+  the other two.
+- A word with an apostrophe beside a `$`, a backtick, a double quote, a backslash or a `!`
+  has no spelling both a POSIX shell and PowerShell read, and gets the POSIX one.
+
+Not run, from each shell's documentation: `cmd.exe` knows no single quotes, so every
+`--stale` row for an anchor, whose `path#symbol` `shlex.quote` always quotes, would pass the
+quotes on, while the bare `path#symbol` of a suggestion runs there; and zsh with
+`EXTENDED_GLOB`, off by default, reads a bare `path#part` as a pattern, which the quoted
+form of `--stale` avoids. One rule for the three commands is the owner's call, since each
+choice breaks one of those shells: bare where nothing needs quoting, or always quoted.
+
 ### `doc-evidence-pins-the-whole-file`
 
 A claim's evidence pin covers a whole file. A claim in state `available` must cite a

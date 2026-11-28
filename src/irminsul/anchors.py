@@ -101,15 +101,25 @@ def parse_anchors(body: str) -> list[Anchor]:
     return anchors
 
 
-_PLAIN_WORD_RE = re.compile(r"[\w@%+=:,./-][\w@%+=:,./#-]*")
+_PLAIN_WORD_RE = re.compile(r"[\w%+:./-][\w@%+=:,./#-]*")
+_EXPANDED_IN_DOUBLE_QUOTES = frozenset('$`"\\!')
 
 
 def shell_word(word: str) -> str:
-    """`word` as a shell reads it back whole: itself where nothing in it is special, a `#`
-    after its first character included, and quoted otherwise, as a key written
-    `tool."a.b"` or a path with a space must be. The command a finding suggests is built
-    of these, so it runs as printed and reads as it always did where nothing needs quoting."""
-    return word if _PLAIN_WORD_RE.fullmatch(word) else shlex.quote(word)
+    """`word` as a POSIX shell and PowerShell 7 both read it back whole. Itself where
+    nothing in it is special, a `#` after its first character included, so a command
+    reads as it always did where nothing needs quoting. In single quotes otherwise, as a
+    key written `tool."a.b"`, a path with a space or a word that starts with `@`, `=` or
+    `,` must be. A word that holds an apostrophe goes in double quotes, since PowerShell
+    reads the POSIX spelling of one as three words; where it also holds what double
+    quotes expand, no spelling serves both, and it is quoted for a POSIX shell."""
+    if _PLAIN_WORD_RE.fullmatch(word):
+        return word
+    if "'" not in word:
+        return f"'{word}'"
+    if not _EXPANDED_IN_DOUBLE_QUOTES & set(word):
+        return f'"{word}"'
+    return shlex.quote(word)
 
 
 def _hash(source: str) -> str:
